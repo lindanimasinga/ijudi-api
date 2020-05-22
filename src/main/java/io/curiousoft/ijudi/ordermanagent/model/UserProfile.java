@@ -4,10 +4,9 @@ import javax.validation.constraints.NotBlank;
 
 public class UserProfile extends Profile {
 
-    @NotBlank
     private String idNumber;
 
-    public UserProfile(String id, String idNumber, @NotBlank(message = "profile name not valid") String name,
+    public UserProfile(@NotBlank(message = "profile name not valid") String name,
                        @NotBlank(message = "profile address not valid") String address,
                        @NotBlank(message = "profile image url not valid") String imageUrl,
                        @NotBlank(message = "profile mobile number not valid") String mobileNumber,

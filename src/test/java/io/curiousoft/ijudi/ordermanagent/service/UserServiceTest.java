@@ -1,7 +1,9 @@
 package io.curiousoft.ijudi.ordermanagent.service;
 
 import io.curiousoft.ijudi.ordermanagent.model.Profile;
+import io.curiousoft.ijudi.ordermanagent.model.UserProfile;
 import io.curiousoft.ijudi.ordermanagent.repo.ProfileRepo;
+import io.curiousoft.ijudi.ordermanagent.repo.UserProfileRepo;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -15,23 +17,23 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
-public class UserServiceImplTest {
+public class UserServiceTest {
 
     //system under test
-    private UserService userService;
+    private UserProfileService profileService;
     @Mock
-    private ProfileRepo profileRepo;
+    private UserProfileRepo profileRepo;
 
     @Before
     public void setUp() {
-        userService = new ProfileServiceImpl(profileRepo);
+        profileService = new UserProfileService(profileRepo);
     }
 
     @Test
     public void create() throws Exception {
 
         //given
-        Profile initialProfile = new Profile(
+        UserProfile initialProfile = new UserProfile(
                 "name",
                 "address",
                 "https://image.url",
@@ -40,7 +42,7 @@ public class UserServiceImplTest {
 
         //when
         when(profileRepo.save(initialProfile)).thenReturn(initialProfile);
-        Profile profile = userService.create(initialProfile);
+        Profile profile = profileService.create(initialProfile);
 
         //verify
         verify(profileRepo).save(initialProfile);
@@ -52,14 +54,14 @@ public class UserServiceImplTest {
 
         //given
         String profileId = "myID";
-        Profile initialProfile = new Profile(
+        UserProfile initialProfile = new UserProfile(
                 "name",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
                 "customer");
 
-        Profile patchProfileRequest = new Profile(
+        UserProfile patchProfileRequest = new UserProfile(
                 "secondName",
                 "address2",
                 "https://image.url2",
@@ -69,7 +71,7 @@ public class UserServiceImplTest {
         //when
         when(profileRepo.findById(profileId)).thenReturn(Optional.of(initialProfile));
         when(profileRepo.save(initialProfile)).thenReturn(initialProfile);
-        Profile profile = userService.update(profileId, patchProfileRequest);
+        Profile profile = profileService.update(profileId, patchProfileRequest);
 
         //verify
         verify(profileRepo).findById(profileId);
@@ -82,7 +84,7 @@ public class UserServiceImplTest {
         String profileId = "myID";
         //when
 
-        userService.delete(profileId);
+        profileService.delete(profileId);
 
         //verify
         verify(profileRepo).deleteById(profileId);
@@ -95,7 +97,7 @@ public class UserServiceImplTest {
         String profileId = "myID";
         //when
 
-        Profile profile = userService.find(profileId);
+        Profile profile = profileService.find(profileId);
 
         //verify
         verify(profileRepo).findById(profileId);

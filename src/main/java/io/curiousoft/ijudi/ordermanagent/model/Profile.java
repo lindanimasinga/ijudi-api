@@ -32,7 +32,7 @@ public class Profile extends BaseModel {
                    @NotBlank(message = "profile image url not valid") String imageUrl,
                    @NotBlank(message = "profile mobile number not valid") String mobileNumber,
                    @NotBlank(message = "role not valid") String role) {
-        super(null);
+        super();
         this.name = name;
         this.address = address;
         this.imageUrl = imageUrl;

@@ -10,7 +10,6 @@ public class Basket {
     private List<BasketItem> items = new ArrayList<>();
 
 
-
     public String getId() {
         return id;
     }

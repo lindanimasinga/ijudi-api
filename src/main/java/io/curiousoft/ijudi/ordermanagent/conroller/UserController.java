@@ -1,7 +1,8 @@
 package io.curiousoft.ijudi.ordermanagent.conroller;
 
 import io.curiousoft.ijudi.ordermanagent.model.Profile;
-import io.curiousoft.ijudi.ordermanagent.service.UserService;
+import io.curiousoft.ijudi.ordermanagent.model.UserProfile;
+import io.curiousoft.ijudi.ordermanagent.service.UserProfileService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,25 +13,25 @@ import javax.validation.Valid;
 public class UserController {
 
 
-    private UserService userService;
+    private UserProfileService profileService;
 
-    public UserController(UserService userService) {
-        this.userService = userService;
+    public UserController(UserProfileService profileService) {
+        this.profileService = profileService;
     }
 
-    @PostMapping(consumes = "application/json", produces = "application/json")
-    public ResponseEntity<Profile> create(@RequestBody @Valid Profile profile) throws Exception {
-        return ResponseEntity.ok(userService.create(profile));
+    @RequestMapping(method = RequestMethod.POST, consumes = "application/json", produces = "application/json")
+    public ResponseEntity<Profile> create(@Valid @RequestBody UserProfile profile) throws Exception {
+        return ResponseEntity.ok(profileService.create(profile));
     }
 
     @PatchMapping(value = "/{id}", consumes = "application/json", produces = "application/json")
-    public ResponseEntity<Profile> update(@PathVariable String id, @RequestBody @Valid Profile profile) throws Exception {
-        return ResponseEntity.ok(userService.update(id, profile));
+    public ResponseEntity<Profile> update(@PathVariable String id, @Valid @RequestBody UserProfile profile) throws Exception {
+        return ResponseEntity.ok(profileService.update(id, profile));
     }
 
     @GetMapping(value = "/{id}", produces = "application/json")
-    public ResponseEntity<Profile> findUser(@RequestParam String id) {
-        Profile user = userService.find(id);
+    public ResponseEntity<Profile> findUser(@PathVariable String id) {
+        Profile user = profileService.find(id);
         return user != null ? ResponseEntity.ok(user) : ResponseEntity.notFound().build();
     }
 }

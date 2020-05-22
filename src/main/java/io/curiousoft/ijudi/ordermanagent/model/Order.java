@@ -7,13 +7,15 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import javax.validation.Valid;
 import javax.validation.constraints.Max;
 import javax.validation.constraints.Min;
+import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import java.util.Date;
 
 @Document
 public class Order extends BaseModel {
 
-    @Min(value = 0, message = "order stage must be between 0 and 3") @Max(value = 3, message = "order stage must be between 0 and 3")
+    @Min(value = 0, message = "order stage must be between 0 and 3")
+    @Max(value = 3, message = "order stage must be between 0 and 3")
     private int stage;
     private Date date;
     @Valid
@@ -22,9 +24,10 @@ public class Order extends BaseModel {
     @Valid
     @NotNull(message = "order basket is not valid")
     private Basket basket;
-    @Valid
-    @NotNull(message = "order customer is not valid")
-    private Customer customer;
+    @NotBlank(message = "order customer is not valid")
+    private String customerId;
+    @NotBlank(message = "order shop is not valid")
+    private String shopId;
 
     public void setDate(Date date) {
         this.date = date;
@@ -58,11 +61,19 @@ public class Order extends BaseModel {
         this.basket = basket;
     }
 
-    public Customer getCustomer() {
-        return customer;
+    public String getCustomerId() {
+        return customerId;
     }
 
-    public void setCustomer(Customer customer) {
-        this.customer = customer;
+    public void setCustomerId(String customerId) {
+        this.customerId = customerId;
+    }
+
+    public String getShopId() {
+        return shopId;
+    }
+
+    public void setShopId(String shopId) {
+        this.shopId = shopId;
     }
 }
