@@ -6,6 +6,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
+import javax.validation.constraints.NotBlank;
+import java.util.List;
 
 @RestController
 @RequestMapping("/order")
@@ -29,8 +31,14 @@ public class OrderController {
     }
 
     @GetMapping(value = "/{id}", produces = "application/json")
-    public ResponseEntity<Order> getOrder(@PathVariable String id) throws Exception {
+    public ResponseEntity<Order> getOrder(@PathVariable String id) {
         Order order = orderService.findOrder(id);
+        return order != null ? ResponseEntity.ok(order) : ResponseEntity.notFound().build();
+    }
+
+    @GetMapping(value = "/", produces = "application/json")
+    public ResponseEntity<List<Order>> getAllOrderForUser(@NotBlank @RequestParam String userId) {
+        List<Order> order = orderService.findOrderByUserId(userId);
         return order != null ? ResponseEntity.ok(order) : ResponseEntity.notFound().build();
     }
 }

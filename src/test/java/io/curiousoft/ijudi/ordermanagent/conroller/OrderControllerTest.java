@@ -25,6 +25,7 @@ public class OrderControllerTest {
     }
 
     @Test
-    public void getOrder() {
+    public void getOrderByCustomer() {
+
     }
 }

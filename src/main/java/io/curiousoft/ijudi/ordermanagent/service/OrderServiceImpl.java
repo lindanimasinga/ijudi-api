@@ -12,7 +12,9 @@ import javax.validation.Validation;
 import javax.validation.Validator;
 import javax.validation.ValidatorFactory;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Set;
 
 @Service
@@ -78,6 +80,11 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Order findOrder(String orderId) {
         return orderRepo.findById(orderId).orElse(null);
+    }
+
+    @Override
+    public List<Order> findOrderByUserId(String userId) {
+        return orderRepo.findByCustomerId(userId).orElse(new ArrayList<>());
     }
 
     private void validate(Order order) throws Exception {
