@@ -36,7 +36,7 @@ public class OrderController {
         return order != null ? ResponseEntity.ok(order) : ResponseEntity.notFound().build();
     }
 
-    @GetMapping(value = "/", produces = "application/json")
+    @GetMapping(produces = "application/json")
     public ResponseEntity<List<Order>> getAllOrderForUser(@NotBlank @RequestParam String userId) {
         List<Order> order = orderService.findOrderByUserId(userId);
         return order != null ? ResponseEntity.ok(order) : ResponseEntity.notFound().build();
