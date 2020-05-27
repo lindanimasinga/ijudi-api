@@ -3,20 +3,20 @@ package io.curiousoft.ijudi.ordermanagent.model;
 
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
+import java.util.Date;
 
 public class ShippingData {
 
     private String id;
     @NotBlank(message = "shipping address id not valid")
     private String fromAddress;
-    @NotBlank(message = "shipping destination address id not valid")
     private String toAddress;
     private String additionalInstructions;
     @NotNull
     private ShippingType type;
     private double fee;
-    @NotNull(message = "messenger not valid")
     private Messager messenger;
+    private Date pickUpTime;
 
     public ShippingData() {
     }
@@ -85,6 +85,14 @@ public class ShippingData {
 
     public void setMessenger(Messager messenger) {
         this.messenger = messenger;
+    }
+
+    public Date getPickUpTime() {
+        return pickUpTime;
+    }
+
+    public void setPickUpTime(Date pickUpTime) {
+        this.pickUpTime = pickUpTime;
     }
 
     public static enum ShippingType {

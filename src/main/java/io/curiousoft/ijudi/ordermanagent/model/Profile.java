@@ -2,6 +2,7 @@ package io.curiousoft.ijudi.ordermanagent.model;
 
 
 import io.curiousoft.ijudi.ordermanagent.service.BaseModel;
+import org.springframework.data.mongodb.core.index.Indexed;
 
 import javax.validation.constraints.NotBlank;
 
@@ -18,6 +19,7 @@ public class Profile extends BaseModel {
     private int likes;
     private int servicesCompleted;
     private int badges;
+    @Indexed(unique = true)
     @NotBlank(message = "profile mobile number not valid")
     private String mobileNumber;
     @NotBlank(message = "role not valid")

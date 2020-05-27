@@ -2,7 +2,6 @@ package io.curiousoft.ijudi.ordermanagent.service;
 
 import io.curiousoft.ijudi.ordermanagent.model.Profile;
 import io.curiousoft.ijudi.ordermanagent.model.UserProfile;
-import io.curiousoft.ijudi.ordermanagent.repo.ProfileRepo;
 import io.curiousoft.ijudi.ordermanagent.repo.UserProfileRepo;
 import org.junit.Assert;
 import org.junit.Before;
@@ -101,5 +100,17 @@ public class UserServiceTest {
 
         //verify
         verify(profileRepo).findById(profileId);
+    }
+
+    @Test
+    public void findOrderByPhone() {
+        //given
+        String phone = "myID";
+        //when
+
+        Profile profile = profileService.findOrderByPhone(phone);
+
+        //verify
+        verify(profileRepo).findByMobileNumber(phone);
     }
 }

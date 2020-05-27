@@ -1,6 +1,7 @@
 package io.curiousoft.ijudi.ordermanagent.service;
 
 import io.curiousoft.ijudi.ordermanagent.model.Order;
+import io.curiousoft.ijudi.ordermanagent.model.UserProfile;
 import io.curiousoft.ijudi.ordermanagent.repo.OrderRepository;
 import io.curiousoft.ijudi.ordermanagent.repo.StoreRepository;
 import io.curiousoft.ijudi.ordermanagent.repo.UserProfileRepo;
@@ -12,10 +13,7 @@ import javax.validation.Validation;
 import javax.validation.Validator;
 import javax.validation.ValidatorFactory;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -25,14 +23,16 @@ public class OrderServiceImpl implements OrderService {
     private final StoreRepository storeRepository;
     private final UserProfileRepo userProfileRepo;
     private final Validator validator;
+    private final PaymentVerifier paymentVerifier;
 
     @Autowired
     public OrderServiceImpl(OrderRepository orderRepository,
                             StoreRepository storeRepository,
-                            UserProfileRepo userProfileRepo) {
+                            UserProfileRepo userProfileRepo, PaymentVerifier paymentVerifier) {
         this.orderRepo = orderRepository;
         this.storeRepository = storeRepository;
         this.userProfileRepo = userProfileRepo;
+        this.paymentVerifier = paymentVerifier;
         ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
         validator = factory.getValidator();
 
@@ -62,19 +62,18 @@ public class OrderServiceImpl implements OrderService {
     public Order finishOder(Order order) throws Exception {
         validate(order);
 
-        if(!userProfileRepo.existsById(order.getCustomerId())) {
-            throw new Exception("user with id "+ order.getCustomerId() + " does not exist");
+        Order persistedOrder = orderRepo.findById(order.getId())
+                .orElseThrow(() -> new Exception("Order with id " +order.getId()+ " not found."));
+
+        persistedOrder.setDescription(order.getDescription());
+        persistedOrder.setPaymentType(order.getPaymentType());
+
+        if(!paymentVerifier.paymentReceived(persistedOrder)) {
+            throw new Exception("Payment not received....");
         }
 
-        if(!storeRepository.existsById(order.getShopId())) {
-            throw new Exception("shop with id "+ order.getShopId() + " does not exist");
-        }
-
-        if(order.getStage() != 2) {
-            throw new Exception("Invalid stage to finish the order stage must be 2");
-        }
-        order.setStage(3);
-        return orderRepo.save(order);
+        persistedOrder.setStage(1);
+        return orderRepo.save(persistedOrder);
     }
 
     @Override
@@ -85,6 +84,13 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public List<Order> findOrderByUserId(String userId) {
         return orderRepo.findByCustomerId(userId).orElse(new ArrayList<>());
+    }
+
+    @Override
+    public List<Order> findOrderByPhone(String phone) throws Exception {
+        UserProfile user = userProfileRepo.findByMobileNumber(phone)
+                .orElseThrow(() -> new Exception("User not found"));
+        return orderRepo.findByCustomerId(user.getId()).orElse(new ArrayList<>());
     }
 
     private void validate(Order order) throws Exception {

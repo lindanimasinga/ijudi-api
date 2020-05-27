@@ -34,4 +34,10 @@ public class UserController {
         Profile user = profileService.find(id);
         return user != null ? ResponseEntity.ok(user) : ResponseEntity.notFound().build();
     }
+
+    @GetMapping(produces = "application/json")
+    public ResponseEntity<Profile> findUserByPhone(@RequestParam String phone) {
+        Profile user = profileService.findOrderByPhone(phone);
+        return user != null ? ResponseEntity.ok(user) : ResponseEntity.notFound().build();
+    }
 }

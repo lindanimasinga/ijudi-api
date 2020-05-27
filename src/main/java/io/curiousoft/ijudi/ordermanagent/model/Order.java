@@ -1,7 +1,7 @@
 package io.curiousoft.ijudi.ordermanagent.model;
 
 import io.curiousoft.ijudi.ordermanagent.service.BaseModel;
-import org.springframework.data.annotation.Id;
+import io.curiousoft.ijudi.ordermanagent.validator.ValidDeliveryInfo;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import javax.validation.Valid;
@@ -18,8 +18,8 @@ public class Order extends BaseModel {
     @Max(value = 3, message = "order stage must be between 0 and 3")
     private int stage;
     private Date date;
+    @ValidDeliveryInfo
     @Valid
-    @NotNull(message = "order shipping is not valid")
     private ShippingData shippingData;
     @Valid
     @NotNull(message = "order basket is not valid")
@@ -28,6 +28,9 @@ public class Order extends BaseModel {
     private String customerId;
     @NotBlank(message = "order shop is not valid")
     private String shopId;
+    @NotBlank(message = "order description is not valid")
+    private String description;
+    private PaymentType paymentType;
 
     public void setDate(Date date) {
         this.date = date;
@@ -76,4 +79,27 @@ public class Order extends BaseModel {
     public void setShopId(String shopId) {
         this.shopId = shopId;
     }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public PaymentType getPaymentType() {
+        return paymentType;
+    }
+
+    public void setPaymentType(PaymentType paymentType) {
+        this.paymentType = paymentType;
+    }
+
+    public double getTotalAmount() {
+        return basket.getItems().stream()
+                    .mapToDouble(BasketItem::getPrice).sum() + shippingData.getFee();
+    }
+
+
 }

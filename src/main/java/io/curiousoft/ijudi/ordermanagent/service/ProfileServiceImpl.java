@@ -12,12 +12,12 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-public abstract class ProfileServiceImpl<U extends Profile> implements ProfileService<U> {
+public abstract class ProfileServiceImpl<E extends ProfileRepo<U>, U extends Profile> implements ProfileService<U> {
 
-    private final ProfileRepo<U> profileRepo;
     private final Validator validator;
+    protected final E profileRepo;
 
-    public ProfileServiceImpl(ProfileRepo<U> userProfileRepo) {
+    public ProfileServiceImpl(E userProfileRepo) {
         this.profileRepo = userProfileRepo;
         ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
         validator = factory.getValidator();

@@ -13,4 +13,6 @@ public interface OrderService {
     Order findOrder(String orderId);
 
     List<Order> findOrderByUserId(String userId);
+
+    List<Order> findOrderByPhone(String userId) throws Exception;
 }
