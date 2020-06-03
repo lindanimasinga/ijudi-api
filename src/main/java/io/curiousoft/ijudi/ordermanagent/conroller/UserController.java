@@ -40,4 +40,11 @@ public class UserController {
         Profile user = profileService.findOrderByPhone(phone);
         return user != null ? ResponseEntity.ok(user) : ResponseEntity.notFound().build();
     }
+
+    @DeleteMapping(value = "/{id}", produces = "application/json")
+    public ResponseEntity deleteUser(@PathVariable String id) {
+        profileService.delete(id);
+        return ResponseEntity.ok().build();
+    }
+
 }
