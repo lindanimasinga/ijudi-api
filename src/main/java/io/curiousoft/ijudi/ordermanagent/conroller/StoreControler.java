@@ -34,7 +34,7 @@ public class StoreControler {
         return user != null ? ResponseEntity.ok(user) : ResponseEntity.notFound().build();
     }
 
-    @GetMapping(value = "/{id}", produces = "application/json")
+    @DeleteMapping(value = "/{id}", produces = "application/json")
     public ResponseEntity deleteStore(@PathVariable String id) {
         storeService.delete(id);
         return ResponseEntity.ok().build();
