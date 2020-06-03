@@ -10,6 +10,7 @@ public class StoreProfile extends Profile {
     @Indexed(unique = true)
     private String regNumber;
     private List<BusinessHours> businessHours;
+    private boolean hasVat;
 
     public StoreProfile(@NotBlank(message = "profile name not valid") String name,
                         @NotBlank(message = "profile address not valid") String address,
@@ -35,5 +36,13 @@ public class StoreProfile extends Profile {
 
     public void setBusinessHours(List<BusinessHours> businessHours) {
         this.businessHours = businessHours;
+    }
+
+    public boolean getHasVat() {
+        return hasVat;
+    }
+
+    public void setHasVat(boolean hasVat) {
+        this.hasVat = hasVat;
     }
 }

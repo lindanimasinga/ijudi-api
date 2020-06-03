@@ -18,10 +18,13 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.logging.Logger;
 import java.util.stream.Stream;
 
 @Service
 public class UkheshePaymentService extends PaymentService {
+
+    private static Logger logger = Logger.getLogger(UkheshePaymentService.class.getName());
 
     private final String username;
     private final String password;
@@ -72,7 +75,9 @@ public class UkheshePaymentService extends PaymentService {
         //Create a new HttpEntity
         final HttpEntity<String> entity = new HttpEntity<>(headers);
         ResponseEntity<UkhesheTransaction[]> response = rest.exchange(url, HttpMethod.GET, entity, UkhesheTransaction[].class);
-
+        if(Objects.requireNonNull(response.getBody()).length > 0) {
+            logger.info(response.getBody()[0].getDescription());
+        }
         return Stream.of(Objects.requireNonNull(response.getBody()))
                 .filter(ukhesheTransaction -> isSameOrder(order, ukhesheTransaction))
                 .count() > 0;
