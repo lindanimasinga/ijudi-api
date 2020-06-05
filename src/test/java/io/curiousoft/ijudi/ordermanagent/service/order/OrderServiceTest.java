@@ -13,7 +13,10 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -396,7 +399,7 @@ public class OrderServiceTest {
     public void finishOder() throws Exception {
 
         //given
-
+        String shopId = "shopid";
         Order order = new Order();
         Basket basket = new Basket();
         order.setBasket(basket);
@@ -413,13 +416,33 @@ public class OrderServiceTest {
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setStage(2);
-        order.setShopId("shopid");
+        order.setShopId(shopId);
         order.setDescription("desc");
+
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        StoreProfile shop = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                "customer",
+                businessHours);
+        shop.setBusinessHours(new ArrayList<>());
+        shop.setFeatured(true);
+        Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
+        shop.setFeaturedExpiry(date);
+
+        Stock stock1 = new Stock("bananas 1kg", 24, 12, 0);
+        List<Stock> stockList = new ArrayList<>();
+        stockList.add(stock1);
+        shop.setStockList(stockList);
 
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
         when(paymentVerifier.paymentReceived(order)).thenReturn(true);
         when(repo.save(order)).thenReturn(order);
+        when(storeRepo.findById(shopId)).thenReturn(Optional.of(shop));
+
         Order finalOrder = sut.finishOder(order);
 
         //verify
@@ -428,6 +451,8 @@ public class OrderServiceTest {
         verify(repo).save(order);
         verify(paymentVerifier).paymentReceived(order);
         verify(repo).findById(order.getId());
+        verify(storeRepo).findById(shopId);
+        verify(storeRepo).save(shop);
 
     }
 

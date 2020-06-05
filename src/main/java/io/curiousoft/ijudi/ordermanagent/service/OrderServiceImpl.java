@@ -1,6 +1,8 @@
 package io.curiousoft.ijudi.ordermanagent.service;
 
 import io.curiousoft.ijudi.ordermanagent.model.Order;
+import io.curiousoft.ijudi.ordermanagent.model.Stock;
+import io.curiousoft.ijudi.ordermanagent.model.StoreProfile;
 import io.curiousoft.ijudi.ordermanagent.model.UserProfile;
 import io.curiousoft.ijudi.ordermanagent.repo.OrderRepository;
 import io.curiousoft.ijudi.ordermanagent.repo.StoreRepository;
@@ -42,12 +44,12 @@ public class OrderServiceImpl implements OrderService {
     public Order startOrder(Order order) throws Exception {
 
         validate(order);
-        if(!userProfileRepo.existsById(order.getCustomerId())) {
-            throw new Exception("user with id "+ order.getCustomerId() + " does not exist");
+        if (!userProfileRepo.existsById(order.getCustomerId())) {
+            throw new Exception("user with id " + order.getCustomerId() + " does not exist");
         }
 
-        if(!storeRepository.existsById(order.getShopId())) {
-            throw new Exception("shop with id "+ order.getShopId() + " does not exist");
+        if (!storeRepository.existsById(order.getShopId())) {
+            throw new Exception("shop with id " + order.getShopId() + " does not exist");
         }
 
         Date orderDate = new Date();
@@ -63,16 +65,33 @@ public class OrderServiceImpl implements OrderService {
         validate(order);
 
         Order persistedOrder = orderRepo.findById(order.getId())
-                .orElseThrow(() -> new Exception("Order with id " +order.getId()+ " not found."));
+                .orElseThrow(() -> new Exception("Order with id " + order.getId() + " not found."));
 
         persistedOrder.setDescription(order.getDescription());
         persistedOrder.setPaymentType(order.getPaymentType());
 
-        if(!paymentVerifier.paymentReceived(persistedOrder)) {
+        if (!paymentVerifier.paymentReceived(persistedOrder)) {
             throw new Exception("Payment not received....");
         }
-
         persistedOrder.setStage(1);
+
+        //decrease stock available
+        Optional<StoreProfile> optional = storeRepository.findById(order.getShopId());
+        if (optional.isPresent()) {
+            StoreProfile store = optional.get();
+            List<Stock> stock = store.getStockList();
+            order.getBasket()
+                    .getItems()
+                    .stream()
+                    .forEach(item -> {
+                        Stock stockitem = stock.stream()
+                                .filter(sto -> sto.getName().equals(item.getName()))
+                                .findFirst()
+                                .get();
+                        stockitem.setQuantity(stockitem.getQuantity() - item.getQuantity());
+                    });
+            storeRepository.save(store);
+        }
         return orderRepo.save(persistedOrder);
     }
 
@@ -95,7 +114,7 @@ public class OrderServiceImpl implements OrderService {
 
     private void validate(Order order) throws Exception {
         Set<ConstraintViolation<Order>> violations = validator.validate(order);
-        if(violations.size() > 0) {
+        if (violations.size() > 0) {
             throw new Exception(violations.iterator().next().getMessage());
         }
     }

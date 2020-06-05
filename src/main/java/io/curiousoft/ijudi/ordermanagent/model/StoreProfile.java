@@ -2,6 +2,7 @@ package io.curiousoft.ijudi.ordermanagent.model;
 
 import org.springframework.data.mongodb.core.index.Indexed;
 
+import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
 import java.util.ArrayList;
 import java.util.Date;
@@ -16,6 +17,8 @@ public class StoreProfile extends Profile {
     private List<String> tags = new ArrayList<>();
     private boolean featured;
     private Date featuredExpiry;
+    @Valid
+    private List<Stock> stockList;
 
     public StoreProfile(@NotBlank(message = "profile name not valid") String name,
                         @NotBlank(message = "profile address not valid") String address,
@@ -73,5 +76,13 @@ public class StoreProfile extends Profile {
 
     public Date getFeaturedExpiry() {
         return featuredExpiry;
+    }
+
+    public List<Stock> getStockList() {
+        return stockList;
+    }
+
+    public void setStockList(List<Stock> stockList) {
+        this.stockList = stockList;
     }
 }

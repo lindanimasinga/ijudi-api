@@ -59,6 +59,6 @@ public class StoreControlerTest {
     }
 
     @Test
-    public void findUser() {
+    public void findStock() {
     }
 }

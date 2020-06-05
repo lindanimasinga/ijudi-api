@@ -1,5 +1,6 @@
 package io.curiousoft.ijudi.ordermanagent.conroller;
 
+import io.curiousoft.ijudi.ordermanagent.model.Stock;
 import io.curiousoft.ijudi.ordermanagent.model.StoreProfile;
 import io.curiousoft.ijudi.ordermanagent.service.StoreService;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +33,18 @@ public class StoreControler {
     public ResponseEntity<StoreProfile> findStore(@PathVariable String id) {
         StoreProfile user = storeService.find(id);
         return user != null ? ResponseEntity.ok(user) : ResponseEntity.notFound().build();
+    }
+
+    @GetMapping(value = "/{id}/stock", produces = "application/json")
+    public ResponseEntity<List<Stock>> findStockForStore(@PathVariable String id) throws Exception {
+        List<Stock> stock = storeService.findStockForShop(id);
+        return stock != null ? ResponseEntity.ok(stock) : ResponseEntity.notFound().build();
+    }
+
+    @PatchMapping(value = "/{id}/stock", produces = "application/json")
+    public ResponseEntity findStockForStore(@Valid @RequestBody Stock stock, @PathVariable String id) throws Exception {
+        storeService.addStockForShop(id, stock);
+        return ResponseEntity.ok().build();
     }
 
     @DeleteMapping(value = "/{id}", produces = "application/json")
