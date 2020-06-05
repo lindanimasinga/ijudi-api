@@ -56,7 +56,7 @@ public abstract class ProfileServiceImpl<E extends ProfileRepo<U>, U extends Pro
     }
 
     private void validate(U profile) throws Exception {
-        Set<ConstraintViolation<Profile>> violations = validator.validate(profile);
+        Set<ConstraintViolation<U>> violations = validator.validate(profile);
         if(violations.size() > 0) {
             throw new Exception(violations.iterator().next().getMessage());
         }

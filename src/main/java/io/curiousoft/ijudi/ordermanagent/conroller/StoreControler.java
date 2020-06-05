@@ -41,8 +41,8 @@ public class StoreControler {
     }
 
     @GetMapping(produces = "application/json")
-    public ResponseEntity<List<StoreProfile>> findAllStores() {
-        List<StoreProfile> user = storeService.findAll();
-        return user != null ? ResponseEntity.ok(user) : ResponseEntity.notFound().build();
+    public ResponseEntity<List<StoreProfile>> findAllStores(@RequestParam(required = false) boolean featured) {
+        List<StoreProfile> stores = featured ? storeService.findFeatured() : storeService.findAll();
+        return stores != null ? ResponseEntity.ok(stores) : ResponseEntity.notFound().build();
     }
 }

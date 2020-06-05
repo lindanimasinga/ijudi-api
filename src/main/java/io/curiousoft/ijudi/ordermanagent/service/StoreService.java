@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfile> {
@@ -29,5 +30,12 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
             profileRepo.save(store);
         }
         return store;
+    }
+
+    public List<StoreProfile> findFeatured() {
+        List<StoreProfile> profiles = profileRepo.findByFeatured(true);
+        return profiles.stream()
+                .filter(profile -> profile.getFeaturedExpiry() != null)
+                .filter(profile -> profile.getFeaturedExpiry().after(new Date())).collect(Collectors.toList());
     }
 }
