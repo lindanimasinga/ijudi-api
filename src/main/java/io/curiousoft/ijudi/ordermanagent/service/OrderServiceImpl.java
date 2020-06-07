@@ -84,11 +84,9 @@ public class OrderServiceImpl implements OrderService {
                     .getItems()
                     .stream()
                     .forEach(item -> {
-                        Stock stockitem = stock.stream()
+                        stock.stream()
                                 .filter(sto -> sto.getName().equals(item.getName()))
-                                .findFirst()
-                                .get();
-                        stockitem.setQuantity(stockitem.getQuantity() - item.getQuantity());
+                                .forEach(stockItem -> stockItem.setQuantity(stockItem.getQuantity() - item.getQuantity()));
                     });
             storeRepository.save(store);
         }

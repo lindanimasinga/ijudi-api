@@ -20,6 +20,8 @@ import org.springframework.test.context.junit4.SpringRunner;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = IjudiApplication.class,
@@ -32,10 +34,12 @@ public class StoreControlerTest {
     @Test
     public void create() throws JsonProcessingException, URISyntaxException {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
         StoreProfile user = new StoreProfile("name",
                 "myaddress",
                 "path to image",
                 "9111111707",
+                tags,
                 "customer",
                 businessHours);
 

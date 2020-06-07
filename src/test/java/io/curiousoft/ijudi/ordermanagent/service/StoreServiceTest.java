@@ -35,11 +35,13 @@ public class StoreServiceTest {
     public void findWithNoBusinessHours() {
         //given
         String profileId = "myID";
+        List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 "name",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
+                tags,
                 "customer",
                 null);
 
@@ -57,11 +59,13 @@ public class StoreServiceTest {
         //given
         String profileId = "myID";
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 "name",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
+                tags,
                 "customer",
                 businessHours);
         initialProfile.setBusinessHours(new ArrayList<>());
@@ -82,11 +86,13 @@ public class StoreServiceTest {
         //given
         String profileId = "myID";
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 "name",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
+                tags,
                 "customer",
                 businessHours);
         initialProfile.setBusinessHours(new ArrayList<>());
@@ -99,6 +105,7 @@ public class StoreServiceTest {
                 "address",
                 "https://image.url",
                 "081mobilenumb",
+                tags,
                 "customer",
                 businessHours);
         initialProfile2.setBusinessHours(new ArrayList<>());
@@ -126,11 +133,13 @@ public class StoreServiceTest {
         //given
         String profileId = "myID";
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 "name",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
+                tags,
                 "customer",
                 businessHours);
         initialProfile.setBusinessHours(new ArrayList<>());
@@ -143,6 +152,7 @@ public class StoreServiceTest {
                 "address",
                 "https://image.url",
                 "081mobilenumb",
+                tags,
                 "customer",
                 businessHours);
         initialProfile2.setBusinessHours(new ArrayList<>());
@@ -167,11 +177,13 @@ public class StoreServiceTest {
         //given
         String profileId = "myID";
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 "name",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
+                 tags,
                 "customer",
                 businessHours);
         initialProfile.setBusinessHours(new ArrayList<>());
@@ -202,11 +214,13 @@ public class StoreServiceTest {
         //given
         String profileId = "myID";
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 "name",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
+                tags,
                 "customer",
                 businessHours);
         initialProfile.setBusinessHours(new ArrayList<>());
@@ -236,11 +250,13 @@ public class StoreServiceTest {
         //given
         String profileId = "myID";
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 "name",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
+                tags,
                 "customer",
                 businessHours);
         initialProfile.setBusinessHours(new ArrayList<>());
@@ -273,11 +289,13 @@ public class StoreServiceTest {
         //given
         String profileId = "myID";
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 "name",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
+                tags,
                 "customer",
                 businessHours);
         initialProfile.setBusinessHours(new ArrayList<>());

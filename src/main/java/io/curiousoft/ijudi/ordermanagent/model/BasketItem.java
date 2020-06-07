@@ -7,6 +7,12 @@ public class BasketItem {
     private double price;
     private double discountPerc;
 
+    public BasketItem(String name, int quantity, double price, double discountPerc) {
+        this.name = name;
+        this.quantity = quantity;
+        this.price = price;
+        this.discountPerc = discountPerc;
+    }
 
     public String getName() {
         return name;

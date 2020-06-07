@@ -8,7 +8,7 @@ import java.util.Date;
 public class ShippingData {
 
     private String id;
-    @NotBlank(message = "shipping address id not valid")
+    @NotBlank(message = "shipping address not valid")
     private String fromAddress;
     private String toAddress;
     private String additionalInstructions;
@@ -21,7 +21,7 @@ public class ShippingData {
     public ShippingData() {
     }
 
-    public ShippingData(@NotBlank(message = "shipping address id not valid") String fromAddress,
+    public ShippingData(@NotBlank(message = "shipping address not valid") String fromAddress,
                         @NotBlank(message = "shipping destination address id not valid") String toAddress,
                         @NotNull ShippingType type,
                         double fee) {

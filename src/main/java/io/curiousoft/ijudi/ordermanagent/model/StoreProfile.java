@@ -4,6 +4,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotEmpty;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -14,20 +15,23 @@ public class StoreProfile extends Profile {
     private String regNumber;
     private List<BusinessHours> businessHours;
     private boolean hasVat;
+    @NotEmpty
     private List<String> tags = new ArrayList<>();
     private boolean featured;
     private Date featuredExpiry;
     @Valid
-    private List<Stock> stockList;
+    private List<Stock> stockList = new ArrayList<>();
 
     public StoreProfile(@NotBlank(message = "profile name not valid") String name,
                         @NotBlank(message = "profile address not valid") String address,
                         @NotBlank(message = "profile image url not valid") String imageUrl,
                         @NotBlank(message = "profile mobile number not valid") String mobileNumber,
+                        @NotEmpty(message = "profile tags not valid") List<String> tags,
                         @NotBlank(message = "role not valid") String role,
                         @NotBlank(message = "Business hours not valid") List<BusinessHours> businessHours) {
         super(name, address, imageUrl, mobileNumber, role);
         this.businessHours = businessHours;
+        this.tags = tags;
     }
 
     public String getRegNumber() {
