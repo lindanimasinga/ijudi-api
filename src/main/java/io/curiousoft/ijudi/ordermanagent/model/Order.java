@@ -31,6 +31,9 @@ public class Order extends BaseModel {
     @NotBlank(message = "order description is not valid")
     private String description;
     private PaymentType paymentType;
+    @NotNull(message = "order type is not valid")
+    private OrderType orderType;
+    private boolean hasVat;
 
     public void setDate(Date date) {
         this.date = date;
@@ -101,5 +104,19 @@ public class Order extends BaseModel {
                     .mapToDouble(BasketItem::getPrice).sum() + shippingData.getFee();
     }
 
+    public OrderType getOrderType() {
+        return orderType;
+    }
 
+    public void setOrderType(OrderType orderType) {
+        this.orderType = orderType;
+    }
+
+    public boolean getHasVat() {
+        return hasVat;
+    }
+
+    public void setHasVat(boolean hasVat) {
+        this.hasVat = hasVat;
+    }
 }

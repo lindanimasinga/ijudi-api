@@ -48,10 +48,11 @@ public class OrderServiceImpl implements OrderService {
             throw new Exception("user with id " + order.getCustomerId() + " does not exist");
         }
 
-        if (!storeRepository.existsById(order.getShopId())) {
+        Optional<StoreProfile> storeOptional = storeRepository.findById(order.getShopId());
+        if (!storeOptional.isPresent()) {
             throw new Exception("shop with id " + order.getShopId() + " does not exist");
         }
-
+        order.setHasVat(storeOptional.get().getHasVat());
         Date orderDate = new Date();
         String orderId = new SimpleDateFormat(DATE_FORMAT).format(orderDate);
         order.setId(orderId);
@@ -116,6 +117,4 @@ public class OrderServiceImpl implements OrderService {
             throw new Exception(violations.iterator().next().getMessage());
         }
     }
-
-
 }

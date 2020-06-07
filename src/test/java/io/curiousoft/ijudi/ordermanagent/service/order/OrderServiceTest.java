@@ -47,6 +47,118 @@ public class OrderServiceTest {
     public void startOrder() throws Exception {
 
         //given
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile storeProfile = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                "customer",
+                businessHours);
+        storeProfile.setBusinessHours(new ArrayList<>());
+        storeProfile.setFeatured(true);
+        storeProfile.setHasVat(false);
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY,
+                10);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(0);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+
+        //when
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+        when(repo.save(order)).thenReturn(order);
+
+        Order newOrder = sut.startOrder(order);
+
+        //verify
+        Assert.assertEquals(0, newOrder.getStage());
+        Assert.assertNotNull(order.getId());
+        Assert.assertNotNull(order.getDate());
+        Assert.assertEquals(false, order.getHasVat());
+        verify(repo).save(order);
+        verify(customerRepo).existsById(order.getCustomerId());
+        verify(storeRepo).findById(order.getShopId());
+    }
+
+    @Test
+    public void startOrderStoreWithVAT() throws Exception {
+
+        //given
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile storeProfile = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                "customer",
+                businessHours);
+        storeProfile.setBusinessHours(new ArrayList<>());
+        storeProfile.setFeatured(true);
+        storeProfile.setHasVat(true);
+        Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
+        storeProfile.setFeaturedExpiry(date);
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY,
+                10);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(0);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+
+        //when
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+        when(repo.save(order)).thenReturn(order);
+
+        Order newOrder = sut.startOrder(order);
+
+        //verify
+        Assert.assertEquals(0, newOrder.getStage());
+        Assert.assertNotNull(order.getId());
+        Assert.assertNotNull(order.getDate());
+        Assert.assertTrue(order.getHasVat());
+        verify(repo).save(order);
+        verify(customerRepo).existsById(order.getCustomerId());
+        verify(storeRepo).findById(order.getShopId());
+    }
+
+    @Test
+    public void startOrderNoOrderType() throws Exception {
+
+        //given
         Order order = new Order();
         Basket basket = new Basket();
         order.setBasket(basket);
@@ -66,20 +178,12 @@ public class OrderServiceTest {
         order.setStage(0);
         order.setDescription("description");
 
-        //when
-        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
-        when(storeRepo.existsById(order.getShopId())).thenReturn(true);
-        when(repo.save(order)).thenReturn(order);
-
-        Order newOrder = sut.startOrder(order);
-
-        //verify
-        Assert.assertEquals(0, newOrder.getStage());
-        Assert.assertNotNull(order.getId());
-        Assert.assertNotNull(order.getDate());
-        verify(repo).save(order);
-        verify(customerRepo).existsById(order.getCustomerId());
-        verify(storeRepo).existsById(order.getShopId());
+        try {
+            Order newOrder = sut.startOrder(order);
+            fail();
+        } catch (Exception e) {
+            Assert.assertEquals("order type is not valid", e.getMessage());
+        }
     }
 
     @Test
@@ -99,7 +203,7 @@ public class OrderServiceTest {
                 10);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
-
+        order.setOrderType(OrderType.ONLINE);
         order.setCustomerId("customerId");
         order.setShopId("shopid");
         order.setStage(0);
@@ -120,6 +224,20 @@ public class OrderServiceTest {
     public void startOrderShopNotExist() throws Exception {
 
         //given
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile storeProfile = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                "customer",
+                businessHours);
+        storeProfile.setBusinessHours(new ArrayList<>());
+        storeProfile.setFeatured(true);
+        storeProfile.setHasVat(false);
+
         Order order = new Order();
         Basket basket = new Basket();
         order.setBasket(basket);
@@ -137,17 +255,16 @@ public class OrderServiceTest {
         order.setCustomerId("customerId");
         order.setShopId("shopid");
         order.setStage(0);
+        order.setOrderType(OrderType.ONLINE);
         order.setDescription("description");
 
         //when
-        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
         try {
             Order newOrder = sut.startOrder(order);
             fail();
         } catch (Exception e) {
             //verify
             verifyNoInteractions(repo);
-            verify(storeRepo).existsById(order.getShopId());
         }
     }
 
@@ -170,6 +287,7 @@ public class OrderServiceTest {
             order.setCustomerId("customerId");
             order.setShopId("shopid");
             order.setStage(0);
+            order.setOrderType(OrderType.ONLINE);
             order.setDescription("description");
 
             //when
@@ -201,7 +319,7 @@ public class OrderServiceTest {
                 10);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
-
+        order.setOrderType(OrderType.ONLINE);
         order.setCustomerId("customerId");
         order.setShopId("shopid");
         order.setStage(0);
@@ -236,6 +354,7 @@ public class OrderServiceTest {
 
             order.setCustomerId("customerId");
             order.setShopId("shopid");
+            order.setOrderType(OrderType.ONLINE);
             order.setStage(0);
             order.setDescription("desc");
 
@@ -269,8 +388,13 @@ public class OrderServiceTest {
 
             order.setCustomerId("customerId");
             order.setShopId("shopid");
+            order.setOrderType(OrderType.ONLINE);
             order.setStage(0);
-            order.setShippingData(new ShippingData());
+            ShippingData shipping = new ShippingData();
+            shipping.setFromAddress("");
+            shipping.setToAddress("");
+            shipping.setType(ShippingData.ShippingType.DELIVERY);
+            order.setShippingData(shipping);
             order.setDescription("desc");
 
             //when
@@ -281,7 +405,9 @@ public class OrderServiceTest {
             fail();
         } catch (Exception e) {
             e.printStackTrace();
-            Assert.assertEquals("Order shipping is null or pickup time or messenger not valid or shipping address not valid", e.getMessage());
+            boolean isvald = e.getMessage().equals("Order shipping is null or pickup time or messenger not valid or shipping address not valid") ||
+                    e.getMessage().equals("shipping address not valid");
+            Assert.assertTrue(isvald);
         }
     }
 
@@ -304,7 +430,7 @@ public class OrderServiceTest {
                     10);
             shipping.setMessenger(messenger);
             order.setShippingData(shipping);
-
+            order.setOrderType(OrderType.ONLINE);
             order.setStage(0);
             order.setShopId("shopid");
             order.setDescription("desc");
@@ -342,6 +468,7 @@ public class OrderServiceTest {
             order.setShippingData(shipping);
 
             order.setStage(0);
+            order.setOrderType(OrderType.ONLINE);
             order.setCustomerId("1234");
             order.setDescription("description");
 
@@ -378,6 +505,7 @@ public class OrderServiceTest {
             order.setCustomerId("customerId");
             order.setShopId("shopid");
             order.setStage(0);
+            order.setOrderType(OrderType.ONLINE);
             order.setDescription("desc");
 
             //when
@@ -412,6 +540,7 @@ public class OrderServiceTest {
         order.setShippingData(shipping);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
+        order.setOrderType(OrderType.ONLINE);
         order.setStage(2);
         order.setShopId(shopId);
         order.setDescription("desc");
@@ -447,6 +576,7 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(1, finalOrder.getStage());
         Assert.assertNotNull(finalOrder.getDescription());
+        Assert.assertTrue(order.getHasVat() == false);
         verify(repo).save(order);
         verify(paymentVerifier).paymentReceived(order);
         verify(repo).findById(order.getId());
@@ -471,7 +601,7 @@ public class OrderServiceTest {
                     10);
             shipping.setMessenger(messenger);
             order.setShippingData(shipping);
-
+            order.setOrderType(OrderType.ONLINE);
             order.setCustomerId("customerId");
             order.setShopId("shopid");
             order.setStage(0);
@@ -645,6 +775,7 @@ public class OrderServiceTest {
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setStage(2);
+        order.setOrderType(OrderType.ONLINE);
         order.setShopId(shopId);
         order.setDescription("desc");
         List<String> tags = Collections.singletonList("Pizza");

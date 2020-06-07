@@ -12,7 +12,7 @@ public class ShippingData {
     private String fromAddress;
     private String toAddress;
     private String additionalInstructions;
-    @NotNull
+    @NotNull(message = "shipping type not valid")
     private ShippingType type;
     private double fee;
     private Messager messenger;
