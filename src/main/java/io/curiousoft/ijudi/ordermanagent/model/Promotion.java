@@ -10,7 +10,6 @@ public class Promotion {
     private String id;
     @NotBlank(message = "promotion image url not valid")
     private String imageUrl;
-    @NotBlank(message = "promotion actionUrl url not valid")
     private String actionUrl;
     @Indexed(unique = true)
     private String title;
@@ -19,7 +18,6 @@ public class Promotion {
     private String shopId;
 
     public Promotion(@NotBlank(message = "promotion image url not valid") String imageUrl,
-                     @NotBlank(message = "promotion actionUrl url not valid") String actionUrl,
                      @NotBlank(message = "promotion shop id url not valid") String shopId) {
         this.imageUrl = imageUrl;
         this.actionUrl = actionUrl;
