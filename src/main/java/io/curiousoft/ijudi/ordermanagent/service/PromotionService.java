@@ -9,6 +9,7 @@ import javax.validation.ConstraintViolation;
 import javax.validation.Validation;
 import javax.validation.Validator;
 import javax.validation.ValidatorFactory;
+import java.util.Date;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -49,7 +50,7 @@ public class PromotionService {
     }
 
     public List<Promotion> findAll() {
-        return promotionRepo.findAll();
+        return promotionRepo.findByExpiryDateBefore(new Date());
     }
 
     protected void validate(Object profile) throws Exception {

@@ -9,8 +9,11 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
+import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -33,7 +36,8 @@ public class PromotionServiceTest {
         //given
         Promotion promotion = new Promotion(
                 "http://image.url",
-                "123456");
+                "123456",
+                new Date());
 
         //when
         when(promotionRepo.save(promotion)).thenReturn(promotion);
@@ -51,12 +55,14 @@ public class PromotionServiceTest {
         String profileId = "myID";
         Promotion promotion = new Promotion(
                 "http://image.url",
-                "123456");
+                "123456",
+                new Date());
         promotion.setId(profileId);
 
         Promotion promotion2 = new Promotion(
                 "http://image.url2",
-                "123456");
+                "123456",
+                new Date());
 
         //when
         when(promotionRepo.findById(profileId)).thenReturn(Optional.of(promotion));
@@ -93,5 +99,18 @@ public class PromotionServiceTest {
 
         //verify
         verify(promotionRepo).findById(profileId);
+    }
+
+    @Test
+    public void findAll() {
+
+        //given
+        String profileId = "myID";
+        //when
+
+        List<Promotion> profile = profileService.findAll();
+
+        //verify
+        verify(promotionRepo).findByExpiryDateBefore(any(Date.class));
     }
 }

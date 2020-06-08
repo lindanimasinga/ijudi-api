@@ -1,10 +1,8 @@
 package io.curiousoft.ijudi.ordermanagent.conroller;
 
 import io.curiousoft.ijudi.ordermanagent.model.Promotion;
-import io.curiousoft.ijudi.ordermanagent.model.StoreProfile;
 import io.curiousoft.ijudi.ordermanagent.service.PromotionService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;

@@ -3,6 +3,8 @@ package io.curiousoft.ijudi.ordermanagent.model;
 import org.springframework.data.mongodb.core.index.Indexed;
 
 import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
+import java.util.Date;
 
 public class Promotion {
 
@@ -16,11 +18,13 @@ public class Promotion {
     private String message;
     @NotBlank(message = "promotion shop id url not valid")
     private String shopId;
+    private Date expiryDate;
 
     public Promotion(@NotBlank(message = "promotion image url not valid") String imageUrl,
-                     @NotBlank(message = "promotion shop id url not valid") String shopId) {
+                     @NotBlank(message = "promotion shop id url not valid") String shopId,
+                     @NotNull(message = "promotion expiry date not valid") Date expiryDate) {
         this.imageUrl = imageUrl;
-        this.actionUrl = actionUrl;
+        this.expiryDate = expiryDate;
         this.shopId = shopId;
     }
 
@@ -70,5 +74,13 @@ public class Promotion {
 
     public void setShopId(String shopId) {
         this.shopId = shopId;
+    }
+
+    public Date getExpiryDate() {
+        return expiryDate;
+    }
+
+    public void setExpiryDate(Date expiryDate) {
+        this.expiryDate = expiryDate;
     }
 }
