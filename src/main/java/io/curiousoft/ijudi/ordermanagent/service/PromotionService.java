@@ -50,7 +50,7 @@ public class PromotionService {
     }
 
     public List<Promotion> findAll() {
-        return promotionRepo.findByExpiryDateBefore(new Date());
+        return promotionRepo.findByExpiryDateAfter(new Date());
     }
 
     protected void validate(Object profile) throws Exception {

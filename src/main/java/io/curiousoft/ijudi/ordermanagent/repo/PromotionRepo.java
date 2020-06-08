@@ -9,4 +9,6 @@ import java.util.List;
 public interface PromotionRepo extends MongoRepository<Promotion, String> {
 
     List<Promotion> findByExpiryDateBefore(Date date);
+
+    List<Promotion> findByExpiryDateAfter(Date date);
 }
