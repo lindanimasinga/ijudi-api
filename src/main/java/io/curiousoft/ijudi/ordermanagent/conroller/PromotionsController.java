@@ -1,11 +1,14 @@
 package io.curiousoft.ijudi.ordermanagent.conroller;
 
 import io.curiousoft.ijudi.ordermanagent.model.Promotion;
+import io.curiousoft.ijudi.ordermanagent.model.StoreProfile;
 import io.curiousoft.ijudi.ordermanagent.service.PromotionService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
+import java.util.List;
 
 @RestController
 @RequestMapping("/promotion")
@@ -37,5 +40,11 @@ public class PromotionsController {
     public ResponseEntity deletePromotion(@PathVariable String id) {
         promotionService.delete(id);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping(produces = "application/json")
+    public ResponseEntity<List<Promotion>> findAllPromotions() {
+        List<Promotion> promotions = promotionService.findAll();
+        return promotions != null ? ResponseEntity.ok(promotions) : ResponseEntity.notFound().build();
     }
 }
