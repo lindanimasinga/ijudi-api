@@ -7,4 +7,6 @@ import java.util.List;
 public interface StoreRepository extends ProfileRepo<StoreProfile> {
 
     List<StoreProfile> findByFeatured(boolean b);
+
+    List<StoreProfile> findByOwnerId(String ownerId);
 }

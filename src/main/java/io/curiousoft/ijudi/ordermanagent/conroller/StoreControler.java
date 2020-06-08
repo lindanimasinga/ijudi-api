@@ -4,6 +4,7 @@ import io.curiousoft.ijudi.ordermanagent.model.Stock;
 import io.curiousoft.ijudi.ordermanagent.model.StoreProfile;
 import io.curiousoft.ijudi.ordermanagent.service.StoreService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -54,8 +55,11 @@ public class StoreControler {
     }
 
     @GetMapping(produces = "application/json")
-    public ResponseEntity<List<StoreProfile>> findAllStores(@RequestParam(required = false) boolean featured) {
-        List<StoreProfile> stores = featured ? storeService.findFeatured() : storeService.findAll();
+    public ResponseEntity<List<StoreProfile>> findAllStores(@RequestParam(required = false) boolean featured,
+                                                            @RequestParam(required = false) String ownerId) {
+        List<StoreProfile> stores = featured ?
+                storeService.findFeatured() : !StringUtils.isEmpty(ownerId) ?
+                storeService.findByOwner(ownerId) : storeService.findAll();
         return stores != null ? ResponseEntity.ok(stores) : ResponseEntity.notFound().build();
     }
 }

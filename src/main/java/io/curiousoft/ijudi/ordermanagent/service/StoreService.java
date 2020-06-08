@@ -1,16 +1,12 @@
 package io.curiousoft.ijudi.ordermanagent.service;
 
 import io.curiousoft.ijudi.ordermanagent.model.BusinessHours;
-import io.curiousoft.ijudi.ordermanagent.model.Order;
 import io.curiousoft.ijudi.ordermanagent.model.Stock;
 import io.curiousoft.ijudi.ordermanagent.model.StoreProfile;
 import io.curiousoft.ijudi.ordermanagent.repo.StoreRepository;
+import io.curiousoft.ijudi.ordermanagent.repo.UserProfileRepo;
 import org.springframework.stereotype.Service;
 
-import javax.validation.ConstraintViolation;
-import javax.validation.Validation;
-import javax.validation.Validator;
-import javax.validation.ValidatorFactory;
 import java.time.DayOfWeek;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -18,12 +14,19 @@ import java.util.stream.Collectors;
 @Service
 public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfile> {
 
-    private final Validator validator;
+    private UserProfileRepo userProfileRepo;
 
-    public StoreService(StoreRepository storeRepository) {
+    public StoreService(StoreRepository storeRepository, UserProfileRepo userProfileRepo) {
         super(storeRepository);
-        ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
-        validator = factory.getValidator();
+        this.userProfileRepo = userProfileRepo;
+    }
+
+    @Override
+    public StoreProfile create(StoreProfile profile) throws Exception {
+        if(Objects.nonNull(profile.getOwnerId()) && !userProfileRepo.existsById(profile.getOwnerId())) {
+            throw new Exception("Store owner with user id does not exist.");
+        }
+        return super.create(profile);
     }
 
     @Override
@@ -40,6 +43,11 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
             profileRepo.save(store);
         }
         return store;
+    }
+
+
+    public List<StoreProfile> findByOwner(String ownerId) {
+        return profileRepo.findByOwnerId(ownerId);
     }
 
     public List<StoreProfile> findFeatured() {
@@ -59,12 +67,5 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         StoreProfile store = profileRepo.findById(profileId).orElseThrow(() -> new Exception("Profile not found"));
         store.getStockList().add(stock);
         profileRepo.save(store);
-    }
-
-    private void validate(Object object) throws Exception {
-        Set<ConstraintViolation<Object>> violations = validator.validate(object);
-        if(violations.size() > 0) {
-            throw new Exception(violations.iterator().next().getMessage());
-        }
     }
 }

@@ -56,7 +56,8 @@ public class OrderServiceTest {
                 "081mobilenumb",
                 tags,
                 "customer",
-                businessHours);
+                businessHours,
+                "ownerId");
         storeProfile.setBusinessHours(new ArrayList<>());
         storeProfile.setFeatured(true);
         storeProfile.setHasVat(false);
@@ -111,7 +112,8 @@ public class OrderServiceTest {
                 "081mobilenumb",
                 tags,
                 "customer",
-                businessHours);
+                businessHours,
+                "ownerId");
         storeProfile.setBusinessHours(new ArrayList<>());
         storeProfile.setFeatured(true);
         storeProfile.setHasVat(true);
@@ -233,7 +235,8 @@ public class OrderServiceTest {
                 "081mobilenumb",
                 tags,
                 "customer",
-                businessHours);
+                businessHours,
+                "ownerId");
         storeProfile.setBusinessHours(new ArrayList<>());
         storeProfile.setFeatured(true);
         storeProfile.setHasVat(false);
@@ -554,7 +557,8 @@ public class OrderServiceTest {
                 "081mobilenumb",
                 tags,
                 "customer",
-                businessHours);
+                businessHours,
+                "ownerId");
         shop.setBusinessHours(new ArrayList<>());
         shop.setFeatured(true);
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -788,7 +792,8 @@ public class OrderServiceTest {
                 "081mobilenumb",
                 tags,
                 "customer",
-                businessHours);
+                businessHours,
+                "ownerId");
         shop.setBusinessHours(new ArrayList<>());
         shop.setFeatured(true);
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());

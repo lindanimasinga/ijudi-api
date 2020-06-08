@@ -11,16 +11,15 @@ import java.util.List;
 
 public class StoreProfile extends Profile {
 
-    @Indexed(unique = true)
-    private String regNumber;
+    @Indexed(unique = true) private String regNumber;
+    @NotBlank String ownerId;
+    @Valid private List<Stock> stockList = new ArrayList<>();
+    @NotEmpty private List<String> tags;
     private List<BusinessHours> businessHours;
     private boolean hasVat;
-    @NotEmpty
-    private List<String> tags = new ArrayList<>();
     private boolean featured;
     private Date featuredExpiry;
-    @Valid
-    private List<Stock> stockList = new ArrayList<>();
+
 
     public StoreProfile(@NotBlank(message = "profile name not valid") String name,
                         @NotBlank(message = "profile address not valid") String address,
@@ -28,10 +27,12 @@ public class StoreProfile extends Profile {
                         @NotBlank(message = "profile mobile number not valid") String mobileNumber,
                         @NotEmpty(message = "profile tags not valid") List<String> tags,
                         @NotBlank(message = "role not valid") String role,
-                        @NotBlank(message = "Business hours not valid") List<BusinessHours> businessHours) {
+                        @NotBlank(message = "Business hours not valid") List<BusinessHours> businessHours,
+                        @NotBlank(message = "shop owner id not valid") String ownerId) {
         super(name, address, imageUrl, mobileNumber, role);
         this.businessHours = businessHours;
         this.tags = tags;
+        this.ownerId = ownerId;
     }
 
     public String getRegNumber() {
@@ -88,5 +89,13 @@ public class StoreProfile extends Profile {
 
     public void setStockList(List<Stock> stockList) {
         this.stockList = stockList;
+    }
+
+    public String getOwnerId() {
+        return ownerId;
+    }
+
+    public void setOwnerId(String ownerId) {
+        this.ownerId = ownerId;
     }
 }

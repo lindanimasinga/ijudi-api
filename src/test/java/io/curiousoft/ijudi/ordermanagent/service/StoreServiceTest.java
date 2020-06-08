@@ -1,9 +1,8 @@
 package io.curiousoft.ijudi.ordermanagent.service;
 
-import io.curiousoft.ijudi.ordermanagent.model.BusinessHours;
-import io.curiousoft.ijudi.ordermanagent.model.Stock;
-import io.curiousoft.ijudi.ordermanagent.model.StoreProfile;
+import io.curiousoft.ijudi.ordermanagent.model.*;
 import io.curiousoft.ijudi.ordermanagent.repo.StoreRepository;
+import io.curiousoft.ijudi.ordermanagent.repo.UserProfileRepo;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -25,10 +24,65 @@ public class StoreServiceTest {
     private StoreService storeService;
     @Mock
     private StoreRepository storeRepository;
+    @Mock
+    UserProfileRepo userProfileRepo;
 
     @Before
     public void setUp() {
-        storeService = new StoreService(storeRepository);
+        storeService = new StoreService(storeRepository, userProfileRepo);
+    }
+
+    @Test
+    public void create() throws Exception {
+
+        //given
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile initialProfile = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                "customer",
+                null,
+                "ownerId");
+
+        //when
+        when(userProfileRepo.existsById(initialProfile.getOwnerId())).thenReturn(true);
+        when(storeRepository.save(initialProfile)).thenReturn(initialProfile);
+        Profile profile = storeService.create(initialProfile);
+
+        //verify
+        verify(userProfileRepo).existsById(initialProfile.getOwnerId());
+        verify(storeRepository).save(initialProfile);
+        Assert.assertNotNull(profile.getId());
+    }
+
+    @Test
+    public void createOwnerNotExist() throws Exception {
+
+        //given
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile initialProfile = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                "customer",
+                null,
+                "ownerId");
+
+        //when
+        when(userProfileRepo.existsById(initialProfile.getOwnerId())).thenReturn(false);
+        try {
+            storeService.create(initialProfile);
+        } catch (Exception e) {
+            Assert.assertEquals("Store owner with user id does not exist.", e.getMessage());
+        }
+
+        //verify
+        verify(userProfileRepo).existsById(initialProfile.getOwnerId());
     }
 
     @Test
@@ -43,7 +97,8 @@ public class StoreServiceTest {
                 "081mobilenumb",
                 tags,
                 "customer",
-                null);
+                null,
+                "ownerId");
 
         //when
         when(storeRepository.findById(profileId)).thenReturn(Optional.of(initialProfile));
@@ -67,7 +122,8 @@ public class StoreServiceTest {
                 "081mobilenumb",
                 tags,
                 "customer",
-                businessHours);
+                businessHours,
+                "ownerId");
         initialProfile.setBusinessHours(new ArrayList<>());
 
         //when
@@ -94,7 +150,8 @@ public class StoreServiceTest {
                 "081mobilenumb",
                 tags,
                 "customer",
-                businessHours);
+                businessHours,
+                "ownerId");
         initialProfile.setBusinessHours(new ArrayList<>());
         initialProfile.setFeatured(true);
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -107,7 +164,8 @@ public class StoreServiceTest {
                 "081mobilenumb",
                 tags,
                 "customer",
-                businessHours);
+                businessHours,
+                "ownerId");
         initialProfile2.setBusinessHours(new ArrayList<>());
         initialProfile2.setFeatured(true);
         Date date2 = Date.from(LocalDateTime.now().minusDays(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -141,7 +199,8 @@ public class StoreServiceTest {
                 "081mobilenumb",
                 tags,
                 "customer",
-                businessHours);
+                businessHours,
+                "ownerId");
         initialProfile.setBusinessHours(new ArrayList<>());
         initialProfile.setFeatured(true);
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -154,7 +213,8 @@ public class StoreServiceTest {
                 "081mobilenumb",
                 tags,
                 "customer",
-                businessHours);
+                businessHours,
+                "ownerId");
         initialProfile2.setBusinessHours(new ArrayList<>());
         initialProfile2.setFeatured(true);
 
@@ -185,7 +245,8 @@ public class StoreServiceTest {
                 "081mobilenumb",
                  tags,
                 "customer",
-                businessHours);
+                businessHours,
+                "ownerId");
         initialProfile.setBusinessHours(new ArrayList<>());
         initialProfile.setFeatured(true);
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -222,7 +283,8 @@ public class StoreServiceTest {
                 "081mobilenumb",
                 tags,
                 "customer",
-                businessHours);
+                businessHours,
+                "ownerId");
         initialProfile.setBusinessHours(new ArrayList<>());
         initialProfile.setFeatured(true);
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -258,7 +320,8 @@ public class StoreServiceTest {
                 "081mobilenumb",
                 tags,
                 "customer",
-                businessHours);
+                businessHours,
+                "ownerId");
         initialProfile.setBusinessHours(new ArrayList<>());
         initialProfile.setFeatured(true);
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -297,7 +360,8 @@ public class StoreServiceTest {
                 "081mobilenumb",
                 tags,
                 "customer",
-                businessHours);
+                businessHours,
+                "ownerId");
         initialProfile.setBusinessHours(new ArrayList<>());
         initialProfile.setFeatured(true);
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());

@@ -41,7 +41,8 @@ public class StoreControlerTest {
                 "9111111707",
                 tags,
                 "customer",
-                businessHours);
+                businessHours,
+                "ownerId");
 
         ResponseEntity<String> result = this.rest.exchange(
                 RequestEntity.post(new URI("/user")).body(user), String.class);
