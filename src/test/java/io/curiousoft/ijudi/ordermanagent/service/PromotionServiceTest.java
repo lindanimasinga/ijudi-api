@@ -33,7 +33,6 @@ public class PromotionServiceTest {
         //given
         Promotion promotion = new Promotion(
                 "http://image.url",
-                "http://action.url",
                 "123456");
 
         //when
@@ -52,13 +51,11 @@ public class PromotionServiceTest {
         String profileId = "myID";
         Promotion promotion = new Promotion(
                 "http://image.url",
-                "http://action.url",
                 "123456");
         promotion.setId(profileId);
 
         Promotion promotion2 = new Promotion(
                 "http://image.url2",
-                "http://action.url2",
                 "123456");
 
         //when
@@ -69,7 +66,7 @@ public class PromotionServiceTest {
         //verify
         verify(promotionRepo).findById(profileId);
         verify(promotionRepo).save(promotion);
-        Assert.assertEquals(promotion2.getActionUrl(), updatedPromotion.getActionUrl());
+        Assert.assertEquals(promotion2.getImageUrl(), updatedPromotion.getImageUrl());
         Assert.assertEquals(promotion.getId(), updatedPromotion.getId());
     }
 
