@@ -1,6 +1,5 @@
 package io.curiousoft.ijudi.ordermanagement.service;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.springframework.data.annotation.Id;
 
 public class BaseModel {

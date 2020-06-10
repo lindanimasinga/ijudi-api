@@ -20,4 +20,12 @@ public class PaymentVerifier {
                 .findFirst().orElseThrow(() -> new Exception("Your order has no ukheshe type set or the ukheshe provider for " + order.getPaymentType() + " not configured on the server"));
         return paymentService.paymentReceived(order);
     }
+
+
+    public boolean completePaymentToShop(Order order) throws Exception {
+        PaymentService paymentService = paymentServices.stream()
+                .filter(service -> order.getPaymentType() == service.getPaymentType())
+                .findFirst().orElseThrow(() -> new Exception("Your order has no ukheshe type set or the ukheshe provider for " + order.getPaymentType() + " not configured on the server"));
+        return paymentService.makePayment(order);
+    }
 }

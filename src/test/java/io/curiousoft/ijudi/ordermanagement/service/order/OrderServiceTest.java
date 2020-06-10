@@ -524,7 +524,7 @@ public class OrderServiceTest {
     }
 
     @Test
-    public void finishOder() throws Exception {
+    public void finishOderOnline() throws Exception {
 
         //given
         String shopId = "shopid";
@@ -580,9 +580,79 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(1, finalOrder.getStage());
         Assert.assertNotNull(finalOrder.getDescription());
+        Assert.assertTrue(!finalOrder.getShopPaid());
+        Assert.assertTrue(!order.getHasVat());
+        verify(repo).save(order);
+        verify(paymentVerifier).paymentReceived(order);
+        verify(repo).findById(order.getId());
+        verify(storeRepo).findById(shopId);
+        verify(storeRepo).save(shop);
+
+    }
+
+    @Test
+    public void finishOderInStore() throws Exception {
+
+        //given
+        String shopId = "shopid";
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY,
+                10);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        order.setDescription("081281445");
+        order.setCustomerId("customerId");
+        order.setOrderType(OrderType.INSTORE);
+        order.setStage(2);
+        order.setShopId(shopId);
+        order.setDescription("desc");
+        List<String> tags = Collections.singletonList("Pizza");
+
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        StoreProfile shop = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                "customer",
+                businessHours,
+                "ownerId");
+        shop.setBusinessHours(new ArrayList<>());
+        shop.setFeatured(true);
+        Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
+        shop.setFeaturedExpiry(date);
+
+        Stock stock1 = new Stock("bananas 1kg", 24, 12, 0);
+        Set<Stock> stockList = new HashSet<>();
+        stockList.add(stock1);
+        shop.setStockList(stockList);
+
+        //when
+        when(repo.findById(order.getId())).thenReturn(Optional.of(order));
+        when(paymentVerifier.paymentReceived(order)).thenReturn(true);
+        when(paymentVerifier.completePaymentToShop(order)).thenReturn(true);
+        when(repo.save(order)).thenReturn(order);
+        when(storeRepo.findById(shopId)).thenReturn(Optional.of(shop));
+
+        Order finalOrder = sut.finishOder(order);
+
+        //verify
+        Assert.assertEquals(5, finalOrder.getStage());
+        Assert.assertTrue(finalOrder.getShopPaid());
+        Assert.assertNotNull(finalOrder.getDescription());
         Assert.assertTrue(order.getHasVat() == false);
         verify(repo).save(order);
         verify(paymentVerifier).paymentReceived(order);
+        verify(paymentVerifier).completePaymentToShop(order);
         verify(repo).findById(order.getId());
         verify(storeRepo).findById(shopId);
         verify(storeRepo).save(shop);

@@ -1,9 +1,6 @@
 package io.curiousoft.ijudi.ordermanagement.service;
 
-import io.curiousoft.ijudi.ordermanagement.model.Order;
-import io.curiousoft.ijudi.ordermanagement.model.Stock;
-import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
-import io.curiousoft.ijudi.ordermanagement.model.UserProfile;
+import io.curiousoft.ijudi.ordermanagement.model.*;
 import io.curiousoft.ijudi.ordermanagement.repo.OrderRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
@@ -74,7 +71,14 @@ public class OrderServiceImpl implements OrderService {
         if (!paymentVerifier.paymentReceived(persistedOrder)) {
             throw new Exception("Payment not received....");
         }
-        persistedOrder.setStage(1);
+
+        if(persistedOrder.getOrderType() == OrderType.INSTORE) {
+            paymentVerifier.completePaymentToShop(persistedOrder);
+            persistedOrder.setStage(5);
+            persistedOrder.setShopPaid(true);
+        } else {
+            persistedOrder.setStage(1);
+        }
 
         //decrease stock available
         Optional<StoreProfile> optional = storeRepository.findById(order.getShopId());

@@ -66,6 +66,45 @@ public class PaymentVerifierTest {
     }
 
     @Test
+    public void completePaymentToShop() throws Exception {
+
+        List<PaymentService> paymentServices = new ArrayList<>();
+        //adding all ukheshe services
+        paymentServices.add(ukheshePaymentService);
+        paymentVerifier = new PaymentVerifier(paymentServices);
+
+        //given an order
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY,
+                10);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        order.setPaymentType(PaymentType.UKHESHE);
+        order.setDescription("081281445");
+        order.setCustomerId("customerId");
+        order.setStage(2);
+        order.setShopId("shopid");
+
+        //when
+        when(ukheshePaymentService.getPaymentType()).thenReturn(PaymentType.UKHESHE);
+        when(ukheshePaymentService.makePayment(order)).thenReturn(true);
+
+        boolean received = paymentVerifier.completePaymentToShop(order);
+
+        //verify
+        assertTrue(received);
+        assertNotNull(order.getPaymentType());
+        verify(ukheshePaymentService).makePayment(order);
+
+    }
+
+    @Test
     public void paymentServiceNotConfigured() {
 
         List<PaymentService> paymentServices = new ArrayList<>();

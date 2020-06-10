@@ -34,6 +34,7 @@ public class Order extends BaseModel {
     @NotNull(message = "order type is not valid")
     private OrderType orderType;
     private boolean hasVat;
+    private boolean shopPaid;
 
     public void setDate(Date date) {
         this.date = date;
@@ -118,5 +119,18 @@ public class Order extends BaseModel {
 
     public void setHasVat(boolean hasVat) {
         this.hasVat = hasVat;
+    }
+
+    public boolean getShopPaid() {
+        return shopPaid;
+    }
+
+    public void setShopPaid(boolean shopPaid) {
+        this.shopPaid = shopPaid;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return obj instanceof Order && getId().equals(((Order) obj).getId());
     }
 }
