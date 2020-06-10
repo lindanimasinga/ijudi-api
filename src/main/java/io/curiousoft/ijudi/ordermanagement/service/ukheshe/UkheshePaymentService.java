@@ -138,7 +138,7 @@ public class UkheshePaymentService extends PaymentService<UkheshePaymentData> {
                 shop.getBank().getAccountId(),
                 order.getTotalAmount(),
                 order.getDescription(),
-                order.getId(),
+                order.getId() + "_2",
                 order.getId());
         return makePayment(payment);
     }
