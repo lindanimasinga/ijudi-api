@@ -139,7 +139,7 @@ public class UkheshePaymentServiceTest {
         List<BasketItem> items = new ArrayList<>();
         BasketItem item = new BasketItem("bananas", 1, 1, 1);
         item.setName("item");
-        item.setPrice(0);
+        item.setPrice(1);
         items.add(item);
         basket.setItems(items);
         order.setBasket(basket);

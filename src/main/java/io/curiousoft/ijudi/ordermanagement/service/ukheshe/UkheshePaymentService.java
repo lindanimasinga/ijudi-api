@@ -109,10 +109,12 @@ public class UkheshePaymentService extends PaymentService<UkheshePaymentData> {
         //get payment or transfer
         String url = baseUrl + "/transfers/";
         URI uri = new URI(url);
-        RestTemplate rest = new RestTemplateBuilder().build();
+        RestTemplate rest = new RestTemplateBuilder()
+                .defaultHeader("Authorization", ukhesheAuthtoken.getHeaderValue())
+                .build();
 
         HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", ukhesheAuthtoken.getHeaderValue());
+        headers.set("Content-Type", "application/json");
         //Create a new HttpEntity
         final HttpEntity<String> entity = new HttpEntity<>(headers);
         ResponseEntity<UkheshePaymentData> response = rest.postForEntity(uri,
