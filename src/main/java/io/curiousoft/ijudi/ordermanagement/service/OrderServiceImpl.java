@@ -22,16 +22,16 @@ public class OrderServiceImpl implements OrderService {
     private final StoreRepository storeRepository;
     private final UserProfileRepo userProfileRepo;
     private final Validator validator;
-    private final PaymentVerifier paymentVerifier;
+    private final PaymentService paymentService;
 
     @Autowired
     public OrderServiceImpl(OrderRepository orderRepository,
                             StoreRepository storeRepository,
-                            UserProfileRepo userProfileRepo, PaymentVerifier paymentVerifier) {
+                            UserProfileRepo userProfileRepo, PaymentService paymentService) {
         this.orderRepo = orderRepository;
         this.storeRepository = storeRepository;
         this.userProfileRepo = userProfileRepo;
-        this.paymentVerifier = paymentVerifier;
+        this.paymentService = paymentService;
         ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
         validator = factory.getValidator();
 
@@ -67,13 +67,14 @@ public class OrderServiceImpl implements OrderService {
 
         persistedOrder.setDescription(order.getDescription());
         persistedOrder.setPaymentType(order.getPaymentType());
+        persistedOrder.setDate(new Date());
 
-        if (!paymentVerifier.paymentReceived(persistedOrder)) {
+        if (!paymentService.paymentReceived(persistedOrder)) {
             throw new Exception("Payment not received....");
         }
 
         if(persistedOrder.getOrderType() == OrderType.INSTORE) {
-            paymentVerifier.completePaymentToShop(persistedOrder);
+            paymentService.completePaymentToShop(persistedOrder);
             persistedOrder.setStage(5);
             persistedOrder.setShopPaid(true);
         } else {

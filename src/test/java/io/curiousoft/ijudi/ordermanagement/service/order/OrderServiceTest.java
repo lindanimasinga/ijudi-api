@@ -5,7 +5,7 @@ import io.curiousoft.ijudi.ordermanagement.repo.OrderRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
 import io.curiousoft.ijudi.ordermanagement.service.OrderServiceImpl;
-import io.curiousoft.ijudi.ordermanagement.service.PaymentVerifier;
+import io.curiousoft.ijudi.ordermanagement.service.PaymentService;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -30,7 +30,7 @@ public class OrderServiceTest {
     @Mock
     private StoreRepository storeRepo;
     @Mock
-    private PaymentVerifier paymentVerifier;
+    private PaymentService paymentService;
 
     //system under test
     private OrderServiceImpl sut;
@@ -40,7 +40,7 @@ public class OrderServiceTest {
         sut = new OrderServiceImpl(repo,
                 storeRepo,
                 customerRepo,
-                paymentVerifier);
+                paymentService);
     }
 
     @Test
@@ -541,6 +541,8 @@ public class OrderServiceTest {
                 10);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
+        Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
+        order.setDate(orderDate);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.ONLINE);
@@ -571,7 +573,7 @@ public class OrderServiceTest {
 
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
-        when(paymentVerifier.paymentReceived(order)).thenReturn(true);
+        when(paymentService.paymentReceived(order)).thenReturn(true);
         when(repo.save(order)).thenReturn(order);
         when(storeRepo.findById(shopId)).thenReturn(Optional.of(shop));
 
@@ -580,10 +582,11 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(1, finalOrder.getStage());
         Assert.assertNotNull(finalOrder.getDescription());
-        Assert.assertTrue(!finalOrder.getShopPaid());
-        Assert.assertTrue(!order.getHasVat());
+        Assert.assertTrue(finalOrder.getDate().after(orderDate));
+        Assert.assertFalse(finalOrder.getShopPaid());
+        Assert.assertFalse(order.getHasVat());
         verify(repo).save(order);
-        verify(paymentVerifier).paymentReceived(order);
+        verify(paymentService).paymentReceived(order);
         verify(repo).findById(order.getId());
         verify(storeRepo).findById(shopId);
         verify(storeRepo).save(shop);
@@ -608,6 +611,8 @@ public class OrderServiceTest {
                 10);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
+        Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
+        order.setDate(orderDate);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.INSTORE);
@@ -638,8 +643,9 @@ public class OrderServiceTest {
 
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
-        when(paymentVerifier.paymentReceived(order)).thenReturn(true);
-        when(paymentVerifier.completePaymentToShop(order)).thenReturn(true);
+        when(paymentService.paymentReceived(order)).thenReturn(true);
+        when(paymentService.paymentReceived(order)).thenReturn(true);
+        when(paymentService.completePaymentToShop(order)).thenReturn(true);
         when(repo.save(order)).thenReturn(order);
         when(storeRepo.findById(shopId)).thenReturn(Optional.of(shop));
 
@@ -648,11 +654,12 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(5, finalOrder.getStage());
         Assert.assertTrue(finalOrder.getShopPaid());
+        Assert.assertTrue(finalOrder.getDate().after(orderDate));
         Assert.assertNotNull(finalOrder.getDescription());
         Assert.assertTrue(order.getHasVat() == false);
         verify(repo).save(order);
-        verify(paymentVerifier).paymentReceived(order);
-        verify(paymentVerifier).completePaymentToShop(order);
+        verify(paymentService).paymentReceived(order);
+        verify(paymentService).completePaymentToShop(order);
         verify(repo).findById(order.getId());
         verify(storeRepo).findById(shopId);
         verify(storeRepo).save(shop);
@@ -876,7 +883,7 @@ public class OrderServiceTest {
 
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
-        when(paymentVerifier.paymentReceived(order)).thenReturn(true);
+        when(paymentService.paymentReceived(order)).thenReturn(true);
         when(repo.save(order)).thenReturn(order);
         when(storeRepo.findById(shopId)).thenReturn(Optional.of(shop));
 
@@ -886,7 +893,7 @@ public class OrderServiceTest {
         Assert.assertEquals(1, finalOrder.getStage());
         Assert.assertNotNull(finalOrder.getDescription());
         verify(repo).save(order);
-        verify(paymentVerifier).paymentReceived(order);
+        verify(paymentService).paymentReceived(order);
         verify(repo).findById(order.getId());
         verify(storeRepo).findById(shopId);
         verify(storeRepo).save(shop);

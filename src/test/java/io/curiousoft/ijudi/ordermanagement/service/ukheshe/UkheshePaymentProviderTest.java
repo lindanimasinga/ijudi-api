@@ -10,20 +10,17 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
-public class UkheshePaymentServiceTest {
+public class UkheshePaymentProviderTest {
 
     //sut
-    private UkheshePaymentService ukheshePaymentService;
+    private UkheshePaymentProvider ukheshePaymentService;
 
     @Mock
     StoreRepository storeRepository;
@@ -38,7 +35,7 @@ public class UkheshePaymentServiceTest {
         String customerId = "534";
         String mainAccount = "2885091160";
 
-        ukheshePaymentService = new UkheshePaymentService(baseUrl,
+        ukheshePaymentService = new UkheshePaymentProvider(baseUrl,
                 username,
                 customerId,
                 password,
@@ -81,7 +78,7 @@ public class UkheshePaymentServiceTest {
         String customerId = "534";
         String mainAccount = "2885091160";
 
-        ukheshePaymentService = new UkheshePaymentService(
+        ukheshePaymentService = new UkheshePaymentProvider(
                 baseUrl, username, customerId, password, mainAccount,
                 storeRepository);
 
@@ -103,7 +100,7 @@ public class UkheshePaymentServiceTest {
                 10);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
-        order.setDate(UkheshePaymentService.dateFormat.parse("2020-05-22T15:07:27"));
+        order.setDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("Payment from 0812815707: order 606071520220511");
         order.setCustomerId("customerId");
@@ -129,7 +126,7 @@ public class UkheshePaymentServiceTest {
         String customerId = "534";
         String mainAccount = "2885091160";
 
-        ukheshePaymentService = new UkheshePaymentService(
+        ukheshePaymentService = new UkheshePaymentProvider(
                 baseUrl, username, customerId, password, mainAccount,
                 storeRepository);
 
@@ -151,12 +148,13 @@ public class UkheshePaymentServiceTest {
                 0);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
-        order.setDate(UkheshePaymentService.dateFormat.parse("2020-05-22T15:07:27"));
+        order.setDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("Payment from 0812815707: order 606071520220511");
         order.setCustomerId("customerId");
         order.setStage(2);
         order.setShopId("shopid");
+        order.setId(UUID.randomUUID().toString());
 
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile shop = new StoreProfile(
@@ -193,7 +191,7 @@ public class UkheshePaymentServiceTest {
         String customerId = "534";
         String mainAccount = "account";
 
-        ukheshePaymentService = new UkheshePaymentService(
+        ukheshePaymentService = new UkheshePaymentProvider(
                 baseUrl, username, customerId, password, mainAccount,
                 storeRepository);
 
@@ -215,7 +213,7 @@ public class UkheshePaymentServiceTest {
                 10);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
-        order.setDate(UkheshePaymentService.dateFormat.parse("2020-05-22T15:07:27"));
+        order.setDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("Payment from 0812815707: order 606071520220511");
         order.setCustomerId("customerId");

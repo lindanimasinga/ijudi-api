@@ -1,25 +1,32 @@
 package io.curiousoft.ijudi.ordermanagement.service;
 
 import io.curiousoft.ijudi.ordermanagement.model.*;
+import io.curiousoft.ijudi.ordermanagement.repo.OrderRepository;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 @RunWith(MockitoJUnitRunner.class)
-public class PaymentVerifierTest {
+public class PaymentServiceTest {
 
     //system under test
-    private PaymentVerifier paymentVerifier;
+    private PaymentService paymentService;
     @Mock
-    PaymentService ukheshePaymentService;
+    PaymentProvider ukheshePaymentProvider;
+    @Mock
+    OrderRepository orderRepo;
 
     @Before
     public void setUp() {
@@ -29,10 +36,10 @@ public class PaymentVerifierTest {
     @Test
     public void paymentReceived() throws Exception {
 
-        List<PaymentService> paymentServices = new ArrayList<>();
+        List<PaymentProvider> paymentProviders = new ArrayList<>();
         //adding all ukheshe services
-        paymentServices.add(ukheshePaymentService);
-        paymentVerifier = new PaymentVerifier(paymentServices);
+        paymentProviders.add(ukheshePaymentProvider);
+        paymentService = new PaymentService(paymentProviders, orderRepo, 0);
 
         //given an order
         Order order = new Order();
@@ -53,25 +60,25 @@ public class PaymentVerifierTest {
         order.setShopId("shopid");
 
         //when
-        when(ukheshePaymentService.getPaymentType()).thenReturn(PaymentType.UKHESHE);
-        when(ukheshePaymentService.paymentReceived(order)).thenReturn(true);
+        when(ukheshePaymentProvider.getPaymentType()).thenReturn(PaymentType.UKHESHE);
+        when(ukheshePaymentProvider.paymentReceived(order)).thenReturn(true);
 
-        boolean received = paymentVerifier.paymentReceived(order);
+        boolean received = paymentService.paymentReceived(order);
 
         //verify
         assertTrue(received);
         assertNotNull(order.getPaymentType());
-        verify(ukheshePaymentService).paymentReceived(order);
+        verify(ukheshePaymentProvider).paymentReceived(order);
 
     }
 
     @Test
     public void completePaymentToShop() throws Exception {
 
-        List<PaymentService> paymentServices = new ArrayList<>();
+        List<PaymentProvider> paymentProviders = new ArrayList<>();
         //adding all ukheshe services
-        paymentServices.add(ukheshePaymentService);
-        paymentVerifier = new PaymentVerifier(paymentServices);
+        paymentProviders.add(ukheshePaymentProvider);
+        paymentService = new PaymentService(paymentProviders, orderRepo, 0);
 
         //given an order
         Order order = new Order();
@@ -92,24 +99,67 @@ public class PaymentVerifierTest {
         order.setShopId("shopid");
 
         //when
-        when(ukheshePaymentService.getPaymentType()).thenReturn(PaymentType.UKHESHE);
-        when(ukheshePaymentService.makePayment(order)).thenReturn(true);
+        when(ukheshePaymentProvider.getPaymentType()).thenReturn(PaymentType.UKHESHE);
+        when(ukheshePaymentProvider.makePayment(order)).thenReturn(true);
 
-        boolean received = paymentVerifier.completePaymentToShop(order);
+        boolean received = paymentService.completePaymentToShop(order);
 
         //verify
         assertTrue(received);
         assertNotNull(order.getPaymentType());
-        verify(ukheshePaymentService).makePayment(order);
+        verify(ukheshePaymentProvider).makePayment(order);
 
     }
 
     @Test
+    public void executePendingPayments() throws Exception {
+        List<PaymentProvider> paymentProviders = new ArrayList<>();
+        //adding all ukheshe services
+        paymentProviders.add(ukheshePaymentProvider);
+        paymentService = new PaymentService(paymentProviders,
+                orderRepo, 1);
+
+        //given an order
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setDate(Date.from(LocalDateTime.now().minusSeconds(6).atZone(ZoneId.systemDefault()).toInstant()));
+        order.setBasket(basket);
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY,
+                10);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        order.setPaymentType(PaymentType.UKHESHE);
+        order.setDescription("081281445");
+        order.setCustomerId("customerId");
+        order.setStage(4);
+        order.setShopId("shopid");
+
+        List<Order> ordersList = Collections.singletonList(order);
+
+        //when
+        when(orderRepo.findByShopPaidAndStageAndDateBefore(eq(false), eq(4),
+                any(Date.class))).thenReturn(ordersList);
+        when(ukheshePaymentProvider.getPaymentType()).thenReturn(PaymentType.UKHESHE);
+
+        paymentService.processPendingPayments();
+
+        //verify
+        assertNotNull(order.getPaymentType());
+        verify(orderRepo).findByShopPaidAndStageAndDateBefore(eq(false), eq(4), any(Date.class));
+        verify(ukheshePaymentProvider).makePayment(ordersList.get(0));
+    }
+
+
+    @Test
     public void paymentServiceNotConfigured() {
 
-        List<PaymentService> paymentServices = new ArrayList<>();
+        List<PaymentProvider> paymentProviders = new ArrayList<>();
         //adding all ukheshe services
-        paymentVerifier = new PaymentVerifier(paymentServices);
+        paymentService = new PaymentService(paymentProviders, orderRepo, 0);
 
         //given an order
         Order order = new Order();
@@ -131,7 +181,7 @@ public class PaymentVerifierTest {
 
         //when
         try {
-            boolean received = paymentVerifier.paymentReceived(order);
+            boolean received = paymentService.paymentReceived(order);
             assertNotNull(order.getPaymentType());
             fail();
         } catch (Exception e) {

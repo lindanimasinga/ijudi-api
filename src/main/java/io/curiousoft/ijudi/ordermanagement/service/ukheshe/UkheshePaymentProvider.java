@@ -5,7 +5,7 @@ import io.curiousoft.ijudi.ordermanagement.model.Order;
 import io.curiousoft.ijudi.ordermanagement.model.PaymentType;
 import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
 import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
-import io.curiousoft.ijudi.ordermanagement.service.PaymentService;
+import io.curiousoft.ijudi.ordermanagement.service.PaymentProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
@@ -17,18 +17,15 @@ import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
 @Service
-public class UkheshePaymentService extends PaymentService<UkheshePaymentData> {
+public class UkheshePaymentProvider extends PaymentProvider<UkheshePaymentData> {
 
-    private static Logger logger = Logger.getLogger(UkheshePaymentService.class.getName());
+    private static Logger logger = Logger.getLogger(UkheshePaymentProvider.class.getName());
 
     private final String username;
     private final String password;
@@ -41,12 +38,12 @@ public class UkheshePaymentService extends PaymentService<UkheshePaymentData> {
     private UkhesheAuthtoken ukhesheAuthtoken;
 
 
-    public UkheshePaymentService(@Value("${ukheshe.apiUrl}") String baseUrl,
-                                 @Value("${ukheshe.username}") String username,
-                                 @Value("${ukheshe.customerId}") String customerId,
-                                 @Value("${ukheshe.password}") String password,
-                                 @Value("${ukheshe.main.account}") String mainAccount,
-                                 StoreRepository storeRepo) {
+    public UkheshePaymentProvider(@Value("${ukheshe.apiUrl}") String baseUrl,
+                                  @Value("${ukheshe.username}") String username,
+                                  @Value("${ukheshe.customerId}") String customerId,
+                                  @Value("${ukheshe.password}") String password,
+                                  @Value("${ukheshe.main.account}") String mainAccount,
+                                  StoreRepository storeRepo) {
         super(PaymentType.UKHESHE);
         this.username = username;
         this.password = password;
@@ -141,6 +138,11 @@ public class UkheshePaymentService extends PaymentService<UkheshePaymentData> {
                 order.getId() + "_2",
                 order.getId());
         return makePayment(payment);
+    }
+
+    @Override
+    public void makePayments(List<Order> ordersList) {
+
     }
 
     private boolean isSameOrder(Order order, UkhesheTransaction ukhesheTransaction) {
