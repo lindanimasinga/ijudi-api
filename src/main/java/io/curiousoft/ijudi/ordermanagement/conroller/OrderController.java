@@ -30,6 +30,11 @@ public class OrderController {
         return ResponseEntity.ok(orderService.finishOder(order));
     }
 
+    @GetMapping(value = "/{id}/nextstage", produces = "application/json")
+    public ResponseEntity<Order> progressNextStage(@PathVariable String orderId) throws Exception {
+        return ResponseEntity.ok(orderService.progressNextStage(orderId));
+    }
+
     @GetMapping(value = "/{id}", produces = "application/json")
     public ResponseEntity<Order> getOrder(@PathVariable String id) {
         Order order = orderService.findOrder(id);
