@@ -162,6 +162,13 @@ public class OrderServiceImpl implements OrderService {
         return orderRepo.findByCustomerId(user.getId()).orElse(new ArrayList<>());
     }
 
+    @Override
+    public List<Order> findOrderByStoreId(String shopId) throws Exception {
+        StoreProfile store = storeRepository.findById(shopId)
+                .orElseThrow(() -> new Exception("Store not found"));
+        return orderRepo.findByShopId(store.getId());
+    }
+
     private void validate(Order order) throws Exception {
         Set<ConstraintViolation<Order>> violations = validator.validate(order);
         if (violations.size() > 0) {

@@ -17,4 +17,6 @@ public interface OrderService {
     List<Order> findOrderByUserId(String userId);
 
     List<Order> findOrderByPhone(String userId) throws Exception;
+
+    List<Order> findOrderByStoreId(String shopId) throws Exception;
 }

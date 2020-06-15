@@ -1045,4 +1045,79 @@ public class OrderServiceTest {
         verify(repo).findById(order.getId());
         verify(repo).save(order);
     }
+
+    @Test
+    public void findOrderByStoreId() throws Exception {
+        //given
+        String shopId = "id of shop";
+        String phoneNumber = "0812445563";
+
+        //order 1
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY,
+                10);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        order.setCustomerId("customer");
+        order.setStage(OrderStage.STAGE_2_STORE_PROCESSING);
+        order.setShopId(shopId);
+
+        //order 2
+        Order order2 = new Order();
+        Basket basket2 = new Basket();
+        order.setBasket(basket);
+        Messager messenger2 = new Messager();
+        messenger.setId("messagerID");
+        ShippingData shipping2 = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY,
+                10);
+        shipping.setMessenger(messenger2);
+        order2.setShippingData(shipping2);
+        order2.setCustomerId("customer id");
+        order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        order2.setShopId(shopId);
+
+        ArrayList<Order> orders = new ArrayList<>();
+        orders.add(order);
+        orders.add(order2);
+
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile initialProfile = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                ProfileRoles.CUSTOMER,
+                businessHours,
+                "ownerId");
+        initialProfile.setBusinessHours(new ArrayList<>());
+        initialProfile.setFeatured(true);
+        Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
+        initialProfile.setFeaturedExpiry(date);
+        Bank bank = new Bank();
+        bank.setAccountId("34567890");
+        initialProfile.setBank(bank);
+
+        //when
+        when(storeRepo.findById(shopId)).thenReturn(Optional.of(initialProfile));
+        when(repo.findByShopId(initialProfile.getId())).thenReturn(orders);
+
+        List<Order> finalOrder = sut.findOrderByStoreId(shopId);
+
+        //verify
+        Assert.assertNotNull(finalOrder);
+        Assert.assertEquals(2, finalOrder.size());
+        Assert.assertEquals(shopId, finalOrder.get(0).getShopId());
+        verify(repo).findByShopId(initialProfile.getId());
+        verify(storeRepo).findById(shopId);
+    }
 }
