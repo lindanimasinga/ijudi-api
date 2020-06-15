@@ -96,6 +96,9 @@ public class OrderServiceImpl implements OrderService {
         }
 
         if(persistedOrder.getOrderType() == INSTORE) {
+            if(persistedOrder.getShopPaid()) {
+                return order;
+            }
             paymentService.completePaymentToShop(persistedOrder);
             persistedOrder.setStage(OrderStage.STAGE_7_PAID_SHOP);
             persistedOrder.setShopPaid(true);
@@ -132,7 +135,7 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new Exception("Order with id " + orderId + " not found."));
         int index = onlineDeliveryStages.indexOf(order.getStage());
 
-        if(order.getOrderType() == INSTORE || index >= onlineDeliveryStages.size() - 1) {
+        if(order.getOrderType() == INSTORE || index >= onlineDeliveryStages.size() - 2) { // last stage is updated by the payment process
             return order;
         }
 

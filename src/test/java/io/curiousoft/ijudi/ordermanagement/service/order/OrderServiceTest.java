@@ -11,7 +11,9 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
+import org.mockito.internal.verification.NoMoreInteractions;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.verification.VerificationMode;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -667,6 +669,77 @@ public class OrderServiceTest {
     }
 
     @Test
+    public void finishOderInStoreAlreadyPaid() throws Exception {
+
+        //given
+        String shopId = "shopid";
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY,
+                10);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
+        order.setDate(orderDate);
+        order.setDescription("081281445");
+        order.setCustomerId("customerId");
+        order.setOrderType(OrderType.INSTORE);
+        order.setStage(OrderStage.STAGE_7_PAID_SHOP);
+        order.setShopPaid(true);
+        order.setShopId(shopId);
+        order.setDescription("desc");
+        List<String> tags = Collections.singletonList("Pizza");
+
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        StoreProfile shop = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                ProfileRoles.CUSTOMER,
+                businessHours,
+                "ownerId");
+        shop.setBusinessHours(new ArrayList<>());
+        shop.setFeatured(true);
+        Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
+        shop.setFeaturedExpiry(date);
+
+        Stock stock1 = new Stock("bananas 1kg", 24, 12, 0);
+        Set<Stock> stockList = new HashSet<>();
+        stockList.add(stock1);
+        shop.setStockList(stockList);
+
+        //when
+        when(repo.findById(order.getId())).thenReturn(Optional.of(order));
+        when(paymentService.paymentReceived(order)).thenReturn(true);
+        when(storeRepo.findById(shopId)).thenReturn(Optional.of(shop));
+
+        Order finalOrder = sut.finishOder(order);
+
+        //verify
+        Assert.assertEquals(OrderStage.STAGE_7_PAID_SHOP, finalOrder.getStage());
+        Assert.assertTrue(finalOrder.getShopPaid());
+        Assert.assertTrue(finalOrder.getDate().after(orderDate));
+        Assert.assertNotNull(finalOrder.getDescription());
+        Assert.assertTrue(order.getHasVat() == false);
+        verify(repo, never()).save(order);
+        verify(paymentService).paymentReceived(order);
+        verify(paymentService, never()).completePaymentToShop(order);
+        verify(repo).findById(order.getId());
+        verify(storeRepo, never()).findById(shopId);
+        verify(storeRepo, never()).save(shop);
+
+    }
+
+    @Test
     public void finishOrderNoBasket() {
 
         try {
@@ -1006,6 +1079,42 @@ public class OrderServiceTest {
 
         //verify
         Assert.assertEquals(OrderStage.STAGE_7_PAID_SHOP, finalOrder.getStage());
+        verify(repo).findById(order.getId());
+    }
+
+    @Test
+    public void progressStage6OnlineDelivery() throws Exception {
+        //given
+        String shopId = "shopid";
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY,
+                10);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
+        order.setDate(orderDate);
+        order.setDescription("081281445");
+        order.setCustomerId("customerId");
+        order.setOrderType(OrderType.ONLINE);
+        order.setStage(OrderStage.STAGE_6_WITH_CUSTOMER);
+        order.setShopId(shopId);
+        order.setDescription("desc");
+
+        //when
+        when(repo.findById(order.getId())).thenReturn(Optional.of(order));
+
+        Order finalOrder = sut.progressNextStage(order.getId());
+
+        //verify
+        Assert.assertEquals(OrderStage.STAGE_6_WITH_CUSTOMER, finalOrder.getStage());
         verify(repo).findById(order.getId());
     }
 
