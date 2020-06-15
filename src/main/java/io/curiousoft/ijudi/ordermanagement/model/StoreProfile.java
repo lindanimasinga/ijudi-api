@@ -5,6 +5,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
 import java.util.*;
 
 public class StoreProfile extends Profile {
@@ -12,8 +13,8 @@ public class StoreProfile extends Profile {
     @Indexed(unique = true) private String regNumber;
     @NotBlank String ownerId;
     @Valid private Set<Stock> stockList = new HashSet<>();
-    @NotEmpty private List<String> tags;
-    private List<BusinessHours> businessHours;
+    @NotEmpty(message = "profile tags not valid") private List<String> tags;
+    @NotEmpty(message = "Business hours not valid") private List<BusinessHours> businessHours;
     private boolean hasVat;
     private boolean featured;
     private Date featuredExpiry;
@@ -24,8 +25,8 @@ public class StoreProfile extends Profile {
                         @NotBlank(message = "profile image url not valid") String imageUrl,
                         @NotBlank(message = "profile mobile number not valid") String mobileNumber,
                         @NotEmpty(message = "profile tags not valid") List<String> tags,
-                        @NotBlank(message = "role not valid") String role,
-                        @NotBlank(message = "Business hours not valid") List<BusinessHours> businessHours,
+                        @NotNull(message = "role not valid") ProfileRoles role,
+                        @NotEmpty(message = "Business hours not valid") List<BusinessHours> businessHours,
                         @NotBlank(message = "shop owner id not valid") String ownerId) {
         super(name, address, imageUrl, mobileNumber, role);
         this.businessHours = businessHours;

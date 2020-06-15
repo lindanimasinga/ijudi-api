@@ -14,9 +14,8 @@ import java.util.Date;
 @Document
 public class Order extends BaseModel {
 
-    @Min(value = 0, message = "order stage must be between 0 and 3")
-    @Max(value = 3, message = "order stage must be between 0 and 3")
-    private int stage;
+    @NotNull(message = "order stage is not valid")
+    private OrderStage stage;
     private Date date;
     @ValidDeliveryInfo
     @Valid
@@ -40,11 +39,11 @@ public class Order extends BaseModel {
         this.date = date;
     }
 
-    public void setStage(int stage) {
+    public void setStage(OrderStage stage) {
         this.stage = stage;
     }
 
-    public int getStage() {
+    public OrderStage getStage() {
         return stage;
     }
 

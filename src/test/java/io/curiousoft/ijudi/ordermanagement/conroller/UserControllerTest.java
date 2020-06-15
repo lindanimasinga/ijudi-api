@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import io.curiousoft.ijudi.ordermanagement.IjudiApplication;
+import io.curiousoft.ijudi.ordermanagement.model.ProfileRoles;
 import io.curiousoft.ijudi.ordermanagement.model.UserProfile;
 import org.junit.Assert;
 import org.junit.Test;
@@ -34,7 +35,7 @@ public class UserControllerTest {
                 "myaddress",
                 "path to image",
                 "9111111707",
-                "customer");
+                ProfileRoles.CUSTOMER);
 
         ResponseEntity<String> result = this.rest.exchange(
                 RequestEntity.post(new URI("/user")).body(user), String.class);
@@ -45,7 +46,7 @@ public class UserControllerTest {
 
         UserProfile responseUser  = new Gson().fromJson(result.getBody(),UserProfile.class);
         Assert.assertEquals("9111111707", responseUser.getMobileNumber());
-        Assert.assertEquals("customer", responseUser.getRole());
+        Assert.assertEquals(ProfileRoles.CUSTOMER, responseUser.getRole());
         Assert.assertEquals("myaddress", responseUser.getAddress());
         Assert.assertEquals("name", responseUser.getName());
         Assert.assertNotNull(responseUser.getId());

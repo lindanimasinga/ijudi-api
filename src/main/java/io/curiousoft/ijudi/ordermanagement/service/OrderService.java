@@ -12,6 +12,8 @@ public interface OrderService {
 
     Order findOrder(String orderId);
 
+    Order progressNextStage(String orderId) throws Exception;
+
     List<Order> findOrderByUserId(String userId);
 
     List<Order> findOrderByPhone(String userId) throws Exception;

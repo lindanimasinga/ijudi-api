@@ -14,10 +14,14 @@ import javax.validation.ValidatorFactory;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
+import static io.curiousoft.ijudi.ordermanagement.model.OrderType.INSTORE;
+
 @Service
 public class OrderServiceImpl implements OrderService {
 
     public static final String DATE_FORMAT = "SSSmmHHyyddMMss";
+    private final LinkedList<OrderStage> onlineCollectionStages;
+    private final LinkedList<OrderStage> onlineDeliveryStages;
     private final OrderRepository orderRepo;
     private final StoreRepository storeRepository;
     private final UserProfileRepo userProfileRepo;
@@ -34,6 +38,24 @@ public class OrderServiceImpl implements OrderService {
         this.paymentService = paymentService;
         ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
         validator = factory.getValidator();
+
+        onlineDeliveryStages = new LinkedList<>();
+        onlineDeliveryStages.add(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        onlineDeliveryStages.add(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        onlineDeliveryStages.add(OrderStage.STAGE_2_STORE_PROCESSING);
+        onlineDeliveryStages.add(OrderStage.STAGE_3_READY_FOR_COLLECTION);
+        onlineDeliveryStages.add(OrderStage.STAGE_4_ON_THE_ROAD);
+        onlineDeliveryStages.add(OrderStage.STAGE_5_ARRIVED);
+        onlineDeliveryStages.add(OrderStage.STAGE_6_WITH_CUSTOMER);
+        onlineDeliveryStages.add(OrderStage.STAGE_7_PAID_SHOP);
+
+        onlineCollectionStages = new LinkedList<>();
+        onlineCollectionStages.add(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        onlineCollectionStages.add(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        onlineCollectionStages.add(OrderStage.STAGE_2_STORE_PROCESSING);
+        onlineCollectionStages.add(OrderStage.STAGE_3_READY_FOR_COLLECTION);
+        onlineCollectionStages.add(OrderStage.STAGE_6_WITH_CUSTOMER);
+        onlineCollectionStages.add(OrderStage.STAGE_7_PAID_SHOP);
 
     }
 
@@ -53,7 +75,7 @@ public class OrderServiceImpl implements OrderService {
         Date orderDate = new Date();
         String orderId = new SimpleDateFormat(DATE_FORMAT).format(orderDate);
         order.setId(orderId);
-        order.setStage(0);
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setDate(orderDate);
         return orderRepo.save(order);
     }
@@ -73,12 +95,12 @@ public class OrderServiceImpl implements OrderService {
             throw new Exception("Payment not received....");
         }
 
-        if(persistedOrder.getOrderType() == OrderType.INSTORE) {
+        if(persistedOrder.getOrderType() == INSTORE) {
             paymentService.completePaymentToShop(persistedOrder);
-            persistedOrder.setStage(5);
+            persistedOrder.setStage(OrderStage.STAGE_7_PAID_SHOP);
             persistedOrder.setShopPaid(true);
         } else {
-            persistedOrder.setStage(1);
+            persistedOrder.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         }
 
         //decrease stock available
@@ -102,6 +124,30 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Order findOrder(String orderId) {
         return orderRepo.findById(orderId).orElse(null);
+    }
+
+    @Override
+    public Order progressNextStage(String orderId) throws Exception {
+        Order order = orderRepo.findById(orderId)
+                .orElseThrow(() -> new Exception("Order with id " + orderId + " not found."));
+        int index = onlineDeliveryStages.indexOf(order.getStage());
+
+        if(order.getOrderType() == INSTORE || index >= onlineDeliveryStages.size() - 1) {
+            return order;
+        }
+
+        switch (order.getShippingData().getType()) {
+            case DELIVERY:
+                OrderStage stage = onlineDeliveryStages.get(index + 1);
+                order.setStage(stage);
+                break;
+            case COLLECTION:
+                OrderStage collectionStage = onlineCollectionStages.get(index + 1);
+                order.setStage(collectionStage);
+                break;
+        }
+        orderRepo.save(order);
+        return order;
     }
 
     @Override

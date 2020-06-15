@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import io.curiousoft.ijudi.ordermanagement.IjudiApplication;
 import io.curiousoft.ijudi.ordermanagement.model.BusinessHours;
+import io.curiousoft.ijudi.ordermanagement.model.ProfileRoles;
 import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
 import org.junit.Assert;
 import org.junit.Ignore;
@@ -41,7 +42,7 @@ public class StoreControlerTest {
                 "path to image",
                 "9111111707",
                 tags,
-                "store",
+                ProfileRoles.STORE,
                 businessHours,
                 "ffd4c856-644f-4453-a5ed-84689801a747");
 

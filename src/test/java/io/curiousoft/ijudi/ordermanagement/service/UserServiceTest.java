@@ -1,6 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.service;
 
 import io.curiousoft.ijudi.ordermanagement.model.Profile;
+import io.curiousoft.ijudi.ordermanagement.model.ProfileRoles;
 import io.curiousoft.ijudi.ordermanagement.model.UserProfile;
 import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
 import org.junit.Assert;
@@ -37,7 +38,7 @@ public class UserServiceTest {
                 "address",
                 "https://image.url",
                 "081mobilenumb",
-                "customer");
+                ProfileRoles.CUSTOMER);
 
         //when
         when(profileRepo.save(initialProfile)).thenReturn(initialProfile);
@@ -58,14 +59,14 @@ public class UserServiceTest {
                 "address",
                 "https://image.url",
                 "081mobilenumb",
-                "customer");
+                ProfileRoles.CUSTOMER);
 
         UserProfile patchProfileRequest = new UserProfile(
                 "secondName",
                 "address2",
                 "https://image.url2",
                 "078mobilenumb",
-                "messanger");
+                ProfileRoles.MESSENGER);
 
         //when
         when(profileRepo.findById(profileId)).thenReturn(Optional.of(initialProfile));

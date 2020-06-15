@@ -1,6 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.repo;
 
 import io.curiousoft.ijudi.ordermanagement.model.Order;
+import io.curiousoft.ijudi.ordermanagement.model.OrderStage;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.Date;
@@ -11,5 +12,5 @@ public interface OrderRepository extends MongoRepository<Order, String> {
 
     Optional<List<Order>> findByCustomerId(String customerId);
 
-    List<Order> findByShopPaidAndStageAndDateBefore(boolean shopPaid, int stage, Date orderDate);
+    List<Order> findByShopPaidAndStageAndDateBefore(boolean shopPaid, OrderStage stage, Date orderDate);
 }

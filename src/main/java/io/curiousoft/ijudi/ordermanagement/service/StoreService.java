@@ -1,9 +1,6 @@
 package io.curiousoft.ijudi.ordermanagement.service;
 
-import io.curiousoft.ijudi.ordermanagement.model.BusinessHours;
-import io.curiousoft.ijudi.ordermanagement.model.Stock;
-import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
-import io.curiousoft.ijudi.ordermanagement.model.UserProfile;
+import io.curiousoft.ijudi.ordermanagement.model.*;
 import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,17 +29,17 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         UserProfile user = userProfileRepo.findById(profile.getOwnerId())
                 .orElseThrow(() -> new Exception("Store owner with user id does not exist."));
         profile.setBank(user.getBank());
-        return super.create(profile);
+        StoreProfile newStore = super.create(profile);
+        user.setRole(ProfileRoles.STORE_ADMIN);
+        return newStore;
     }
 
     @Override
     public List<StoreProfile> findAll() {
         return super.findAll()
                 .stream()
-                .map(profile -> {
-                    profile.getBank().setAccountId(mainPayAccount);
-                    return profile;
-                }).collect(Collectors.toList());
+                .peek(profile -> profile.getBank().setAccountId(mainPayAccount))
+                .collect(Collectors.toList());
     }
 
     @Override

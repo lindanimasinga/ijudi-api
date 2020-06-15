@@ -1,6 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.service;
 
 import io.curiousoft.ijudi.ordermanagement.model.Order;
+import io.curiousoft.ijudi.ordermanagement.model.OrderStage;
 import io.curiousoft.ijudi.ordermanagement.repo.OrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,11 +53,15 @@ public class PaymentService {
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
         List<Order> orders = orderRepo
-                .findByShopPaidAndStageAndDateBefore(false, 4, pastDate);
+                .findByShopPaidAndStageAndDateBefore(false,
+                        OrderStage.STAGE_6_WITH_CUSTOMER, pastDate);
 
+        logger.info("Processing " + orders.size() + " pending payments");
         orders.forEach(order -> {
                     try {
                         completePaymentToShop(order);
+                        order.setStage(OrderStage.STAGE_7_PAID_SHOP);
+                        order.setShopPaid(true);
                     } catch (Exception e) {
                         logger.error(e.getMessage(), e);
                     }

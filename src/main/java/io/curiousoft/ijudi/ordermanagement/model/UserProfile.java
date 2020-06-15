@@ -1,6 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.model;
 
 import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 
 public class UserProfile extends Profile {
 
@@ -10,7 +11,7 @@ public class UserProfile extends Profile {
                        @NotBlank(message = "profile address not valid") String address,
                        @NotBlank(message = "profile image url not valid") String imageUrl,
                        @NotBlank(message = "profile mobile number not valid") String mobileNumber,
-                       @NotBlank(message = "role not valid") String role) {
+                       @NotNull(message = "role not valid") ProfileRoles role) {
         super(name, address, imageUrl, mobileNumber, role);
         this.idNumber = idNumber;
     }

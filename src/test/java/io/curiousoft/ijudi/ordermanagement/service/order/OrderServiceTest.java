@@ -55,7 +55,7 @@ public class OrderServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 businessHours,
                 "ownerId");
         storeProfile.setBusinessHours(new ArrayList<>());
@@ -78,7 +78,7 @@ public class OrderServiceTest {
 
         order.setCustomerId("customerId");
         order.setShopId("shopid");
-        order.setStage(0);
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setOrderType(OrderType.ONLINE);
         order.setDescription("description");
 
@@ -90,7 +90,7 @@ public class OrderServiceTest {
         Order newOrder = sut.startOrder(order);
 
         //verify
-        Assert.assertEquals(0, newOrder.getStage());
+        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
         Assert.assertNotNull(order.getDate());
         Assert.assertEquals(false, order.getHasVat());
@@ -111,7 +111,7 @@ public class OrderServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 businessHours,
                 "ownerId");
         storeProfile.setBusinessHours(new ArrayList<>());
@@ -136,7 +136,7 @@ public class OrderServiceTest {
 
         order.setCustomerId("customerId");
         order.setShopId("shopid");
-        order.setStage(0);
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setOrderType(OrderType.ONLINE);
         order.setDescription("description");
 
@@ -148,7 +148,7 @@ public class OrderServiceTest {
         Order newOrder = sut.startOrder(order);
 
         //verify
-        Assert.assertEquals(0, newOrder.getStage());
+        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
         Assert.assertNotNull(order.getDate());
         Assert.assertTrue(order.getHasVat());
@@ -177,7 +177,7 @@ public class OrderServiceTest {
 
         order.setCustomerId("customerId");
         order.setShopId("shopid");
-        order.setStage(0);
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setDescription("description");
 
         try {
@@ -208,7 +208,7 @@ public class OrderServiceTest {
         order.setOrderType(OrderType.ONLINE);
         order.setCustomerId("customerId");
         order.setShopId("shopid");
-        order.setStage(0);
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setDescription("description");
 
         //when
@@ -234,7 +234,7 @@ public class OrderServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 businessHours,
                 "ownerId");
         storeProfile.setBusinessHours(new ArrayList<>());
@@ -257,7 +257,7 @@ public class OrderServiceTest {
 
         order.setCustomerId("customerId");
         order.setShopId("shopid");
-        order.setStage(0);
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setOrderType(OrderType.ONLINE);
         order.setDescription("description");
 
@@ -285,11 +285,11 @@ public class OrderServiceTest {
                     "testName",
                     "41 Sheffs, Afr, 8009",
                     "Https://url.com",
-                    "messanger");
+                    ProfileRoles.MESSENGER);
 
             order.setCustomerId("customerId");
             order.setShopId("shopid");
-            order.setStage(0);
+            order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
             order.setOrderType(OrderType.ONLINE);
             order.setDescription("description");
 
@@ -325,7 +325,7 @@ public class OrderServiceTest {
         order.setOrderType(OrderType.ONLINE);
         order.setCustomerId("customerId");
         order.setShopId("shopid");
-        order.setStage(0);
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setDescription("description");
 
         //when
@@ -353,12 +353,12 @@ public class OrderServiceTest {
                     "testName",
                     "41 Sheffs, Afr, 8009",
                     "Https://url.com",
-                    "messanger");
+                    ProfileRoles.MESSENGER);
 
             order.setCustomerId("customerId");
             order.setShopId("shopid");
             order.setOrderType(OrderType.ONLINE);
-            order.setStage(0);
+            order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
             order.setDescription("desc");
 
             //when
@@ -387,12 +387,12 @@ public class OrderServiceTest {
                     "testName",
                     "41 Sheffs, Afr, 8009",
                     "Https://url.com",
-                    "messanger");
+                    ProfileRoles.MESSENGER);
 
             order.setCustomerId("customerId");
             order.setShopId("shopid");
             order.setOrderType(OrderType.ONLINE);
-            order.setStage(0);
+            order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
             ShippingData shipping = new ShippingData();
             shipping.setFromAddress("");
             shipping.setToAddress("");
@@ -434,7 +434,7 @@ public class OrderServiceTest {
             shipping.setMessenger(messenger);
             order.setShippingData(shipping);
             order.setOrderType(OrderType.ONLINE);
-            order.setStage(0);
+            order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
             order.setShopId("shopid");
             order.setDescription("desc");
 
@@ -470,7 +470,7 @@ public class OrderServiceTest {
             shipping.setMessenger(messenger);
             order.setShippingData(shipping);
 
-            order.setStage(0);
+            order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
             order.setOrderType(OrderType.ONLINE);
             order.setCustomerId("1234");
             order.setDescription("description");
@@ -507,7 +507,7 @@ public class OrderServiceTest {
 
             order.setCustomerId("customerId");
             order.setShopId("shopid");
-            order.setStage(0);
+            order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
             order.setOrderType(OrderType.ONLINE);
             order.setDescription("desc");
 
@@ -546,7 +546,7 @@ public class OrderServiceTest {
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.ONLINE);
-        order.setStage(2);
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setShopId(shopId);
         order.setDescription("desc");
         List<String> tags = Collections.singletonList("Pizza");
@@ -558,7 +558,7 @@ public class OrderServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 businessHours,
                 "ownerId");
         shop.setBusinessHours(new ArrayList<>());
@@ -580,7 +580,7 @@ public class OrderServiceTest {
         Order finalOrder = sut.finishOder(order);
 
         //verify
-        Assert.assertEquals(1, finalOrder.getStage());
+        Assert.assertEquals(OrderStage.STAGE_1_WAITING_STORE_CONFIRM, finalOrder.getStage());
         Assert.assertNotNull(finalOrder.getDescription());
         Assert.assertTrue(finalOrder.getDate().after(orderDate));
         Assert.assertFalse(finalOrder.getShopPaid());
@@ -616,7 +616,7 @@ public class OrderServiceTest {
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.INSTORE);
-        order.setStage(2);
+        order.setStage(OrderStage.STAGE_6_WITH_CUSTOMER);
         order.setShopId(shopId);
         order.setDescription("desc");
         List<String> tags = Collections.singletonList("Pizza");
@@ -628,7 +628,7 @@ public class OrderServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 businessHours,
                 "ownerId");
         shop.setBusinessHours(new ArrayList<>());
@@ -652,7 +652,7 @@ public class OrderServiceTest {
         Order finalOrder = sut.finishOder(order);
 
         //verify
-        Assert.assertEquals(5, finalOrder.getStage());
+        Assert.assertEquals(OrderStage.STAGE_7_PAID_SHOP, finalOrder.getStage());
         Assert.assertTrue(finalOrder.getShopPaid());
         Assert.assertTrue(finalOrder.getDate().after(orderDate));
         Assert.assertNotNull(finalOrder.getDescription());
@@ -685,7 +685,7 @@ public class OrderServiceTest {
             order.setOrderType(OrderType.ONLINE);
             order.setCustomerId("customerId");
             order.setShopId("shopid");
-            order.setStage(0);
+            order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
             order.setDescription("desc");
 
             //when
@@ -719,7 +719,7 @@ public class OrderServiceTest {
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setCustomerId(customerId);
-        order.setStage(2);
+        order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         order.setShopId("shopid");
 
         //order 2
@@ -735,7 +735,7 @@ public class OrderServiceTest {
         shipping.setMessenger(messenger2);
         order2.setShippingData(shipping2);
         order2.setCustomerId(customerId);
-        order2.setStage(2);
+        order2.setStage(OrderStage.STAGE_2_STORE_PROCESSING);
         order2.setShopId("shopid");
 
         ArrayList<Order> orders = new ArrayList<>();
@@ -789,7 +789,7 @@ public class OrderServiceTest {
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setCustomerId(customerId);
-        order.setStage(2);
+        order.setStage(OrderStage.STAGE_2_STORE_PROCESSING);
         order.setShopId("shopid");
 
         //order 2
@@ -805,7 +805,7 @@ public class OrderServiceTest {
         shipping.setMessenger(messenger2);
         order2.setShippingData(shipping2);
         order2.setCustomerId(customerId);
-        order2.setStage(2);
+        order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         order2.setShopId("shopid");
 
         ArrayList<Order> orders = new ArrayList<>();
@@ -817,7 +817,7 @@ public class OrderServiceTest {
                 "address",
                 "https://image.url",
                 phoneNumber,
-                "customer");
+                ProfileRoles.CUSTOMER);
         initialProfile.setId("initialID");
 
         //when
@@ -855,7 +855,7 @@ public class OrderServiceTest {
         order.setShippingData(shipping);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
-        order.setStage(2);
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setOrderType(OrderType.ONLINE);
         order.setShopId(shopId);
         order.setDescription("desc");
@@ -868,7 +868,7 @@ public class OrderServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 businessHours,
                 "ownerId");
         shop.setBusinessHours(new ArrayList<>());
@@ -890,7 +890,7 @@ public class OrderServiceTest {
         Order finalOrder = sut.finishOder(order);
 
         //verify
-        Assert.assertEquals(1, finalOrder.getStage());
+        Assert.assertEquals(OrderStage.STAGE_1_WAITING_STORE_CONFIRM, finalOrder.getStage());
         Assert.assertNotNull(finalOrder.getDescription());
         verify(repo).save(order);
         verify(paymentService).paymentReceived(order);
@@ -898,5 +898,151 @@ public class OrderServiceTest {
         verify(storeRepo).findById(shopId);
         verify(storeRepo).save(shop);
 
+    }
+
+    @Test
+    public void progressNextStageOnlineDelivery() throws Exception {
+        //given
+        String shopId = "shopid";
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY,
+                10);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
+        order.setDate(orderDate);
+        order.setDescription("081281445");
+        order.setCustomerId("customerId");
+        order.setOrderType(OrderType.ONLINE);
+        order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        order.setShopId(shopId);
+        order.setDescription("desc");
+
+        //when
+        when(repo.findById(order.getId())).thenReturn(Optional.of(order));
+
+        Order finalOrder = sut.progressNextStage(order.getId());
+
+        //verify
+        Assert.assertEquals(OrderStage.STAGE_2_STORE_PROCESSING, finalOrder.getStage());
+        verify(repo).findById(order.getId());
+        verify(repo).save(order);
+    }
+
+    @Test
+    public void progressNextStageInstore() throws Exception {
+        //given
+        String shopId = "shopid";
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY,
+                10);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
+        order.setDate(orderDate);
+        order.setDescription("081281445");
+        order.setCustomerId("customerId");
+        order.setOrderType(OrderType.INSTORE);
+        order.setStage(OrderStage.STAGE_7_PAID_SHOP);
+        order.setShopId(shopId);
+        order.setDescription("desc");
+
+        //when
+        when(repo.findById(order.getId())).thenReturn(Optional.of(order));
+
+        Order finalOrder = sut.progressNextStage(order.getId());
+
+        //verify
+        Assert.assertEquals(OrderStage.STAGE_7_PAID_SHOP, finalOrder.getStage());
+        verify(repo).findById(order.getId());
+    }
+
+    @Test
+    public void progressLastStageOnlineDelivery() throws Exception {
+        //given
+        String shopId = "shopid";
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY,
+                10);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
+        order.setDate(orderDate);
+        order.setDescription("081281445");
+        order.setCustomerId("customerId");
+        order.setOrderType(OrderType.ONLINE);
+        order.setStage(OrderStage.STAGE_7_PAID_SHOP);
+        order.setShopId(shopId);
+        order.setDescription("desc");
+
+        //when
+        when(repo.findById(order.getId())).thenReturn(Optional.of(order));
+
+        Order finalOrder = sut.progressNextStage(order.getId());
+
+        //verify
+        Assert.assertEquals(OrderStage.STAGE_7_PAID_SHOP, finalOrder.getStage());
+        verify(repo).findById(order.getId());
+    }
+
+    @Test
+    public void progressNextStageOnlineCollection() throws Exception {
+        //given
+        String shopId = "shopid";
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.COLLECTION,
+                10);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
+        order.setDate(orderDate);
+        order.setDescription("081281445");
+        order.setCustomerId("customerId");
+        order.setOrderType(OrderType.ONLINE);
+        order.setStage(OrderStage.STAGE_3_READY_FOR_COLLECTION);
+        order.setShopId(shopId);
+        order.setDescription("desc");
+
+        //when
+        when(repo.findById(order.getId())).thenReturn(Optional.of(order));
+
+        Order finalOrder = sut.progressNextStage(order.getId());
+
+        //verify
+        Assert.assertEquals(OrderStage.STAGE_6_WITH_CUSTOMER, finalOrder.getStage());
+        verify(repo).findById(order.getId());
+        verify(repo).save(order);
     }
 }

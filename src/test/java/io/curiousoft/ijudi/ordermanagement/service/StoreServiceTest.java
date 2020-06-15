@@ -10,6 +10,7 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
@@ -42,7 +43,7 @@ public class StoreServiceTest {
                 "address",
                 "https://image.url",
                 "081mobilenumb",
-                "customer");
+                ProfileRoles.CUSTOMER);
 
         Bank bank = new Bank();
         bank.setAccountId("accountId");
@@ -51,6 +52,9 @@ public class StoreServiceTest {
         bank.setType("wallet");
         user.setBank(bank);
 
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        BusinessHours hours = new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date());
+        businessHours.add(hours);
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 "name",
@@ -58,9 +62,10 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
-                null,
+                ProfileRoles.CUSTOMER,
+                businessHours,
                 "ownerId");
+
 
         //when
         when(userProfileRepo.findById(initialProfile.getOwnerId())).thenReturn(Optional.of(user));
@@ -74,6 +79,7 @@ public class StoreServiceTest {
         Assert.assertNotNull(profile.getOwnerId());
         Assert.assertNotNull(profile.getBank());
         Assert.assertEquals(user.getBank().getAccountId(), profile.getBank().getAccountId());
+        Assert.assertEquals(ProfileRoles.STORE_ADMIN, user.getRole());
     }
 
     @Test
@@ -87,7 +93,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 null,
                 "ownerId");
 
@@ -114,7 +120,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 null,
                 "ownerId");
 
@@ -139,7 +145,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 businessHours,
                 "ownerId");
         initialProfile.setBusinessHours(new ArrayList<>());
@@ -167,7 +173,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 businessHours,
                 "ownerId");
         initialProfile.setBusinessHours(new ArrayList<>());
@@ -184,7 +190,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 businessHours,
                 "ownerId");
         initialProfile2.setBusinessHours(new ArrayList<>());
@@ -223,7 +229,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 businessHours,
                 "ownerId");
         initialProfile.setBusinessHours(new ArrayList<>());
@@ -240,7 +246,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 businessHours,
                 "ownerId");
         initialProfile2.setBusinessHours(new ArrayList<>());
@@ -273,7 +279,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 businessHours,
                 "ownerId");
         initialProfile.setBusinessHours(new ArrayList<>());
@@ -290,7 +296,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 businessHours,
                 "ownerId");
         initialProfile2.setBusinessHours(new ArrayList<>());
@@ -324,7 +330,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                  tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 businessHours,
                 "ownerId");
         initialProfile.setBusinessHours(new ArrayList<>());
@@ -362,7 +368,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 businessHours,
                 "ownerId");
         initialProfile.setBusinessHours(new ArrayList<>());
@@ -399,7 +405,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 businessHours,
                 "ownerId");
         initialProfile.setBusinessHours(new ArrayList<>());
@@ -439,7 +445,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 businessHours,
                 "ownerId");
         initialProfile.setBusinessHours(new ArrayList<>());

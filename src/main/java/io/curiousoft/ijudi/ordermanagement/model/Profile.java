@@ -5,6 +5,7 @@ import io.curiousoft.ijudi.ordermanagement.service.BaseModel;
 import org.springframework.data.mongodb.core.index.Indexed;
 
 import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 
 public class Profile extends BaseModel {
 
@@ -22,8 +23,8 @@ public class Profile extends BaseModel {
     @Indexed(unique = true)
     @NotBlank(message = "profile mobile number not valid")
     private String mobileNumber;
-    @NotBlank(message = "role not valid")
-    private String role;
+    @NotNull(message = "role not valid")
+    private ProfileRoles role;
     private int responseTimeMinutes;
     private String verificationCode;
     private Bank bank;
@@ -33,7 +34,7 @@ public class Profile extends BaseModel {
                    @NotBlank(message = "profile address not valid") String address,
                    @NotBlank(message = "profile image url not valid") String imageUrl,
                    @NotBlank(message = "profile mobile number not valid") String mobileNumber,
-                   @NotBlank(message = "role not valid") String role) {
+                   @NotNull(message = "role not valid") ProfileRoles role) {
         super();
         this.name = name;
         this.address = address;
@@ -114,11 +115,11 @@ public class Profile extends BaseModel {
         this.mobileNumber = mobileNumber;
     }
 
-    public String getRole() {
+    public ProfileRoles getRole() {
         return role;
     }
 
-    public void setRole(String role) {
+    public void setRole(ProfileRoles role) {
         this.role = role;
     }
 

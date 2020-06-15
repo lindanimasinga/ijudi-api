@@ -56,7 +56,7 @@ public class UkheshePaymentProviderTest {
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
-        order.setStage(2);
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setShopId("shopid");
 
         //when
@@ -104,7 +104,7 @@ public class UkheshePaymentProviderTest {
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("Payment from 0812815707: order 606071520220511");
         order.setCustomerId("customerId");
-        order.setStage(2);
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setShopId("shopid");
 
         //when
@@ -152,7 +152,7 @@ public class UkheshePaymentProviderTest {
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("Payment from 0812815707: order 606071520220511");
         order.setCustomerId("customerId");
-        order.setStage(2);
+        order.setStage(OrderStage.STAGE_6_WITH_CUSTOMER);
         order.setShopId("shopid");
         order.setId(UUID.randomUUID().toString());
 
@@ -163,7 +163,7 @@ public class UkheshePaymentProviderTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                "customer",
+                ProfileRoles.CUSTOMER,
                 null,
                 "ownerId");
 
@@ -217,7 +217,7 @@ public class UkheshePaymentProviderTest {
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("Payment from 0812815707: order 606071520220511");
         order.setCustomerId("customerId");
-        order.setStage(2);
+        order.setStage(OrderStage.STAGE_6_WITH_CUSTOMER);
         order.setShopId("shopid");
 
         try {

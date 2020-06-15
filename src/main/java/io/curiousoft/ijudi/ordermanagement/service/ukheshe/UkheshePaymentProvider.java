@@ -17,6 +17,8 @@ import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -36,6 +38,7 @@ public class UkheshePaymentProvider extends PaymentProvider<UkheshePaymentData> 
 
     public static final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
     private UkhesheAuthtoken ukhesheAuthtoken;
+    private ResponseEntity<UkhesheTransaction[]> response;
 
 
     public UkheshePaymentProvider(@Value("${ukheshe.apiUrl}") String baseUrl,
@@ -61,8 +64,12 @@ public class UkheshePaymentProvider extends PaymentProvider<UkheshePaymentData> 
         }
 
         //get transactions
+        LocalDateTime fromLocalDate = LocalDateTime.ofInstant(order.getDate().toInstant(),
+                ZoneId.systemDefault()).minusMinutes(10);
+        Date fromDate = Date.from(fromLocalDate.atZone(ZoneId.systemDefault()).toInstant());
+
         String url = baseUrl + "/customers/" + customerId + "/transactions";
-        url = url + "?dateFromIncl=" + dateFormat.format(order.getDate()) ;
+        url = url + "?dateFromIncl=" + dateFormat.format(fromDate) ;
         url = url + "&dateToExcl=" + dateFormat.format(new Date());
         URI uri = new URI(url);
         RestTemplate rest = new RestTemplateBuilder().build();

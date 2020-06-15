@@ -2,6 +2,7 @@ package io.curiousoft.ijudi.ordermanagement.service;
 
 import io.curiousoft.ijudi.ordermanagement.model.*;
 import io.curiousoft.ijudi.ordermanagement.repo.OrderRepository;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -56,7 +57,7 @@ public class PaymentServiceTest {
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
-        order.setStage(2);
+        order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         order.setShopId("shopid");
 
         //when
@@ -95,7 +96,7 @@ public class PaymentServiceTest {
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
-        order.setStage(2);
+        order.setStage(OrderStage.STAGE_6_WITH_CUSTOMER);
         order.setShopId("shopid");
 
         //when
@@ -135,13 +136,13 @@ public class PaymentServiceTest {
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
-        order.setStage(4);
+        order.setStage(OrderStage.STAGE_6_WITH_CUSTOMER);
         order.setShopId("shopid");
 
         List<Order> ordersList = Collections.singletonList(order);
 
         //when
-        when(orderRepo.findByShopPaidAndStageAndDateBefore(eq(false), eq(4),
+        when(orderRepo.findByShopPaidAndStageAndDateBefore(eq(false), eq(OrderStage.STAGE_6_WITH_CUSTOMER),
                 any(Date.class))).thenReturn(ordersList);
         when(ukheshePaymentProvider.getPaymentType()).thenReturn(PaymentType.UKHESHE);
 
@@ -149,8 +150,11 @@ public class PaymentServiceTest {
 
         //verify
         assertNotNull(order.getPaymentType());
-        verify(orderRepo).findByShopPaidAndStageAndDateBefore(eq(false), eq(4), any(Date.class));
+        assertEquals(OrderStage.STAGE_7_PAID_SHOP, order.getStage());
+        Assert.assertTrue(order.getShopPaid());
+        verify(orderRepo).findByShopPaidAndStageAndDateBefore(eq(false), eq(OrderStage.STAGE_6_WITH_CUSTOMER), any(Date.class));
         verify(ukheshePaymentProvider).makePayment(ordersList.get(0));
+
     }
 
 
@@ -176,7 +180,7 @@ public class PaymentServiceTest {
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
-        order.setStage(2);
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setShopId("shopid");
 
         //when
