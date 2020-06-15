@@ -154,6 +154,7 @@ public class PaymentServiceTest {
         Assert.assertTrue(order.getShopPaid());
         verify(orderRepo).findByShopPaidAndStageAndDateBefore(eq(false), eq(OrderStage.STAGE_6_WITH_CUSTOMER), any(Date.class));
         verify(ukheshePaymentProvider).makePayment(ordersList.get(0));
+        verify(orderRepo).save(ordersList.get(0));
 
     }
 

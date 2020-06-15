@@ -62,6 +62,7 @@ public class PaymentService {
                         completePaymentToShop(order);
                         order.setStage(OrderStage.STAGE_7_PAID_SHOP);
                         order.setShopPaid(true);
+                        orderRepo.save(order);
                     } catch (Exception e) {
                         logger.error(e.getMessage(), e);
                     }
