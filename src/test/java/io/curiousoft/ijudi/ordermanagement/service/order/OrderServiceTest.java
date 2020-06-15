@@ -720,7 +720,6 @@ public class OrderServiceTest {
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
         when(paymentService.paymentReceived(order)).thenReturn(true);
-        when(storeRepo.findById(shopId)).thenReturn(Optional.of(shop));
 
         Order finalOrder = sut.finishOder(order);
 
