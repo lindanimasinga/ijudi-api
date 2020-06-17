@@ -1,6 +1,8 @@
 package io.curiousoft.ijudi.ordermanagement.service;
 
 import io.curiousoft.ijudi.ordermanagement.model.*;
+import io.curiousoft.ijudi.ordermanagement.notification.PushNotificationService;
+import io.curiousoft.ijudi.ordermanagement.repo.DeviceRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.OrderRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
@@ -27,15 +29,21 @@ public class OrderServiceImpl implements OrderService {
     private final UserProfileRepo userProfileRepo;
     private final Validator validator;
     private final PaymentService paymentService;
+    private final DeviceRepository deviceRepo;
+    private final PushNotificationService pushNotificationService;
 
     @Autowired
     public OrderServiceImpl(OrderRepository orderRepository,
                             StoreRepository storeRepository,
-                            UserProfileRepo userProfileRepo, PaymentService paymentService) {
+                            UserProfileRepo userProfileRepo, PaymentService paymentService,
+                            DeviceRepository deviceRepo,
+                            PushNotificationService pushNotificationService) {
         this.orderRepo = orderRepository;
         this.storeRepository = storeRepository;
         this.userProfileRepo = userProfileRepo;
         this.paymentService = paymentService;
+        this.pushNotificationService = pushNotificationService;
+        this.deviceRepo = deviceRepo;
         ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
         validator = factory.getValidator();
 
@@ -56,7 +64,6 @@ public class OrderServiceImpl implements OrderService {
         onlineCollectionStages.add(OrderStage.STAGE_3_READY_FOR_COLLECTION);
         onlineCollectionStages.add(OrderStage.STAGE_6_WITH_CUSTOMER);
         onlineCollectionStages.add(OrderStage.STAGE_7_PAID_SHOP);
-
     }
 
     @Override
@@ -110,6 +117,9 @@ public class OrderServiceImpl implements OrderService {
         Optional<StoreProfile> optional = storeRepository.findById(order.getShopId());
         if (optional.isPresent()) {
             StoreProfile store = optional.get();
+            //notify the shop
+            List<Device> shopDevices = deviceRepo.findByUserId(store.getOwnerId());
+            pushNotificationService.notifyOrderPlaced(shopDevices, order);
             Set<Stock> stock = store.getStockList();
             order.getBasket()
                     .getItems()

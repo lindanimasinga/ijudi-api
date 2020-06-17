@@ -1,6 +1,8 @@
 package io.curiousoft.ijudi.ordermanagement.service.order;
 
 import io.curiousoft.ijudi.ordermanagement.model.*;
+import io.curiousoft.ijudi.ordermanagement.notification.PushNotificationService;
+import io.curiousoft.ijudi.ordermanagement.repo.DeviceRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.OrderRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
@@ -11,9 +13,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.internal.verification.NoMoreInteractions;
 import org.mockito.junit.MockitoJUnitRunner;
-import org.mockito.verification.VerificationMode;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -33,16 +33,23 @@ public class OrderServiceTest {
     private StoreRepository storeRepo;
     @Mock
     private PaymentService paymentService;
+    @Mock
+    private PushNotificationService pushNotificationService;
+    @Mock
+    private DeviceRepository deviceRepo;
 
     //system under test
     private OrderServiceImpl sut;
 
     @Before
     public void setUp() throws Exception {
-        sut = new OrderServiceImpl(repo,
+        sut = new OrderServiceImpl(
+                repo,
                 storeRepo,
                 customerRepo,
-                paymentService);
+                paymentService,
+                deviceRepo,
+                pushNotificationService);
     }
 
     @Test
@@ -529,6 +536,7 @@ public class OrderServiceTest {
     public void finishOderOnline() throws Exception {
 
         //given
+        List<Device> storeDevices = Collections.singletonList(new Device("token"));
         String shopId = "shopid";
         Order order = new Order();
         Basket basket = new Basket();
@@ -578,6 +586,7 @@ public class OrderServiceTest {
         when(paymentService.paymentReceived(order)).thenReturn(true);
         when(repo.save(order)).thenReturn(order);
         when(storeRepo.findById(shopId)).thenReturn(Optional.of(shop));
+        when(deviceRepo.findByUserId(shop.getOwnerId())).thenReturn(storeDevices);
 
         Order finalOrder = sut.finishOder(order);
 
@@ -592,13 +601,15 @@ public class OrderServiceTest {
         verify(repo).findById(order.getId());
         verify(storeRepo).findById(shopId);
         verify(storeRepo).save(shop);
-
+        verify(pushNotificationService).notifyOrderPlaced(storeDevices, order);
+        verify(deviceRepo).findByUserId(shop.getOwnerId());
     }
 
     @Test
     public void finishOderInStore() throws Exception {
 
         //given
+        List<Device> storeDevices = Collections.singletonList(new Device("token"));
         String shopId = "shopid";
         Order order = new Order();
         Basket basket = new Basket();
@@ -650,6 +661,7 @@ public class OrderServiceTest {
         when(paymentService.completePaymentToShop(order)).thenReturn(true);
         when(repo.save(order)).thenReturn(order);
         when(storeRepo.findById(shopId)).thenReturn(Optional.of(shop));
+        when(deviceRepo.findByUserId(shop.getOwnerId())).thenReturn(storeDevices);
 
         Order finalOrder = sut.finishOder(order);
 
@@ -665,6 +677,8 @@ public class OrderServiceTest {
         verify(repo).findById(order.getId());
         verify(storeRepo).findById(shopId);
         verify(storeRepo).save(shop);
+        verify(pushNotificationService).notifyOrderPlaced(storeDevices, order);
+        verify(deviceRepo).findByUserId(shop.getOwnerId());
 
     }
 
