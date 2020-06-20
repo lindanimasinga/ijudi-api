@@ -1231,7 +1231,6 @@ public class OrderServiceTest {
 
         //when
         when(storeRepo.findById(shopId)).thenReturn(Optional.of(initialProfile));
-        when(repo.findByShopId(initialProfile.getId())).thenReturn(orders);
         when(repo.findByShopIdAndStageNot(initialProfile.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID)).thenReturn(orders);
 
         List<Order> finalOrder = sut.findOrderByStoreId(shopId);
