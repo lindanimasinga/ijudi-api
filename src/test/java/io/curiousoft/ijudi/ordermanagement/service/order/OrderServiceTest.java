@@ -1240,7 +1240,6 @@ public class OrderServiceTest {
         Assert.assertNotNull(finalOrder);
         Assert.assertEquals(2, finalOrder.size());
         Assert.assertEquals(shopId, finalOrder.get(0).getShopId());
-        verify(repo).findByShopId(initialProfile.getId());
         verify(storeRepo).findById(shopId);
         verify(repo).findByShopIdAndStageNot(initialProfile.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
     }
