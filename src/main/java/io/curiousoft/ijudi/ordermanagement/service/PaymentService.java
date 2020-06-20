@@ -1,8 +1,10 @@
 package io.curiousoft.ijudi.ordermanagement.service;
 
-import io.curiousoft.ijudi.ordermanagement.model.Order;
-import io.curiousoft.ijudi.ordermanagement.model.OrderStage;
+import io.curiousoft.ijudi.ordermanagement.model.*;
+import io.curiousoft.ijudi.ordermanagement.notification.PushNotificationService;
+import io.curiousoft.ijudi.ordermanagement.repo.DeviceRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.OrderRepository;
+import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,12 +24,21 @@ public class PaymentService {
     private final List<PaymentProvider> paymentProviders;
     private final OrderRepository orderRepo;
     private final long processPaymentIntervalMinutes;
+    private final PushNotificationService pushNotificationService;
+    private final DeviceRepository deviceRepo;
+    private final StoreRepository storeRepository;
 
-    public PaymentService(List<PaymentProvider> paymentProviders, OrderRepository orderRepo,
+    public PaymentService(PushNotificationService pushNotificationService,
+                          List<PaymentProvider> paymentProviders, OrderRepository orderRepo,
+                          DeviceRepository deviceRepo,
+                          StoreRepository storeRepository,
                           @Value("${payment.process.pending.minutes}") long processPaymentIntervalMinutes) {
         this.paymentProviders = paymentProviders;
         this.orderRepo = orderRepo;
         this.processPaymentIntervalMinutes = processPaymentIntervalMinutes;
+        this.pushNotificationService = pushNotificationService;
+        this.deviceRepo = deviceRepo;
+        this.storeRepository = storeRepository;
     }
 
     public boolean paymentReceived(Order order) throws Exception {
@@ -42,7 +53,24 @@ public class PaymentService {
         PaymentProvider paymentProvider = paymentProviders.stream()
                 .filter(service -> order.getPaymentType() == service.getPaymentType())
                 .findFirst().orElseThrow(() -> new Exception("Your order has no ukheshe type set or the ukheshe provider for " + order.getPaymentType() + " not configured on the server"));
-        return paymentProvider.makePayment(order);
+
+        paymentProvider.makePayment(order);
+        String content = "Payment of R " + order.getTotalAmount() + " received";
+        PushHeading heading = new PushHeading("Payment of R " + order.getTotalAmount() + " received",
+                "Order Payment Received", null);
+        PushMessage message = new PushMessage(PushMessageType.PAYMENT, heading, content);
+        StoreProfile shop = storeRepository.findById(order.getShopId()).orElse(null);
+        if(shop != null) {
+            deviceRepo.findByUserId(shop.getOwnerId())
+                    .forEach(device -> {
+                        try {
+                            pushNotificationService.sendNotification(device, message);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    });
+        }
+        return true;
     }
 
 

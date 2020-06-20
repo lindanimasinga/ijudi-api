@@ -15,4 +15,6 @@ public interface OrderRepository extends MongoRepository<Order, String> {
     List<Order> findByShopPaidAndStageAndDateBefore(boolean shopPaid, OrderStage stage, Date orderDate);
 
     List<Order> findByShopId(String id);
+
+    List<Order> findByShopIdAndStageNot(String id, OrderStage stage);
 }

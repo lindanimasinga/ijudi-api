@@ -1,7 +1,10 @@
 package io.curiousoft.ijudi.ordermanagement.service;
 
 import io.curiousoft.ijudi.ordermanagement.model.*;
+import io.curiousoft.ijudi.ordermanagement.notification.FirebaseNotificationService;
+import io.curiousoft.ijudi.ordermanagement.repo.DeviceRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.OrderRepository;
+import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -11,10 +14,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
@@ -28,6 +28,12 @@ public class PaymentServiceTest {
     PaymentProvider ukheshePaymentProvider;
     @Mock
     OrderRepository orderRepo;
+    @Mock
+    FirebaseNotificationService pushNotificationService;
+    @Mock
+    private DeviceRepository deviceRepo;
+    @Mock
+    private StoreRepository storeRepository;
 
     @Before
     public void setUp() {
@@ -40,7 +46,12 @@ public class PaymentServiceTest {
         List<PaymentProvider> paymentProviders = new ArrayList<>();
         //adding all ukheshe services
         paymentProviders.add(ukheshePaymentProvider);
-        paymentService = new PaymentService(paymentProviders, orderRepo, 0);
+        paymentService = new PaymentService(pushNotificationService,
+                paymentProviders,
+                orderRepo,
+                deviceRepo,
+                storeRepository,
+                0);
 
         //given an order
         Order order = new Order();
@@ -79,7 +90,7 @@ public class PaymentServiceTest {
         List<PaymentProvider> paymentProviders = new ArrayList<>();
         //adding all ukheshe services
         paymentProviders.add(ukheshePaymentProvider);
-        paymentService = new PaymentService(paymentProviders, orderRepo, 0);
+        paymentService = new PaymentService(pushNotificationService, paymentProviders, orderRepo, deviceRepo, storeRepository, 0);
 
         //given an order
         Order order = new Order();
@@ -99,9 +110,27 @@ public class PaymentServiceTest {
         order.setStage(OrderStage.STAGE_6_WITH_CUSTOMER);
         order.setShopId("shopid");
 
+        StoreProfile shop = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                null,
+                ProfileRoles.CUSTOMER,
+                null,
+                "ownerId");;
+
+        Device storeDevice = new Device("token");
+        String content = "Payment of R " + order.getTotalAmount() + " received";
+        PushHeading heading = new PushHeading("Payment of R " + order.getTotalAmount() + " received",
+                "Order Payment Received", null);
+        PushMessage message = new PushMessage(PushMessageType.PAYMENT, heading, content);
+
         //when
         when(ukheshePaymentProvider.getPaymentType()).thenReturn(PaymentType.UKHESHE);
         when(ukheshePaymentProvider.makePayment(order)).thenReturn(true);
+        when(deviceRepo.findByUserId(shop.getOwnerId())).thenReturn(Collections.singletonList(storeDevice));
+        when(storeRepository.findById(order.getShopId())).thenReturn(Optional.of(shop));
 
         boolean received = paymentService.completePaymentToShop(order);
 
@@ -109,6 +138,9 @@ public class PaymentServiceTest {
         assertTrue(received);
         assertNotNull(order.getPaymentType());
         verify(ukheshePaymentProvider).makePayment(order);
+        verify(deviceRepo).findByUserId(shop.getOwnerId());
+        verify(storeRepository).findById(order.getShopId());
+        verify(pushNotificationService).sendNotification(storeDevice, message);
 
     }
 
@@ -117,8 +149,8 @@ public class PaymentServiceTest {
         List<PaymentProvider> paymentProviders = new ArrayList<>();
         //adding all ukheshe services
         paymentProviders.add(ukheshePaymentProvider);
-        paymentService = new PaymentService(paymentProviders,
-                orderRepo, 1);
+        paymentService = new PaymentService(pushNotificationService, paymentProviders,
+                orderRepo, deviceRepo, storeRepository, 1);
 
         //given an order
         Order order = new Order();
@@ -164,7 +196,7 @@ public class PaymentServiceTest {
 
         List<PaymentProvider> paymentProviders = new ArrayList<>();
         //adding all ukheshe services
-        paymentService = new PaymentService(paymentProviders, orderRepo, 0);
+        paymentService = new PaymentService(pushNotificationService, paymentProviders, orderRepo, deviceRepo, storeRepository, 0);
 
         //given an order
         Order order = new Order();

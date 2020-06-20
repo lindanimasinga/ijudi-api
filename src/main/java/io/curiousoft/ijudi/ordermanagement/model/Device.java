@@ -7,7 +7,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import javax.validation.constraints.NotBlank;
 import java.util.UUID;
 
-@Document
 public class Device extends BaseModel {
 
     @NotBlank(message = "device token required")
@@ -17,6 +16,12 @@ public class Device extends BaseModel {
 
     public Device(@NotBlank(message = "device token required") String token) {
         super(UUID.randomUUID().toString());
+        this.token = token;
+        this.userId = userId;
+    }
+
+    public Device() {
+        super(null);
         this.token = token;
         this.userId = userId;
     }

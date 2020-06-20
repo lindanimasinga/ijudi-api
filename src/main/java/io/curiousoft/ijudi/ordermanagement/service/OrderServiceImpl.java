@@ -179,7 +179,7 @@ public class OrderServiceImpl implements OrderService {
     public List<Order> findOrderByStoreId(String shopId) throws Exception {
         StoreProfile store = storeRepository.findById(shopId)
                 .orElseThrow(() -> new Exception("Store not found"));
-        return orderRepo.findByShopId(store.getId());
+        return orderRepo.findByShopIdAndStageNot(store.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
     }
 
     private void validate(Order order) throws Exception {
