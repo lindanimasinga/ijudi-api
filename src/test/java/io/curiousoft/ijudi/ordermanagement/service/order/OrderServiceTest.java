@@ -1232,6 +1232,7 @@ public class OrderServiceTest {
         //when
         when(storeRepo.findById(shopId)).thenReturn(Optional.of(initialProfile));
         when(repo.findByShopId(initialProfile.getId())).thenReturn(orders);
+        when(repo.findByShopIdAndStageNot(initialProfile.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID)).thenReturn(orders);
 
         List<Order> finalOrder = sut.findOrderByStoreId(shopId);
 
@@ -1241,6 +1242,7 @@ public class OrderServiceTest {
         Assert.assertEquals(shopId, finalOrder.get(0).getShopId());
         verify(repo).findByShopId(initialProfile.getId());
         verify(storeRepo).findById(shopId);
+        verify(repo).findByShopIdAndStageNot(initialProfile.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
     }
 
     @Test
