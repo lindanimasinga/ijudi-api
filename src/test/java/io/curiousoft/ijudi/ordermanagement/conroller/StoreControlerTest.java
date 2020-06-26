@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import io.curiousoft.ijudi.ordermanagement.IjudiApplication;
+import io.curiousoft.ijudi.ordermanagement.model.Bank;
 import io.curiousoft.ijudi.ordermanagement.model.BusinessHours;
 import io.curiousoft.ijudi.ordermanagement.model.ProfileRoles;
 import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
@@ -44,7 +45,8 @@ public class StoreControlerTest {
                 tags,
                 ProfileRoles.STORE,
                 businessHours,
-                "ffd4c856-644f-4453-a5ed-84689801a747");
+                "ffd4c856-644f-4453-a5ed-84689801a747",
+                new Bank());
 
         ResponseEntity<String> result = this.rest.exchange(
                 RequestEntity.post(new URI("/store")).body(store), String.class);

@@ -57,10 +57,14 @@ public class StoreControler {
 
     @GetMapping(produces = "application/json")
     public ResponseEntity<List<StoreProfile>> findAllStores(@RequestParam(required = false) boolean featured,
-                                                            @RequestParam(required = false) String ownerId) {
+                                                            @RequestParam(required = false) String ownerId,
+                                                            @RequestParam(required = false, defaultValue = "0") double latitude,
+                                                            @RequestParam(required = false, defaultValue = "0") double longitude,
+                                                            @RequestParam(required = false, defaultValue = "0") double range,
+                                                            @RequestParam(required = false, defaultValue = "0") int size) {
         List<StoreProfile> stores = featured ?
-                storeService.findFeatured() : !StringUtils.isEmpty(ownerId) ?
-                storeService.findByOwner(ownerId) : storeService.findAll();
+                storeService.findFeatured(latitude, longitude, range, size) : !StringUtils.isEmpty(ownerId) ?
+                storeService.findByOwner(ownerId) : storeService.findNearbyStores(latitude, longitude, range, size);
         return stores != null ? ResponseEntity.ok(stores) : ResponseEntity.notFound().build();
     }
 }

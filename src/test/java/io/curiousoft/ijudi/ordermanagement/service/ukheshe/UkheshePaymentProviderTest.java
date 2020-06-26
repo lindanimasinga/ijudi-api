@@ -165,7 +165,8 @@ public class UkheshePaymentProviderTest {
                 tags,
                 ProfileRoles.CUSTOMER,
                 null,
-                "ownerId");
+                "ownerId",
+                new Bank());
 
         Bank bank = new Bank();
         bank.setAccountId("2885091160");

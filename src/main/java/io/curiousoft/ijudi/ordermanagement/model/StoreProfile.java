@@ -6,9 +6,12 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
-import java.util.*;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
-public class StoreProfile extends Profile {
+public class StoreProfile extends Profile implements GeoPoint {
 
     @Indexed(unique = true) private String regNumber;
     @NotBlank String ownerId;
@@ -18,6 +21,8 @@ public class StoreProfile extends Profile {
     private boolean hasVat;
     private boolean featured;
     private Date featuredExpiry;
+    private double latitude;
+    private double longitude;
 
 
     public StoreProfile(@NotBlank(message = "profile name not valid") String name,
@@ -27,11 +32,13 @@ public class StoreProfile extends Profile {
                         @NotEmpty(message = "profile tags not valid") List<String> tags,
                         @NotNull(message = "role not valid") ProfileRoles role,
                         @NotEmpty(message = "Business hours not valid") List<BusinessHours> businessHours,
-                        @NotBlank(message = "shop owner id not valid") String ownerId) {
+                        @NotBlank(message = "shop owner id not valid") String ownerId,
+                        @NotNull(message = "Shop bank not valid") Bank bank) {
         super(name, address, imageUrl, mobileNumber, role);
         this.businessHours = businessHours;
         this.tags = tags;
         this.ownerId = ownerId;
+        setBank(bank);
     }
 
     public String getRegNumber() {
@@ -96,5 +103,25 @@ public class StoreProfile extends Profile {
 
     public void setOwnerId(String ownerId) {
         this.ownerId = ownerId;
+    }
+
+    @Override
+    public double getLatitude() {
+        return latitude;
+    }
+
+    @Override
+    public void setLatitude(double latitude) {
+        this.latitude = latitude;
+    }
+
+    @Override
+    public double getLongitude() {
+        return longitude;
+    }
+
+    @Override
+    public void setLongitude(double longitude) {
+        this.longitude = longitude;
     }
 }

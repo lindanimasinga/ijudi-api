@@ -118,7 +118,8 @@ public class PaymentServiceTest {
                 null,
                 ProfileRoles.CUSTOMER,
                 null,
-                "ownerId");;
+                "ownerId",
+                new Bank());;
 
         Device storeDevice = new Device("token");
         String content = "Payment of R " + order.getTotalAmount() + " received";

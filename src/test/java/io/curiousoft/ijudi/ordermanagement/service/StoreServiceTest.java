@@ -64,7 +64,8 @@ public class StoreServiceTest {
                 tags,
                 ProfileRoles.CUSTOMER,
                 businessHours,
-                "ownerId");
+                "ownerId",
+                new Bank());
 
 
         //when
@@ -95,7 +96,8 @@ public class StoreServiceTest {
                 tags,
                 ProfileRoles.CUSTOMER,
                 null,
-                "ownerId");
+                "ownerId",
+                new Bank());
 
         //when
         when(userProfileRepo.findById(initialProfile.getOwnerId())).thenReturn(Optional.empty());
@@ -122,7 +124,8 @@ public class StoreServiceTest {
                 tags,
                 ProfileRoles.CUSTOMER,
                 null,
-                "ownerId");
+                "ownerId",
+                new Bank());
 
         //when
         when(storeRepository.findById(profileId)).thenReturn(Optional.of(initialProfile));
@@ -147,7 +150,8 @@ public class StoreServiceTest {
                 tags,
                 ProfileRoles.CUSTOMER,
                 businessHours,
-                "ownerId");
+                "ownerId",
+                new Bank());
         initialProfile.setBusinessHours(new ArrayList<>());
 
         //when
@@ -175,7 +179,8 @@ public class StoreServiceTest {
                 tags,
                 ProfileRoles.CUSTOMER,
                 businessHours,
-                "ownerId");
+                "ownerId",
+                new Bank());
         initialProfile.setBusinessHours(new ArrayList<>());
         initialProfile.setFeatured(true);
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -192,7 +197,8 @@ public class StoreServiceTest {
                 tags,
                 ProfileRoles.CUSTOMER,
                 businessHours,
-                "ownerId");
+                "ownerId",
+                new Bank());
         initialProfile2.setBusinessHours(new ArrayList<>());
         initialProfile2.setFeatured(true);
         Date date2 = Date.from(LocalDateTime.now().minusDays(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -205,14 +211,84 @@ public class StoreServiceTest {
         initialProfiles.add(initialProfile);
         initialProfiles.add(initialProfile2);
 
+        double latitude = 1;
+        double longitude = 1;
+        double range = 1;
+        int maxStores = 1;
+
         //when
-        when(storeRepository.findByFeatured(true)).thenReturn(initialProfiles);
-        List<StoreProfile> returnedProfiles = storeService.findFeatured();
+        when(storeRepository.findByLatitudeBetweenAndLongitudeBetween(latitude - range, latitude + range, longitude - range, longitude + range))
+                .thenReturn(initialProfiles);
+        List<StoreProfile> returnedProfiles = storeService.findFeatured(latitude, longitude, range, maxStores);
 
         //verify
-        verify(storeRepository).findByFeatured(true);
+        verify(storeRepository).findByLatitudeBetweenAndLongitudeBetween(latitude - range, latitude + range, longitude - range, longitude + range);
         verify(storeRepository, never()).save(initialProfile);
         Assert.assertEquals(1, returnedProfiles.size());
+        Assert.assertEquals(MAIN_PAY_ACCOUNT, returnedProfiles.get(0).getBank().getAccountId());
+    }
+
+    @Test
+    public void findStoresByLocation() {
+
+        //given
+        String profileId = "myID";
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile initialProfile = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                ProfileRoles.CUSTOMER,
+                businessHours,
+                "ownerId",
+                new Bank());
+        initialProfile.setBusinessHours(new ArrayList<>());
+        initialProfile.setFeatured(true);
+        Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
+        initialProfile.setFeaturedExpiry(date);
+        Bank bank = new Bank();
+        bank.setAccountId("34567890");
+        initialProfile.setBank(bank);
+
+        StoreProfile initialProfile2 = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                ProfileRoles.CUSTOMER,
+                businessHours,
+                "ownerId",
+                new Bank());
+        initialProfile2.setBusinessHours(new ArrayList<>());
+        initialProfile2.setFeatured(true);
+        Date date2 = Date.from(LocalDateTime.now().minusDays(5).atZone(ZoneId.systemDefault()).toInstant());
+        initialProfile2.setFeaturedExpiry(date2);
+        Bank bank2 = new Bank();
+        bank2.setAccountId("34567890");
+        initialProfile2.setBank(bank2);
+
+        List<StoreProfile> initialProfiles = new ArrayList<>();
+        initialProfiles.add(initialProfile);
+        initialProfiles.add(initialProfile2);
+
+        double latitude = 10.10, longitude = 10.10, range = 10;
+        int maxLocations = 10;
+
+        //when
+        when(storeRepository
+                .findByLatitudeBetweenAndLongitudeBetween(latitude - range, latitude + range, longitude - range, longitude + range))
+                .thenReturn(initialProfiles);
+        List<StoreProfile> returnedProfiles = storeService.findNearbyStores(longitude, latitude,
+                range, maxLocations);
+
+        //verify
+        verify(storeRepository).findByLatitudeBetweenAndLongitudeBetween(latitude - range, latitude + range, longitude - range, longitude + range);
+        verify(storeRepository, never()).save(initialProfile);
+        Assert.assertEquals(2, returnedProfiles.size());
         Assert.assertEquals(MAIN_PAY_ACCOUNT, returnedProfiles.get(0).getBank().getAccountId());
     }
 
@@ -231,7 +307,8 @@ public class StoreServiceTest {
                 tags,
                 ProfileRoles.CUSTOMER,
                 businessHours,
-                "ownerId");
+                "ownerId",
+                new Bank());
         initialProfile.setBusinessHours(new ArrayList<>());
         initialProfile.setFeatured(true);
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -248,7 +325,8 @@ public class StoreServiceTest {
                 tags,
                 ProfileRoles.CUSTOMER,
                 businessHours,
-                "ownerId");
+                "ownerId",
+                new Bank());
         initialProfile2.setBusinessHours(new ArrayList<>());
         initialProfile2.setFeatured(true);
 
@@ -256,12 +334,17 @@ public class StoreServiceTest {
         initialProfiles.add(initialProfile);
         initialProfiles.add(initialProfile2);
 
+        double latitude = 10.10, longitude = 10.10, range = 10;
+        int maxLocations = 10;
+
         //when
-        when(storeRepository.findByFeatured(true)).thenReturn(initialProfiles);
-        List<StoreProfile> returnedProfiles = storeService.findFeatured();
+        when(storeRepository
+                .findByLatitudeBetweenAndLongitudeBetween(latitude - range, latitude + range, longitude - range, longitude + range))
+                .thenReturn(initialProfiles);
+        List<StoreProfile> returnedProfiles = storeService.findFeatured(latitude, latitude, range, maxLocations );
 
         //verify
-        verify(storeRepository).findByFeatured(true);
+        verify(storeRepository).findByLatitudeBetweenAndLongitudeBetween(latitude - range, latitude + range, longitude - range, longitude + range);
         verify(storeRepository, never()).save(initialProfile);
         Assert.assertEquals(1, returnedProfiles.size());
         Assert.assertEquals(MAIN_PAY_ACCOUNT, returnedProfiles.get(0).getBank().getAccountId());
@@ -281,7 +364,8 @@ public class StoreServiceTest {
                 tags,
                 ProfileRoles.CUSTOMER,
                 businessHours,
-                "ownerId");
+                "ownerId",
+                new Bank());
         initialProfile.setBusinessHours(new ArrayList<>());
         initialProfile.setFeatured(true);
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -298,7 +382,8 @@ public class StoreServiceTest {
                 tags,
                 ProfileRoles.CUSTOMER,
                 businessHours,
-                "ownerId");
+                "ownerId",
+                new Bank());
         initialProfile2.setBusinessHours(new ArrayList<>());
         initialProfile2.setFeatured(true);
 
@@ -332,7 +417,8 @@ public class StoreServiceTest {
                  tags,
                 ProfileRoles.CUSTOMER,
                 businessHours,
-                "ownerId");
+                "ownerId",
+                new Bank());
         initialProfile.setBusinessHours(new ArrayList<>());
         initialProfile.setFeatured(true);
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -370,7 +456,8 @@ public class StoreServiceTest {
                 tags,
                 ProfileRoles.CUSTOMER,
                 businessHours,
-                "ownerId");
+                "ownerId",
+                new Bank());
         initialProfile.setBusinessHours(new ArrayList<>());
         initialProfile.setFeatured(true);
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -407,7 +494,8 @@ public class StoreServiceTest {
                 tags,
                 ProfileRoles.CUSTOMER,
                 businessHours,
-                "ownerId");
+                "ownerId",
+                new Bank());
         initialProfile.setBusinessHours(new ArrayList<>());
         initialProfile.setFeatured(true);
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -447,7 +535,8 @@ public class StoreServiceTest {
                 tags,
                 ProfileRoles.CUSTOMER,
                 businessHours,
-                "ownerId");
+                "ownerId",
+                new Bank());
         initialProfile.setBusinessHours(new ArrayList<>());
         initialProfile.setFeatured(true);
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());

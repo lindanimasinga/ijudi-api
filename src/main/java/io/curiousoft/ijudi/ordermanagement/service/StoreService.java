@@ -10,6 +10,8 @@ import java.time.DayOfWeek;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static io.curiousoft.ijudi.ordermanagement.model.GeoDistance.getDistanceInKiloMetersBetweenTwoGeoPoints;
+
 @Service
 public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfile> {
 
@@ -63,15 +65,12 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         return profileRepo.findByOwnerId(ownerId);
     }
 
-    public List<StoreProfile> findFeatured() {
-        List<StoreProfile> profiles = profileRepo.findByFeatured(true);
-        return profiles.stream()
-                .filter(profile -> profile.getFeaturedExpiry() != null)
+    public List<StoreProfile> findFeatured(double latitude, double longitude, double range, int maxStores) {
+        return findNearbyStores(latitude, longitude, range, maxStores)
+                .stream()
+                .filter(storeProfile ->  storeProfile.getFeaturedExpiry() != null)
                 .filter(profile -> profile.getFeaturedExpiry().after(new Date()))
-                .map(profile -> {
-                    profile.getBank().setAccountId(mainPayAccount);
-                    return profile;
-                })
+                .filter(StoreProfile::getFeatured)
                 .collect(Collectors.toList());
     }
 
@@ -85,5 +84,27 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         StoreProfile store = profileRepo.findById(profileId).orElseThrow(() -> new Exception("Profile not found"));
         store.getStockList().add(stock);
         profileRepo.save(store);
+    }
+
+    public List<StoreProfile> findNearbyStores(double latitude, double longitude, double range, int maxLocations) {
+        double maxLong = longitude + range,
+                minLong = longitude - range;
+        double maxLat = latitude + range,
+                minLat = latitude - range;
+
+        List<StoreProfile> stores = profileRepo.findByLatitudeBetweenAndLongitudeBetween(minLat,
+                maxLat, minLong, maxLong).stream()
+                .peek(profile -> profile.getBank().setAccountId(mainPayAccount))
+                .collect(Collectors.toList());;
+
+        GeoPoint origin = new GeoPointImpl(latitude, longitude);
+        Collections.sort(stores, (a, b) -> {
+            double distanceToA = getDistanceInKiloMetersBetweenTwoGeoPoints(origin, a);
+            double distanceToB = getDistanceInKiloMetersBetweenTwoGeoPoints(origin, b);
+            return (int) (distanceToA - distanceToB);
+        });
+
+        maxLocations = maxLocations <= 0 ? 30 : maxLocations;
+        return maxLocations > stores.size() ?  stores : stores.subList(0, maxLocations);
     }
 }
