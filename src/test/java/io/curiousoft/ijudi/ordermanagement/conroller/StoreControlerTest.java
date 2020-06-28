@@ -43,7 +43,6 @@ public class StoreControlerTest {
                 "path to image",
                 "9111111707",
                 tags,
-                ProfileRoles.STORE,
                 businessHours,
                 "ffd4c856-644f-4453-a5ed-84689801a747",
                 new Bank());

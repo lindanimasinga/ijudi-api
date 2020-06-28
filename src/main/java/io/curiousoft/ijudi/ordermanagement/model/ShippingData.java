@@ -23,12 +23,10 @@ public class ShippingData {
 
     public ShippingData(@NotBlank(message = "shipping address not valid") String fromAddress,
                         @NotBlank(message = "shipping destination address id not valid") String toAddress,
-                        @NotNull ShippingType type,
-                        double fee) {
+                        @NotNull ShippingType type) {
         this.fromAddress = fromAddress;
         this.toAddress = toAddress;
         this.type = type;
-        this.fee = fee;
     }
 
     public String getId() {

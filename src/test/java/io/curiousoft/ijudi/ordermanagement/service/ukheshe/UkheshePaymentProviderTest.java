@@ -20,7 +20,7 @@ import static org.mockito.Mockito.when;
 public class UkheshePaymentProviderTest {
 
     //sut
-    private UkheshePaymentProvider ukheshePaymentService;
+    private UkheshePaymentProvider ukheshePaymentProvider;
 
     @Mock
     StoreRepository storeRepository;
@@ -35,7 +35,7 @@ public class UkheshePaymentProviderTest {
         String customerId = "534";
         String mainAccount = "2885091160";
 
-        ukheshePaymentService = new UkheshePaymentProvider(baseUrl,
+        ukheshePaymentProvider = new UkheshePaymentProvider(baseUrl,
                 username,
                 customerId,
                 password,
@@ -49,8 +49,7 @@ public class UkheshePaymentProviderTest {
         messenger.setId("messagerID");
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setPaymentType(PaymentType.UKHESHE);
@@ -61,7 +60,7 @@ public class UkheshePaymentProviderTest {
 
         //when
         try {
-            boolean received = ukheshePaymentService.paymentReceived(order);
+            boolean received = ukheshePaymentProvider.paymentReceived(order);
             fail();
         } catch (Exception e) {
             Assert.assertEquals("401 Unauthorized: [no body]", e.getMessage());
@@ -78,7 +77,7 @@ public class UkheshePaymentProviderTest {
         String customerId = "534";
         String mainAccount = "2885091160";
 
-        ukheshePaymentService = new UkheshePaymentProvider(
+        ukheshePaymentProvider = new UkheshePaymentProvider(
                 baseUrl, username, customerId, password, mainAccount,
                 storeRepository);
 
@@ -96,8 +95,7 @@ public class UkheshePaymentProviderTest {
         messenger.setId("messagerID");
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
@@ -109,11 +107,11 @@ public class UkheshePaymentProviderTest {
 
         //when
 
-        boolean received = ukheshePaymentService.paymentReceived(order);
+        boolean received = ukheshePaymentProvider.paymentReceived(order);
 
         //verify
         Assert.assertTrue(received);
-        Assert.assertNotNull(ukheshePaymentService.getUkhesheAuthtoken());
+        Assert.assertNotNull(ukheshePaymentProvider.getUkhesheAuthtoken());
 
     }
 
@@ -126,7 +124,7 @@ public class UkheshePaymentProviderTest {
         String customerId = "534";
         String mainAccount = "2885091160";
 
-        ukheshePaymentService = new UkheshePaymentProvider(
+        ukheshePaymentProvider = new UkheshePaymentProvider(
                 baseUrl, username, customerId, password, mainAccount,
                 storeRepository);
 
@@ -144,8 +142,7 @@ public class UkheshePaymentProviderTest {
         messenger.setId("messagerID");
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                0);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
@@ -163,7 +160,6 @@ public class UkheshePaymentProviderTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
                 null,
                 "ownerId",
                 new Bank());
@@ -177,7 +173,7 @@ public class UkheshePaymentProviderTest {
         //when
         when(storeRepository.findById(order.getShopId())).thenReturn(Optional.of(shop));
 
-        boolean paid = ukheshePaymentService.makePayment(order);
+        boolean paid = ukheshePaymentProvider.makePayment(order, order.getBasketAmount());
 
         verify(storeRepository).findById(order.getShopId());
         Assert.assertTrue(paid);
@@ -192,7 +188,7 @@ public class UkheshePaymentProviderTest {
         String customerId = "534";
         String mainAccount = "account";
 
-        ukheshePaymentService = new UkheshePaymentProvider(
+        ukheshePaymentProvider = new UkheshePaymentProvider(
                 baseUrl, username, customerId, password, mainAccount,
                 storeRepository);
 
@@ -210,8 +206,7 @@ public class UkheshePaymentProviderTest {
         messenger.setId("messagerID");
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
@@ -222,7 +217,7 @@ public class UkheshePaymentProviderTest {
         order.setShopId("shopid");
 
         try {
-            boolean paid = ukheshePaymentService.makePayment(order);
+            boolean paid = ukheshePaymentProvider.makePayment(order, order.getBasketAmount());
             fail();
         } catch (Exception e) {
             Assert.assertEquals("shop does not exist", e.getMessage());

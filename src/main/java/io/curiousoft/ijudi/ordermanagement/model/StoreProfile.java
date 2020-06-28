@@ -30,11 +30,10 @@ public class StoreProfile extends Profile implements GeoPoint {
                         @NotBlank(message = "profile image url not valid") String imageUrl,
                         @NotBlank(message = "profile mobile number not valid") String mobileNumber,
                         @NotEmpty(message = "profile tags not valid") List<String> tags,
-                        @NotNull(message = "role not valid") ProfileRoles role,
                         @NotEmpty(message = "Business hours not valid") List<BusinessHours> businessHours,
                         @NotBlank(message = "shop owner id not valid") String ownerId,
                         @NotNull(message = "Shop bank not valid") Bank bank) {
-        super(name, address, imageUrl, mobileNumber, role);
+        super(name, address, imageUrl, mobileNumber, ProfileRoles.STORE);
         this.businessHours = businessHours;
         this.tags = tags;
         this.ownerId = ownerId;

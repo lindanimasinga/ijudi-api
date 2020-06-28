@@ -38,7 +38,7 @@ public class StoreServiceTest {
     public void create() throws Exception {
 
         //given
-        UserProfile user =  new UserProfile(
+        UserProfile user = new UserProfile(
                 "name",
                 "address",
                 "https://image.url",
@@ -62,7 +62,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -94,7 +94,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+
                 null,
                 "ownerId",
                 new Bank());
@@ -122,7 +122,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+
                 null,
                 "ownerId",
                 new Bank());
@@ -148,7 +148,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -177,7 +177,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -195,7 +195,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -241,7 +241,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -259,7 +259,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -305,7 +305,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -323,7 +323,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -341,7 +341,7 @@ public class StoreServiceTest {
         when(storeRepository
                 .findByLatitudeBetweenAndLongitudeBetween(latitude - range, latitude + range, longitude - range, longitude + range))
                 .thenReturn(initialProfiles);
-        List<StoreProfile> returnedProfiles = storeService.findFeatured(latitude, latitude, range, maxLocations );
+        List<StoreProfile> returnedProfiles = storeService.findFeatured(latitude, latitude, range, maxLocations);
 
         //verify
         verify(storeRepository).findByLatitudeBetweenAndLongitudeBetween(latitude - range, latitude + range, longitude - range, longitude + range);
@@ -362,7 +362,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -380,7 +380,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -414,8 +414,8 @@ public class StoreServiceTest {
                 "address",
                 "https://image.url",
                 "081mobilenumb",
-                 tags,
-                ProfileRoles.CUSTOMER,
+                tags,
+
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -454,7 +454,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -492,7 +492,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -533,7 +533,7 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+
                 businessHours,
                 "ownerId",
                 new Bank());

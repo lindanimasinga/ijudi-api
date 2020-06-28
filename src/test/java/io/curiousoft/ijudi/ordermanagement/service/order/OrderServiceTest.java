@@ -43,7 +43,11 @@ public class OrderServiceTest {
 
     @Before
     public void setUp() throws Exception {
+        double deliveryFee = 10;
+        double serviceFee = 5;
         sut = new OrderServiceImpl(
+                deliveryFee,
+                serviceFee,
                 repo,
                 storeRepo,
                 customerRepo,
@@ -53,7 +57,7 @@ public class OrderServiceTest {
     }
 
     @Test
-    public void startOrder() throws Exception {
+    public void startOrderOnlineDelivery() throws Exception {
 
         //given
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
@@ -64,7 +68,7 @@ public class OrderServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+                
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -74,6 +78,10 @@ public class OrderServiceTest {
 
         Order order = new Order();
         Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
         order.setBasket(basket);
 
         Messager messenger = new Messager();
@@ -81,8 +89,7 @@ public class OrderServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
 
@@ -103,7 +110,76 @@ public class OrderServiceTest {
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
         Assert.assertNotNull(order.getDate());
+        Assert.assertEquals(10, order.getShippingData().getFee(), 0);
+        Assert.assertEquals(5.00, order.getServiceFee(), 0);
+        Assert.assertEquals(40.00, order.getBasketAmount(), 0);
         Assert.assertEquals(false, order.getHasVat());
+        verify(repo).save(order);
+        verify(customerRepo).existsById(order.getCustomerId());
+        verify(storeRepo).findById(order.getShopId());
+    }
+
+    @Test
+    public void startOrderOnlineCollectionOrPayInstore() throws Exception {
+
+        //given
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile storeProfile = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                
+                businessHours,
+                "ownerId",
+                new Bank());
+        storeProfile.setBusinessHours(new ArrayList<>());
+        storeProfile.setFeatured(true);
+        storeProfile.setHasVat(false);
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+
+        //when
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+        when(repo.save(order)).thenReturn(order);
+
+        Order newOrder = sut.startOrder(order);
+
+        //verify
+        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        Assert.assertNotNull(order.getId());
+        Assert.assertNotNull(order.getDate());
+        Assert.assertEquals(5.00, order.getServiceFee(), 0);
+        Assert.assertEquals(10.00, order.getShippingData().getFee(), 0);
+        Assert.assertEquals(40.00, order.getBasketAmount(), 0);
+        //verify total amount paid
+        Assert.assertEquals(order.getServiceFee() + basket.getItems().stream()
+                .mapToDouble(BasketItem::getPrice).sum() + shipping.getFee(), order.getTotalAmount(), 0);
+        Assert.assertFalse(order.getHasVat());
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
@@ -121,7 +197,7 @@ public class OrderServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+                
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -133,6 +209,10 @@ public class OrderServiceTest {
 
         Order order = new Order();
         Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
         order.setBasket(basket);
 
         Messager messenger = new Messager();
@@ -140,8 +220,7 @@ public class OrderServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
 
@@ -163,6 +242,9 @@ public class OrderServiceTest {
         Assert.assertNotNull(order.getId());
         Assert.assertNotNull(order.getDate());
         Assert.assertTrue(order.getHasVat());
+        Assert.assertEquals(5.00, order.getServiceFee(), 0);
+        Assert.assertEquals(10.00, order.getShippingData().getFee(), 0);
+        Assert.assertEquals(40, order.getBasketAmount(), 0);
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
@@ -174,6 +256,10 @@ public class OrderServiceTest {
         //given
         Order order = new Order();
         Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
         order.setBasket(basket);
 
         Messager messenger = new Messager();
@@ -181,8 +267,7 @@ public class OrderServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
 
@@ -205,6 +290,10 @@ public class OrderServiceTest {
         //given
         Order order = new Order();
         Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
         order.setBasket(basket);
 
         Messager messenger = new Messager();
@@ -212,8 +301,7 @@ public class OrderServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setOrderType(OrderType.ONLINE);
@@ -245,7 +333,7 @@ public class OrderServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+                
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -262,8 +350,7 @@ public class OrderServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
 
@@ -290,6 +377,10 @@ public class OrderServiceTest {
             //given
             Order order = new Order();
             Basket basket = new Basket();
+            List<BasketItem> items = new ArrayList<>();
+            items.add(new BasketItem("chips", 2, 10, 0));
+            items.add(new BasketItem("hotdog", 1, 20, 0));
+            basket.setItems(items);
             order.setBasket(basket);
 
             UserProfile messenger = new UserProfile(
@@ -323,6 +414,10 @@ public class OrderServiceTest {
         //given
         Order order = new Order();
         Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
         order.setBasket(basket);
 
         Messager messenger = new Messager();
@@ -330,8 +425,7 @@ public class OrderServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setOrderType(OrderType.ONLINE);
@@ -358,6 +452,10 @@ public class OrderServiceTest {
             //given
             Order order = new Order();
             Basket basket = new Basket();
+            List<BasketItem> items = new ArrayList<>();
+            items.add(new BasketItem("chips", 2, 10, 0));
+            items.add(new BasketItem("hotdog", 1, 20, 0));
+            basket.setItems(items);
             order.setBasket(basket);
 
             UserProfile messenger = new UserProfile(
@@ -392,6 +490,10 @@ public class OrderServiceTest {
             //given
             Order order = new Order();
             Basket basket = new Basket();
+            List<BasketItem> items = new ArrayList<>();
+            items.add(new BasketItem("chips", 2, 10, 0));
+            items.add(new BasketItem("hotdog", 1, 20, 0));
+            basket.setItems(items);
             order.setBasket(basket);
 
             UserProfile messenger = new UserProfile(
@@ -434,6 +536,10 @@ public class OrderServiceTest {
             //given
             Order order = new Order();
             Basket basket = new Basket();
+            List<BasketItem> items = new ArrayList<>();
+            items.add(new BasketItem("chips", 2, 10, 0));
+            items.add(new BasketItem("hotdog", 1, 20, 0));
+            basket.setItems(items);
             order.setBasket(basket);
 
             Messager messenger = new Messager();
@@ -441,8 +547,7 @@ public class OrderServiceTest {
 
             ShippingData shipping = new ShippingData("shopAddress",
                     "to address",
-                    ShippingData.ShippingType.DELIVERY,
-                    10);
+                    ShippingData.ShippingType.DELIVERY);
             shipping.setMessenger(messenger);
             order.setShippingData(shipping);
             order.setOrderType(OrderType.ONLINE);
@@ -470,6 +575,10 @@ public class OrderServiceTest {
             //given
             Order order = new Order();
             Basket basket = new Basket();
+            List<BasketItem> items = new ArrayList<>();
+            items.add(new BasketItem("chips", 2, 10, 0));
+            items.add(new BasketItem("hotdog", 1, 20, 0));
+            basket.setItems(items);
             order.setBasket(basket);
 
             Messager messenger = new Messager();
@@ -477,8 +586,7 @@ public class OrderServiceTest {
 
             ShippingData shipping = new ShippingData("shopAddress",
                     "to address",
-                    ShippingData.ShippingType.DELIVERY,
-                    10);
+                    ShippingData.ShippingType.DELIVERY);
             shipping.setMessenger(messenger);
             order.setShippingData(shipping);
 
@@ -512,8 +620,7 @@ public class OrderServiceTest {
 
             ShippingData shipping = new ShippingData("shopAddress",
                     "to address",
-                    ShippingData.ShippingType.DELIVERY,
-                    10);
+                    ShippingData.ShippingType.DELIVERY);
             shipping.setMessenger(messenger);
             order.setShippingData(shipping);
 
@@ -540,9 +647,14 @@ public class OrderServiceTest {
 
         //given
         List<Device> storeDevices = Collections.singletonList(new Device("token"));
+        List<Device> messengerDevices = Collections.singletonList(new Device("token"));
         String shopId = "shopid";
         Order order = new Order();
         Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
         order.setBasket(basket);
 
         Messager messenger = new Messager();
@@ -550,8 +662,7 @@ public class OrderServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -571,7 +682,7 @@ public class OrderServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+                
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -591,6 +702,7 @@ public class OrderServiceTest {
         when(repo.save(order)).thenReturn(order);
         when(storeRepo.findById(shopId)).thenReturn(Optional.of(shop));
         when(deviceRepo.findByUserId(shop.getOwnerId())).thenReturn(storeDevices);
+        when(deviceRepo.findByUserId(order.getShippingData().getMessenger().getId())).thenReturn(messengerDevices);
 
         Order finalOrder = sut.finishOder(order);
 
@@ -605,7 +717,8 @@ public class OrderServiceTest {
         verify(repo).findById(order.getId());
         verify(storeRepo).findById(shopId);
         verify(storeRepo).save(shop);
-        verify(pushNotificationService).notifyOrderPlaced(storeDevices, order);
+        verify(pushNotificationService).notifyStoreOrderPlaced(storeDevices, order);
+        verify(pushNotificationService).notifyMessengerOrderPlaced(messengerDevices, order, shop);
         verify(deviceRepo).findByUserId(shop.getOwnerId());
     }
 
@@ -617,6 +730,10 @@ public class OrderServiceTest {
         String shopId = "shopid";
         Order order = new Order();
         Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
         order.setBasket(basket);
 
         Messager messenger = new Messager();
@@ -624,8 +741,7 @@ public class OrderServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -645,7 +761,7 @@ public class OrderServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+                
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -682,7 +798,7 @@ public class OrderServiceTest {
         verify(repo).findById(order.getId());
         verify(storeRepo).findById(shopId);
         verify(storeRepo).save(shop);
-        verify(pushNotificationService).notifyOrderPlaced(storeDevices, order);
+        verify(pushNotificationService).notifyStoreOrderPlaced(storeDevices, order);
         verify(deviceRepo).findByUserId(shop.getOwnerId());
 
     }
@@ -694,6 +810,10 @@ public class OrderServiceTest {
         String shopId = "shopid";
         Order order = new Order();
         Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
         order.setBasket(basket);
 
         Messager messenger = new Messager();
@@ -701,8 +821,7 @@ public class OrderServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -723,7 +842,7 @@ public class OrderServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+                
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -770,8 +889,7 @@ public class OrderServiceTest {
 
             ShippingData shipping = new ShippingData("shopAddress",
                     "to address",
-                    ShippingData.ShippingType.DELIVERY,
-                    10);
+                    ShippingData.ShippingType.DELIVERY);
             shipping.setMessenger(messenger);
             order.setShippingData(shipping);
             order.setOrderType(OrderType.ONLINE);
@@ -806,8 +924,7 @@ public class OrderServiceTest {
         messenger.setId("messagerID");
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setCustomerId(customerId);
@@ -822,8 +939,7 @@ public class OrderServiceTest {
         messenger.setId("messagerID");
         ShippingData shipping2 = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger2);
         order2.setShippingData(shipping2);
         order2.setCustomerId(customerId);
@@ -876,8 +992,7 @@ public class OrderServiceTest {
         messenger.setId("messagerID");
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setCustomerId(customerId);
@@ -892,8 +1007,7 @@ public class OrderServiceTest {
         messenger.setId("messagerID");
         ShippingData shipping2 = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger2);
         order2.setShippingData(shipping2);
         order2.setCustomerId(customerId);
@@ -941,8 +1055,7 @@ public class OrderServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setDescription("081281445");
@@ -960,7 +1073,7 @@ public class OrderServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+                
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -1006,8 +1119,7 @@ public class OrderServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -1043,8 +1155,7 @@ public class OrderServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -1079,8 +1190,7 @@ public class OrderServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -1115,8 +1225,7 @@ public class OrderServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -1151,8 +1260,7 @@ public class OrderServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.COLLECTION,
-                10);
+                ShippingData.ShippingType.COLLECTION);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -1189,8 +1297,7 @@ public class OrderServiceTest {
         messenger.setId("messagerID");
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setCustomerId("customer");
@@ -1205,8 +1312,7 @@ public class OrderServiceTest {
         messenger.setId("messagerID");
         ShippingData shipping2 = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger2);
         order2.setShippingData(shipping2);
         order2.setCustomerId("customer id");
@@ -1225,7 +1331,7 @@ public class OrderServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.CUSTOMER,
+                
                 businessHours,
                 "ownerId",
                 new Bank());
@@ -1265,8 +1371,7 @@ public class OrderServiceTest {
         messenger.setId("messagerID");
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setCustomerId("customer");
@@ -1281,8 +1386,7 @@ public class OrderServiceTest {
         messenger.setId("messagerID");
         ShippingData shipping2 = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger2);
         order2.setShippingData(shipping2);
         order2.setCustomerId("customer id");
@@ -1300,7 +1404,6 @@ public class OrderServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                ProfileRoles.STORE,
                 businessHours,
                 "ownerId",
                 new Bank());

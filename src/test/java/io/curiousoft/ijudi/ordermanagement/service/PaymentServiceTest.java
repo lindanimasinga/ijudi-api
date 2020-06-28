@@ -61,8 +61,7 @@ public class PaymentServiceTest {
         messenger.setId("messagerID");
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setPaymentType(PaymentType.UKHESHE);
@@ -90,18 +89,23 @@ public class PaymentServiceTest {
         List<PaymentProvider> paymentProviders = new ArrayList<>();
         //adding all ukheshe services
         paymentProviders.add(ukheshePaymentProvider);
-        paymentService = new PaymentService(pushNotificationService, paymentProviders, orderRepo, deviceRepo, storeRepository, 0);
+        paymentService = new PaymentService(pushNotificationService,
+                paymentProviders, orderRepo, deviceRepo, storeRepository, 0);
 
         //given an order
         Order order = new Order();
         Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
         order.setBasket(basket);
         Messager messenger = new Messager();
         messenger.setId("messagerID");
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setFee(10);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setPaymentType(PaymentType.UKHESHE);
@@ -109,6 +113,7 @@ public class PaymentServiceTest {
         order.setCustomerId("customerId");
         order.setStage(OrderStage.STAGE_6_WITH_CUSTOMER);
         order.setShopId("shopid");
+        order.setServiceFee(5.00);
 
         StoreProfile shop = new StoreProfile(
                 "name",
@@ -116,20 +121,19 @@ public class PaymentServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 null,
-                ProfileRoles.CUSTOMER,
                 null,
                 "ownerId",
                 new Bank());;
 
         Device storeDevice = new Device("token");
-        String content = "Payment of R " + order.getTotalAmount() + " received";
-        PushHeading heading = new PushHeading("Payment of R " + order.getTotalAmount() + " received",
+        String content = "Payment of R " + order.getBasketAmount() + " received";
+        PushHeading heading = new PushHeading("Payment of R " + order.getBasketAmount() + " received",
                 "Order Payment Received", null);
         PushMessage message = new PushMessage(PushMessageType.PAYMENT, heading, content);
 
         //when
         when(ukheshePaymentProvider.getPaymentType()).thenReturn(PaymentType.UKHESHE);
-        when(ukheshePaymentProvider.makePayment(order)).thenReturn(true);
+        when(ukheshePaymentProvider.makePayment(order, order.getBasketAmount())).thenReturn(true);
         when(deviceRepo.findByUserId(shop.getOwnerId())).thenReturn(Collections.singletonList(storeDevice));
         when(storeRepository.findById(order.getShopId())).thenReturn(Optional.of(shop));
 
@@ -138,7 +142,8 @@ public class PaymentServiceTest {
         //verify
         assertTrue(received);
         assertNotNull(order.getPaymentType());
-        verify(ukheshePaymentProvider).makePayment(order);
+        verify(ukheshePaymentProvider).makePayment(order, order.getBasketAmount());
+        verify(ukheshePaymentProvider).makePayment(order, 40);
         verify(deviceRepo).findByUserId(shop.getOwnerId());
         verify(storeRepository).findById(order.getShopId());
         verify(pushNotificationService).sendNotification(storeDevice, message);
@@ -162,8 +167,7 @@ public class PaymentServiceTest {
         messenger.setId("messagerID");
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setPaymentType(PaymentType.UKHESHE);
@@ -186,7 +190,7 @@ public class PaymentServiceTest {
         assertEquals(OrderStage.STAGE_7_PAID_SHOP, order.getStage());
         Assert.assertTrue(order.getShopPaid());
         verify(orderRepo).findByShopPaidAndStageAndDateBefore(eq(false), eq(OrderStage.STAGE_6_WITH_CUSTOMER), any(Date.class));
-        verify(ukheshePaymentProvider).makePayment(ordersList.get(0));
+        verify(ukheshePaymentProvider).makePayment(ordersList.get(0), ordersList.get(0).getBasketAmount());
         verify(orderRepo).save(ordersList.get(0));
 
     }
@@ -207,8 +211,7 @@ public class PaymentServiceTest {
         messenger.setId("messagerID");
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setPaymentType(PaymentType.UKHESHE);

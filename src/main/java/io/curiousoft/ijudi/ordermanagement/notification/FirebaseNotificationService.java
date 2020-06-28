@@ -4,6 +4,7 @@ package io.curiousoft.ijudi.ordermanagement.notification;
 import com.curiousoft.google.services.FCMMessage;
 import com.curiousoft.google.services.FirebaseConnectionWrapper;
 import io.curiousoft.ijudi.ordermanagement.model.*;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -28,8 +29,9 @@ public class FirebaseNotificationService implements PushNotificationService {
         firebaseConnectionWrapper.sendMessage(fcmMessage);
     }
 
+    @Async
     @Override
-    public void notifyOrderPlaced(List<Device> devices, Order order) {
+    public void notifyStoreOrderPlaced(List<Device> devices, Order order) {
         devices.forEach(device -> {
             PushHeading title = new PushHeading("New " + order.getOrderType().toString() + " Order",
                     PushMessageType.NEW_ORDER.toString(), null);
@@ -102,5 +104,22 @@ public class FirebaseNotificationService implements PushNotificationService {
             topic = !topic.startsWith(TOPICS) ? TOPICS + topic : topic;
             firebaseConnectionWrapper.unSubscribe(topic, deviceToken);
         }
+    }
+
+    @Async
+    @Override
+    public void notifyMessengerOrderPlaced(List<Device> messengerDevices,
+                                           Order order,
+                                           StoreProfile shop) {
+        messengerDevices.forEach(device -> {
+            PushHeading title = new PushHeading("New place at " +shop.getName()+ " Order. we will notify when an order is ready for collection.",
+                    PushMessageType.NEW_ORDER.toString(), null);
+            PushMessage message = new PushMessage(PushMessageType.NEW_ORDER, title, order);
+            try {
+                sendNotification(device, message);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
     }
 }

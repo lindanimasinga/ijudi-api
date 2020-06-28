@@ -1,5 +1,6 @@
 package io.curiousoft.ijudi.ordermanagement.model;
 
+import javax.validation.constraints.NotEmpty;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -7,6 +8,7 @@ public class Basket {
 
 
     private String id;
+    @NotEmpty(message = "order basket is empty")
     private List<BasketItem> items = new ArrayList<>();
 
 

@@ -26,7 +26,7 @@ public class CashPaymentProvider extends PaymentProvider {
     }
 
     @Override
-    public boolean makePayment(Order order) throws Exception {
+    public boolean makePayment(Order order, double basketAmountExclFees) throws Exception {
         return true;
     }
 

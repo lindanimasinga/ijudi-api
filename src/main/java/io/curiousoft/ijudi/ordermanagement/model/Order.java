@@ -5,8 +5,10 @@ import io.curiousoft.ijudi.ordermanagement.validator.ValidDeliveryInfo;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import javax.validation.Valid;
+import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.PositiveOrZero;
 import java.util.Date;
 
 @Document
@@ -32,6 +34,8 @@ public class Order extends BaseModel {
     private OrderType orderType;
     private boolean hasVat;
     private boolean shopPaid;
+    @PositiveOrZero(message = "service fee was modified")
+    private double serviceFee;
 
     public void setDate(Date date) {
         this.date = date;
@@ -98,7 +102,7 @@ public class Order extends BaseModel {
     }
 
     public double getTotalAmount() {
-        return basket.getItems().stream()
+        return serviceFee + basket.getItems().stream()
                     .mapToDouble(BasketItem::getPrice).sum() + shippingData.getFee();
     }
 
@@ -129,5 +133,18 @@ public class Order extends BaseModel {
     @Override
     public boolean equals(Object obj) {
         return obj instanceof Order && getId().equals(((Order) obj).getId());
+    }
+
+    public double getBasketAmount() {
+        return basket.getItems().stream()
+                .mapToDouble(item -> item.getPrice() * item.getQuantity()).sum();
+    }
+
+    public double getServiceFee() {
+        return serviceFee;
+    }
+
+    public void setServiceFee(double serviceFee) {
+        this.serviceFee = serviceFee;
     }
 }

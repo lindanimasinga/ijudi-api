@@ -54,9 +54,9 @@ public class PaymentService {
                 .filter(service -> order.getPaymentType() == service.getPaymentType())
                 .findFirst().orElseThrow(() -> new Exception("Your order has no ukheshe type set or the ukheshe provider for " + order.getPaymentType() + " not configured on the server"));
 
-        paymentProvider.makePayment(order);
-        String content = "Payment of R " + order.getTotalAmount() + " received";
-        PushHeading heading = new PushHeading("Payment of R " + order.getTotalAmount() + " received",
+        paymentProvider.makePayment(order, order.getBasketAmount());
+        String content = "Payment of R " + order.getBasketAmount() + " received";
+        PushHeading heading = new PushHeading("Payment of R " + order.getBasketAmount() + " received",
                 "Order Payment Received", null);
         PushMessage message = new PushMessage(PushMessageType.PAYMENT, heading, content);
         StoreProfile shop = storeRepository.findById(order.getShopId()).orElse(null);

@@ -1,7 +1,5 @@
 package io.curiousoft.ijudi.ordermanagement.notification;
 
-import static org.junit.Assert.*;
-
 import com.curiousoft.google.services.FCMMessage;
 import com.curiousoft.google.services.FirebaseConnectionWrapper;
 import io.curiousoft.ijudi.ordermanagement.model.*;
@@ -63,8 +61,7 @@ public class FirebaseNotificationServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY,
-                10);
+                ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -85,7 +82,56 @@ public class FirebaseNotificationServiceTest {
         devices.add(device2);
 
         //when
-        firebaseNotificationService.notifyOrderPlaced(devices, order);
+        firebaseNotificationService.notifyStoreOrderPlaced(devices, order);
+        //then
+        verify(wrapper, times(2)).sendMessage(any(FCMMessage.class));
+    }
+
+    @Test
+    public void notifyMessengerOrderPlaced() throws Exception {
+        //given
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
+        order.setDate(orderDate);
+        order.setDescription("081281445");
+        order.setCustomerId("customerId");
+        order.setOrderType(OrderType.INSTORE);
+        order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        order.setShopPaid(true);
+        order.setShopId("shopId");
+        order.setDescription("desc");
+        List<String> tags = Collections.singletonList("Pizza");
+
+        Device device = new Device("testToken");
+        Device device2 = new Device("testToken");
+        ArrayList<Device> devices = new ArrayList<>();
+        devices.add(device);
+        devices.add(device2);
+
+        StoreProfile shop = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                null,
+                "ownerId",
+                new Bank());
+
+        //when
+        firebaseNotificationService.notifyMessengerOrderPlaced(devices, order, shop);
         //then
         verify(wrapper, times(2)).sendMessage(any(FCMMessage.class));
     }

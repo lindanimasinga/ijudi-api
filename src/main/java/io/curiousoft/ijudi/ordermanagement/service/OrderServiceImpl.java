@@ -7,6 +7,7 @@ import io.curiousoft.ijudi.ordermanagement.repo.OrderRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.validation.ConstraintViolation;
@@ -31,13 +32,19 @@ public class OrderServiceImpl implements OrderService {
     private final PaymentService paymentService;
     private final DeviceRepository deviceRepo;
     private final PushNotificationService pushNotificationService;
+    private final double deliveryFee;
+    private final double serviceFee;
 
     @Autowired
-    public OrderServiceImpl(OrderRepository orderRepository,
+    public OrderServiceImpl(@Value("${service.delivery.fee}") double deliveryFee,
+                            @Value("${service.fee}") double serviceFee,
+                            OrderRepository orderRepository,
                             StoreRepository storeRepository,
                             UserProfileRepo userProfileRepo, PaymentService paymentService,
                             DeviceRepository deviceRepo,
                             PushNotificationService pushNotificationService) {
+        this.deliveryFee = deliveryFee;
+        this.serviceFee = serviceFee;
         this.orderRepo = orderRepository;
         this.storeRepository = storeRepository;
         this.userProfileRepo = userProfileRepo;
@@ -84,6 +91,8 @@ public class OrderServiceImpl implements OrderService {
         order.setId(orderId);
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setDate(orderDate);
+        order.setServiceFee(serviceFee);
+        order.getShippingData().setFee(deliveryFee);
         return orderRepo.save(order);
     }
 
@@ -97,9 +106,11 @@ public class OrderServiceImpl implements OrderService {
         persistedOrder.setDescription(order.getDescription());
         persistedOrder.setPaymentType(order.getPaymentType());
         persistedOrder.setDate(new Date());
+        order.setServiceFee(serviceFee);
+        order.getShippingData().setFee(deliveryFee);
 
         if (!paymentService.paymentReceived(persistedOrder)) {
-            throw new Exception("Payment not received....");
+            throw new Exception("Payment not cleared yet. please verify again.");
         }
 
         if(persistedOrder.getOrderType() == INSTORE) {
@@ -119,7 +130,7 @@ public class OrderServiceImpl implements OrderService {
             StoreProfile store = optional.get();
             //notify the shop
             List<Device> shopDevices = deviceRepo.findByUserId(store.getOwnerId());
-            pushNotificationService.notifyOrderPlaced(shopDevices, order);
+            pushNotificationService.notifyStoreOrderPlaced(shopDevices, order);
             Set<Stock> stock = store.getStockList();
             order.getBasket()
                     .getItems()
@@ -130,7 +141,11 @@ public class OrderServiceImpl implements OrderService {
                                 .forEach(stockItem -> stockItem.setQuantity(stockItem.getQuantity() - item.getQuantity()));
                     });
             storeRepository.save(store);
+
+            List<Device> messengerDevices = deviceRepo.findByUserId(order.getShippingData().getMessenger().getId());
+            pushNotificationService.notifyMessengerOrderPlaced(messengerDevices, order, store);
         }
+
         return orderRepo.save(persistedOrder);
     }
 
