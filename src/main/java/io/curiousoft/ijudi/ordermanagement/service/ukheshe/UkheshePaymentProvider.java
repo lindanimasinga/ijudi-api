@@ -140,7 +140,7 @@ public class UkheshePaymentProvider extends PaymentProvider<UkheshePaymentData> 
         UkheshePaymentData payment = new UkheshePaymentData(
                 fromAccount,
                 shop.getBank().getAccountId(),
-                order.getTotalAmount(),
+                basketAmountExclFees,
                 order.getDescription(),
                 order.getId() + "_2",
                 order.getId());

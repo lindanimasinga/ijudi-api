@@ -23,6 +23,7 @@ public class FirebaseNotificationService implements PushNotificationService {
         this.firebaseConnectionWrapper = firebaseConnectionWrapper;
     }
 
+    @Async
     @Override
     public void sendNotification(Device device, PushMessage message) throws Exception {
         FCMMessage fcmMessage = getFcmMessage(device.getToken(), message);

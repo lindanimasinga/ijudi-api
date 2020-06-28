@@ -69,6 +69,7 @@ public class UkheshePaymentProviderTest {
     }
 
 
+    @Ignore
     @Test
     public void paymentReceivedValidCredentials() throws Exception {
 
@@ -145,6 +146,7 @@ public class UkheshePaymentProviderTest {
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
+        shipping.setFee(10);
         order.setShippingData(shipping);
         order.setDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
         order.setPaymentType(PaymentType.UKHESHE);
@@ -152,6 +154,7 @@ public class UkheshePaymentProviderTest {
         order.setCustomerId("customerId");
         order.setStage(OrderStage.STAGE_6_WITH_CUSTOMER);
         order.setShopId("shopid");
+        order.setServiceFee(5);
         order.setId(UUID.randomUUID().toString());
 
         List<String> tags = Collections.singletonList("Pizza");

@@ -742,7 +742,7 @@ public class OrderServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY);
+                ShippingData.ShippingType.COLLECTION);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());

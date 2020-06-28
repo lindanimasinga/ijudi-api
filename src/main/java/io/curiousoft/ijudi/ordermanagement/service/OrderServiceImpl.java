@@ -18,6 +18,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 import static io.curiousoft.ijudi.ordermanagement.model.OrderType.INSTORE;
+import static io.curiousoft.ijudi.ordermanagement.model.OrderType.ONLINE;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -92,8 +93,7 @@ public class OrderServiceImpl implements OrderService {
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setDate(orderDate);
         order.setServiceFee(serviceFee);
-        if(order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY ||
-            order.getOrderType() == INSTORE) {
+        if(order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
             order.getShippingData().setFee(deliveryFee);
         }
         return orderRepo.save(order);
@@ -110,8 +110,7 @@ public class OrderServiceImpl implements OrderService {
         persistedOrder.setPaymentType(order.getPaymentType());
         persistedOrder.setDate(new Date());
         order.setServiceFee(serviceFee);
-        if(order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY ||
-                order.getOrderType() == INSTORE) {
+        if(order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
             order.getShippingData().setFee(deliveryFee);
         }
 
@@ -148,8 +147,10 @@ public class OrderServiceImpl implements OrderService {
                     });
             storeRepository.save(store);
 
-            List<Device> messengerDevices = deviceRepo.findByUserId(order.getShippingData().getMessenger().getId());
-            pushNotificationService.notifyMessengerOrderPlaced(messengerDevices, order, store);
+            if(order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
+                List<Device> messengerDevices = deviceRepo.findByUserId(order.getShippingData().getMessenger().getId());
+                pushNotificationService.notifyMessengerOrderPlaced(messengerDevices, order, store);
+            }
         }
 
         return orderRepo.save(persistedOrder);
