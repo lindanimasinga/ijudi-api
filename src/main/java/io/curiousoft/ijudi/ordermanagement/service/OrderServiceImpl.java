@@ -92,7 +92,10 @@ public class OrderServiceImpl implements OrderService {
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setDate(orderDate);
         order.setServiceFee(serviceFee);
-        order.getShippingData().setFee(deliveryFee);
+        if(order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY ||
+            order.getOrderType() == INSTORE) {
+            order.getShippingData().setFee(deliveryFee);
+        }
         return orderRepo.save(order);
     }
 
@@ -107,7 +110,10 @@ public class OrderServiceImpl implements OrderService {
         persistedOrder.setPaymentType(order.getPaymentType());
         persistedOrder.setDate(new Date());
         order.setServiceFee(serviceFee);
-        order.getShippingData().setFee(deliveryFee);
+        if(order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY ||
+                order.getOrderType() == INSTORE) {
+            order.getShippingData().setFee(deliveryFee);
+        }
 
         if (!paymentService.paymentReceived(persistedOrder)) {
             throw new Exception("Payment not cleared yet. please verify again.");

@@ -68,7 +68,7 @@ public class UkheshePaymentProviderTest {
         }
     }
 
-    @Ignore
+
     @Test
     public void paymentReceivedValidCredentials() throws Exception {
 

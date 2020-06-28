@@ -153,7 +153,7 @@ public class OrderServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.DELIVERY);
+                ShippingData.ShippingType.COLLECTION);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
 
@@ -175,7 +175,7 @@ public class OrderServiceTest {
         Assert.assertNotNull(order.getId());
         Assert.assertNotNull(order.getDate());
         Assert.assertEquals(5.00, order.getServiceFee(), 0);
-        Assert.assertEquals(10.00, order.getShippingData().getFee(), 0);
+        Assert.assertEquals(0, order.getShippingData().getFee(), 0);
         Assert.assertEquals(40.00, order.getBasketAmount(), 0);
         //verify total amount paid
         Assert.assertEquals(order.getServiceFee() + basket.getItems().stream()
@@ -789,6 +789,8 @@ public class OrderServiceTest {
 
         //verify
         Assert.assertEquals(OrderStage.STAGE_7_PAID_SHOP, finalOrder.getStage());
+        Assert.assertEquals(0, finalOrder.getShippingData().getFee(), 0);
+        Assert.assertEquals(5, finalOrder.getServiceFee(), 0);
         Assert.assertTrue(finalOrder.getShopPaid());
         Assert.assertTrue(finalOrder.getDate().after(orderDate));
         Assert.assertNotNull(finalOrder.getDescription());
