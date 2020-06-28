@@ -174,6 +174,65 @@ public class OrderServiceImpl implements OrderService {
                 order.setStage(collectionStage);
                 break;
         }
+
+
+        switch (order.getStage()) {
+            case STAGE_2_STORE_PROCESSING:
+                //notify only customer
+                deviceRepo.findByUserId(order.getCustomerId()).forEach(device -> {
+                    PushHeading title = new PushHeading("The store has started processing your order " + order.getId(),
+                            "The store has started processing your order " + order.getId(), null);
+                    PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
+                    try {
+                        pushNotificationService.sendNotification(device, message);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                });
+                break;
+            case STAGE_3_READY_FOR_COLLECTION:
+                StoreProfile shop = storeRepository.findById(order.getShopId()).get();
+                deviceRepo.findByUserId(order.getShippingData().getMessenger().getId()).forEach(device -> {
+                    PushHeading title = new PushHeading("Food is ready for Collection at " + shop.getName(),
+                            "Food is ready for Collection at " + shop.getName(), null);
+                    PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
+                    try {
+                        pushNotificationService.sendNotification(device, message);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                });
+
+                break;
+            case STAGE_4_ON_THE_ROAD:
+                deviceRepo.findByUserId(order.getCustomerId()).forEach(device -> {
+                    PushHeading title = new PushHeading("The driver is on the way",
+                            "The driver is on the way", null);
+                    PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
+                    try {
+                        pushNotificationService.sendNotification(device, message);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                });
+
+                break;
+            case STAGE_5_ARRIVED:
+                deviceRepo.findByUserId(order.getCustomerId()).forEach(device -> {
+                    PushHeading title = new PushHeading("The driver has arrived",
+                            "The driver has arrived", null);
+                    PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
+                    try {
+                        pushNotificationService.sendNotification(device, message);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                });
+
+                break;
+
+        }
+
         orderRepo.save(order);
         return order;
     }

@@ -4,5 +4,6 @@ public enum PushMessageType {
 
     NEW_ORDER,
     MARKETING,
-    PAYMENT
+    PAYMENT,
+    NEW_ORDER_UPDATE;
 }

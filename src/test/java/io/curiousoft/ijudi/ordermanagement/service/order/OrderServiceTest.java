@@ -15,6 +15,7 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
@@ -1131,13 +1132,200 @@ public class OrderServiceTest {
         order.setShopId(shopId);
         order.setDescription("desc");
 
+        Device device = new Device("token");
+        PushHeading title = new PushHeading("The store has started processing your order " + order.getId(),
+                "The store has started processing your order " + order.getId(), null);
+        PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
+
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
+        when(deviceRepo.findByUserId(order.getCustomerId())).thenReturn(Collections.singletonList(device));
 
         Order finalOrder = sut.progressNextStage(order.getId());
 
         //verify
         Assert.assertEquals(OrderStage.STAGE_2_STORE_PROCESSING, finalOrder.getStage());
+        verify(deviceRepo).findByUserId(order.getCustomerId());
+        verify(pushNotificationService).sendNotification(device, message);
+        verify(repo).findById(order.getId());
+        verify(repo).save(order);
+    }
+
+    @Test
+    public void progressNextStageOnlineDeliveryReadyForCollection() throws Exception {
+        //given
+        String shopId = "shopid";
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        BusinessHours hours = new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date());
+        businessHours.add(hours);
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile shop = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+
+                businessHours,
+                "ownerId",
+                new Bank());
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
+        order.setDate(orderDate);
+        order.setDescription("081281445");
+        order.setCustomerId("customerId");
+        order.setOrderType(OrderType.ONLINE);
+        order.setStage(OrderStage.STAGE_2_STORE_PROCESSING);
+        order.setShopId(shopId);
+        order.setDescription("desc");
+
+        Device device = new Device("token");
+        PushHeading title = new PushHeading("Food is ready for Collection at " + shop.getName(),
+                "Food is ready for Collection at " + shop.getName(), null);
+        PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
+
+        //when
+        when(repo.findById(order.getId())).thenReturn(Optional.of(order));
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(shop));
+        when(deviceRepo.findByUserId(order.getShippingData().getMessenger().getId())).thenReturn(Collections.singletonList(device));
+
+        Order finalOrder = sut.progressNextStage(order.getId());
+
+        //verify
+        Assert.assertEquals(OrderStage.STAGE_3_READY_FOR_COLLECTION, finalOrder.getStage());
+        verify(deviceRepo).findByUserId(order.getShippingData().getMessenger().getId());
+        verify(pushNotificationService).sendNotification(device, message);
+        verify(storeRepo).findById(order.getShopId());
+        verify(repo).findById(order.getId());
+        verify(repo).save(order);
+    }
+
+    @Test
+    public void progressNextStageOnlineDeliveryDriverOnHisWay() throws Exception {
+        //given
+        String shopId = "shopid";
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        BusinessHours hours = new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date());
+        businessHours.add(hours);
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile shop = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+
+                businessHours,
+                "ownerId",
+                new Bank());
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
+        order.setDate(orderDate);
+        order.setDescription("081281445");
+        order.setCustomerId("customerId");
+        order.setOrderType(OrderType.ONLINE);
+        order.setStage(OrderStage.STAGE_3_READY_FOR_COLLECTION);
+        order.setShopId(shopId);
+        order.setDescription("desc");
+
+        Device device = new Device("token");
+        PushHeading title = new PushHeading("The driver is on the way",
+                "The driver is on the way", null);
+        PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
+
+        //when
+        when(repo.findById(order.getId())).thenReturn(Optional.of(order));
+        when(deviceRepo.findByUserId(order.getCustomerId())).thenReturn(Collections.singletonList(device));
+
+        Order finalOrder = sut.progressNextStage(order.getId());
+
+        //verify
+        Assert.assertEquals(OrderStage.STAGE_4_ON_THE_ROAD, finalOrder.getStage());
+        verify(deviceRepo).findByUserId(order.getCustomerId());
+        verify(pushNotificationService).sendNotification(device, message);
+        verify(repo).findById(order.getId());
+        verify(repo).save(order);
+    }
+
+    @Test
+    public void progressNextStageOnlineDeliveryDriverArrived() throws Exception {
+        //given
+        String shopId = "shopid";
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        BusinessHours hours = new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date());
+        businessHours.add(hours);
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile shop = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+
+                businessHours,
+                "ownerId",
+                new Bank());
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
+        order.setDate(orderDate);
+        order.setDescription("081281445");
+        order.setCustomerId("customerId");
+        order.setOrderType(OrderType.ONLINE);
+        order.setStage(OrderStage.STAGE_4_ON_THE_ROAD);
+        order.setShopId(shopId);
+        order.setDescription("desc");
+
+        Device device = new Device("token");
+        PushHeading title = new PushHeading("The driver has arrived",
+                "The driver has arrived", null);
+        PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
+
+        //when
+        when(repo.findById(order.getId())).thenReturn(Optional.of(order));
+        when(deviceRepo.findByUserId(order.getCustomerId())).thenReturn(Collections.singletonList(device));
+
+        Order finalOrder = sut.progressNextStage(order.getId());
+
+        //verify
+        Assert.assertEquals(OrderStage.STAGE_5_ARRIVED, finalOrder.getStage());
+        verify(deviceRepo).findByUserId(order.getCustomerId());
+        verify(pushNotificationService).sendNotification(device, message);
         verify(repo).findById(order.getId());
         verify(repo).save(order);
     }

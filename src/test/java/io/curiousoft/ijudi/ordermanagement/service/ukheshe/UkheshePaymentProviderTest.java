@@ -19,6 +19,7 @@ import static org.mockito.Mockito.when;
 @RunWith(MockitoJUnitRunner.class)
 public class UkheshePaymentProviderTest {
 
+    public static final String PASSWORD = "111111";
     //sut
     private UkheshePaymentProvider ukheshePaymentProvider;
 
@@ -72,7 +73,7 @@ public class UkheshePaymentProviderTest {
     public void paymentReceivedValidCredentials() throws Exception {
 
         String username = "0812815707";
-        String password = "Csd0148()1";
+        String password = PASSWORD;
         String baseUrl = "https://ukheshe-sandbox.jini.rocks/ukheshe-conductor/rest/v1";
         String customerId = "534";
         String mainAccount = "2885091160";
@@ -119,7 +120,7 @@ public class UkheshePaymentProviderTest {
     public void makePaymentForOrder() throws Exception {
 
         String username = "0812815707";
-        String password = "Csd0148()1";
+        String password = PASSWORD;
         String baseUrl = "https://ukheshe-sandbox.jini.rocks/ukheshe-conductor/rest/v1";
         String customerId = "534";
         String mainAccount = "2885091160";
@@ -183,7 +184,7 @@ public class UkheshePaymentProviderTest {
     public void makePaymentForOrderNoShopExist() throws ParseException {
 
         String username = "0812815707";
-        String password = "Csd0148()1";
+        String password = PASSWORD;
         String baseUrl = "https://ukheshe-sandbox.jini.rocks/ukheshe-conductor/rest/v1";
         String customerId = "534";
         String mainAccount = "account";
