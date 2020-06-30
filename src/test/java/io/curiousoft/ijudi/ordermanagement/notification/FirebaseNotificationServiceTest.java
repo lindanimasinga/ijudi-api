@@ -1,6 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.notification;
 
 import com.curiousoft.google.services.FCMMessage;
+import com.curiousoft.google.services.FCMNotification;
 import com.curiousoft.google.services.FirebaseConnectionWrapper;
 import io.curiousoft.ijudi.ordermanagement.model.*;
 import org.junit.Assert;
@@ -40,7 +41,8 @@ public class FirebaseNotificationServiceTest {
         Map data = new HashMap<>();
         data.put("messageType", message.getPushMessageType());
         data.put("messageContent", message.getPushContent());
-        FCMMessage fcmMessage = new FCMMessage(device.getToken(), null, data);
+        FCMNotification notification = new FCMNotification(heading.getBody(), heading.getTitle(), null);
+        FCMMessage fcmMessage = new FCMMessage(device.getToken(), notification, data);
 
         //when
         firebaseNotificationService.sendNotification(device, message);
@@ -185,7 +187,8 @@ public class FirebaseNotificationServiceTest {
         Map data = new HashMap<>();
         data.put("messageType", message.getPushMessageType());
         data.put("messageContent", message.getPushContent());
-        FCMMessage fcmMessage = new FCMMessage("/topics/"+topicName, null, data);
+        FCMNotification notification = new FCMNotification(heading.getBody(), heading.getTitle(), null);
+        FCMMessage fcmMessage = new FCMMessage("/topics/"+topicName, notification, data);
 
         //when
         firebaseNotificationService.publishTopic(topicName, message);

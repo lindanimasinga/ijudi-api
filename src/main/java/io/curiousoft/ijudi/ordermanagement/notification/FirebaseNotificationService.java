@@ -2,8 +2,12 @@ package io.curiousoft.ijudi.ordermanagement.notification;
 
 
 import com.curiousoft.google.services.FCMMessage;
+import com.curiousoft.google.services.FCMNotification;
 import com.curiousoft.google.services.FirebaseConnectionWrapper;
 import io.curiousoft.ijudi.ordermanagement.model.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -14,6 +18,8 @@ import java.util.Map;
 
 @Service
 public class FirebaseNotificationService implements PushNotificationService {
+
+    private static Logger LOGGER = LoggerFactory.getLogger(FirebaseNotificationService.class);
 
     public static final String TOPICS = "/topics/";
 
@@ -34,11 +40,13 @@ public class FirebaseNotificationService implements PushNotificationService {
     @Override
     public void notifyStoreOrderPlaced(List<Device> devices, Order order) {
         devices.forEach(device -> {
-            PushHeading title = new PushHeading("New " + order.getOrderType().toString() + " Order",
-                    PushMessageType.NEW_ORDER.toString(), null);
+            PushHeading title = new PushHeading(
+                    "New " + order.getOrderType().toString().toLowerCase() + " order placed. Please confirmed the order.",
+                    "New Order Received", null);
             PushMessage message = new PushMessage(PushMessageType.NEW_ORDER, title, order);
             try {
                 sendNotification(device, message);
+                LOGGER.info("Notification sent to device " + device.getUserId());
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -77,7 +85,11 @@ public class FirebaseNotificationService implements PushNotificationService {
         Map data = new HashMap<>();
         data.put("messageType", message.getPushMessageType());
         data.put("messageContent", message.getPushContent());
-        return new FCMMessage(destination, null, data);
+
+        FCMNotification notification = new FCMNotification(message.getPushHeading().getBody(),
+                message.getPushHeading().getTitle(),
+                null);
+        return new FCMMessage(destination, notification, data);
     }
 
     @Override
@@ -113,9 +125,13 @@ public class FirebaseNotificationService implements PushNotificationService {
                                            Order order,
                                            StoreProfile shop) {
         messengerDevices.forEach(device -> {
-            PushHeading title = new PushHeading("New place at " +shop.getName()+ " Order. we will notify when an order is ready for collection.",
+            PushHeading title = new PushHeading("An order is placed at " +shop.getName() + " shop. We will notify you when the order is ready for collection. :)",
                     PushMessageType.NEW_ORDER.toString(), null);
-            PushMessage message = new PushMessage(PushMessageType.NEW_ORDER, title, order);
+            Order tempOrder = new Order();
+            BeanUtils.copyProperties(tempOrder, tempOrder);
+            tempOrder.setShippingData(null);
+            tempOrder.setBasket(null);
+            PushMessage message = new PushMessage(PushMessageType.NEW_ORDER, title, tempOrder);
             try {
                 sendNotification(device, message);
             } catch (Exception e) {
