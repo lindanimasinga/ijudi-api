@@ -4,6 +4,8 @@ package io.curiousoft.ijudi.ordermanagement.notification;
 import com.curiousoft.google.services.FCMMessage;
 import com.curiousoft.google.services.FCMNotification;
 import com.curiousoft.google.services.FirebaseConnectionWrapper;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import io.curiousoft.ijudi.ordermanagement.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +22,7 @@ import java.util.Map;
 public class FirebaseNotificationService implements PushNotificationService {
 
     private static Logger LOGGER = LoggerFactory.getLogger(FirebaseNotificationService.class);
+    private static Gson GSON = new GsonBuilder().create();
 
     public static final String TOPICS = "/topics/";
 
@@ -33,6 +36,7 @@ public class FirebaseNotificationService implements PushNotificationService {
     @Override
     public void sendNotification(Device device, PushMessage message) throws Exception {
         FCMMessage fcmMessage = getFcmMessage(device.getToken(), message);
+        LOGGER.debug(GSON.toJson(fcmMessage));
         firebaseConnectionWrapper.sendMessage(fcmMessage);
     }
 

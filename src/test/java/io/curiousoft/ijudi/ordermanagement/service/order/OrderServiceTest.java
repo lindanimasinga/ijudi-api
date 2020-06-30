@@ -1136,7 +1136,7 @@ public class OrderServiceTest {
 
         Device device = new Device("token");
         PushHeading title = new PushHeading("The store has started processing your order " + order.getId(),
-                "The store has started processing your order " + order.getId(), null);
+                "Order Status Updated", null);
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
 
         //when
