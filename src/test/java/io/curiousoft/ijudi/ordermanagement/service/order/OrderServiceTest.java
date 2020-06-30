@@ -1195,7 +1195,7 @@ public class OrderServiceTest {
 
         Device device = new Device("token");
         PushHeading title = new PushHeading("Food is ready for Collection at " + shop.getName(),
-                "Food is ready for Collection at " + shop.getName(), null);
+                "Order Status Updated", null);
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
 
         //when
@@ -1256,7 +1256,7 @@ public class OrderServiceTest {
 
         Device device = new Device("token");
         PushHeading title = new PushHeading("The driver is on the way",
-                "The driver is on the way", null);
+                "Order Status Updated", null);
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
 
         //when
@@ -1315,7 +1315,7 @@ public class OrderServiceTest {
 
         Device device = new Device("token");
         PushHeading title = new PushHeading("The driver has arrived",
-                "The driver has arrived", null);
+                "Order Status Updated", null);
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
 
         //when
