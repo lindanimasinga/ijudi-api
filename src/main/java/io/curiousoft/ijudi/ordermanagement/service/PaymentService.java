@@ -77,7 +77,7 @@ public class PaymentService {
     @Scheduled(fixedDelay = 900000) // 15 minutes
     public void processPendingPayments() {
         Date pastDate = Date.from(LocalDateTime.now()
-                .minusSeconds(processPaymentIntervalMinutes)
+                .minusMinutes(processPaymentIntervalMinutes)
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
         List<Order> orders = orderRepo

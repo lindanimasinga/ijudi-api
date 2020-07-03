@@ -46,9 +46,11 @@ public class OrderServiceTest {
     public void setUp() throws Exception {
         double deliveryFee = 10;
         double serviceFee = 5;
+        long cleanInMinutes = 5;
         sut = new OrderServiceImpl(
                 deliveryFee,
                 serviceFee,
+                cleanInMinutes,
                 repo,
                 storeRepo,
                 customerRepo,
@@ -1618,5 +1620,71 @@ public class OrderServiceTest {
         Assert.assertEquals(shopId, finalOrder.get(0).getShopId());
         verify(repo).findByShopIdAndStageNot(initialProfile.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         verify(storeRepo).findById(shopId);
+    }
+
+    @Test
+    public void cleanUnPaidOrders() {
+        //given
+        String shopId = "id of shop";
+        String phoneNumber = "0812445563";
+
+        //order 1
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        order.setCustomerId("customer");
+        order.setStage(OrderStage.STAGE_2_STORE_PROCESSING);
+        order.setShopId(shopId);
+
+        //order 2
+        Order order2 = new Order();
+        Basket basket2 = new Basket();
+        order.setBasket(basket);
+        Messager messenger2 = new Messager();
+        messenger.setId("messagerID");
+        ShippingData shipping2 = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessenger(messenger2);
+        order2.setShippingData(shipping2);
+        order2.setCustomerId("customer id");
+        order2.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order2.setShopId(shopId);
+
+        ArrayList<Order> orders = new ArrayList<>();
+        orders.add(order);
+
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile initialProfile = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                businessHours,
+                "ownerId",
+                new Bank());
+        initialProfile.setBusinessHours(new ArrayList<>());
+        initialProfile.setFeatured(true);
+        Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
+        initialProfile.setFeaturedExpiry(date);
+        Bank bank = new Bank();
+        bank.setAccountId("34567890");
+        initialProfile.setBank(bank);
+
+        //when
+        sut.cleanUnpaidOrders();
+
+        //verify
+        verify(repo).deleteByShopPaidAndStageAndDateBefore(eq(false), eq(OrderStage.STAGE_0_CUSTOMER_NOT_PAID),
+                any(Date.class));
     }
 }

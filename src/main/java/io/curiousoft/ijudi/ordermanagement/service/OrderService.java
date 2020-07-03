@@ -19,4 +19,6 @@ public interface OrderService {
     List<Order> findOrderByPhone(String userId) throws Exception;
 
     List<Order> findOrderByStoreId(String shopId) throws Exception;
+
+    void cleanUnpaidOrders();
 }

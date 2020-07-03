@@ -1,13 +1,17 @@
 package io.curiousoft.ijudi.ordermanagement.service;
 
 import io.curiousoft.ijudi.ordermanagement.model.*;
+import io.curiousoft.ijudi.ordermanagement.notification.FirebaseNotificationService;
 import io.curiousoft.ijudi.ordermanagement.notification.PushNotificationService;
 import io.curiousoft.ijudi.ordermanagement.repo.DeviceRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.OrderRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import javax.validation.ConstraintViolation;
@@ -15,6 +19,8 @@ import javax.validation.Validation;
 import javax.validation.Validator;
 import javax.validation.ValidatorFactory;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 
 import static io.curiousoft.ijudi.ordermanagement.model.OrderType.INSTORE;
@@ -22,6 +28,8 @@ import static io.curiousoft.ijudi.ordermanagement.model.OrderType.ONLINE;
 
 @Service
 public class OrderServiceImpl implements OrderService {
+
+    private static Logger LOGGER = LoggerFactory.getLogger(OrderServiceImpl.class);
 
     public static final String DATE_FORMAT = "SSSmmHHyyddMMss";
     private final LinkedList<OrderStage> onlineCollectionStages;
@@ -35,10 +43,12 @@ public class OrderServiceImpl implements OrderService {
     private final PushNotificationService pushNotificationService;
     private final double deliveryFee;
     private final double serviceFee;
+    private final long cleanUpMinutes;
 
     @Autowired
     public OrderServiceImpl(@Value("${service.delivery.fee}") double deliveryFee,
                             @Value("${service.fee}") double serviceFee,
+                            @Value("${order.cleanup.unpaid.minutes}") long cleanUpMinutes,
                             OrderRepository orderRepository,
                             StoreRepository storeRepository,
                             UserProfileRepo userProfileRepo, PaymentService paymentService,
@@ -46,6 +56,7 @@ public class OrderServiceImpl implements OrderService {
                             PushNotificationService pushNotificationService) {
         this.deliveryFee = deliveryFee;
         this.serviceFee = serviceFee;
+        this.cleanUpMinutes = cleanUpMinutes;
         this.orderRepo = orderRepository;
         this.storeRepository = storeRepository;
         this.userProfileRepo = userProfileRepo;
@@ -145,6 +156,7 @@ public class OrderServiceImpl implements OrderService {
                                 .filter(sto -> sto.getName().equals(item.getName()))
                                 .forEach(stockItem -> stockItem.setQuantity(stockItem.getQuantity() - item.getQuantity()));
                     });
+            store.setServicesCompleted(store.getServicesCompleted() + 1);
             storeRepository.save(store);
 
             if(order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
@@ -261,6 +273,17 @@ public class OrderServiceImpl implements OrderService {
         StoreProfile store = storeRepository.findById(shopId)
                 .orElseThrow(() -> new Exception("Store not found"));
         return orderRepo.findByShopIdAndStageNot(store.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+    }
+
+    @Scheduled(fixedDelay = 900000) // 15 minutes
+    @Override
+    public void cleanUnpaidOrders() {
+        Date pastDate = Date.from(LocalDateTime.now()
+                .minusMinutes(cleanUpMinutes)
+                .atZone(ZoneId.systemDefault())
+                .toInstant());
+        LOGGER.info("Cleaning up all orders before   s" + pastDate);
+        orderRepo.deleteByShopPaidAndStageAndDateBefore(false, OrderStage.STAGE_0_CUSTOMER_NOT_PAID, pastDate);
     }
 
     private void validate(Order order) throws Exception {
