@@ -13,16 +13,18 @@ import java.util.Set;
 
 public class StoreProfile extends Profile implements GeoPoint {
 
-    @Indexed(unique = true) private String regNumber;
+    @Indexed(unique = true)
+    private String regNumber;
     @NotBlank String ownerId;
-    @Valid private Set<Stock> stockList = new HashSet<>();
-    @NotEmpty(message = "profile tags not valid") private List<String> tags;
-    @NotEmpty(message = "Business hours not valid") private List<BusinessHours> businessHours;
+    @Valid
+    private Set<Stock> stockList = new HashSet<>();
+    @NotEmpty(message = "profile tags not valid")
+    private List<String> tags;
+    @NotEmpty(message = "Business hours not valid")
+    private List<BusinessHours> businessHours;
     private boolean hasVat;
     private boolean featured;
     private Date featuredExpiry;
-    private double latitude;
-    private double longitude;
 
 
     public StoreProfile(@NotBlank(message = "profile name not valid") String name,
@@ -104,23 +106,4 @@ public class StoreProfile extends Profile implements GeoPoint {
         this.ownerId = ownerId;
     }
 
-    @Override
-    public double getLatitude() {
-        return latitude;
-    }
-
-    @Override
-    public void setLatitude(double latitude) {
-        this.latitude = latitude;
-    }
-
-    @Override
-    public double getLongitude() {
-        return longitude;
-    }
-
-    @Override
-    public void setLongitude(double longitude) {
-        this.longitude = longitude;
-    }
 }

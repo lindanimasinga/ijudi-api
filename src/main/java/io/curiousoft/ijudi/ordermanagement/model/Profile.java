@@ -28,6 +28,8 @@ public class Profile extends BaseModel {
     private int responseTimeMinutes;
     private String verificationCode;
     private Bank bank;
+    private double latitude;
+    private double longitude;
 
 
     public Profile(@NotBlank(message = "profile name not valid") String name,
@@ -145,5 +147,21 @@ public class Profile extends BaseModel {
 
     public void setBank(Bank bank) {
         this.bank = bank;
+    }
+
+    public double getLatitude() {
+        return latitude;
+    }
+
+    public void setLatitude(double latitude) {
+        this.latitude = latitude;
+    }
+
+    public double getLongitude() {
+        return longitude;
+    }
+
+    public void setLongitude(double longitude) {
+        this.longitude = longitude;
     }
 }

@@ -42,13 +42,15 @@ public class OrderController {
     }
 
     @GetMapping(produces = "application/json")
-    public ResponseEntity<List<Order>> getAllOrderForUser(@RequestParam(required = false) String userId,
-                                                          @RequestParam(required = false) String phone,
-                                                          @RequestParam(required = false) String storeId) throws Exception {
-        List<Order> order = !StringUtils.isEmpty(userId) ?
-                orderService.findOrderByUserId(userId) :
+    public ResponseEntity<List<Order>> getAllOrders(@RequestParam(required = false) String userId,
+                                                    @RequestParam(required = false) String phone,
+                                                    @RequestParam(required = false) String messengerId,
+                                                    @RequestParam(required = false) String storeId) throws Exception {
+        List<Order> order = !StringUtils.isEmpty(userId) ? orderService.findOrderByUserId(userId) :
                 !StringUtils.isEmpty(phone) ? orderService.findOrderByPhone(phone) :
-                        !StringUtils.isEmpty(storeId) ? orderService.findOrderByStoreId(storeId) : null;
+                !StringUtils.isEmpty(storeId) ? orderService.findOrderByStoreId(storeId) :
+                !StringUtils.isEmpty(messengerId) ? orderService.findOrderByMessengerId(messengerId) :
+                        orderService.findAll();
         return order != null ? ResponseEntity.ok(order) : ResponseEntity.notFound().build();
     }
 }

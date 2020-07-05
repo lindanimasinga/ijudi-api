@@ -21,4 +21,8 @@ public interface OrderService {
     List<Order> findOrderByStoreId(String shopId) throws Exception;
 
     void cleanUnpaidOrders();
+
+    List<Order> findOrderByMessengerId(String id);
+
+    List<Order> findAll();
 }

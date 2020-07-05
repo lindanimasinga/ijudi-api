@@ -1,7 +1,6 @@
 package io.curiousoft.ijudi.ordermanagement.service;
 
 import io.curiousoft.ijudi.ordermanagement.model.*;
-import io.curiousoft.ijudi.ordermanagement.notification.FirebaseNotificationService;
 import io.curiousoft.ijudi.ordermanagement.notification.PushNotificationService;
 import io.curiousoft.ijudi.ordermanagement.repo.DeviceRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.OrderRepository;
@@ -23,8 +22,8 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
 
+import static io.curiousoft.ijudi.ordermanagement.model.OrderStage.*;
 import static io.curiousoft.ijudi.ordermanagement.model.OrderType.INSTORE;
-import static io.curiousoft.ijudi.ordermanagement.model.OrderType.ONLINE;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -69,7 +68,7 @@ public class OrderServiceImpl implements OrderService {
         onlineDeliveryStages = new LinkedList<>();
         onlineDeliveryStages.add(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         onlineDeliveryStages.add(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
-        onlineDeliveryStages.add(OrderStage.STAGE_2_STORE_PROCESSING);
+        onlineDeliveryStages.add(STAGE_2_STORE_PROCESSING);
         onlineDeliveryStages.add(OrderStage.STAGE_3_READY_FOR_COLLECTION);
         onlineDeliveryStages.add(OrderStage.STAGE_4_ON_THE_ROAD);
         onlineDeliveryStages.add(OrderStage.STAGE_5_ARRIVED);
@@ -79,7 +78,7 @@ public class OrderServiceImpl implements OrderService {
         onlineCollectionStages = new LinkedList<>();
         onlineCollectionStages.add(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         onlineCollectionStages.add(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
-        onlineCollectionStages.add(OrderStage.STAGE_2_STORE_PROCESSING);
+        onlineCollectionStages.add(STAGE_2_STORE_PROCESSING);
         onlineCollectionStages.add(OrderStage.STAGE_3_READY_FOR_COLLECTION);
         onlineCollectionStages.add(OrderStage.STAGE_6_WITH_CUSTOMER);
         onlineCollectionStages.add(OrderStage.STAGE_7_PAID_SHOP);
@@ -179,8 +178,14 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new Exception("Order with id " + orderId + " not found."));
         int index = onlineDeliveryStages.indexOf(order.getStage());
 
-        if(order.getOrderType() == INSTORE || index >= onlineDeliveryStages.size() - 2) { // last stage is updated by the payment process
+        if(order.getOrderType() == INSTORE || order.getStage() == STAGE_0_CUSTOMER_NOT_PAID
+                || order.getStage() == STAGE_7_PAID_SHOP) { // last stage is updated by the payment process
             return order;
+        }
+
+        if(order.getStage() == STAGE_6_WITH_CUSTOMER) {
+            order.setDate(new Date());
+            return orderRepo.save(order);
         }
 
         switch (order.getShippingData().getType()) {
@@ -251,9 +256,8 @@ public class OrderServiceImpl implements OrderService {
                 break;
 
         }
-
-        orderRepo.save(order);
-        return order;
+        order.setDate(new Date());
+        return orderRepo.save(order);
     }
 
     @Override
@@ -284,6 +288,16 @@ public class OrderServiceImpl implements OrderService {
                 .toInstant());
         LOGGER.info("Cleaning up all orders before   s" + pastDate);
         orderRepo.deleteByShopPaidAndStageAndDateBefore(false, OrderStage.STAGE_0_CUSTOMER_NOT_PAID, pastDate);
+    }
+
+    @Override
+    public List<Order> findOrderByMessengerId(String id) {
+        return orderRepo.findByShippingDataMessengerIdAndStageNot(id, OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+    }
+
+    @Override
+    public List<Order> findAll() {
+        return orderRepo.findAll();
     }
 
     private void validate(Order order) throws Exception {

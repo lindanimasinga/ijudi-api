@@ -11,6 +11,8 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.Mockito.verify;
@@ -104,14 +106,41 @@ public class UserServiceTest {
     }
 
     @Test
-    public void findOrderByPhone() {
+    public void findUserByPhone() {
         //given
         String phone = "myID";
         //when
 
-        Profile profile = profileService.findOrderByPhone(phone);
+        Profile profile = profileService.findUserByPhone(phone);
 
         //verify
         verify(profileRepo).findByMobileNumber(phone);
+    }
+
+    @Test
+    public void findMessengerByLocation() {
+        //given
+        double latitude = 10;
+        double longitude = 10;
+        double range =  0.2;
+
+        UserProfile patchProfileRequest = new UserProfile(
+                "secondName",
+                "address2",
+                "https://image.url2",
+                "078mobilenumb",
+                ProfileRoles.MESSENGER);
+
+        //when
+        when(profileRepo.findByRoleAndLatitudeBetweenAndLongitudeBetween(ProfileRoles.MESSENGER,
+                latitude - range, latitude + range, longitude - range, longitude + range))
+                .thenReturn(Collections.singletonList(patchProfileRequest));
+
+        List<UserProfile> messangers = profileService.findByLocation(ProfileRoles.MESSENGER, latitude, longitude, range);
+
+        //verify
+        Assert.assertEquals(1, messangers.size());
+        verify(profileRepo).findByRoleAndLatitudeBetweenAndLongitudeBetween(ProfileRoles.MESSENGER,
+                latitude - range, latitude + range, longitude - range, longitude + range);
     }
 }

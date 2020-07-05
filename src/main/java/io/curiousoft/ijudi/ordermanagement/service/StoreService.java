@@ -95,7 +95,7 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         List<StoreProfile> stores = profileRepo.findByLatitudeBetweenAndLongitudeBetween(minLat,
                 maxLat, minLong, maxLong).stream()
                 .peek(profile -> profile.getBank().setAccountId(mainPayAccount))
-                .collect(Collectors.toList());;
+                .collect(Collectors.toList());
 
         GeoPoint origin = new GeoPointImpl(latitude, longitude);
         Collections.sort(stores, (a, b) -> {

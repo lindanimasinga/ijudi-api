@@ -1143,6 +1143,7 @@ public class OrderServiceTest {
 
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
+        when(repo.save(order)).thenReturn(order);
         when(deviceRepo.findByUserId(order.getCustomerId())).thenReturn(Collections.singletonList(device));
 
         Order finalOrder = sut.progressNextStage(order.getId());
@@ -1202,6 +1203,7 @@ public class OrderServiceTest {
 
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
+        when(repo.save(order)).thenReturn(order);
         when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(shop));
         when(deviceRepo.findByUserId(order.getShippingData().getMessenger().getId())).thenReturn(Collections.singletonList(device));
 
@@ -1263,6 +1265,7 @@ public class OrderServiceTest {
 
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
+        when(repo.save(order)).thenReturn(order);
         when(deviceRepo.findByUserId(order.getCustomerId())).thenReturn(Collections.singletonList(device));
 
         Order finalOrder = sut.progressNextStage(order.getId());
@@ -1322,6 +1325,7 @@ public class OrderServiceTest {
 
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
+        when(repo.save(order)).thenReturn(order);
         when(deviceRepo.findByUserId(order.getCustomerId())).thenReturn(Collections.singletonList(device));
 
         Order finalOrder = sut.progressNextStage(order.getId());
@@ -1431,11 +1435,12 @@ public class OrderServiceTest {
 
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
-
+        when(repo.save(order)).thenReturn(order);
         Order finalOrder = sut.progressNextStage(order.getId());
 
         //verify
         Assert.assertEquals(OrderStage.STAGE_6_WITH_CUSTOMER, finalOrder.getStage());
+        Assert.assertNotEquals(orderDate, finalOrder.getDate());
         verify(repo).findById(order.getId());
     }
 
@@ -1466,6 +1471,7 @@ public class OrderServiceTest {
 
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
+        when(repo.save(order)).thenReturn(order);
 
         Order finalOrder = sut.progressNextStage(order.getId());
 
@@ -1547,6 +1553,64 @@ public class OrderServiceTest {
         Assert.assertEquals(shopId,  finalOrder.get(0).getShopId());
         verify(storeRepo).findById(shopId);
         verify(repo).findByShopIdAndStageNot(initialProfile.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+    }
+
+    @Test
+    public void findOrderByMessengerId() throws Exception {
+        //given
+        String shopId = "id of shop";
+
+        UserProfile patchProfileRequest = new UserProfile(
+                "secondName",
+                "address2",
+                "https://image.url2",
+                "078mobilenumb",
+                ProfileRoles.MESSENGER);
+
+        //order 1
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+        Messager messenger = new Messager();
+        messenger.setId(patchProfileRequest.getId());
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        order.setCustomerId("customer");
+        order.setStage(OrderStage.STAGE_2_STORE_PROCESSING);
+        order.setShopId(shopId);
+
+        //order 2
+        Order order2 = new Order();
+        Basket basket2 = new Basket();
+        order.setBasket(basket);
+        Messager messenger2 = new Messager();
+        messenger.setId("messagerID");
+        ShippingData shipping2 = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessenger(messenger2);
+        order2.setShippingData(shipping2);
+        order2.setCustomerId("customer id");
+        order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        order2.setShopId(shopId);
+
+        ArrayList<Order> orders = new ArrayList<>();
+        orders.add(order);
+        orders.add(order2);
+
+        //when
+        when(repo.findByShippingDataMessengerIdAndStageNot(patchProfileRequest.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID)).thenReturn(orders);
+
+        List<Order> finalOrder = sut.findOrderByMessengerId(patchProfileRequest.getId());
+
+        //verify
+        Assert.assertNotNull(finalOrder);
+        Assert.assertEquals(2, finalOrder.size());
+        Assert.assertEquals(patchProfileRequest.getId(),  finalOrder.get(0).getShippingData().getMessenger().getId());
+        verify(repo).findByShippingDataMessengerIdAndStageNot(patchProfileRequest.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
     }
 
     @Test
