@@ -216,7 +216,11 @@ public class OrderServiceImpl implements OrderService {
                 break;
             case STAGE_3_READY_FOR_COLLECTION:
                 StoreProfile shop = storeRepository.findById(order.getShopId()).get();
-                deviceRepo.findByUserId(order.getShippingData().getMessenger().getId()).forEach(device -> {
+                List<Device> devices = order.getShippingData().getType() == ShippingData.ShippingType.COLLECTION ?
+                        deviceRepo.findByUserId(order.getCustomerId()) :
+                        deviceRepo.findByUserId(order.getShippingData().getMessenger().getId());
+
+                devices.forEach(device -> {
                     PushHeading title = new PushHeading("Food is ready for Collection at " + shop.getName(),
                             order_status_updated, null);
                     PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);

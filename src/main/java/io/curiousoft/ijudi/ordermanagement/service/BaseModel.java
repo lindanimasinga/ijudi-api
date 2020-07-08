@@ -8,7 +8,7 @@ public class BaseModel {
 
     @Id
     private String id;
-    private Date createdDate;
+    private Date createdDate = new Date();
 
     public BaseModel() {
     }

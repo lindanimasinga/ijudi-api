@@ -1445,6 +1445,69 @@ public class OrderServiceTest {
     }
 
     @Test
+    public void progressNextStageOnlineCollectionReady() throws Exception {
+        //given
+        String shopId = "shopid";
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile storeProfile = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+
+                businessHours,
+                "ownerId",
+                new Bank());
+        storeProfile.setBusinessHours(new ArrayList<>());
+        storeProfile.setFeatured(true);
+        storeProfile.setHasVat(false);
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.COLLECTION);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
+        order.setDate(orderDate);
+        order.setDescription("081281445");
+        order.setCustomerId("customerId");
+        order.setOrderType(OrderType.ONLINE);
+        order.setStage(OrderStage.STAGE_2_STORE_PROCESSING);
+        order.setShopId(shopId);
+        order.setDescription("desc");
+
+        Device device = new Device("token");
+        PushHeading title = new PushHeading("Food is ready for Collection at " + storeProfile.getName(),
+                "Order Status Updated", null);
+        PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
+
+        //when
+        when(repo.findById(order.getId())).thenReturn(Optional.of(order));
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+        when(repo.save(order)).thenReturn(order);
+        when(deviceRepo.findByUserId(order.getCustomerId())).thenReturn(Collections.singletonList(device));
+
+
+        Order finalOrder = sut.progressNextStage(order.getId());
+
+        //verify
+        Assert.assertEquals(OrderStage.STAGE_3_READY_FOR_COLLECTION, finalOrder.getStage());
+        verify(deviceRepo).findByUserId(order.getCustomerId());
+        verify(pushNotificationService).sendNotification(device, message);
+        verify(repo).findById(order.getId());
+        verify(repo).save(order);
+    }
+
+    @Test
     public void progressNextStageOnlineCollection() throws Exception {
         //given
         String shopId = "shopid";
@@ -1469,9 +1532,15 @@ public class OrderServiceTest {
         order.setShopId(shopId);
         order.setDescription("desc");
 
+        Device device = new Device("token");
+        PushHeading title = new PushHeading("The store has started processing your order " + order.getId(),
+                "Order Status Updated", null);
+        PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
+
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
         when(repo.save(order)).thenReturn(order);
+
 
         Order finalOrder = sut.progressNextStage(order.getId());
 
