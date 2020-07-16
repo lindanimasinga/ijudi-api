@@ -8,6 +8,7 @@ import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
 import io.curiousoft.ijudi.ordermanagement.service.OrderServiceImpl;
 import io.curiousoft.ijudi.ordermanagement.service.PaymentService;
+import io.curiousoft.ijudi.ordermanagement.service.SmsNotificationService;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -37,6 +38,8 @@ public class OrderServiceTest {
     @Mock
     private PushNotificationService pushNotificationService;
     @Mock
+    private SmsNotificationService smsNotifcation;
+    @Mock
     private DeviceRepository deviceRepo;
 
     //system under test
@@ -56,7 +59,8 @@ public class OrderServiceTest {
                 customerRepo,
                 paymentService,
                 deviceRepo,
-                pushNotificationService);
+                pushNotificationService,
+                smsNotifcation);
     }
 
     @Test
@@ -1819,5 +1823,321 @@ public class OrderServiceTest {
         //verify
         verify(repo).deleteByShopPaidAndStageAndDateBefore(eq(false), eq(OrderStage.STAGE_0_CUSTOMER_NOT_PAID),
                 any(Date.class));
+    }
+
+    @Test
+    public void checkNotAcceptedOrdersAndNotify() throws Exception {
+        //given
+        String shopId = "id of shop";
+        String phoneNumber = "0812445563";
+
+        //order 1
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        order.setCustomerId("customer");
+        order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        Date orderDate = Date.from(LocalDateTime.now().minusMinutes(10).atZone(ZoneId.systemDefault()).toInstant());
+        order.setDate(orderDate);
+        order.setShopId(shopId);
+
+        //order 2
+        Order order2 = new Order();
+        Basket basket2 = new Basket();
+        order.setBasket(basket);
+        Messager messenger2 = new Messager();
+        messenger.setId("messagerID");
+        ShippingData shipping2 = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.COLLECTION);
+        Date pickUpTime = Date.from(LocalDateTime.now().minusMinutes(320).atZone(ZoneId.systemDefault()).toInstant());
+        shipping2.setPickUpTime(pickUpTime);
+        shipping.setMessenger(messenger2);
+        order2.setShippingData(shipping2);
+        order2.setCustomerId("customer id");
+        order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(5).atZone(ZoneId.systemDefault()).toInstant());
+        order2.setDate(orderDate);
+        order2.setShopId(shopId);
+
+        ArrayList<Order> orders = new ArrayList<>();
+        orders.add(order);
+
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile initialProfile = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                businessHours,
+                "ownerId",
+                new Bank());
+        initialProfile.setBusinessHours(new ArrayList<>());
+        initialProfile.setFeatured(true);
+        Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
+        initialProfile.setFeaturedExpiry(date);
+        Bank bank = new Bank();
+        bank.setAccountId("34567890");
+        initialProfile.setBank(bank);
+
+        //when
+        when(repo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM)).thenReturn(orders);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(initialProfile));
+
+        sut.checkUnconfirmedOrders();
+
+        //verify
+        verify(repo).findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        verify(smsNotifcation, times(1))
+                .sendMessage(initialProfile.getMobileNumber(),
+                        "Hello " + initialProfile.getName() + ", Please accept the order " + order.getId() +
+                                " on iZinga app, otherwise the order will be cancelled.");
+    }
+
+    @Test
+    public void checkNotAcceptedOrdersAndNotNotify() throws Exception {
+        //given
+        String shopId = "id of shop";
+        String phoneNumber = "0812445563";
+
+        //order 1
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+        order.setCustomerId("customer");
+        order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        Date orderDate = Date.from(LocalDateTime.now().minusMinutes(9).atZone(ZoneId.systemDefault()).toInstant());
+        order.setDate(orderDate);
+        order.setShopId(shopId);
+
+        //order 2
+        Order order2 = new Order();
+        Basket basket2 = new Basket();
+        order.setBasket(basket);
+        Messager messenger2 = new Messager();
+        messenger.setId("messagerID");
+        ShippingData shipping2 = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.COLLECTION);
+        Date pickUpTime = Date.from(LocalDateTime.now().minusMinutes(320).atZone(ZoneId.systemDefault()).toInstant());
+        shipping2.setPickUpTime(pickUpTime);
+        shipping.setMessenger(messenger2);
+        order2.setShippingData(shipping2);
+        order2.setCustomerId("customer id");
+        order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(5).atZone(ZoneId.systemDefault()).toInstant());
+        order2.setDate(orderDate);
+        order2.setShopId(shopId);
+
+        ArrayList<Order> orders = new ArrayList<>();
+        orders.add(order);
+
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile initialProfile = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                businessHours,
+                "ownerId",
+                new Bank());
+        initialProfile.setBusinessHours(new ArrayList<>());
+        initialProfile.setFeatured(true);
+        Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
+        initialProfile.setFeaturedExpiry(date);
+        Bank bank = new Bank();
+        bank.setAccountId("34567890");
+        initialProfile.setBank(bank);
+
+        //when
+        when(repo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM)).thenReturn(orders);
+
+        sut.checkUnconfirmedOrders();
+
+        //verify
+        verify(repo).findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        verify(smsNotifcation, times(0))
+                .sendMessage(initialProfile.getMobileNumber(),
+                        "Hello " + initialProfile.getName() + ", Please accept the order " + order.getId() +
+                                " on iZinga app, otherwise the order will be cancelled.");
+    }
+
+    @Test
+    public void checkNotAcceptedCollectionOrdersAndNotify() throws Exception {
+        //given
+        String shopId = "id of shop";
+        String phoneNumber = "0812445563";
+
+        //order 1
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.COLLECTION);
+        shipping.setMessenger(messenger);
+        Date pickUpTime = Date.from(LocalDateTime.now().plusMinutes(320).atZone(ZoneId.systemDefault()).toInstant());
+        shipping.setPickUpTime(pickUpTime);
+        order.setShippingData(shipping);
+        order.setCustomerId("customer");
+        order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        Date orderDate = Date.from(LocalDateTime.now().minusMinutes(66).atZone(ZoneId.systemDefault()).toInstant());
+        order.setDate(orderDate);
+        order.setShopId(shopId);
+
+        //order 2
+        Order order2 = new Order();
+        Basket basket2 = new Basket();
+        order.setBasket(basket);
+        Messager messenger2 = new Messager();
+        messenger.setId("messagerID");
+        ShippingData shipping2 = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.COLLECTION);
+        shipping.setMessenger(messenger2);
+        Date pickUpTime2 = Date.from(LocalDateTime.now()
+                .plusMinutes(60)
+                .atZone(ZoneId.systemDefault())
+                .toInstant());
+        shipping2.setPickUpTime(pickUpTime2);
+        order2.setShippingData(shipping2);
+        order2.setCustomerId("customer id");
+        order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(60).atZone(ZoneId.systemDefault()).toInstant());
+        order2.setDate(orderDate2);
+        order2.setShopId(shopId);
+
+        ArrayList<Order> orders = new ArrayList<>();
+        orders.add(order);
+        orders.add(order2);
+
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile initialProfile = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                businessHours,
+                "ownerId",
+                new Bank());
+        initialProfile.setBusinessHours(new ArrayList<>());
+        Bank bank = new Bank();
+        bank.setAccountId("34567890");
+        initialProfile.setBank(bank);
+
+        //when
+        when(repo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM)).thenReturn(orders);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(initialProfile));
+
+        sut.checkUnconfirmedOrders();
+
+        //verify
+        verify(repo).findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        verify(smsNotifcation, times(1))
+                .sendMessage(initialProfile.getMobileNumber(),
+                        "Hello " + initialProfile.getName() + ", Please accept the order " + order2.getId() +
+                                " on iZinga app, otherwise the order will be cancelled.");
+    }
+
+    @Test
+    public void checkNotAcceptedCollectionOrdersAndNotNotify() throws Exception {
+        //given
+        String shopId = "id of shop";
+        String phoneNumber = "0812445563";
+
+        //order 1
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.COLLECTION);
+        shipping.setMessenger(messenger);
+        Date pickUpTime = Date.from(LocalDateTime.now().plusMinutes(320).atZone(ZoneId.systemDefault()).toInstant());
+        shipping.setPickUpTime(pickUpTime);
+        order.setShippingData(shipping);
+        order.setCustomerId("customer");
+        order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        Date orderDate = Date.from(LocalDateTime.now().minusMinutes(66).atZone(ZoneId.systemDefault()).toInstant());
+        order.setDate(orderDate);
+        order.setShopId(shopId);
+
+        //order 2
+        Order order2 = new Order();
+        Basket basket2 = new Basket();
+        order.setBasket(basket);
+        Messager messenger2 = new Messager();
+        messenger.setId("messagerID");
+        ShippingData shipping2 = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.COLLECTION);
+        shipping.setMessenger(messenger2);
+        Date pickUpTime2 = Date.from(LocalDateTime.now()
+                .plusMinutes(61)
+                .atZone(ZoneId.systemDefault())
+                .toInstant());
+        shipping2.setPickUpTime(pickUpTime2);
+        order2.setShippingData(shipping2);
+        order2.setCustomerId("customer id");
+        order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(60).atZone(ZoneId.systemDefault()).toInstant());
+        order2.setDate(orderDate2);
+        order2.setShopId(shopId);
+
+        ArrayList<Order> orders = new ArrayList<>();
+        orders.add(order);
+        orders.add(order2);
+
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile initialProfile = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                businessHours,
+                "ownerId",
+                new Bank());
+        initialProfile.setBusinessHours(new ArrayList<>());
+        Bank bank = new Bank();
+        bank.setAccountId("34567890");
+        initialProfile.setBank(bank);
+
+        //when
+        when(repo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM)).thenReturn(orders);
+
+        sut.checkUnconfirmedOrders();
+
+        //verify
+        verify(repo).findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        verify(smsNotifcation, times(0))
+                .sendMessage(initialProfile.getMobileNumber(),
+                        "Hello " + initialProfile.getName() + ", Please accept the order " + order2.getId() +
+                                " on iZinga app, otherwise the order will be cancelled.");
     }
 }

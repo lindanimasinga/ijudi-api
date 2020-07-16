@@ -93,7 +93,7 @@ public class ShippingData {
         this.pickUpTime = pickUpTime;
     }
 
-    public static enum ShippingType {
+    public enum ShippingType {
         COLLECTION,
         DELIVERY
     }

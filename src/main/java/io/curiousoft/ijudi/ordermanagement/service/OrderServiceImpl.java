@@ -20,7 +20,9 @@ import javax.validation.ValidatorFactory;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 import static io.curiousoft.ijudi.ordermanagement.model.OrderStage.*;
 import static io.curiousoft.ijudi.ordermanagement.model.OrderType.INSTORE;
@@ -40,6 +42,7 @@ public class OrderServiceImpl implements OrderService {
     private final PaymentService paymentService;
     private final DeviceRepository deviceRepo;
     private final PushNotificationService pushNotificationService;
+    private final SmsNotificationService smsNotificationService;
     private final double deliveryFee;
     private final double serviceFee;
     private final long cleanUpMinutes;
@@ -52,7 +55,8 @@ public class OrderServiceImpl implements OrderService {
                             StoreRepository storeRepository,
                             UserProfileRepo userProfileRepo, PaymentService paymentService,
                             DeviceRepository deviceRepo,
-                            PushNotificationService pushNotificationService) {
+                            PushNotificationService pushNotificationService,
+                            SmsNotificationService smsNotifcationService) {
         this.deliveryFee = deliveryFee;
         this.serviceFee = serviceFee;
         this.cleanUpMinutes = cleanUpMinutes;
@@ -61,6 +65,7 @@ public class OrderServiceImpl implements OrderService {
         this.userProfileRepo = userProfileRepo;
         this.paymentService = paymentService;
         this.pushNotificationService = pushNotificationService;
+        this.smsNotificationService = smsNotifcationService;
         this.deviceRepo = deviceRepo;
         ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
         validator = factory.getValidator();
@@ -103,7 +108,7 @@ public class OrderServiceImpl implements OrderService {
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setDate(orderDate);
         order.setServiceFee(serviceFee);
-        if(order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
+        if (order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
             order.getShippingData().setFee(deliveryFee);
         }
         return orderRepo.save(order);
@@ -120,7 +125,7 @@ public class OrderServiceImpl implements OrderService {
         persistedOrder.setPaymentType(order.getPaymentType());
         persistedOrder.setDate(new Date());
         order.setServiceFee(serviceFee);
-        if(order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
+        if (order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
             order.getShippingData().setFee(deliveryFee);
         }
 
@@ -128,8 +133,8 @@ public class OrderServiceImpl implements OrderService {
             throw new Exception("Payment not cleared yet. please verify again.");
         }
 
-        if(persistedOrder.getOrderType() == INSTORE) {
-            if(persistedOrder.getShopPaid()) {
+        if (persistedOrder.getOrderType() == INSTORE) {
+            if (persistedOrder.getShopPaid()) {
                 return order;
             }
             paymentService.completePaymentToShop(persistedOrder);
@@ -158,7 +163,7 @@ public class OrderServiceImpl implements OrderService {
             store.setServicesCompleted(store.getServicesCompleted() + 1);
             storeRepository.save(store);
 
-            if(order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
+            if (order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
                 List<Device> messengerDevices = deviceRepo.findByUserId(order.getShippingData().getMessenger().getId());
                 pushNotificationService.notifyMessengerOrderPlaced(messengerDevices, order, store);
             }
@@ -178,12 +183,12 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new Exception("Order with id " + orderId + " not found."));
         int index = onlineDeliveryStages.indexOf(order.getStage());
 
-        if(order.getOrderType() == INSTORE || order.getStage() == STAGE_0_CUSTOMER_NOT_PAID
+        if (order.getOrderType() == INSTORE || order.getStage() == STAGE_0_CUSTOMER_NOT_PAID
                 || order.getStage() == STAGE_7_PAID_SHOP) { // last stage is updated by the payment process
             return order;
         }
 
-        if(order.getStage() == STAGE_6_WITH_CUSTOMER) {
+        if (order.getStage() == STAGE_6_WITH_CUSTOMER) {
             order.setDate(new Date());
             return orderRepo.save(order);
         }
@@ -302,6 +307,39 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public List<Order> findAll() {
         return orderRepo.findAll();
+    }
+
+    @Scheduled(fixedDelay = 600000)// 10 minutes
+    @Override
+    public void checkUnconfirmedOrders() {
+        LOGGER.info("Checking unconfirmed orders..");
+        List<Order> orders = orderRepo.findByStage(STAGE_1_WAITING_STORE_CONFIRM);
+        orders.forEach(order -> {
+            Date checkDate = order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY ?
+                    Date.from(LocalDateTime.now()
+                            .minusMinutes(10)
+                            .atZone(ZoneId.systemDefault())
+                            .toInstant())
+                    : Date.from(LocalDateTime.now()
+                    .plusMinutes(60)
+                    .atZone(ZoneId.systemDefault())
+                    .toInstant());
+
+            //notify by sms
+            boolean isLateDeliveryOrder = order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY && order.getDate().before(checkDate);
+            boolean isLateCollectionOrder = order.getShippingData().getType() == ShippingData.ShippingType.COLLECTION
+                                            && order.getShippingData().getPickUpTime().before(checkDate);
+
+            if (isLateDeliveryOrder || isLateCollectionOrder) {
+                StoreProfile store = storeRepository.findById(order.getShopId()).get();
+                try {
+                    smsNotificationService.sendMessage(store.getMobileNumber(), "Hello " + store.getName() + ", Please accept the order " + order.getId() +
+                            " on iZinga app, otherwise the order will be cancelled.");
+                } catch (Exception e) {
+                    LOGGER.error("Failed to send sms. ",e);
+                }
+            }
+        });
     }
 
     private void validate(Order order) throws Exception {

@@ -21,4 +21,6 @@ public interface OrderRepository extends MongoRepository<Order, String> {
     void deleteByShopPaidAndStageAndDateBefore(boolean shopPaid, OrderStage stage, Date date);
 
     List<Order> findByShippingDataMessengerIdAndStageNot(String id, OrderStage customerNotPaid);
+
+    List<Order> findByStage(OrderStage eq);
 }

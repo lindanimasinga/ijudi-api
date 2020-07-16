@@ -25,4 +25,6 @@ public interface OrderService {
     List<Order> findOrderByMessengerId(String id);
 
     List<Order> findAll();
+
+    void checkUnconfirmedOrders();
 }
