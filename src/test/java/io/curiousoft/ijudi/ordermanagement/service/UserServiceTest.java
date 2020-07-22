@@ -15,6 +15,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -44,12 +46,36 @@ public class UserServiceTest {
 
         //when
         when(profileRepo.save(initialProfile)).thenReturn(initialProfile);
+        when(profileRepo.existsByMobileNumber(initialProfile.getMobileNumber())).thenReturn(false);
         Profile profile = profileService.create(initialProfile);
 
         //verify
         Assert.assertNotNull(profile.getCreatedDate());
+        verify(profileRepo).existsByMobileNumber(initialProfile.getMobileNumber());
         verify(profileRepo).save(initialProfile);
         Assert.assertNotNull(profile.getId());
+    }
+
+    @Test
+    public void createAlreadyExists() throws Exception {
+
+        //given
+        UserProfile initialProfile = new UserProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                ProfileRoles.CUSTOMER);
+
+        //when
+        when(profileRepo.save(initialProfile)).thenReturn(initialProfile);
+        when(profileRepo.existsByMobileNumber(initialProfile.getMobileNumber())).thenReturn(true);
+        try {
+            Profile profile = profileService.create(initialProfile);
+            fail();
+        } catch (Exception e) {
+            Assert.assertNotNull("Entity with id " + initialProfile.getId() + " already exist.",e.getMessage());
+        }
     }
 
     @Test

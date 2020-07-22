@@ -13,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
@@ -136,10 +137,12 @@ public class UkheshePaymentProvider extends PaymentProvider<UkheshePaymentData> 
         String fromAccount = mainAccount;
         StoreProfile shop = storeRepo.findById(order.getShopId())
                 .orElseThrow(() -> new Exception("shop does not exist"));
+        String shopAccount = !StringUtils.isEmpty(shop.getBank().getAccountId()) ?
+                shop.getBank().getAccountId() : shop.getBank().getPhone();
 
         UkheshePaymentData payment = new UkheshePaymentData(
                 fromAccount,
-                shop.getBank().getAccountId(),
+                shopAccount,
                 basketAmountExclFees,
                 order.getDescription(),
                 order.getId() + "_2",

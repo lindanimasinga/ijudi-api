@@ -1,6 +1,9 @@
 package io.curiousoft.ijudi.ordermanagement.service.zoomsms;
 
+import io.curiousoft.ijudi.ordermanagement.service.OrderServiceImpl;
 import io.curiousoft.ijudi.ordermanagement.service.SmsNotificationService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
@@ -13,6 +16,8 @@ import java.net.URI;
 
 @Service
 public class ZoomSmsNotificationService implements SmsNotificationService {
+
+    private static Logger LOGGER = LoggerFactory.getLogger(ZoomSmsNotificationService.class);
 
     private final String url;
     private final String email;
@@ -31,6 +36,7 @@ public class ZoomSmsNotificationService implements SmsNotificationService {
     @Override
     public void sendMessage(String mobileNumber, String message) throws Exception {
         URI uri = new URI(url + "?email="+ email + "&token=" + token);
+        LOGGER.info("Sending sms to "+ mobileNumber);
         ZoomSMSMessage smsMessage = new ZoomSMSMessage(mobileNumber, message);
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-Type", "application/json");

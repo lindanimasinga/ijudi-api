@@ -6,6 +6,7 @@ import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class UserProfileService extends ProfileServiceImpl<UserProfileRepo, UserProfile>{
@@ -26,5 +27,12 @@ public class UserProfileService extends ProfileServiceImpl<UserProfileRepo, User
 
         return profileRepo.findByRoleAndLatitudeBetweenAndLongitudeBetween(role, minLat,
                 maxLat, minLong, maxLong);
+    }
+
+    @Override
+    public UserProfile create(UserProfile profile) throws Exception {
+        if(profileRepo.existsByMobileNumber(profile.getMobileNumber()))
+            throw new Exception("User with id " + profile.getId() + " already exist.");
+        return super.create(profile);
     }
 }
