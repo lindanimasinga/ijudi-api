@@ -68,13 +68,12 @@ public class UserServiceTest {
                 ProfileRoles.CUSTOMER);
 
         //when
-        when(profileRepo.save(initialProfile)).thenReturn(initialProfile);
         when(profileRepo.existsByMobileNumber(initialProfile.getMobileNumber())).thenReturn(true);
         try {
             Profile profile = profileService.create(initialProfile);
             fail();
         } catch (Exception e) {
-            Assert.assertNotNull("Entity with id " + initialProfile.getId() + " already exist.",e.getMessage());
+            Assert.assertEquals("User with phone number " + initialProfile.getMobileNumber() + " already exist.",e.getMessage());
         }
     }
 

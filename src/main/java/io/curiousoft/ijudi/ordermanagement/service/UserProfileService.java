@@ -32,7 +32,7 @@ public class UserProfileService extends ProfileServiceImpl<UserProfileRepo, User
     @Override
     public UserProfile create(UserProfile profile) throws Exception {
         if(profileRepo.existsByMobileNumber(profile.getMobileNumber()))
-            throw new Exception("User with id " + profile.getId() + " already exist.");
+            throw new Exception("User with phone number " + profile.getMobileNumber() + " already exist.");
         return super.create(profile);
     }
 }

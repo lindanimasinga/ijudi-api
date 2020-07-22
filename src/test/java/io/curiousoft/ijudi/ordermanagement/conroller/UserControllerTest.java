@@ -6,6 +6,8 @@ import com.google.gson.Gson;
 import io.curiousoft.ijudi.ordermanagement.IjudiApplication;
 import io.curiousoft.ijudi.ordermanagement.model.ProfileRoles;
 import io.curiousoft.ijudi.ordermanagement.model.UserProfile;
+import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -27,6 +29,8 @@ public class UserControllerTest {
 
     @Autowired
     private TestRestTemplate rest;
+    @Autowired
+    UserProfileRepo userProfileRepo;
 
     @Test
     public void create() throws URISyntaxException, JsonProcessingException {
@@ -58,5 +62,10 @@ public class UserControllerTest {
 
     @Test
     public void findUser() {
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        userProfileRepo.deleteAll();
     }
 }
