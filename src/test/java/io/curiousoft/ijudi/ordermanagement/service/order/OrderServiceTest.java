@@ -1276,6 +1276,7 @@ public class OrderServiceTest {
 
         //verify
         Assert.assertEquals(OrderStage.STAGE_4_ON_THE_ROAD, finalOrder.getStage());
+        verify(paymentService).completePaymentToShop(order);
         verify(deviceRepo).findByUserId(order.getCustomerId());
         verify(pushNotificationService).sendNotification(device, message);
         verify(repo).findById(order.getId());
@@ -1550,6 +1551,7 @@ public class OrderServiceTest {
 
         //verify
         Assert.assertEquals(OrderStage.STAGE_6_WITH_CUSTOMER, finalOrder.getStage());
+        verify(paymentService).completePaymentToShop(order);
         verify(repo).findById(order.getId());
         verify(repo).save(order);
     }

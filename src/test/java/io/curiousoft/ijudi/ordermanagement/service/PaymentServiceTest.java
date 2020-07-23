@@ -141,6 +141,7 @@ public class PaymentServiceTest {
 
         //verify
         assertTrue(received);
+        assertTrue(order.getShopPaid());
         assertNotNull(order.getPaymentType());
         verify(ukheshePaymentProvider).makePayment(order, order.getBasketAmount());
         verify(ukheshePaymentProvider).makePayment(order, 40);
