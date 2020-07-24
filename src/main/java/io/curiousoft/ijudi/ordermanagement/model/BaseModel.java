@@ -1,5 +1,6 @@
-package io.curiousoft.ijudi.ordermanagement.service;
+package io.curiousoft.ijudi.ordermanagement.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -10,8 +11,9 @@ public class BaseModel {
 
     @Id
     private String id;
+    @JsonProperty(value = "date")
     @CreatedDate
-    private Date createdDate;
+    private Date createdDate = new Date();
     @LastModifiedDate
     private Date modifiedDate;
 

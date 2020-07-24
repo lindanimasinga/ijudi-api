@@ -1,7 +1,6 @@
 package io.curiousoft.ijudi.ordermanagement.model;
 
 
-import io.curiousoft.ijudi.ordermanagement.service.BaseModel;
 import org.springframework.data.mongodb.core.index.Indexed;
 
 import javax.validation.constraints.NotBlank;
