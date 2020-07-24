@@ -50,7 +50,6 @@ public class UserServiceTest {
         Profile profile = profileService.create(initialProfile);
 
         //verify
-        Assert.assertNotNull(profile.getCreatedDate());
         verify(profileRepo).existsByMobileNumber(initialProfile.getMobileNumber());
         verify(profileRepo).save(initialProfile);
         Assert.assertNotNull(profile.getId());

@@ -15,7 +15,6 @@ public class Order extends BaseModel {
 
     @NotNull(message = "order stage is not valid")
     private OrderStage stage;
-    private Date date;
     @ValidDeliveryInfo
     @Valid
     private ShippingData shippingData;
@@ -36,20 +35,12 @@ public class Order extends BaseModel {
     @PositiveOrZero(message = "service fee was modified")
     private double serviceFee;
 
-    public void setDate(Date date) {
-        this.date = date;
-    }
-
     public void setStage(OrderStage stage) {
         this.stage = stage;
     }
 
     public OrderStage getStage() {
         return stage;
-    }
-
-    public Date getDate() {
-        return date;
     }
 
     public ShippingData getShippingData() {

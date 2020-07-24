@@ -162,7 +162,7 @@ public class PaymentServiceTest {
         //given an order
         Order order = new Order();
         Basket basket = new Basket();
-        order.setDate(Date.from(LocalDateTime.now().minusSeconds(6).atZone(ZoneId.systemDefault()).toInstant()));
+        order.setModifiedDate(Date.from(LocalDateTime.now().minusSeconds(6).atZone(ZoneId.systemDefault()).toInstant()));
         order.setBasket(basket);
         Messager messenger = new Messager();
         messenger.setId("messagerID");
@@ -180,7 +180,7 @@ public class PaymentServiceTest {
         List<Order> ordersList = Collections.singletonList(order);
 
         //when
-        when(orderRepo.findByShopPaidAndStageAndDateBefore(eq(false), eq(OrderStage.STAGE_6_WITH_CUSTOMER),
+        when(orderRepo.findByShopPaidAndStageAndModifiedDateBefore(eq(false), eq(OrderStage.STAGE_6_WITH_CUSTOMER),
                 any(Date.class))).thenReturn(ordersList);
         when(ukheshePaymentProvider.getPaymentType()).thenReturn(PaymentType.UKHESHE);
 
@@ -190,7 +190,7 @@ public class PaymentServiceTest {
         assertNotNull(order.getPaymentType());
         assertEquals(OrderStage.STAGE_7_PAID_SHOP, order.getStage());
         Assert.assertTrue(order.getShopPaid());
-        verify(orderRepo).findByShopPaidAndStageAndDateBefore(eq(false), eq(OrderStage.STAGE_6_WITH_CUSTOMER), any(Date.class));
+        verify(orderRepo).findByShopPaidAndStageAndModifiedDateBefore(eq(false), eq(OrderStage.STAGE_6_WITH_CUSTOMER), any(Date.class));
         verify(ukheshePaymentProvider).makePayment(ordersList.get(0), ordersList.get(0).getBasketAmount());
         verify(orderRepo).save(ordersList.get(0));
 

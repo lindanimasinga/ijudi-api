@@ -20,9 +20,7 @@ import javax.validation.ValidatorFactory;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 import static io.curiousoft.ijudi.ordermanagement.model.OrderStage.*;
 import static io.curiousoft.ijudi.ordermanagement.model.OrderType.INSTORE;
@@ -106,7 +104,6 @@ public class OrderServiceImpl implements OrderService {
         String orderId = new SimpleDateFormat(DATE_FORMAT).format(orderDate);
         order.setId(orderId);
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
-        order.setDate(orderDate);
         order.setServiceFee(serviceFee);
         if (order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
             order.getShippingData().setFee(deliveryFee);
@@ -123,7 +120,6 @@ public class OrderServiceImpl implements OrderService {
 
         persistedOrder.setDescription(order.getDescription());
         persistedOrder.setPaymentType(order.getPaymentType());
-        persistedOrder.setDate(new Date());
         order.setServiceFee(serviceFee);
         if (order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
             order.getShippingData().setFee(deliveryFee);
@@ -189,7 +185,6 @@ public class OrderServiceImpl implements OrderService {
         }
 
         if (order.getStage() == STAGE_6_WITH_CUSTOMER) {
-            order.setDate(new Date());
             return orderRepo.save(order);
         }
 
@@ -271,7 +266,6 @@ public class OrderServiceImpl implements OrderService {
                 break;
 
         }
-        order.setDate(new Date());
         return orderRepo.save(order);
     }
 
@@ -302,7 +296,7 @@ public class OrderServiceImpl implements OrderService {
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
         LOGGER.info("Cleaning up all orders before   s" + pastDate);
-        orderRepo.deleteByShopPaidAndStageAndDateBefore(false, OrderStage.STAGE_0_CUSTOMER_NOT_PAID, pastDate);
+        orderRepo.deleteByShopPaidAndStageAndModifiedDateBefore(false, OrderStage.STAGE_0_CUSTOMER_NOT_PAID, pastDate);
     }
 
     @Override
@@ -332,7 +326,7 @@ public class OrderServiceImpl implements OrderService {
                     .toInstant());
 
             //notify by sms
-            boolean isLateDeliveryOrder = order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY && order.getDate().before(checkDate);
+            boolean isLateDeliveryOrder = order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY && order.getModifiedDate().before(checkDate);
             boolean isLateCollectionOrder = order.getShippingData().getType() == ShippingData.ShippingType.COLLECTION
                                             && order.getShippingData().getPickUpTime().before(checkDate);
 

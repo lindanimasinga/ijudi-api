@@ -82,7 +82,7 @@ public class PaymentService {
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
         List<Order> orders = orderRepo
-                .findByShopPaidAndStageAndDateBefore(false,
+                .findByShopPaidAndStageAndModifiedDateBefore(false,
                         OrderStage.STAGE_6_WITH_CUSTOMER, pastDate);
 
         logger.info("Processing " + orders.size() + " pending payments");

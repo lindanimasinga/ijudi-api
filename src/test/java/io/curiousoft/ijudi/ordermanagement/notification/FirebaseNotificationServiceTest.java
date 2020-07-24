@@ -67,7 +67,6 @@ public class FirebaseNotificationServiceTest {
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
-        order.setDate(orderDate);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.INSTORE);
@@ -106,7 +105,6 @@ public class FirebaseNotificationServiceTest {
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
-        order.setDate(orderDate);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.INSTORE);

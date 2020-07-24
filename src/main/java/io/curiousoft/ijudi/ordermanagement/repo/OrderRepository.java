@@ -12,15 +12,16 @@ public interface OrderRepository extends MongoRepository<Order, String> {
 
     Optional<List<Order>> findByCustomerId(String customerId);
 
-    List<Order> findByShopPaidAndStageAndDateBefore(boolean shopPaid, OrderStage stage, Date orderDate);
-
     List<Order> findByShopId(String id);
 
     List<Order> findByShopIdAndStageNot(String id, OrderStage stage);
 
-    void deleteByShopPaidAndStageAndDateBefore(boolean shopPaid, OrderStage stage, Date date);
+    void deleteByShopPaidAndStageAndModifiedDateBefore(boolean shopPaid, OrderStage stage, Date date);
 
     List<Order> findByShippingDataMessengerIdAndStageNot(String id, OrderStage customerNotPaid);
 
     List<Order> findByStage(OrderStage eq);
+
+    List<Order> findByShopPaidAndStageAndModifiedDateBefore(boolean b, OrderStage stage6WithCustomer, Date pastDate);
+
 }

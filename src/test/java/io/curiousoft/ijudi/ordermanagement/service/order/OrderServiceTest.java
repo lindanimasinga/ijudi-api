@@ -116,7 +116,6 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
-        Assert.assertNotNull(order.getDate());
         Assert.assertEquals(10, order.getShippingData().getFee(), 0);
         Assert.assertEquals(5.00, order.getServiceFee(), 0);
         Assert.assertEquals(40.00, order.getBasketAmount(), 0);
@@ -179,7 +178,6 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
-        Assert.assertNotNull(order.getDate());
         Assert.assertEquals(5.00, order.getServiceFee(), 0);
         Assert.assertEquals(0, order.getShippingData().getFee(), 0);
         Assert.assertEquals(40.00, order.getBasketAmount(), 0);
@@ -247,7 +245,6 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
-        Assert.assertNotNull(order.getDate());
         Assert.assertTrue(order.getHasVat());
         Assert.assertEquals(5.00, order.getServiceFee(), 0);
         Assert.assertEquals(10.00, order.getShippingData().getFee(), 0);
@@ -672,8 +669,6 @@ public class OrderServiceTest {
                 ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
-        Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
-        order.setDate(orderDate);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.ONLINE);
@@ -716,7 +711,6 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(OrderStage.STAGE_1_WAITING_STORE_CONFIRM, finalOrder.getStage());
         Assert.assertNotNull(finalOrder.getDescription());
-        Assert.assertTrue(finalOrder.getDate().after(orderDate));
         Assert.assertFalse(finalOrder.getShopPaid());
         Assert.assertFalse(order.getHasVat());
         verify(repo).save(order);
@@ -751,8 +745,6 @@ public class OrderServiceTest {
                 ShippingData.ShippingType.COLLECTION);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
-        Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
-        order.setDate(orderDate);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.INSTORE);
@@ -798,7 +790,6 @@ public class OrderServiceTest {
         Assert.assertEquals(0, finalOrder.getShippingData().getFee(), 0);
         Assert.assertEquals(5, finalOrder.getServiceFee(), 0);
         Assert.assertTrue(finalOrder.getShopPaid());
-        Assert.assertTrue(finalOrder.getDate().after(orderDate));
         Assert.assertNotNull(finalOrder.getDescription());
         Assert.assertTrue(order.getHasVat() == false);
         verify(repo).save(order);
@@ -833,8 +824,6 @@ public class OrderServiceTest {
                 ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
-        Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
-        order.setDate(orderDate);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.INSTORE);
@@ -874,7 +863,6 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(OrderStage.STAGE_7_PAID_SHOP, finalOrder.getStage());
         Assert.assertTrue(finalOrder.getShopPaid());
-        Assert.assertTrue(finalOrder.getDate().after(orderDate));
         Assert.assertNotNull(finalOrder.getDescription());
         Assert.assertTrue(order.getHasVat() == false);
         verify(repo, never()).save(order);
@@ -1132,7 +1120,6 @@ public class OrderServiceTest {
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
-        order.setDate(orderDate);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.ONLINE);
@@ -1192,7 +1179,6 @@ public class OrderServiceTest {
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
-        order.setDate(orderDate);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.ONLINE);
@@ -1254,7 +1240,6 @@ public class OrderServiceTest {
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
-        order.setDate(orderDate);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.ONLINE);
@@ -1315,7 +1300,6 @@ public class OrderServiceTest {
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
-        order.setDate(orderDate);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.ONLINE);
@@ -1360,7 +1344,6 @@ public class OrderServiceTest {
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
-        order.setDate(orderDate);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.INSTORE);
@@ -1395,7 +1378,6 @@ public class OrderServiceTest {
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
-        order.setDate(orderDate);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.ONLINE);
@@ -1430,7 +1412,6 @@ public class OrderServiceTest {
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
-        order.setDate(orderDate);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.ONLINE);
@@ -1445,7 +1426,6 @@ public class OrderServiceTest {
 
         //verify
         Assert.assertEquals(OrderStage.STAGE_6_WITH_CUSTOMER, finalOrder.getStage());
-        Assert.assertNotEquals(orderDate, finalOrder.getDate());
         verify(repo).findById(order.getId());
     }
 
@@ -1482,7 +1462,6 @@ public class OrderServiceTest {
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
-        order.setDate(orderDate);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.ONLINE);
@@ -1529,7 +1508,6 @@ public class OrderServiceTest {
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
-        order.setDate(orderDate);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.ONLINE);
@@ -1823,7 +1801,7 @@ public class OrderServiceTest {
         sut.cleanUnpaidOrders();
 
         //verify
-        verify(repo).deleteByShopPaidAndStageAndDateBefore(eq(false), eq(OrderStage.STAGE_0_CUSTOMER_NOT_PAID),
+        verify(repo).deleteByShopPaidAndStageAndModifiedDateBefore(eq(false), eq(OrderStage.STAGE_0_CUSTOMER_NOT_PAID),
                 any(Date.class));
     }
 
@@ -1847,7 +1825,7 @@ public class OrderServiceTest {
         order.setCustomerId("customer");
         order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate = Date.from(LocalDateTime.now().minusMinutes(10).atZone(ZoneId.systemDefault()).toInstant());
-        order.setDate(orderDate);
+        order.setModifiedDate(orderDate);
         order.setShopId(shopId);
 
         //order 2
@@ -1866,7 +1844,7 @@ public class OrderServiceTest {
         order2.setCustomerId("customer id");
         order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(5).atZone(ZoneId.systemDefault()).toInstant());
-        order2.setDate(orderDate);
+        order2.setModifiedDate(orderDate2);
         order2.setShopId(shopId);
 
         ArrayList<Order> orders = new ArrayList<>();
@@ -1925,7 +1903,7 @@ public class OrderServiceTest {
         order.setCustomerId("customer");
         order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate = Date.from(LocalDateTime.now().minusMinutes(9).atZone(ZoneId.systemDefault()).toInstant());
-        order.setDate(orderDate);
+        order.setModifiedDate(orderDate);
         order.setShopId(shopId);
 
         //order 2
@@ -1944,7 +1922,7 @@ public class OrderServiceTest {
         order2.setCustomerId("customer id");
         order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(5).atZone(ZoneId.systemDefault()).toInstant());
-        order2.setDate(orderDate);
+        order2.setModifiedDate(orderDate2);
         order2.setShopId(shopId);
 
         ArrayList<Order> orders = new ArrayList<>();
@@ -2004,7 +1982,7 @@ public class OrderServiceTest {
         order.setCustomerId("customer");
         order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate = Date.from(LocalDateTime.now().minusMinutes(66).atZone(ZoneId.systemDefault()).toInstant());
-        order.setDate(orderDate);
+        order.setModifiedDate(orderDate);
         order.setShopId(shopId);
 
         //order 2
@@ -2026,7 +2004,7 @@ public class OrderServiceTest {
         order2.setCustomerId("customer id");
         order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(60).atZone(ZoneId.systemDefault()).toInstant());
-        order2.setDate(orderDate2);
+        order2.setModifiedDate(orderDate2);
         order2.setShopId(shopId);
 
         ArrayList<Order> orders = new ArrayList<>();
@@ -2085,7 +2063,7 @@ public class OrderServiceTest {
         order.setCustomerId("customer");
         order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate = Date.from(LocalDateTime.now().minusMinutes(66).atZone(ZoneId.systemDefault()).toInstant());
-        order.setDate(orderDate);
+        order.setModifiedDate(orderDate);
         order.setShopId(shopId);
 
         //order 2
@@ -2107,7 +2085,7 @@ public class OrderServiceTest {
         order2.setCustomerId("customer id");
         order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(60).atZone(ZoneId.systemDefault()).toInstant());
-        order2.setDate(orderDate2);
+        order2.setModifiedDate(orderDate2);
         order2.setShopId(shopId);
 
         ArrayList<Order> orders = new ArrayList<>();

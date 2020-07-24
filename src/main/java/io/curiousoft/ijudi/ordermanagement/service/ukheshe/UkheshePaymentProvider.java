@@ -65,7 +65,7 @@ public class UkheshePaymentProvider extends PaymentProvider<UkheshePaymentData> 
         }
 
         //get transactions
-        LocalDateTime fromLocalDate = LocalDateTime.ofInstant(order.getDate().toInstant(),
+        LocalDateTime fromLocalDate = LocalDateTime.ofInstant(order.getCreatedDate().toInstant(),
                 ZoneId.systemDefault()).minusMinutes(10);
         Date fromDate = Date.from(fromLocalDate.atZone(ZoneId.systemDefault()).toInstant());
 

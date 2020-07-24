@@ -100,7 +100,7 @@ public class UkheshePaymentProviderTest {
                 ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
-        order.setDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
+        order.setCreatedDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("Payment from 0812815707: order 606071520220511");
         order.setCustomerId("customerId");
@@ -148,7 +148,7 @@ public class UkheshePaymentProviderTest {
         shipping.setMessenger(messenger);
         shipping.setFee(10);
         order.setShippingData(shipping);
-        order.setDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
+        order.setCreatedDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("Payment from 0812815707: order 606071520220511");
         order.setCustomerId("customerId");
@@ -214,7 +214,7 @@ public class UkheshePaymentProviderTest {
         shipping.setMessenger(messenger);
         shipping.setFee(10);
         order.setShippingData(shipping);
-        order.setDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
+        order.setCreatedDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("Payment from 0812815707: order 606071520220511");
         order.setCustomerId("customerId");
@@ -278,7 +278,7 @@ public class UkheshePaymentProviderTest {
                 ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
-        order.setDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
+        order.setCreatedDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("Payment from 0812815707: order 606071520220511");
         order.setCustomerId("customerId");
