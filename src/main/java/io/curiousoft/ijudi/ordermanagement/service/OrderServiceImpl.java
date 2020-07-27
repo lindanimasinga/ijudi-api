@@ -76,7 +76,7 @@ public class OrderServiceImpl implements OrderService {
         onlineDeliveryStages.add(OrderStage.STAGE_4_ON_THE_ROAD);
         onlineDeliveryStages.add(OrderStage.STAGE_5_ARRIVED);
         onlineDeliveryStages.add(OrderStage.STAGE_6_WITH_CUSTOMER);
-        onlineDeliveryStages.add(OrderStage.STAGE_7_PAID_SHOP);
+        onlineDeliveryStages.add(OrderStage.STAGE_7_ALL_PAID);
 
         onlineCollectionStages = new LinkedList<>();
         onlineCollectionStages.add(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
@@ -84,7 +84,7 @@ public class OrderServiceImpl implements OrderService {
         onlineCollectionStages.add(STAGE_2_STORE_PROCESSING);
         onlineCollectionStages.add(OrderStage.STAGE_3_READY_FOR_COLLECTION);
         onlineCollectionStages.add(OrderStage.STAGE_6_WITH_CUSTOMER);
-        onlineCollectionStages.add(OrderStage.STAGE_7_PAID_SHOP);
+        onlineCollectionStages.add(OrderStage.STAGE_7_ALL_PAID);
     }
 
     @Override
@@ -134,7 +134,7 @@ public class OrderServiceImpl implements OrderService {
                 return order;
             }
             paymentService.completePaymentToShop(persistedOrder);
-            persistedOrder.setStage(OrderStage.STAGE_7_PAID_SHOP);
+            persistedOrder.setStage(OrderStage.STAGE_7_ALL_PAID);
             persistedOrder.setShopPaid(true);
         } else {
             persistedOrder.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
@@ -180,12 +180,8 @@ public class OrderServiceImpl implements OrderService {
         int index = onlineDeliveryStages.indexOf(order.getStage());
 
         if (order.getOrderType() == INSTORE || order.getStage() == STAGE_0_CUSTOMER_NOT_PAID
-                || order.getStage() == STAGE_7_PAID_SHOP) { // last stage is updated by the payment process
+                || order.getStage() == STAGE_7_ALL_PAID) {
             return order;
-        }
-
-        if (order.getStage() == STAGE_6_WITH_CUSTOMER) {
-            return orderRepo.save(order);
         }
 
         switch (order.getShippingData().getType()) {
@@ -263,6 +259,10 @@ public class OrderServiceImpl implements OrderService {
                 if(!order.getShopPaid()){
                     paymentService.completePaymentToShop(order);
                 }
+                if(!order.getMessengerPaid()){
+                    paymentService.completePaymentToMessenger(order);
+                }
+                order.setStage(STAGE_7_ALL_PAID);
                 break;
 
         }

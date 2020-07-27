@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.ijudi.ordermanagement.model.Order;
 import io.curiousoft.ijudi.ordermanagement.model.PaymentType;
 import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
+import io.curiousoft.ijudi.ordermanagement.model.UserProfile;
 import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
+import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
 import io.curiousoft.ijudi.ordermanagement.service.PaymentProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
@@ -36,6 +38,7 @@ public class UkheshePaymentProvider extends PaymentProvider<UkheshePaymentData> 
     private final String customerId;
     private final String mainAccount;
     private final StoreRepository storeRepo;
+    private final UserProfileRepo userProfileRepo;
 
     public static final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
     private UkhesheAuthtoken ukhesheAuthtoken;
@@ -47,7 +50,8 @@ public class UkheshePaymentProvider extends PaymentProvider<UkheshePaymentData> 
                                   @Value("${ukheshe.customerId}") String customerId,
                                   @Value("${ukheshe.password}") String password,
                                   @Value("${ukheshe.main.account}") String mainAccount,
-                                  StoreRepository storeRepo) {
+                                  StoreRepository storeRepo,
+                                  UserProfileRepo userProfileRepo) {
         super(PaymentType.UKHESHE);
         this.username = username;
         this.password = password;
@@ -55,6 +59,7 @@ public class UkheshePaymentProvider extends PaymentProvider<UkheshePaymentData> 
         this.customerId = customerId;
         this.mainAccount = mainAccount;
         this.storeRepo = storeRepo;
+        this.userProfileRepo = userProfileRepo;
     }
 
     @Override
@@ -104,7 +109,7 @@ public class UkheshePaymentProvider extends PaymentProvider<UkheshePaymentData> 
     }
 
     @Override
-    public boolean makePayment(UkheshePaymentData paymentData) throws Exception {
+    public boolean makePaymentToShop(UkheshePaymentData paymentData) throws Exception {
 
         if(ukhesheAuthtoken == null || ukhesheAuthtoken.hasExpired()) {
             refreshToken();
@@ -133,7 +138,7 @@ public class UkheshePaymentProvider extends PaymentProvider<UkheshePaymentData> 
     }
 
     @Override
-    public boolean makePayment(Order order, double basketAmountExclFees) throws Exception {
+    public boolean makePaymentToShop(Order order, double basketAmountExclFees) throws Exception {
         String fromAccount = mainAccount;
         StoreProfile shop = storeRepo.findById(order.getShopId())
                 .orElseThrow(() -> new Exception("shop does not exist"));
@@ -147,12 +152,29 @@ public class UkheshePaymentProvider extends PaymentProvider<UkheshePaymentData> 
                 order.getDescription(),
                 order.getId() + "_2",
                 order.getId());
-        return makePayment(payment);
+        return makePaymentToShop(payment);
     }
 
     @Override
     public void makePayments(List<Order> ordersList) {
 
+    }
+
+    @Override
+    public void makePaymentToMessenger(Order order, double amount) throws Exception {
+        UserProfile shop = userProfileRepo.findById(order.getShippingData().getMessenger().getId())
+                .orElseThrow(() -> new Exception("Messenger does not exist"));
+        String shopAccount = !StringUtils.isEmpty(shop.getBank().getAccountId()) ?
+                shop.getBank().getAccountId() : shop.getBank().getPhone();
+
+        UkheshePaymentData payment = new UkheshePaymentData(
+                mainAccount,
+                shopAccount,
+                amount,
+                order.getDescription(),
+                order.getId() + "_2",
+                order.getId());
+        makePaymentToShop(payment);
     }
 
     private boolean isSameOrder(Order order, UkhesheTransaction ukhesheTransaction) {

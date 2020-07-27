@@ -21,13 +21,17 @@ public class CashPaymentProvider extends PaymentProvider {
     }
 
     @Override
-    public boolean makePayment(PaymentData paymentData) {
+    public boolean makePaymentToShop(PaymentData paymentData) {
         return true;
     }
 
     @Override
-    public boolean makePayment(Order order, double basketAmountExclFees) throws Exception {
+    public boolean makePaymentToShop(Order order, double basketAmountExclFees) throws Exception {
         return true;
+    }
+
+    @Override
+    public void makePaymentToMessenger(Order order, double amount) {
     }
 
     @Override

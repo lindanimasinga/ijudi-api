@@ -5,6 +5,7 @@ import io.curiousoft.ijudi.ordermanagement.notification.PushNotificationService;
 import io.curiousoft.ijudi.ordermanagement.repo.DeviceRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.OrderRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
+import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,11 +28,13 @@ public class PaymentService {
     private final PushNotificationService pushNotificationService;
     private final DeviceRepository deviceRepo;
     private final StoreRepository storeRepository;
+    private final UserProfileRepo userProfileRepo;
 
     public PaymentService(PushNotificationService pushNotificationService,
                           List<PaymentProvider> paymentProviders, OrderRepository orderRepo,
                           DeviceRepository deviceRepo,
                           StoreRepository storeRepository,
+                          UserProfileRepo userProfileRepo,
                           @Value("${payment.process.pending.minutes}") long processPaymentIntervalMinutes) {
         this.paymentProviders = paymentProviders;
         this.orderRepo = orderRepo;
@@ -39,6 +42,7 @@ public class PaymentService {
         this.pushNotificationService = pushNotificationService;
         this.deviceRepo = deviceRepo;
         this.storeRepository = storeRepository;
+        this.userProfileRepo = userProfileRepo;
     }
 
     public boolean paymentReceived(Order order) throws Exception {
@@ -54,7 +58,7 @@ public class PaymentService {
                 .filter(service -> order.getPaymentType() == service.getPaymentType())
                 .findFirst().orElseThrow(() -> new Exception("Your order has no ukheshe type set or the ukheshe provider for " + order.getPaymentType() + " not configured on the server"));
 
-        boolean paid = paymentProvider.makePayment(order, order.getBasketAmount());
+        boolean paid = paymentProvider.makePaymentToShop(order, order.getBasketAmount());
         order.setShopPaid(paid);
         String content = "Payment of R " + order.getBasketAmount() + " received";
         PushHeading heading = new PushHeading("Payment of R " + order.getBasketAmount() + " received",
@@ -89,7 +93,7 @@ public class PaymentService {
         orders.forEach(order -> {
                     try {
                         completePaymentToShop(order);
-                        order.setStage(OrderStage.STAGE_7_PAID_SHOP);
+                        order.setStage(OrderStage.STAGE_7_ALL_PAID);
                         order.setShopPaid(true);
                         orderRepo.save(order);
                     } catch (Exception e) {
@@ -97,5 +101,27 @@ public class PaymentService {
                     }
                 });
 
+    }
+
+    public void completePaymentToMessenger(Order order) throws Exception {
+
+        PaymentProvider paymentProvider = paymentProviders.stream()
+                .filter(service -> order.getPaymentType() == service.getPaymentType())
+                .findFirst().orElseThrow(() -> new Exception("Your order has no ukheshe type set or the ukheshe provider for " + order.getPaymentType() + " not configured on the server"));
+
+        paymentProvider.makePaymentToMessenger(order, order.getShippingData().getFee());
+        order.setMessengerPaid(true);
+        String content = "Payment of R " + order.getShippingData().getFee() + " received";
+        PushHeading heading = new PushHeading("Payment of R " + order.getShippingData().getFee() + " received",
+                "Order Payment Received", null);
+        PushMessage message = new PushMessage(PushMessageType.PAYMENT, heading, content);
+        deviceRepo.findByUserId(order.getShippingData().getMessenger().getId())
+                    .forEach(device -> {
+                        try {
+                            pushNotificationService.sendNotification(device, message);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    });
     }
 }

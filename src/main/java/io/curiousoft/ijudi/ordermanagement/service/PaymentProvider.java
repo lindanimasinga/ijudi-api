@@ -24,9 +24,11 @@ public abstract class PaymentProvider<P extends PaymentData> {
         this.paymentType = paymentType;
     }
 
-    public abstract boolean makePayment(P paymentData) throws Exception;
+    public abstract boolean makePaymentToShop(P paymentData) throws Exception;
 
-    public abstract boolean makePayment(Order order, double basketAmountExclFees) throws Exception;
+    public abstract boolean makePaymentToShop(Order order, double basketAmountExclFees) throws Exception;
 
     public abstract void makePayments(List<Order> ordersList);
+
+    public abstract void makePaymentToMessenger(Order order, double amount) throws Exception;
 }

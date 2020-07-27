@@ -1,12 +1,14 @@
 package io.curiousoft.ijudi.ordermanagement.service.zoomsms;
 
 import io.curiousoft.ijudi.ordermanagement.service.SmsNotificationService;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
 
 public class ZoomSmsNotificationServiceTest {
 
+    @Ignore
     @Test
     public void sendMessage() throws Exception {
         SmsNotificationService zoomSmsNotificationService = new ZoomSmsNotificationService("https://www.zoomconnect.com/app/api/rest/v1/sms/send",

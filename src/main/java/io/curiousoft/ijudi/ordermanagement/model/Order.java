@@ -32,6 +32,7 @@ public class Order extends BaseModel {
     private boolean shopPaid;
     @PositiveOrZero(message = "service fee was modified")
     private double serviceFee;
+    private boolean messengerPaid;
 
     public void setStage(OrderStage stage) {
         this.stage = stage;
@@ -134,5 +135,13 @@ public class Order extends BaseModel {
 
     public void setServiceFee(double serviceFee) {
         this.serviceFee = serviceFee;
+    }
+
+    public boolean getMessengerPaid() {
+        return messengerPaid;
+    }
+
+    public void setMessengerPaid(boolean messengerPaid) {
+        this.messengerPaid = messengerPaid;
     }
 }

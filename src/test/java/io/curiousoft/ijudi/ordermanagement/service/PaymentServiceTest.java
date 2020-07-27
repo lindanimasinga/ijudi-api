@@ -5,15 +5,13 @@ import io.curiousoft.ijudi.ordermanagement.notification.FirebaseNotificationServ
 import io.curiousoft.ijudi.ordermanagement.repo.DeviceRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.OrderRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
-import org.junit.Assert;
+import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.*;
 
 import static org.junit.Assert.*;
@@ -34,6 +32,8 @@ public class PaymentServiceTest {
     private DeviceRepository deviceRepo;
     @Mock
     private StoreRepository storeRepository;
+    @Mock
+    private UserProfileRepo userProfileRepo;
 
     @Before
     public void setUp() {
@@ -51,6 +51,7 @@ public class PaymentServiceTest {
                 orderRepo,
                 deviceRepo,
                 storeRepository,
+                userProfileRepo,
                 0);
 
         //given an order
@@ -90,7 +91,8 @@ public class PaymentServiceTest {
         //adding all ukheshe services
         paymentProviders.add(ukheshePaymentProvider);
         paymentService = new PaymentService(pushNotificationService,
-                paymentProviders, orderRepo, deviceRepo, storeRepository, 0);
+                paymentProviders, orderRepo, deviceRepo, storeRepository,
+                userProfileRepo,0);
 
         //given an order
         Order order = new Order();
@@ -133,7 +135,7 @@ public class PaymentServiceTest {
 
         //when
         when(ukheshePaymentProvider.getPaymentType()).thenReturn(PaymentType.UKHESHE);
-        when(ukheshePaymentProvider.makePayment(order, order.getBasketAmount())).thenReturn(true);
+        when(ukheshePaymentProvider.makePaymentToShop(order, order.getBasketAmount())).thenReturn(true);
         when(deviceRepo.findByUserId(shop.getOwnerId())).thenReturn(Collections.singletonList(storeDevice));
         when(storeRepository.findById(order.getShopId())).thenReturn(Optional.of(shop));
 
@@ -143,8 +145,8 @@ public class PaymentServiceTest {
         assertTrue(received);
         assertTrue(order.getShopPaid());
         assertNotNull(order.getPaymentType());
-        verify(ukheshePaymentProvider).makePayment(order, order.getBasketAmount());
-        verify(ukheshePaymentProvider).makePayment(order, 40);
+        verify(ukheshePaymentProvider).makePaymentToShop(order, order.getBasketAmount());
+        verify(ukheshePaymentProvider).makePaymentToShop(order, 40);
         verify(deviceRepo).findByUserId(shop.getOwnerId());
         verify(storeRepository).findById(order.getShopId());
         verify(pushNotificationService).sendNotification(storeDevice, message);
@@ -152,23 +154,28 @@ public class PaymentServiceTest {
     }
 
     @Test
-    public void executePendingPayments() throws Exception {
+    public void completePaymentToMessenger() throws Exception {
+
         List<PaymentProvider> paymentProviders = new ArrayList<>();
         //adding all ukheshe services
         paymentProviders.add(ukheshePaymentProvider);
-        paymentService = new PaymentService(pushNotificationService, paymentProviders,
-                orderRepo, deviceRepo, storeRepository, 1);
+        paymentService = new PaymentService(pushNotificationService,
+                paymentProviders, orderRepo, deviceRepo, storeRepository,userProfileRepo, 0);
 
         //given an order
         Order order = new Order();
         Basket basket = new Basket();
-        order.setModifiedDate(Date.from(LocalDateTime.now().minusSeconds(6).atZone(ZoneId.systemDefault()).toInstant()));
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
         order.setBasket(basket);
         Messager messenger = new Messager();
         messenger.setId("messagerID");
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
+        shipping.setFee(10);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setPaymentType(PaymentType.UKHESHE);
@@ -176,24 +183,42 @@ public class PaymentServiceTest {
         order.setCustomerId("customerId");
         order.setStage(OrderStage.STAGE_6_WITH_CUSTOMER);
         order.setShopId("shopid");
+        order.setShopPaid(true);
+        order.setServiceFee(5.00);
 
-        List<Order> ordersList = Collections.singletonList(order);
+        UserProfile messengerProfile = new UserProfile(
+                "secondName",
+                "address2",
+                "https://image.url2",
+                "078mobilenumb",
+                ProfileRoles.MESSENGER);
+        messengerProfile.setId(order.getShippingData().getMessenger().getId());
+
+        Bank bank = new Bank();
+        bank.setPhone("0812823345");
+        bank.setType("ukheshe");
+        messengerProfile.setBank(bank);
+
+        Device storeDevice = new Device("token");
+        String content = "Payment of R " + order.getShippingData().getFee() + " received";
+        PushHeading heading = new PushHeading("Payment of R " + order.getShippingData().getFee() + " received",
+                "Order Payment Received", null);
+        PushMessage message = new PushMessage(PushMessageType.PAYMENT, heading, content);
 
         //when
-        when(orderRepo.findByShopPaidAndStageAndModifiedDateBefore(eq(false), eq(OrderStage.STAGE_6_WITH_CUSTOMER),
-                any(Date.class))).thenReturn(ordersList);
         when(ukheshePaymentProvider.getPaymentType()).thenReturn(PaymentType.UKHESHE);
+        when(deviceRepo.findByUserId(messengerProfile.getId())).thenReturn(Collections.singletonList(storeDevice));
 
-        paymentService.processPendingPayments();
+        paymentService.completePaymentToMessenger(order);
 
         //verify
+        assertTrue(order.getShopPaid());
+        assertTrue(order.getMessengerPaid());
         assertNotNull(order.getPaymentType());
-        assertEquals(OrderStage.STAGE_7_PAID_SHOP, order.getStage());
-        Assert.assertTrue(order.getShopPaid());
-        verify(orderRepo).findByShopPaidAndStageAndModifiedDateBefore(eq(false), eq(OrderStage.STAGE_6_WITH_CUSTOMER), any(Date.class));
-        verify(ukheshePaymentProvider).makePayment(ordersList.get(0), ordersList.get(0).getBasketAmount());
-        verify(orderRepo).save(ordersList.get(0));
-
+        verify(ukheshePaymentProvider).makePaymentToMessenger(order, order.getShippingData().getFee());
+        verify(ukheshePaymentProvider).makePaymentToMessenger(order, 10);
+        verify(deviceRepo).findByUserId(order.getShippingData().getMessenger().getId());
+        verify(pushNotificationService).sendNotification(storeDevice, message);
     }
 
 
@@ -202,7 +227,7 @@ public class PaymentServiceTest {
 
         List<PaymentProvider> paymentProviders = new ArrayList<>();
         //adding all ukheshe services
-        paymentService = new PaymentService(pushNotificationService, paymentProviders, orderRepo, deviceRepo, storeRepository, 0);
+        paymentService = new PaymentService(pushNotificationService, paymentProviders, orderRepo, deviceRepo, storeRepository,userProfileRepo, 0);
 
         //given an order
         Order order = new Order();

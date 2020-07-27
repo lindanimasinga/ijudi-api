@@ -9,5 +9,5 @@ public enum OrderStage {
     STAGE_4_ON_THE_ROAD,
     STAGE_5_ARRIVED,
     STAGE_6_WITH_CUSTOMER,
-    STAGE_7_PAID_SHOP
+    STAGE_7_ALL_PAID
 }
