@@ -3,6 +3,7 @@ package io.curiousoft.ijudi.ordermanagement.model;
 import javax.validation.constraints.DecimalMin;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
+import java.util.List;
 import java.util.Objects;
 
 public class Stock {
@@ -15,6 +16,7 @@ public class Stock {
     private double price;
     @Min(value = 0, message = "discount % must be >= 0")
     private double discountPerc;
+    private List<String> images;
 
     public Stock(@NotBlank(message = "stock name must not be blank") String name,
                  @Min(value = 1) int quantity,
@@ -56,6 +58,14 @@ public class Stock {
 
     public void setDiscountPerc(double discountPerc) {
         this.discountPerc = discountPerc;
+    }
+
+    public List<String> getImages() {
+        return images;
+    }
+
+    public void setImages(List<String> images) {
+        this.images = images;
     }
 
     @Override

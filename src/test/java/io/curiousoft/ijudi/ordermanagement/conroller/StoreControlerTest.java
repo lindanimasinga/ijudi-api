@@ -21,8 +21,10 @@ import org.springframework.test.context.junit4.SpringRunner;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.DayOfWeek;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 
 @RunWith(SpringRunner.class)
@@ -37,6 +39,8 @@ public class StoreControlerTest {
     @Test
     public void create() throws JsonProcessingException, URISyntaxException {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        BusinessHours hours = new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date());
+        businessHours.add(hours);
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile store = new StoreProfile("name",
                 "myaddress",
@@ -49,7 +53,6 @@ public class StoreControlerTest {
 
         ResponseEntity<String> result = this.rest.exchange(
                 RequestEntity.post(new URI("/store")).body(store), String.class);
-
 
         System.out.println(new ObjectMapper().writeValueAsString(result.getBody()));
         Assert.assertTrue(result.getStatusCode().is2xxSuccessful());
