@@ -10,7 +10,11 @@ public class ShippingData {
     private String id;
     @NotBlank(message = "shipping address not valid")
     private String fromAddress;
+    @NotBlank(message = "Shipping address not valid")
     private String toAddress;
+    BuildingType buildingType;
+    String unitNumber;
+    String buildingName;
     private String additionalInstructions;
     @NotNull(message = "shipping type not valid")
     private ShippingType type;
@@ -91,6 +95,30 @@ public class ShippingData {
 
     public void setPickUpTime(Date pickUpTime) {
         this.pickUpTime = pickUpTime;
+    }
+
+    public BuildingType getBuildingType() {
+        return buildingType;
+    }
+
+    public void setBuildingType(BuildingType buildingType) {
+        this.buildingType = buildingType;
+    }
+
+    public String getUnitNumber() {
+        return unitNumber;
+    }
+
+    public void setUnitNumber(String unitNumber) {
+        this.unitNumber = unitNumber;
+    }
+
+    public String getBuildingName() {
+        return buildingName;
+    }
+
+    public void setBuildingName(String buildingName) {
+        this.buildingName = buildingName;
     }
 
     public enum ShippingType {

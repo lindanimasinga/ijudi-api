@@ -98,6 +98,7 @@ public class OrderServiceTest {
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
+        shipping.setBuildingType(BuildingType.HOUSE);
         order.setShippingData(shipping);
 
         order.setCustomerId("customerId");
@@ -123,6 +124,164 @@ public class OrderServiceTest {
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
+    }
+
+    @Test
+    public void startOrderOnlineDeliveryNoBuildingType() throws Exception {
+
+        //given
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile storeProfile = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+
+                businessHours,
+                "ownerId",
+                new Bank());
+        storeProfile.setBusinessHours(new ArrayList<>());
+        storeProfile.setFeatured(true);
+        storeProfile.setHasVat(false);
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessenger(messenger);
+        order.setShippingData(shipping);
+
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+
+        try {
+            Order newOrder = sut.startOrder(order);
+            fail();
+        }catch (Exception e) {
+            Assert.assertEquals("Order shipping is null or pickup time or messenger not valid or shipping address not valid", e.getMessage());
+        }
+    }
+
+    @Test
+    public void startOrderOnlineDeliveryNoBuildingUnit() throws Exception {
+
+        //given
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile storeProfile = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+
+                businessHours,
+                "ownerId",
+                new Bank());
+        storeProfile.setBusinessHours(new ArrayList<>());
+        storeProfile.setFeatured(true);
+        storeProfile.setHasVat(false);
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessenger(messenger);
+        shipping.setBuildingType(BuildingType.APARTMENT);
+        shipping.setBuildingName("nameofbuilding");
+        order.setShippingData(shipping);
+
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+
+        try {
+            Order newOrder = sut.startOrder(order);
+            fail();
+        }catch (Exception e) {
+            Assert.assertEquals("Order shipping is null or pickup time or messenger not valid or shipping address not valid", e.getMessage());
+        }
+    }
+
+    @Test
+    public void startOrderOnlineDeliveryNoBuildingName() throws Exception {
+
+        //given
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile storeProfile = new StoreProfile(
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+
+                businessHours,
+                "ownerId",
+                new Bank());
+        storeProfile.setBusinessHours(new ArrayList<>());
+        storeProfile.setFeatured(true);
+        storeProfile.setHasVat(false);
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+
+        Messager messenger = new Messager();
+        messenger.setId("messagerID");
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessenger(messenger);
+        shipping.setMessenger(messenger);
+        shipping.setBuildingType(BuildingType.APARTMENT);
+        shipping.setUnitNumber("unit number for building");
+        order.setShippingData(shipping);
+
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+
+        try {
+            Order newOrder = sut.startOrder(order);
+            fail();
+        }catch (Exception e) {
+            Assert.assertEquals("Order shipping is null or pickup time or messenger not valid or shipping address not valid", e.getMessage());
+        }
     }
 
     @Test
@@ -227,6 +386,7 @@ public class OrderServiceTest {
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
+        shipping.setBuildingType(BuildingType.HOUSE);
         order.setShippingData(shipping);
 
         order.setCustomerId("customerId");
@@ -284,7 +444,8 @@ public class OrderServiceTest {
             Order newOrder = sut.startOrder(order);
             fail();
         } catch (Exception e) {
-            Assert.assertEquals("order type is not valid", e.getMessage());
+            Assert.assertTrue("order type is not valid".equals(e.getMessage()) ||
+                    "Order shipping is null or pickup time or messenger not valid or shipping address not valid".equals(e.getMessage()));
         }
     }
 
@@ -307,6 +468,7 @@ public class OrderServiceTest {
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
+        shipping.setBuildingType(BuildingType.HOUSE);
         order.setShippingData(shipping);
         order.setOrderType(OrderType.ONLINE);
         order.setCustomerId("customerId");
@@ -431,6 +593,7 @@ public class OrderServiceTest {
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
+        shipping.setBuildingType(BuildingType.HOUSE);
         order.setShippingData(shipping);
         order.setOrderType(OrderType.ONLINE);
         order.setCustomerId("customerId");
@@ -512,9 +675,10 @@ public class OrderServiceTest {
             order.setOrderType(OrderType.ONLINE);
             order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
             ShippingData shipping = new ShippingData();
-            shipping.setFromAddress("");
-            shipping.setToAddress("");
+            shipping.setFromAddress("address");
+            shipping.setToAddress("address");
             shipping.setType(ShippingData.ShippingType.DELIVERY);
+            shipping.setBuildingType(BuildingType.HOUSE);
             order.setShippingData(shipping);
             order.setDescription("desc");
 
@@ -552,6 +716,7 @@ public class OrderServiceTest {
             ShippingData shipping = new ShippingData("shopAddress",
                     "to address",
                     ShippingData.ShippingType.DELIVERY);
+            shipping.setBuildingType(BuildingType.HOUSE);
             shipping.setMessenger(messenger);
             order.setShippingData(shipping);
             order.setOrderType(OrderType.ONLINE);
@@ -592,6 +757,7 @@ public class OrderServiceTest {
                     "to address",
                     ShippingData.ShippingType.DELIVERY);
             shipping.setMessenger(messenger);
+            shipping.setBuildingType(BuildingType.HOUSE);
             order.setShippingData(shipping);
 
             order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
@@ -626,6 +792,7 @@ public class OrderServiceTest {
                     "to address",
                     ShippingData.ShippingType.DELIVERY);
             shipping.setMessenger(messenger);
+            shipping.setBuildingType(BuildingType.HOUSE);
             order.setShippingData(shipping);
 
             order.setCustomerId("customerId");
@@ -668,6 +835,7 @@ public class OrderServiceTest {
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
+        shipping.setBuildingType(BuildingType.HOUSE);
         order.setShippingData(shipping);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
@@ -822,6 +990,7 @@ public class OrderServiceTest {
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
+        shipping.setBuildingType(BuildingType.HOUSE);
         shipping.setMessenger(messenger);
         order.setShippingData(shipping);
         order.setDescription("081281445");
@@ -888,6 +1057,7 @@ public class OrderServiceTest {
                     "to address",
                     ShippingData.ShippingType.DELIVERY);
             shipping.setMessenger(messenger);
+            shipping.setBuildingType(BuildingType.HOUSE);
             order.setShippingData(shipping);
             order.setOrderType(OrderType.ONLINE);
             order.setCustomerId("customerId");
@@ -1054,6 +1224,7 @@ public class OrderServiceTest {
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
+        shipping.setBuildingType(BuildingType.HOUSE);
         order.setShippingData(shipping);
         order.setDescription("081281445");
         order.setCustomerId("customerId");
@@ -1822,6 +1993,7 @@ public class OrderServiceTest {
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
         shipping.setMessenger(messenger);
+        shipping.setBuildingType(BuildingType.HOUSE);
         order.setShippingData(shipping);
         order.setCustomerId("customer");
         order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
@@ -1979,6 +2151,7 @@ public class OrderServiceTest {
         shipping.setMessenger(messenger);
         Date pickUpTime = Date.from(LocalDateTime.now().plusMinutes(320).atZone(ZoneId.systemDefault()).toInstant());
         shipping.setPickUpTime(pickUpTime);
+        shipping.setBuildingType(BuildingType.HOUSE);
         order.setShippingData(shipping);
         order.setCustomerId("customer");
         order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
