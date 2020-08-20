@@ -1,4 +1,4 @@
-package com.wfs.shoplifter.security;
+package io.curiousoft.ijudi.ordermanagement.security;
 
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.GenericFilterBean;

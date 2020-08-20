@@ -6,11 +6,9 @@ import java.util.List;
 
 public class Basket {
 
-
     private String id;
     @NotEmpty(message = "order basket is empty")
     private List<BasketItem> items = new ArrayList<>();
-
 
     public String getId() {
         return id;

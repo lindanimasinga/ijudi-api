@@ -6,7 +6,6 @@ import com.google.gson.Gson;
 import io.curiousoft.ijudi.ordermanagement.IjudiApplication;
 import io.curiousoft.ijudi.ordermanagement.model.Bank;
 import io.curiousoft.ijudi.ordermanagement.model.BusinessHours;
-import io.curiousoft.ijudi.ordermanagement.model.ProfileRoles;
 import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
 import org.junit.Assert;
 import org.junit.Ignore;

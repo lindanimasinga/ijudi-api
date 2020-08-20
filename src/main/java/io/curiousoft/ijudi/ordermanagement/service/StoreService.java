@@ -33,6 +33,7 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         profile.setBank(user.getBank());
         StoreProfile newStore = super.create(profile);
         user.setRole(ProfileRoles.STORE_ADMIN);
+        userProfileRepo.save(user);
         return newStore;
     }
 

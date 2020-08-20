@@ -115,7 +115,7 @@ public class PaymentService {
         PushHeading heading = new PushHeading("Payment of R " + order.getShippingData().getFee() + " received",
                 "Order Payment Received", null);
         PushMessage message = new PushMessage(PushMessageType.PAYMENT, heading, content);
-        deviceRepo.findByUserId(order.getShippingData().getMessenger().getId())
+        deviceRepo.findByUserId(order.getShippingData().getMessengerId())
                     .forEach(device -> {
                         try {
                             pushNotificationService.sendNotification(device, message);

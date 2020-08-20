@@ -76,6 +76,8 @@ public class StoreServiceTest {
         //verify
         verify(userProfileRepo).findById(initialProfile.getOwnerId());
         verify(storeRepository).save(initialProfile);
+        verify(userProfileRepo).save(user);
+
         Assert.assertNotNull(profile.getId());
         Assert.assertNotNull(profile.getOwnerId());
         Assert.assertNotNull(profile.getBank());
@@ -424,8 +426,8 @@ public class StoreServiceTest {
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
         initialProfile.setFeaturedExpiry(date);
 
-        Stock stock1 = new Stock("bananas 1kg", 24, 15, 0);
-        Stock stock2 = new Stock("bananas 1kg", 24, 15, 0);
+        Stock stock1 = new Stock("bananas 1kg", 24, 15, 0, Collections.emptyList());
+        Stock stock2 = new Stock("bananas 1kg", 24, 15, 0, Collections.emptyList());
         Set<Stock> stockList = new HashSet<>();
         stockList.add(stock1);
         stockList.add(stock2);
@@ -463,12 +465,12 @@ public class StoreServiceTest {
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
         initialProfile.setFeaturedExpiry(date);
 
-        Stock stock1 = new Stock("bananas 1kg", 24, 15, 0);
+        Stock stock1 = new Stock("bananas 1kg", 24, 15, 0, Collections.emptyList());
         Set<Stock> stockList = new HashSet<>();
         stockList.add(stock1);
         initialProfile.setStockList(stockList);
 
-        Stock stock2 = new Stock("bananas 1kg", 24, 15, 0);
+        Stock stock2 = new Stock("bananas 1kg", 24, 15, 0, Collections.emptyList());
 
         //when
         when(storeRepository.findById(profileId)).thenReturn(Optional.of(initialProfile));
@@ -501,12 +503,12 @@ public class StoreServiceTest {
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
         initialProfile.setFeaturedExpiry(date);
 
-        Stock stock1 = new Stock("bananas 1kg", 24, 12, 0);
+        Stock stock1 = new Stock("bananas 1kg", 24, 12, 0, Collections.emptyList());
         Set<Stock> stockList = new HashSet<>();
         stockList.add(stock1);
         initialProfile.setStockList(stockList);
 
-        Stock stock2 = new Stock("bananas 1kg", 24, 0, 0);
+        Stock stock2 = new Stock("bananas 1kg", 24, 0, 0, Collections.emptyList());
 
         //when
         try {
@@ -542,12 +544,12 @@ public class StoreServiceTest {
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
         initialProfile.setFeaturedExpiry(date);
 
-        Stock stock1 = new Stock("bananas 1kg", 24, 12, 0);
+        Stock stock1 = new Stock("bananas 1kg", 24, 12, 0, Collections.emptyList());
         Set<Stock> stockList = new HashSet<>();
         stockList.add(stock1);
         initialProfile.setStockList(stockList);
 
-        Stock stock2 = new Stock("", 24, 12, 0);
+        Stock stock2 = new Stock("", 24, 12, 0, Collections.emptyList());
 
         //when
         try {

@@ -1,6 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.model;
 
 import io.curiousoft.ijudi.ordermanagement.validator.ValidDeliveryInfo;
+import io.curiousoft.ijudi.ordermanagement.validator.ValidOrder;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import javax.validation.Valid;
@@ -8,13 +9,14 @@ import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.PositiveOrZero;
 
+@ValidOrder
+@ValidDeliveryInfo
 @Document
 public class Order extends BaseModel {
 
     @NotNull(message = "order stage is not valid")
     private OrderStage stage;
-    @ValidDeliveryInfo
-    @Valid
+
     private ShippingData shippingData;
     @Valid
     @NotNull(message = "order basket is not valid")
@@ -92,7 +94,7 @@ public class Order extends BaseModel {
 
     public double getTotalAmount() {
         return serviceFee + basket.getItems().stream()
-                    .mapToDouble(BasketItem::getPrice).sum() + shippingData.getFee();
+                    .mapToDouble(BasketItem::getPrice).sum() + (shippingData != null? shippingData.getFee() : 0);
     }
 
     public OrderType getOrderType() {

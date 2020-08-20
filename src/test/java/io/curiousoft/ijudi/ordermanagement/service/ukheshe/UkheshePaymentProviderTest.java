@@ -50,12 +50,11 @@ public class UkheshePaymentProviderTest {
         Order order = new Order();
         Basket basket = new Basket();
         order.setBasket(basket);
-        Messager messenger = new Messager();
-        messenger.setId("messagerID");
+
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
-        shipping.setMessenger(messenger);
+        shipping.setMessengerId("messagerID");
         order.setShippingData(shipping);
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("081281445");
@@ -97,12 +96,11 @@ public class UkheshePaymentProviderTest {
         items.add(item);
         basket.setItems(items);
         order.setBasket(basket);
-        Messager messenger = new Messager();
-        messenger.setId("messagerID");
+
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
-        shipping.setMessenger(messenger);
+        shipping.setMessengerId("messagerID");
         order.setShippingData(shipping);
         order.setCreatedDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
         order.setPaymentType(PaymentType.UKHESHE);
@@ -144,12 +142,11 @@ public class UkheshePaymentProviderTest {
         items.add(item);
         basket.setItems(items);
         order.setBasket(basket);
-        Messager messenger = new Messager();
-        messenger.setId("messagerID");
+
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
-        shipping.setMessenger(messenger);
+        shipping.setMessengerId("messagerID");
         shipping.setFee(10);
         order.setShippingData(shipping);
         order.setCreatedDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
@@ -210,12 +207,11 @@ public class UkheshePaymentProviderTest {
         items.add(item);
         basket.setItems(items);
         order.setBasket(basket);
-        Messager messenger = new Messager();
-        messenger.setId("messagerID");
+
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
-        shipping.setMessenger(messenger);
+        shipping.setMessengerId("messagerID");
         shipping.setFee(10);
         order.setShippingData(shipping);
         order.setCreatedDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
@@ -275,12 +271,11 @@ public class UkheshePaymentProviderTest {
         items.add(item);
         basket.setItems(items);
         order.setBasket(basket);
-        Messager messenger = new Messager();
-        messenger.setId("messagerID");
+
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
-        shipping.setMessenger(messenger);
+        shipping.setMessengerId("messagerID");
         order.setShippingData(shipping);
         order.setCreatedDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
         order.setPaymentType(PaymentType.UKHESHE);
@@ -320,12 +315,11 @@ public class UkheshePaymentProviderTest {
         items.add(item);
         basket.setItems(items);
         order.setBasket(basket);
-        Messager messenger = new Messager();
-        messenger.setId("messagerID");
+
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
-        shipping.setMessenger(messenger);
+        shipping.setMessengerId("messagerID");
         shipping.setFee(10);
         order.setShippingData(shipping);
         order.setCreatedDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
@@ -344,7 +338,7 @@ public class UkheshePaymentProviderTest {
                 "https://image.url2",
                 "078mobilenumb",
                 ProfileRoles.MESSENGER);
-        messengerProfile.setId(order.getShippingData().getMessenger().getId());
+        messengerProfile.setId(order.getShippingData().getMessengerId());
 
         Bank bank = new Bank();
         bank.setAccountId("2885091160");
@@ -353,11 +347,11 @@ public class UkheshePaymentProviderTest {
         bank.setType("wallet");
         messengerProfile.setBank(bank);
         //when
-        when(userProfileRepo.findById(order.getShippingData().getMessenger().getId())).thenReturn(Optional.of(messengerProfile));
+        when(userProfileRepo.findById(order.getShippingData().getMessengerId())).thenReturn(Optional.of(messengerProfile));
 
         ukheshePaymentProvider.makePaymentToMessenger(order, order.getShippingData().getFee());
 
-        verify(userProfileRepo).findById(order.getShippingData().getMessenger().getId());
+        verify(userProfileRepo).findById(order.getShippingData().getMessengerId());
     }
 
     @Test
@@ -383,12 +377,11 @@ public class UkheshePaymentProviderTest {
         items.add(item);
         basket.setItems(items);
         order.setBasket(basket);
-        Messager messenger = new Messager();
-        messenger.setId("messagerID");
+
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
-        shipping.setMessenger(messenger);
+        shipping.setMessengerId("messagerID");
         shipping.setFee(10);
         order.setShippingData(shipping);
         order.setCreatedDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
@@ -407,7 +400,7 @@ public class UkheshePaymentProviderTest {
                 "https://image.url2",
                 "078mobilenumb",
                 ProfileRoles.MESSENGER);
-        messengerProfile.setId(order.getShippingData().getMessenger().getId());
+        messengerProfile.setId(order.getShippingData().getMessengerId());
 
         Bank bank = new Bank();
         bank.setName("ukheshe");
@@ -415,11 +408,11 @@ public class UkheshePaymentProviderTest {
         bank.setType("wallet");
         messengerProfile.setBank(bank);
         //when
-        when(userProfileRepo.findById(order.getShippingData().getMessenger().getId())).thenReturn(Optional.of(messengerProfile));
+        when(userProfileRepo.findById(order.getShippingData().getMessengerId())).thenReturn(Optional.of(messengerProfile));
 
         ukheshePaymentProvider.makePaymentToMessenger(order, order.getShippingData().getFee());
 
-        verify(userProfileRepo).findById(order.getShippingData().getMessenger().getId());
+        verify(userProfileRepo).findById(order.getShippingData().getMessengerId());
     }
 
     @Test
@@ -445,12 +438,11 @@ public class UkheshePaymentProviderTest {
         items.add(item);
         basket.setItems(items);
         order.setBasket(basket);
-        Messager messenger = new Messager();
-        messenger.setId("messagerID");
+
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
-        shipping.setMessenger(messenger);
+        shipping.setMessengerId("messagerID");
         order.setShippingData(shipping);
         order.setCreatedDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
         order.setPaymentType(PaymentType.UKHESHE);

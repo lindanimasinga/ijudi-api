@@ -1,11 +1,14 @@
 package io.curiousoft.ijudi.ordermanagement.model;
 
+import java.util.List;
+
 public class BasketItem {
 
     private String name;
     private int quantity;
     private double price;
     private double discountPerc;
+    private List<SelectionOption> options;
 
     public BasketItem(String name, int quantity, double price, double discountPerc) {
         this.name = name;
@@ -44,5 +47,21 @@ public class BasketItem {
 
     public void setDiscountPerc(double discountPerc) {
         this.discountPerc = discountPerc;
+    }
+
+    public List<SelectionOption> getOptions() {
+        return options;
+    }
+
+    public void setOptions(List<SelectionOption> options) {
+        this.options = options;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        BasketItem that = (BasketItem) o;
+        return name.equals(that.name);
     }
 }

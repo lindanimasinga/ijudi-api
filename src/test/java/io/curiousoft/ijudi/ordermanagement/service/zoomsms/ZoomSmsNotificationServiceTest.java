@@ -4,8 +4,6 @@ import io.curiousoft.ijudi.ordermanagement.service.SmsNotificationService;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import static org.junit.Assert.*;
-
 public class ZoomSmsNotificationServiceTest {
 
     @Ignore

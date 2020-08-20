@@ -1,6 +1,5 @@
 package io.curiousoft.ijudi.ordermanagement.service.zoomsms;
 
-import io.curiousoft.ijudi.ordermanagement.service.OrderServiceImpl;
 import io.curiousoft.ijudi.ordermanagement.service.SmsNotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

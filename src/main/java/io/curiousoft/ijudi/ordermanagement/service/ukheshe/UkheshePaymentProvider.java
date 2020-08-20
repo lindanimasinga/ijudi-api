@@ -162,7 +162,7 @@ public class UkheshePaymentProvider extends PaymentProvider<UkheshePaymentData> 
 
     @Override
     public void makePaymentToMessenger(Order order, double amount) throws Exception {
-        UserProfile shop = userProfileRepo.findById(order.getShippingData().getMessenger().getId())
+        UserProfile shop = userProfileRepo.findById(order.getShippingData().getMessengerId())
                 .orElseThrow(() -> new Exception("Messenger does not exist"));
         String shopAccount = !StringUtils.isEmpty(shop.getBank().getAccountId()) ?
                 shop.getBank().getAccountId() : shop.getBank().getPhone();

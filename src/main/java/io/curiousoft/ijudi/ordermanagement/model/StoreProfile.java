@@ -19,9 +19,9 @@ public class StoreProfile extends Profile implements GeoPoint {
     @Valid
     private Set<Stock> stockList = new HashSet<>();
     @NotEmpty(message = "profile tags not valid")
-    private List<String> tags;
+    private List<@NotEmpty String> tags;
     @NotEmpty(message = "Business hours not valid")
-    private List<BusinessHours> businessHours;
+    private List<@NotNull BusinessHours> businessHours;
     private boolean hasVat;
     private boolean featured;
     private Date featuredExpiry;

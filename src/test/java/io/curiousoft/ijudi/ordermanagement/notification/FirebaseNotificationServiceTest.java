@@ -15,7 +15,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -58,13 +57,10 @@ public class FirebaseNotificationServiceTest {
         Basket basket = new Basket();
         order.setBasket(basket);
 
-        Messager messenger = new Messager();
-        messenger.setId("messagerID");
-
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
-        shipping.setMessenger(messenger);
+        shipping.setMessengerId("messagerID");
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
         order.setDescription("081281445");
@@ -96,13 +92,10 @@ public class FirebaseNotificationServiceTest {
         Basket basket = new Basket();
         order.setBasket(basket);
 
-        Messager messenger = new Messager();
-        messenger.setId("messagerID");
-
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
-        shipping.setMessenger(messenger);
+        shipping.setMessengerId("messagerID");
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
         order.setDescription("081281445");

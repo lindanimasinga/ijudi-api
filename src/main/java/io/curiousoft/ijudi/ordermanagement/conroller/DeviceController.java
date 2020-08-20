@@ -1,16 +1,12 @@
 package io.curiousoft.ijudi.ordermanagement.conroller;
 
 import io.curiousoft.ijudi.ordermanagement.model.Device;
-import io.curiousoft.ijudi.ordermanagement.model.Order;
-import io.curiousoft.ijudi.ordermanagement.model.Profile;
-import io.curiousoft.ijudi.ordermanagement.model.UserProfile;
 import io.curiousoft.ijudi.ordermanagement.service.DeviceService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
-import java.util.List;
 
 @RestController
 @RequestMapping("/device")

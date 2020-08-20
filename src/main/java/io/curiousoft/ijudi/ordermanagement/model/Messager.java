@@ -1,5 +1,5 @@
 package io.curiousoft.ijudi.ordermanagement.model;
 
-public class String extends BaseModel {
+public class Messager extends BaseModel {
 
 }

@@ -58,12 +58,11 @@ public class PaymentServiceTest {
         Order order = new Order();
         Basket basket = new Basket();
         order.setBasket(basket);
-        Messager messenger = new Messager();
-        messenger.setId("messagerID");
+
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
-        shipping.setMessenger(messenger);
+        shipping.setMessengerId("messagerID");
         order.setShippingData(shipping);
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("081281445");
@@ -102,13 +101,12 @@ public class PaymentServiceTest {
         items.add(new BasketItem("hotdog", 1, 20, 0));
         basket.setItems(items);
         order.setBasket(basket);
-        Messager messenger = new Messager();
-        messenger.setId("messagerID");
+
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
         shipping.setFee(10);
-        shipping.setMessenger(messenger);
+        shipping.setMessengerId("messagerID");
         order.setShippingData(shipping);
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("081281445");
@@ -170,13 +168,12 @@ public class PaymentServiceTest {
         items.add(new BasketItem("hotdog", 1, 20, 0));
         basket.setItems(items);
         order.setBasket(basket);
-        Messager messenger = new Messager();
-        messenger.setId("messagerID");
+
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
         shipping.setFee(10);
-        shipping.setMessenger(messenger);
+        shipping.setMessengerId("messagerID");
         order.setShippingData(shipping);
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("081281445");
@@ -192,7 +189,7 @@ public class PaymentServiceTest {
                 "https://image.url2",
                 "078mobilenumb",
                 ProfileRoles.MESSENGER);
-        messengerProfile.setId(order.getShippingData().getMessenger().getId());
+        messengerProfile.setId(order.getShippingData().getMessengerId());
 
         Bank bank = new Bank();
         bank.setPhone("0812823345");
@@ -217,7 +214,7 @@ public class PaymentServiceTest {
         assertNotNull(order.getPaymentType());
         verify(ukheshePaymentProvider).makePaymentToMessenger(order, order.getShippingData().getFee());
         verify(ukheshePaymentProvider).makePaymentToMessenger(order, 10);
-        verify(deviceRepo).findByUserId(order.getShippingData().getMessenger().getId());
+        verify(deviceRepo).findByUserId(order.getShippingData().getMessengerId());
         verify(pushNotificationService).sendNotification(storeDevice, message);
     }
 
@@ -233,12 +230,11 @@ public class PaymentServiceTest {
         Order order = new Order();
         Basket basket = new Basket();
         order.setBasket(basket);
-        Messager messenger = new Messager();
-        messenger.setId("messagerID");
+
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
-        shipping.setMessenger(messenger);
+        shipping.setMessengerId("messagerID");
         order.setShippingData(shipping);
         order.setPaymentType(PaymentType.UKHESHE);
         order.setDescription("081281445");

@@ -19,7 +19,7 @@ public class ShippingData {
     @NotNull(message = "shipping type not valid")
     private ShippingType type;
     private double fee;
-    private Messager messenger;
+    private String messengerId;
     private Date pickUpTime;
 
     public ShippingData() {
@@ -81,12 +81,12 @@ public class ShippingData {
         this.fee = fee;
     }
 
-    public Messager getMessenger() {
-        return messenger;
+    public String getMessengerId() {
+        return messengerId;
     }
 
-    public void setMessenger(Messager messenger) {
-        this.messenger = messenger;
+    public void setMessengerId(String messengerId) {
+        this.messengerId = messengerId;
     }
 
     public Date getPickUpTime() {

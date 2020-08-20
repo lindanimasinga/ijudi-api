@@ -99,13 +99,19 @@ public class OrderServiceImpl implements OrderService {
         if (!storeOptional.isPresent()) {
             throw new Exception("shop with id " + order.getShopId() + " does not exist");
         }
+
+        boolean isValidBasketItems = storeOptional.get().getStockList().containsAll(order.getBasket().getItems());
+        if(!isValidBasketItems) {
+            throw new Exception("Some basket item are not available in the shop.");
+        }
+
         order.setHasVat(storeOptional.get().getHasVat());
         Date orderDate = new Date();
         String orderId = new SimpleDateFormat(DATE_FORMAT).format(orderDate);
         order.setId(orderId);
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setServiceFee(serviceFee);
-        if (order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
+        if (order.getOrderType() == OrderType.ONLINE && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
             order.getShippingData().setFee(deliveryFee);
         }
         return orderRepo.save(order);
@@ -120,9 +126,11 @@ public class OrderServiceImpl implements OrderService {
 
         persistedOrder.setDescription(order.getDescription());
         persistedOrder.setPaymentType(order.getPaymentType());
-        order.setServiceFee(serviceFee);
-        if (order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
-            order.getShippingData().setFee(deliveryFee);
+        persistedOrder.setServiceFee(serviceFee);
+        boolean isDelivery = persistedOrder.getShippingData() != null &&
+                persistedOrder.getShippingData().getType() == ShippingData.ShippingType.DELIVERY;
+        if (isDelivery) {
+            persistedOrder.getShippingData().setFee(deliveryFee);
         }
 
         if (!paymentService.paymentReceived(persistedOrder)) {
@@ -141,14 +149,14 @@ public class OrderServiceImpl implements OrderService {
         }
 
         //decrease stock available
-        Optional<StoreProfile> optional = storeRepository.findById(order.getShopId());
+        Optional<StoreProfile> optional = storeRepository.findById(persistedOrder.getShopId());
         if (optional.isPresent()) {
             StoreProfile store = optional.get();
             //notify the shop
             List<Device> shopDevices = deviceRepo.findByUserId(store.getOwnerId());
-            pushNotificationService.notifyStoreOrderPlaced(shopDevices, order);
+            pushNotificationService.notifyStoreOrderPlaced(shopDevices, persistedOrder);
             Set<Stock> stock = store.getStockList();
-            order.getBasket()
+            persistedOrder.getBasket()
                     .getItems()
                     .stream()
                     .forEach(item -> {
@@ -159,9 +167,9 @@ public class OrderServiceImpl implements OrderService {
             store.setServicesCompleted(store.getServicesCompleted() + 1);
             storeRepository.save(store);
 
-            if (order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
-                List<Device> messengerDevices = deviceRepo.findByUserId(order.getShippingData().getMessenger().getId());
-                pushNotificationService.notifyMessengerOrderPlaced(messengerDevices, order, store);
+            if (isDelivery) {
+                List<Device> messengerDevices = deviceRepo.findByUserId(persistedOrder.getShippingData().getMessengerId());
+                pushNotificationService.notifyMessengerOrderPlaced(messengerDevices, persistedOrder, store);
             }
         }
 
@@ -214,7 +222,7 @@ public class OrderServiceImpl implements OrderService {
                 StoreProfile shop = storeRepository.findById(order.getShopId()).get();
                 List<Device> devices = order.getShippingData().getType() == ShippingData.ShippingType.COLLECTION ?
                         deviceRepo.findByUserId(order.getCustomerId()) :
-                        deviceRepo.findByUserId(order.getShippingData().getMessenger().getId());
+                        deviceRepo.findByUserId(order.getShippingData().getMessengerId());
 
                 devices.forEach(device -> {
                     PushHeading title = new PushHeading("Food is ready for Collection at " + shop.getName(),
