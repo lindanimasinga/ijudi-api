@@ -21,6 +21,7 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static io.curiousoft.ijudi.ordermanagement.model.OrderStage.*;
 import static io.curiousoft.ijudi.ordermanagement.model.OrderType.INSTORE;
@@ -100,8 +101,15 @@ public class OrderServiceImpl implements OrderService {
             throw new Exception("shop with id " + order.getShopId() + " does not exist");
         }
 
-        boolean isValidBasketItems = storeOptional.get().getStockList().containsAll(order.getBasket().getItems());
-        if(!isValidBasketItems) {
+        List<String> stockItemNames = storeOptional.get()
+                .getStockList().stream().map(Stock::getName)
+                .collect(Collectors.toList());
+        List<String> basketItemNames = order
+                .getBasket().getItems().stream().map(BasketItem::getName)
+                .collect(Collectors.toList());
+
+        boolean isValidBasketItems = stockItemNames.containsAll(basketItemNames);
+        if(!INSTORE.equals(order.getOrderType()) && !isValidBasketItems) {
             throw new Exception("Some basket item are not available in the shop.");
         }
 

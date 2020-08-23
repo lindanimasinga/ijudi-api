@@ -75,6 +75,11 @@ public class OrderServiceTest {
         storeProfile.setBusinessHours(new ArrayList<>());
         storeProfile.setFeatured(true);
         storeProfile.setHasVat(false);
+        Set<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
+        stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+
         Order order = new Order();
         Basket basket = new Basket();
         List<BasketItem> items = new ArrayList<>();
@@ -300,6 +305,12 @@ public class OrderServiceTest {
                 businessHours,
                 "ownerId",
                 new Bank());
+
+        Set<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
+        stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+        
         storeProfile.setBusinessHours(new ArrayList<>());
         storeProfile.setFeatured(true);
         storeProfile.setHasVat(false);
@@ -354,6 +365,12 @@ public class OrderServiceTest {
                 businessHours,
                 "ownerId",
                 new Bank());
+
+        Set<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
+        stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+
         storeProfile.setBusinessHours(new ArrayList<>());
         storeProfile.setFeatured(true);
         storeProfile.setHasVat(true);
