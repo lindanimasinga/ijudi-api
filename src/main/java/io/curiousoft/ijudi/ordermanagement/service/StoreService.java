@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static io.curiousoft.ijudi.ordermanagement.model.GeoDistance.getDistanceInKiloMetersBetweenTwoGeoPoints;
@@ -18,7 +19,7 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
     private UserProfileRepo userProfileRepo;
     private String mainPayAccount;
 
-    public StoreService(StoreRepository storeRepository,
+    public  StoreService(StoreRepository storeRepository,
                         UserProfileRepo userProfileRepo,
                         @Value("${ukheshe.main.account}") String mainPayAccount) {
         super(storeRepository);
@@ -66,8 +67,12 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         return profileRepo.findByOwnerId(ownerId);
     }
 
-    public List<StoreProfile> findFeatured(double latitude, double longitude, double range, int maxStores) {
-        return findNearbyStores(latitude, longitude, range, maxStores)
+    public List<StoreProfile> findFeatured(double latitude,
+                                           double longitude,
+                                           StoreType storeType,
+                                           double range,
+                                           int maxStores) {
+        return findNearbyStores(latitude, longitude, storeType, range, maxStores)
                 .stream()
                 .filter(storeProfile ->  storeProfile.getFeaturedExpiry() != null)
                 .filter(profile -> profile.getFeaturedExpiry().after(new Date()))
@@ -87,19 +92,23 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         profileRepo.save(store);
     }
 
-    public List<StoreProfile> findNearbyStores(double latitude, double longitude, double range, int maxLocations) {
+    public List<StoreProfile> findNearbyStores(double latitude,
+                                               double longitude,
+                                               StoreType storeType,
+                                               double range,
+                                               int maxLocations) {
         double maxLong = longitude + range,
                 minLong = longitude - range;
         double maxLat = latitude + range,
                 minLat = latitude - range;
 
-        List<StoreProfile> stores = profileRepo.findByLatitudeBetweenAndLongitudeBetween(minLat,
-                maxLat, minLong, maxLong).stream()
+        List<StoreProfile> stores = profileRepo.findByLatitudeBetweenAndLongitudeBetweenAndStoreType(minLat,
+                maxLat, minLong, maxLong, storeType).stream()
                 .peek(profile -> profile.getBank().setAccountId(mainPayAccount))
                 .collect(Collectors.toList());
 
         GeoPoint origin = new GeoPointImpl(latitude, longitude);
-        Collections.sort(stores, (a, b) -> {
+        stores.sort((a, b) -> {
             double distanceToA = getDistanceInKiloMetersBetweenTwoGeoPoints(origin, a);
             double distanceToB = getDistanceInKiloMetersBetweenTwoGeoPoints(origin, b);
             return (int) (distanceToA - distanceToB);

@@ -114,6 +114,7 @@ public class FirebaseNotificationServiceTest {
         devices.add(device2);
 
         StoreProfile shop = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",

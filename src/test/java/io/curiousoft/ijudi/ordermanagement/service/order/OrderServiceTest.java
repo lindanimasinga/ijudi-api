@@ -63,6 +63,7 @@ public class OrderServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile storeProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -120,6 +121,7 @@ public class OrderServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile storeProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -161,6 +163,7 @@ public class OrderServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile storeProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -204,6 +207,7 @@ public class OrderServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile storeProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -248,6 +252,7 @@ public class OrderServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile storeProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -296,6 +301,7 @@ public class OrderServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile storeProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -356,6 +362,7 @@ public class OrderServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile storeProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -476,6 +483,7 @@ public class OrderServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile storeProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -739,6 +747,7 @@ public class OrderServiceTest {
         List<String> tags = Collections.singletonList("Pizza");
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         StoreProfile shop = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -800,6 +809,7 @@ public class OrderServiceTest {
         List<String> tags = Collections.singletonList("Pizza");
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         StoreProfile shop = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -863,6 +873,7 @@ public class OrderServiceTest {
         List<String> tags = Collections.singletonList("Pizza");
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         StoreProfile shop = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -1056,6 +1067,7 @@ public class OrderServiceTest {
         List<String> tags = Collections.singletonList("Pizza");
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         StoreProfile shop = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -1134,6 +1146,7 @@ public class OrderServiceTest {
         businessHours.add(hours);
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile shop = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -1355,6 +1368,7 @@ public class OrderServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile storeProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -1472,6 +1486,7 @@ public class OrderServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -1583,6 +1598,7 @@ public class OrderServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -1646,6 +1662,7 @@ public class OrderServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -1710,6 +1727,7 @@ public class OrderServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -1778,6 +1796,7 @@ public class OrderServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -1852,6 +1871,7 @@ public class OrderServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -1923,6 +1943,7 @@ public class OrderServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",

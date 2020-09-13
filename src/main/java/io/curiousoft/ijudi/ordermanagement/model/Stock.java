@@ -4,11 +4,14 @@ import javax.validation.constraints.*;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 public class Stock {
 
+    String id = UUID.randomUUID().toString();
     @NotBlank(message = "stock name must not be blank")
     private String name;
+    private String description;
     @Min(value = 1, message = "stock quantity not valid")
     private int quantity;
     @DecimalMin(value = "0.01", message = "stock price must be greater than or equal to 0.01")
@@ -30,6 +33,14 @@ public class Stock {
         this.price = price;
         this.discountPerc = discountPerc;
         this.mandatorySelection = mandatorySelection;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
     }
 
     public String getName() {
@@ -86,6 +97,14 @@ public class Stock {
 
     public void setOptionalSelection(List<SelectionOption> optionalSelection) {
         this.optionalSelection = optionalSelection;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     @Override

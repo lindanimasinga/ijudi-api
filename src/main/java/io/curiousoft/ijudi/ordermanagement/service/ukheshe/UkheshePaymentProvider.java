@@ -179,7 +179,7 @@ public class UkheshePaymentProvider extends PaymentProvider<UkheshePaymentData> 
 
     private boolean isSameOrder(Order order, UkhesheTransaction ukhesheTransaction) {
 
-        return order.getDescription().equals(ukhesheTransaction.getDescription())
+        return ukhesheTransaction.getDescription().contains(order.getId())
                             && order.getTotalAmount() == ukhesheTransaction.getAmount();
     }
 

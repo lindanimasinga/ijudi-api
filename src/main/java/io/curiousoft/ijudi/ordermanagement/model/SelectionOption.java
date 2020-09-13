@@ -2,13 +2,15 @@ package io.curiousoft.ijudi.ordermanagement.model;
 
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotEmpty;
+import java.util.List;
 
 public class SelectionOption {
 
     @NotEmpty
     private String name;
     @NotEmpty
-    private String value;
+    private List<String> values;
+    private String selected;
     @Min(value = 0)
     private double price;
 
@@ -20,12 +22,12 @@ public class SelectionOption {
         this.name = name;
     }
 
-    public String getValue() {
-        return value;
+    public List<String> getValues() {
+        return values;
     }
 
-    public void setValue(String value) {
-        this.value = value;
+    public void setValues(List<String> values) {
+        this.values = values;
     }
 
     public double getPrice() {
@@ -34,5 +36,13 @@ public class SelectionOption {
 
     public void setPrice(double price) {
         this.price = price;
+    }
+
+    public String getSelected() {
+        return selected;
+    }
+
+    public void setSelected(String selected) {
+        this.selected = selected;
     }
 }

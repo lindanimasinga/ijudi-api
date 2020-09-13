@@ -116,6 +116,7 @@ public class PaymentServiceTest {
         order.setServiceFee(5.00);
 
         StoreProfile shop = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",

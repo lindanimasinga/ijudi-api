@@ -25,9 +25,13 @@ public class StoreProfile extends Profile implements GeoPoint {
     private boolean hasVat;
     private boolean featured;
     private Date featuredExpiry;
+    @NotNull(message = "storeType is not valid")
+    private StoreType storeType;
 
 
-    public StoreProfile(@NotBlank(message = "profile name not valid") String name,
+    public StoreProfile(
+                        @NotNull(message = "storeType is not valid") StoreType storeType,
+                        @NotBlank(message = "profile name not valid") String name,
                         @NotBlank(message = "profile address not valid") String address,
                         @NotBlank(message = "profile image url not valid") String imageUrl,
                         @NotBlank(message = "profile mobile number not valid") String mobileNumber,
@@ -39,6 +43,7 @@ public class StoreProfile extends Profile implements GeoPoint {
         this.businessHours = businessHours;
         this.tags = tags;
         this.ownerId = ownerId;
+        this.storeType = storeType;
         setBank(bank);
     }
 
@@ -106,4 +111,11 @@ public class StoreProfile extends Profile implements GeoPoint {
         this.ownerId = ownerId;
     }
 
+    public StoreType getStoreType() {
+        return storeType;
+    }
+
+    public void setStoreType(StoreType storeType) {
+        this.storeType = storeType;
+    }
 }

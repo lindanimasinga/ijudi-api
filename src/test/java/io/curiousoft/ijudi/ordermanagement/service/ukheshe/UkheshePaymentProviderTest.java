@@ -160,6 +160,7 @@ public class UkheshePaymentProviderTest {
 
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile shop = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -225,6 +226,7 @@ public class UkheshePaymentProviderTest {
 
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile shop = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",

@@ -7,6 +7,7 @@ import io.curiousoft.ijudi.ordermanagement.IjudiApplication;
 import io.curiousoft.ijudi.ordermanagement.model.Bank;
 import io.curiousoft.ijudi.ordermanagement.model.BusinessHours;
 import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
+import io.curiousoft.ijudi.ordermanagement.model.StoreType;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -41,7 +42,9 @@ public class StoreControlerTest {
         BusinessHours hours = new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date());
         businessHours.add(hours);
         List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile store = new StoreProfile("name",
+        StoreProfile store = new StoreProfile(
+                StoreType.FOOD,
+                "name",
                 "myaddress",
                 "path to image",
                 "9111111707",

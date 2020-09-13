@@ -57,6 +57,7 @@ public class StoreServiceTest {
         businessHours.add(hours);
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -91,6 +92,7 @@ public class StoreServiceTest {
         //given
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -119,6 +121,7 @@ public class StoreServiceTest {
         String profileId = "myID";
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -145,6 +148,7 @@ public class StoreServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -174,6 +178,7 @@ public class StoreServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -192,6 +197,7 @@ public class StoreServiceTest {
         initialProfile.setBank(bank);
 
         StoreProfile initialProfile2 = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -219,12 +225,14 @@ public class StoreServiceTest {
         int maxStores = 1;
 
         //when
-        when(storeRepository.findByLatitudeBetweenAndLongitudeBetween(latitude - range, latitude + range, longitude - range, longitude + range))
+        when(storeRepository.findByLatitudeBetweenAndLongitudeBetweenAndStoreType(latitude - range,
+                latitude + range, longitude - range, longitude + range, StoreType.FOOD))
                 .thenReturn(initialProfiles);
-        List<StoreProfile> returnedProfiles = storeService.findFeatured(latitude, longitude, range, maxStores);
+        List<StoreProfile> returnedProfiles = storeService.findFeatured(latitude, longitude, StoreType.FOOD, range, maxStores);
 
         //verify
-        verify(storeRepository).findByLatitudeBetweenAndLongitudeBetween(latitude - range, latitude + range, longitude - range, longitude + range);
+        verify(storeRepository).findByLatitudeBetweenAndLongitudeBetweenAndStoreType(latitude - range,
+                latitude + range, longitude - range, longitude + range, StoreType.FOOD);
         verify(storeRepository, never()).save(initialProfile);
         Assert.assertEquals(1, returnedProfiles.size());
         Assert.assertEquals(MAIN_PAY_ACCOUNT, returnedProfiles.get(0).getBank().getAccountId());
@@ -238,6 +246,7 @@ public class StoreServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -256,6 +265,7 @@ public class StoreServiceTest {
         initialProfile.setBank(bank);
 
         StoreProfile initialProfile2 = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -282,13 +292,13 @@ public class StoreServiceTest {
 
         //when
         when(storeRepository
-                .findByLatitudeBetweenAndLongitudeBetween(latitude - range, latitude + range, longitude - range, longitude + range))
+                .findByLatitudeBetweenAndLongitudeBetweenAndStoreType(latitude - range, latitude + range, longitude - range, longitude + range, StoreType.FOOD))
                 .thenReturn(initialProfiles);
-        List<StoreProfile> returnedProfiles = storeService.findNearbyStores(longitude, latitude,
+        List<StoreProfile> returnedProfiles = storeService.findNearbyStores(longitude, latitude, StoreType.FOOD,
                 range, maxLocations);
 
         //verify
-        verify(storeRepository).findByLatitudeBetweenAndLongitudeBetween(latitude - range, latitude + range, longitude - range, longitude + range);
+        verify(storeRepository).findByLatitudeBetweenAndLongitudeBetweenAndStoreType(latitude - range, latitude + range, longitude - range, longitude + range, StoreType.FOOD);
         verify(storeRepository, never()).save(initialProfile);
         Assert.assertEquals(2, returnedProfiles.size());
         Assert.assertEquals(MAIN_PAY_ACCOUNT, returnedProfiles.get(0).getBank().getAccountId());
@@ -302,6 +312,7 @@ public class StoreServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -320,6 +331,7 @@ public class StoreServiceTest {
         initialProfile.setBank(bank);
 
         StoreProfile initialProfile2 = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -341,12 +353,18 @@ public class StoreServiceTest {
 
         //when
         when(storeRepository
-                .findByLatitudeBetweenAndLongitudeBetween(latitude - range, latitude + range, longitude - range, longitude + range))
+                .findByLatitudeBetweenAndLongitudeBetweenAndStoreType(latitude - range,
+                        latitude + range,
+                        longitude - range,
+                        longitude + range, StoreType.FOOD))
                 .thenReturn(initialProfiles);
-        List<StoreProfile> returnedProfiles = storeService.findFeatured(latitude, latitude, range, maxLocations);
+        List<StoreProfile> returnedProfiles = storeService.findFeatured(latitude, latitude, StoreType.FOOD, range, maxLocations);
 
         //verify
-        verify(storeRepository).findByLatitudeBetweenAndLongitudeBetween(latitude - range, latitude + range, longitude - range, longitude + range);
+        verify(storeRepository).findByLatitudeBetweenAndLongitudeBetweenAndStoreType(latitude - range,
+                latitude + range,
+                longitude - range,
+                longitude + range, StoreType.FOOD);
         verify(storeRepository, never()).save(initialProfile);
         Assert.assertEquals(1, returnedProfiles.size());
         Assert.assertEquals(MAIN_PAY_ACCOUNT, returnedProfiles.get(0).getBank().getAccountId());
@@ -359,6 +377,7 @@ public class StoreServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -377,6 +396,7 @@ public class StoreServiceTest {
         initialProfile.setBank(bank);
 
         StoreProfile initialProfile2 = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -412,6 +432,7 @@ public class StoreServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -451,6 +472,7 @@ public class StoreServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -489,6 +511,7 @@ public class StoreServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
@@ -530,6 +553,7 @@ public class StoreServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
                 "name",
                 "address",
                 "https://image.url",
