@@ -7,6 +7,7 @@ import org.springframework.util.StringUtils;
 
 import javax.validation.ConstraintValidator;
 import javax.validation.ConstraintValidatorContext;
+import java.util.Date;
 
 public class ShippingValidator implements ConstraintValidator<ValidDeliveryInfo, Order> {
 
@@ -17,7 +18,8 @@ public class ShippingValidator implements ConstraintValidator<ValidDeliveryInfo,
             boolean isValidBuildingType = value.getType() == ShippingData.ShippingType.COLLECTION
                     || value.getBuildingType() == BuildingType.HOUSE ||
                     (!StringUtils.isEmpty(value.getUnitNumber()) && !StringUtils.isEmpty(value.getBuildingName()));
-            boolean isValidPickup = value.getType() == ShippingData.ShippingType.COLLECTION && value.getPickUpTime() != null;
+            boolean isValidPickup = value.getType() == ShippingData.ShippingType.COLLECTION
+                    && value.getPickUpTime() != null && value.getPickUpTime().after(new Date());
             boolean hasMessengerForDelivery = value.getMessengerId() != null;
             return isValidBuildingType && ( isValidPickup || hasMessengerForDelivery);
         }

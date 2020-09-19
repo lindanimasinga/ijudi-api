@@ -12,9 +12,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Target({ FIELD, TYPE})
 @Retention(RUNTIME)
-@Constraint(validatedBy = OrderValidator.class)
+@Constraint(validatedBy = OrderTypeValidator.class)
 @Documented
-public @interface ValidOrder {
+public @interface ValidOrderType {
 
     String message() default "Please supply shipping info for delivery or If you are paying in store, shipping should be null";
 

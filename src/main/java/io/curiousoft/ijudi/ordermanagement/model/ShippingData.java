@@ -1,6 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.model;
 
 
+import javax.validation.constraints.Future;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import java.util.Date;
@@ -20,6 +21,7 @@ public class ShippingData {
     private ShippingType type;
     private double fee;
     private String messengerId;
+    @Future(message = "pickup date must be at least 15 minutes ahead")
     private Date pickUpTime;
 
     public ShippingData() {

@@ -6,7 +6,7 @@ import io.curiousoft.ijudi.ordermanagement.model.OrderType;
 import javax.validation.ConstraintValidator;
 import javax.validation.ConstraintValidatorContext;
 
-public class OrderValidator implements ConstraintValidator<ValidOrder, Order> {
+public class OrderTypeValidator implements ConstraintValidator<ValidOrderType, Order> {
 
     @Override
     public boolean isValid(Order value, ConstraintValidatorContext context) {

@@ -1,7 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.model;
 
 import io.curiousoft.ijudi.ordermanagement.validator.ValidDeliveryInfo;
-import io.curiousoft.ijudi.ordermanagement.validator.ValidOrder;
+import io.curiousoft.ijudi.ordermanagement.validator.ValidOrderType;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import javax.validation.Valid;
@@ -9,7 +9,7 @@ import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.PositiveOrZero;
 
-@ValidOrder
+@ValidOrderType
 @ValidDeliveryInfo
 @Document
 public class Order extends BaseModel {
