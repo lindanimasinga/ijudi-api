@@ -43,12 +43,12 @@ public class OrderServiceImpl implements OrderService {
     private final PushNotificationService pushNotificationService;
     private final SmsNotificationService smsNotificationService;
     private final double deliveryFee;
-    private final double serviceFee;
+    private final double serviceFeePerc;
     private final long cleanUpMinutes;
 
     @Autowired
     public OrderServiceImpl(@Value("${service.delivery.fee}") double deliveryFee,
-                            @Value("${service.fee}") double serviceFee,
+                            @Value("${service.fee}") double serviceFeePerc,
                             @Value("${order.cleanup.unpaid.minutes}") long cleanUpMinutes,
                             OrderRepository orderRepository,
                             StoreRepository storeRepository,
@@ -57,7 +57,7 @@ public class OrderServiceImpl implements OrderService {
                             PushNotificationService pushNotificationService,
                             SmsNotificationService smsNotifcationService) {
         this.deliveryFee = deliveryFee;
-        this.serviceFee = serviceFee;
+        this.serviceFeePerc = serviceFeePerc;
         this.cleanUpMinutes = cleanUpMinutes;
         this.orderRepo = orderRepository;
         this.storeRepository = storeRepository;
@@ -118,7 +118,7 @@ public class OrderServiceImpl implements OrderService {
         String orderId = new SimpleDateFormat(DATE_FORMAT).format(orderDate);
         order.setId(orderId);
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
-        order.setServiceFee(serviceFee);
+        order.setServiceFee(serviceFeePerc * order.getBasketAmount());
         if (order.getOrderType() == OrderType.ONLINE && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
             order.getShippingData().setFee(deliveryFee);
         }
@@ -134,7 +134,7 @@ public class OrderServiceImpl implements OrderService {
 
         persistedOrder.setDescription(order.getDescription());
         persistedOrder.setPaymentType(order.getPaymentType());
-        persistedOrder.setServiceFee(serviceFee);
+        persistedOrder.setServiceFee(serviceFeePerc * order.getBasketAmount());
         boolean isDelivery = persistedOrder.getShippingData() != null &&
                 persistedOrder.getShippingData().getType() == ShippingData.ShippingType.DELIVERY;
         if (isDelivery) {

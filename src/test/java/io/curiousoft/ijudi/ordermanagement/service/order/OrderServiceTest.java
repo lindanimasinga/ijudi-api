@@ -44,7 +44,7 @@ public class OrderServiceTest {
     @Before
     public void setUp() throws Exception {
         double deliveryFee = 10;
-        double serviceFee = 5;
+        double serviceFee = 0.025;
         long cleanInMinutes = 5;
         sut = new OrderServiceImpl(
                 deliveryFee,
@@ -109,7 +109,7 @@ public class OrderServiceTest {
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
         Assert.assertEquals(10, order.getShippingData().getFee(), 0);
-        Assert.assertEquals(5.00, order.getServiceFee(), 0);
+        Assert.assertEquals(1.00, order.getServiceFee(), 0);
         Assert.assertEquals(40.00, order.getBasketAmount(), 0);
         Assert.assertEquals(false, order.getHasVat());
         verify(repo).save(order);
@@ -285,7 +285,7 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
-        Assert.assertEquals(5.00, order.getServiceFee(), 0);
+        Assert.assertEquals(1.00, order.getServiceFee(), 0);
         Assert.assertNull(order.getShippingData());
         Assert.assertEquals(40.00, order.getBasketAmount(), 0);
         //verify total amount paid
@@ -350,7 +350,7 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
-        Assert.assertEquals(5.00, order.getServiceFee(), 0);
+        Assert.assertEquals(1.00, order.getServiceFee(), 0);
         Assert.assertEquals(0, order.getShippingData().getFee(), 0);
         Assert.assertEquals(40.00, order.getBasketAmount(), 0);
         //verify total amount paid
@@ -468,7 +468,7 @@ public class OrderServiceTest {
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
         Assert.assertTrue(order.getHasVat());
-        Assert.assertEquals(5.00, order.getServiceFee(), 0);
+        Assert.assertEquals(1.00, order.getServiceFee(), 0);
         Assert.assertEquals(10.00, order.getShippingData().getFee(), 0);
         Assert.assertEquals(40, order.getBasketAmount(), 0);
         verify(repo).save(order);
@@ -897,7 +897,7 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
         Assert.assertNull(finalOrder.getShippingData());
-        Assert.assertEquals(5, finalOrder.getServiceFee(), 0);
+        Assert.assertEquals(1, finalOrder.getServiceFee(), 0);
         Assert.assertTrue(finalOrder.getShopPaid());
         Assert.assertNotNull(finalOrder.getDescription());
         Assert.assertTrue(order.getHasVat() == false);
@@ -1518,9 +1518,7 @@ public class OrderServiceTest {
 
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
-        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
         when(repo.save(order)).thenReturn(order);
-        when(deviceRepo.findByUserId(order.getCustomerId())).thenReturn(Collections.singletonList(device));
 
         Order finalOrder = sut.progressNextStage(order.getId());
         //verify
