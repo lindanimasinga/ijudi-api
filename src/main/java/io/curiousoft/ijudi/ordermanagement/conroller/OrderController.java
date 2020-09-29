@@ -26,8 +26,8 @@ public class OrderController {
     }
 
     @PatchMapping(value = "/{id}", consumes = "application/json", produces = "application/json")
-    public ResponseEntity<Order> finishOrder(@RequestBody @Valid Order order) throws Exception {
-        return ResponseEntity.ok(orderService.finishOder(order));
+    public ResponseEntity<Order> finishOrder(@PathVariable String id, @RequestBody @Valid Order order) throws Exception {
+        return !order.getId().equals(id)? ResponseEntity.badRequest().build() : ResponseEntity.ok(orderService.finishOder(order));
     }
 
     @GetMapping(value = "/{orderId}/nextstage", produces = "application/json")

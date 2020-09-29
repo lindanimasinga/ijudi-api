@@ -22,6 +22,7 @@ public class Profile extends BaseModel {
     @Indexed(unique = true)
     @NotBlank(message = "profile mobile number not valid")
     private String mobileNumber;
+    private String emailAddress;
     @NotNull(message = "role not valid")
     private ProfileRoles role;
     private int responseTimeMinutes;
@@ -162,5 +163,13 @@ public class Profile extends BaseModel {
 
     public void setLongitude(double longitude) {
         this.longitude = longitude;
+    }
+
+    public String getEmailAddress() {
+        return emailAddress;
+    }
+
+    public void setEmailAddress(String emailAddress) {
+        this.emailAddress = emailAddress;
     }
 }

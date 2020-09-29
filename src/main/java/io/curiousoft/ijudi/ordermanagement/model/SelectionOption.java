@@ -6,9 +6,9 @@ import java.util.List;
 
 public class SelectionOption {
 
-    @NotEmpty
+    @NotEmpty(message = "selectionOption name not valid")
     private String name;
-    @NotEmpty
+    @NotEmpty(message = "selectionOption values not valid")
     private List<String> values;
     private String selected;
     @Min(value = 0)
