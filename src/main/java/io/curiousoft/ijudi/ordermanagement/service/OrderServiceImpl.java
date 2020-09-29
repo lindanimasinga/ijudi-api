@@ -275,7 +275,8 @@ public class OrderServiceImpl implements OrderService {
                 if(!order.getShopPaid()){
                     paymentService.completePaymentToShop(order);
                 }
-                if(!order.getMessengerPaid()){
+
+                if(order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY && !order.getMessengerPaid()){
                     paymentService.completePaymentToMessenger(order);
                 }
                 order.setStage(STAGE_7_ALL_PAID);
