@@ -37,6 +37,10 @@ public class BasketItem {
         return price;
     }
 
+    public double getTotalPrice() {
+        return price * quantity;
+    }
+
     public void setPrice(double price) {
         this.price = price;
     }

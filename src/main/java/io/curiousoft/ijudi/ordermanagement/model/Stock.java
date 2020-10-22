@@ -14,7 +14,7 @@ public class Stock {
     private String description;
     @Min(value = 1, message = "stock quantity not valid")
     private int quantity;
-    @DecimalMin(value = "0.01", message = "stock price must be greater than or equal to 0.01")
+    @DecimalMin(value = "0.001", message = "stock price must be greater than or equal to 0.001")
     private double price;
     @Min(value = 0, message = "discount % must be >= 0")
     private double discountPerc;
@@ -113,5 +113,10 @@ public class Stock {
         if (o == null || getClass() != o.getClass()) return false;
         Stock stock = (Stock) o;
         return Objects.equals(name, stock.name);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(name);
     }
 }

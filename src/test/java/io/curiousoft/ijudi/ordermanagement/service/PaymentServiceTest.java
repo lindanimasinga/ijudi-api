@@ -186,6 +186,7 @@ public class PaymentServiceTest {
 
         UserProfile messengerProfile = new UserProfile(
                 "secondName",
+                UserProfile.SignUpReason.BUY,
                 "address2",
                 "https://image.url2",
                 "078mobilenumb",

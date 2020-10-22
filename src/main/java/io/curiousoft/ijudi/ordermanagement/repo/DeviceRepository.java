@@ -8,7 +8,9 @@ import java.util.Optional;
 
 public interface DeviceRepository extends MongoRepository<Device, String> {
 
-    Optional<Device> findByToken(String token);
+    Optional<Device> findOneByToken(String token);
 
     List<Device> findByUserId(String userId);
+
+    Optional<Device> findOneByIdOrToken(String id, String token);
 }

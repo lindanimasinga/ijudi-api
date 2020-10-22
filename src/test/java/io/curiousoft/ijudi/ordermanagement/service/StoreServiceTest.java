@@ -40,6 +40,7 @@ public class StoreServiceTest {
         //given
         UserProfile user = new UserProfile(
                 "name",
+                UserProfile.SignUpReason.BUY,
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -83,6 +84,7 @@ public class StoreServiceTest {
         Assert.assertNotNull(profile.getOwnerId());
         Assert.assertNotNull(profile.getBank());
         Assert.assertEquals(user.getBank().getAccountId(), profile.getBank().getAccountId());
+        Assert.assertEquals(user.getBank().getPhone(), profile.getBank().getPhone());
         Assert.assertEquals(ProfileRoles.STORE_ADMIN, user.getRole());
     }
 
@@ -448,7 +450,7 @@ public class StoreServiceTest {
         initialProfile.setFeaturedExpiry(date);
 
         Stock stock1 = new Stock("bananas 1kg", 24, 15, 0, Collections.emptyList());
-        Stock stock2 = new Stock("bananas 1kg", 24, 15, 0, Collections.emptyList());
+        Stock stock2 = new Stock("bananas 1kg", 24, 16, 0, Collections.emptyList());
         Set<Stock> stockList = new HashSet<>();
         stockList.add(stock1);
         stockList.add(stock2);
@@ -456,12 +458,13 @@ public class StoreServiceTest {
 
         //when
         when(storeRepository.findById(profileId)).thenReturn(Optional.of(initialProfile));
-        Set<Stock> returnedProfiles = storeService.findStockForShop(profileId);
+        Set<Stock> stockForShop = storeService.findStockForShop(profileId);
 
         //verify
         verify(storeRepository).findById(profileId);
-        Assert.assertNotNull(returnedProfiles);
-        Assert.assertEquals(2, returnedProfiles.size());
+        Assert.assertNotNull(stockForShop);
+        Assert.assertEquals(1, stockForShop.size());
+        Assert.assertEquals(15, stockForShop.iterator().next().getPrice(), 0);
 
     }
 
@@ -487,11 +490,6 @@ public class StoreServiceTest {
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
         initialProfile.setFeaturedExpiry(date);
 
-        Stock stock1 = new Stock("bananas 1kg", 24, 15, 0, Collections.emptyList());
-        Set<Stock> stockList = new HashSet<>();
-        stockList.add(stock1);
-        initialProfile.setStockList(stockList);
-
         Stock stock2 = new Stock("bananas 1kg", 24, 15, 0, Collections.emptyList());
 
         //when
@@ -500,6 +498,48 @@ public class StoreServiceTest {
 
         //verify
         verify(storeRepository).findById(profileId);
+        Assert.assertEquals(1, initialProfile.getStockList().size());
+        verify(storeRepository).save(initialProfile);
+
+    }
+
+    @Test
+    public void addStock_AlreadyExist() throws Exception {
+        //given
+        String profileId = "myID";
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+
+                businessHours,
+                "ownerId",
+                new Bank());
+        initialProfile.setBusinessHours(new ArrayList<>());
+        initialProfile.setFeatured(true);
+        Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
+        initialProfile.setFeaturedExpiry(date);
+
+        Stock stock1 = new Stock("bananas 1kg", 24, 15, 0, Collections.emptyList());
+        Set<Stock> stockList = new HashSet<>();
+        stockList.add(stock1);
+        initialProfile.setStockList(stockList);
+
+        Stock stock2 = new Stock("bananas 1kg", 24, 18, 0, Collections.emptyList());
+
+        //when
+        when(storeRepository.findById(profileId)).thenReturn(Optional.of(initialProfile));
+        storeService.addStockForShop(profileId, stock2);
+
+        //verify
+        verify(storeRepository).findById(profileId);
+        Assert.assertEquals(1, initialProfile.getStockList().size());
+        Assert.assertEquals(18, initialProfile.getStockList().iterator().next().getPrice(), 0);
         verify(storeRepository).save(initialProfile);
 
     }
@@ -539,7 +579,7 @@ public class StoreServiceTest {
             fail();
         } catch (Exception e) {
             e.printStackTrace();
-            Assert.assertEquals("stock price must be greater than or equal to 0.01", e.getMessage());
+            Assert.assertEquals("stock price must be greater than or equal to 0.001", e.getMessage());
         }
         //verify
         verifyNoInteractions(storeRepository);

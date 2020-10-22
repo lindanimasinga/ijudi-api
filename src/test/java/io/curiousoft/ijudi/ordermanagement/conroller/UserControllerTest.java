@@ -36,6 +36,7 @@ public class UserControllerTest {
     public void create() throws URISyntaxException, JsonProcessingException {
 
         UserProfile user = new UserProfile("name",
+                UserProfile.SignUpReason.BUY,
                 "myaddress",
                 "path to image",
                 "9111111707",

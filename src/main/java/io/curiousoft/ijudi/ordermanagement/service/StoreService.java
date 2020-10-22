@@ -3,6 +3,7 @@ package io.curiousoft.ijudi.ordermanagement.service;
 import io.curiousoft.ijudi.ordermanagement.model.*;
 import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -88,7 +89,17 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
     public void addStockForShop(String profileId, Stock stock) throws Exception {
         validate(stock);
         StoreProfile store = profileRepo.findById(profileId).orElseThrow(() -> new Exception("Profile not found"));
-        store.getStockList().add(stock);
+        Optional<Stock> stockOptional = store.getStockList().stream()
+                .filter(item -> stock.getName().equals(item.getName()))
+                .findFirst();
+        if(stockOptional.isPresent()) {
+            Stock oldStock = stockOptional.get();
+            String id = oldStock.getId();
+            BeanUtils.copyProperties(stock, oldStock);
+            oldStock.setId(id);
+        } else {
+            store.getStockList().add(stock);
+        }
         profileRepo.save(store);
     }
 

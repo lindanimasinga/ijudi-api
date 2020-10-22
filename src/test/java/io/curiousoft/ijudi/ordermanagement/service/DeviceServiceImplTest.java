@@ -47,6 +47,42 @@ public class DeviceServiceImplTest {
     }
 
     @Test
+    public void addAlreadyExist() throws Exception {
+
+        //given
+        String pushToken = "23423werwlekrjwlekjr23423j4l2k3j423gdfgergerg";
+        Device device = new Device(pushToken);
+
+        Device oldDevice = new Device(pushToken);
+        oldDevice.setId("111");
+
+        //when
+        when(deviceRepo.findOneByToken("23423werwlekrjwlekjr23423j4l2k3j423gdfgergerg")).thenReturn(Optional.of(oldDevice));
+
+        Device newDevice = sut.create(device);
+
+        //verify
+        Assert.assertEquals(oldDevice, newDevice);
+        verify(deviceRepo, times(0)).save(oldDevice);
+    }
+
+    @Test
+    public void createDeviceAlreadyExist() throws Exception {
+
+        //given
+        String pushToken = "23423werwlekrjwlekjr23423j4l2k3j423gdfgergerg";
+        Device device = new Device(pushToken);
+        //when
+        when(deviceRepo.findOneByToken("23423werwlekrjwlekjr23423j4l2k3j423gdfgergerg"))
+                .thenReturn(Optional.of(device));
+        Device newDevice = sut.create(device);
+
+        //verify
+        verify(deviceRepo, times(0)).save(device);
+        verify(deviceRepo).findOneByToken("23423werwlekrjwlekjr23423j4l2k3j423gdfgergerg");
+    }
+
+    @Test
     public void addNoToken() {
         //given
         String pushToken = "";
@@ -71,11 +107,11 @@ public class DeviceServiceImplTest {
         String pushToken = "23423werwlekrjwlekjr23423j4l2k3j423gdfgergerg";
         Device oldDevice = new Device(pushToken);
         oldDevice.setUserId("old user");
-        Device updateDevice = new Device("newToken");
+        Device updateDevice = new Device("23423werwlekrjwlekjr23423j4l2k3j423gdfgergerg");
         updateDevice.setUserId("new userId");
 
         //when
-        when(deviceRepo.findById("deviceId")).thenReturn(Optional.of(oldDevice));
+        when(deviceRepo.findOneByIdOrToken("deviceId", updateDevice.getToken())).thenReturn(Optional.of(oldDevice));
         when(deviceRepo.save(oldDevice)).thenReturn(oldDevice);
         Device newDevice = sut.update("deviceId", updateDevice);
 
@@ -136,12 +172,12 @@ public class DeviceServiceImplTest {
         Device device = new Device(token);
         //when
 
-        when(deviceRepo.findByToken(token)).thenReturn(Optional.of(device));
+        when(deviceRepo.findOneByToken(token)).thenReturn(Optional.of(device));
         sut.findByToken(token);
 
         //verify
         Assert.assertNotNull(device);
-        verify(deviceRepo).findByToken(token);
+        verify(deviceRepo).findOneByToken(token);
     }
 
     @Test

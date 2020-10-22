@@ -13,11 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import javax.validation.ConstraintViolation;
-import javax.validation.Validation;
-import javax.validation.Validator;
-import javax.validation.ValidatorFactory;
-import java.text.SimpleDateFormat;
+import javax.validation.*;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
@@ -31,7 +27,6 @@ public class OrderServiceImpl implements OrderService {
 
     private static Logger LOGGER = LoggerFactory.getLogger(OrderServiceImpl.class);
 
-    public static final String DATE_FORMAT = "SSSmmHHyyddMMss";
     private final LinkedList<OrderStage> onlineCollectionStages;
     private final LinkedList<OrderStage> onlineDeliveryStages;
     private final OrderRepository orderRepo;
@@ -45,11 +40,13 @@ public class OrderServiceImpl implements OrderService {
     private final double deliveryFee;
     private final double serviceFeePerc;
     private final long cleanUpMinutes;
+    private final List<String> adminCellNumbers;
 
     @Autowired
     public OrderServiceImpl(@Value("${service.delivery.fee}") double deliveryFee,
                             @Value("${service.fee}") double serviceFeePerc,
                             @Value("${order.cleanup.unpaid.minutes}") long cleanUpMinutes,
+                            @Value("${admin.cellNumber}") List<String> adminCellNumbers,
                             OrderRepository orderRepository,
                             StoreRepository storeRepository,
                             UserProfileRepo userProfileRepo, PaymentService paymentService,
@@ -59,6 +56,7 @@ public class OrderServiceImpl implements OrderService {
         this.deliveryFee = deliveryFee;
         this.serviceFeePerc = serviceFeePerc;
         this.cleanUpMinutes = cleanUpMinutes;
+        this.adminCellNumbers = adminCellNumbers;
         this.orderRepo = orderRepository;
         this.storeRepository = storeRepository;
         this.userProfileRepo = userProfileRepo;
@@ -114,8 +112,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.setHasVat(storeOptional.get().getHasVat());
-        Date orderDate = new Date();
-        String orderId = new SimpleDateFormat(DATE_FORMAT).format(orderDate);
+        String orderId = Order.generateId();
         order.setId(orderId);
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setServiceFee(serviceFeePerc * order.getBasketAmount());
@@ -350,8 +347,22 @@ public class OrderServiceImpl implements OrderService {
             if (isLateDeliveryOrder || isLateCollectionOrder) {
                 StoreProfile store = storeRepository.findById(order.getShopId()).get();
                 try {
-                    smsNotificationService.sendMessage(store.getMobileNumber(), "Hello " + store.getName() + ", Please accept the order " + order.getId() +
-                            " on iZinga app, otherwise the order will be cancelled.");
+                    if(!order.getSmsSentToShop()) {
+                        smsNotificationService.sendMessage(store.getMobileNumber(), "Hello " + store.getName() + ", Please accept the order " + order.getId() +
+                                " on iZinga app, otherwise the order will be cancelled.");
+                        order.setSmsSentToShop(true);
+
+                    }else if(!order.getSmsSentToAdmin()) {
+                        order.setSmsSentToAdmin(true);
+                        for (String number : adminCellNumbers) {
+                            smsNotificationService.sendMessage(number, "Hi, iZinga Admin. " + store.getName() + ", has not accepted order " + order.getId() +
+                                    " on iZinga app, otherwise the order will be cancelled.");
+                        }
+                    }else
+                     {
+                        //reverse the transaction
+                    }
+                    orderRepo.save(order);
                 } catch (Exception e) {
                     LOGGER.error("Failed to send sms. ",e);
                 }

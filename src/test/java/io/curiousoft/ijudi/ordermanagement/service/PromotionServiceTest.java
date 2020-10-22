@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -108,9 +109,23 @@ public class PromotionServiceTest {
         String profileId = "myID";
         //when
 
-        List<Promotion> profile = profileService.findAll();
+        List<Promotion> profile = profileService.findAll(null);
 
         //verify
         verify(promotionRepo).findByExpiryDateAfter(any(Date.class));
+    }
+
+    @Test
+    public void findAllByStoreId() {
+
+        //given
+        String profileId = "myID";
+        String storeId = "storeID";
+        //when
+
+        List<Promotion> profile = profileService.findAll(storeId);
+
+        //verify
+        verify(promotionRepo).findByShopIdAndExpiryDateAfter(eq(storeId), any(Date.class));
     }
 }

@@ -39,8 +39,12 @@ public class OrderServiceTest {
     private SmsNotificationService smsNotifcation;
     @Mock
     private DeviceRepository deviceRepo;
+    List<String> phoneNumbers = Collections.singletonList("08128155660");
+
     //system under test
     private OrderServiceImpl sut;
+
+
     @Before
     public void setUp() throws Exception {
         double deliveryFee = 10;
@@ -50,6 +54,7 @@ public class OrderServiceTest {
                 deliveryFee,
                 serviceFee,
                 cleanInMinutes,
+                phoneNumbers,
                 repo,
                 storeRepo,
                 customerRepo,
@@ -290,7 +295,7 @@ public class OrderServiceTest {
         Assert.assertEquals(40.00, order.getBasketAmount(), 0);
         //verify total amount paid
         Assert.assertEquals(order.getServiceFee() + basket.getItems().stream()
-                .mapToDouble(BasketItem::getPrice).sum(), order.getTotalAmount(), 0);
+                .mapToDouble(BasketItem::getTotalPrice).sum(), order.getTotalAmount(), 0);
         Assert.assertFalse(order.getHasVat());
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
@@ -355,11 +360,13 @@ public class OrderServiceTest {
         Assert.assertEquals(40.00, order.getBasketAmount(), 0);
         //verify total amount paid
         Assert.assertEquals(order.getServiceFee() + basket.getItems().stream()
-                .mapToDouble(BasketItem::getPrice).sum() + shipping.getFee(), order.getTotalAmount(), 0);
+                .mapToDouble(BasketItem::getTotalPrice).sum() + shipping.getFee(), order.getTotalAmount(), 0);
         Assert.assertFalse(order.getHasVat());
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
+
+        System.out.println(order.getId());
     }
 
     @Test
@@ -775,6 +782,7 @@ public class OrderServiceTest {
             Assert.assertEquals("order basket is not valid", e.getMessage());
         }
     }
+
     @Test
     public void finishOderOnline() throws Exception {
         //given
@@ -1083,6 +1091,7 @@ public class OrderServiceTest {
         orders.add(order2);
         UserProfile initialProfile = new UserProfile(
                 "name",
+                UserProfile.SignUpReason.BUY,
                 "address",
                 "https://image.url",
                 phoneNumber,
@@ -1633,6 +1642,7 @@ public class OrderServiceTest {
         String shopId = "id of shop";
         UserProfile patchProfileRequest = new UserProfile(
                 "secondName",
+                UserProfile.SignUpReason.BUY,
                 "address2",
                 "https://image.url2",
                 "078mobilenumb",
@@ -1797,8 +1807,9 @@ public class OrderServiceTest {
         verify(repo).deleteByShopPaidAndStageAndModifiedDateBefore(eq(false), eq(OrderStage.STAGE_0_CUSTOMER_NOT_PAID),
                 any(Date.class));
     }
+
     @Test
-    public void checkNotAcceptedOrdersAndNotify() throws Exception {
+    public void checkNotAcceptedOrdersAndSMS_Sent_To_Shop() throws Exception {
         //given
         String shopId = "id of shop";
         //order 1
@@ -1867,6 +1878,161 @@ public class OrderServiceTest {
                         "Hello " + initialProfile.getName() + ", Please accept the order " + order.getId() +
                                 " on iZinga app, otherwise the order will be cancelled.");
     }
+
+    @Test
+    public void checkNotAcceptedOrdersAndSendToAdmin() throws Exception {
+        //given
+        String shopId = "id of shop";
+        //order 1
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messagerID");
+        shipping.setBuildingType(BuildingType.HOUSE);
+        order.setShippingData(shipping);
+        order.setSmsSentToShop(true);
+        order.setCustomerId("customer");
+        order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        Date orderDate = Date.from(LocalDateTime.now().minusMinutes(10).atZone(ZoneId.systemDefault()).toInstant());
+        order.setModifiedDate(orderDate);
+        order.setShopId(shopId);
+        //order 2
+        Order order2 = new Order();
+        order.setBasket(basket);
+
+
+        ShippingData shipping2 = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.COLLECTION);
+        Date pickUpTime = Date.from(LocalDateTime.now().minusMinutes(320).atZone(ZoneId.systemDefault()).toInstant());
+        shipping2.setPickUpTime(pickUpTime);
+        shipping.setMessengerId("messagerID");
+        order2.setShippingData(shipping2);
+        order2.setSmsSentToShop(true);
+        order2.setCustomerId("customer id");
+        order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(5).atZone(ZoneId.systemDefault()).toInstant());
+        order2.setModifiedDate(orderDate2);
+        order2.setShopId(shopId);
+        ArrayList<Order> orders = new ArrayList<>();
+        orders.add(order);
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                businessHours,
+                "ownerId",
+                new Bank());
+        initialProfile.setBusinessHours(new ArrayList<>());
+        initialProfile.setFeatured(true);
+        Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
+        initialProfile.setFeaturedExpiry(date);
+        Bank bank = new Bank();
+        bank.setAccountId("34567890");
+        initialProfile.setBank(bank);
+        //when
+        when(repo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM)).thenReturn(orders);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(initialProfile));
+        sut.checkUnconfirmedOrders();
+        //verify
+        verify(repo).findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        verify(repo).save(order);
+        verify(smsNotifcation, times(0))
+                .sendMessage(initialProfile.getMobileNumber(),
+                        "Hello " + initialProfile.getName() + ", Please accept the order " + order.getId() +
+                                " on iZinga app, otherwise the order will be cancelled.");
+        verify(smsNotifcation, times(1))
+                .sendMessage(phoneNumbers.get(0), "Hi, iZinga Admin. " + initialProfile.getName() + ", has not accepted order " + order.getId() +
+                        " on iZinga app, otherwise the order will be cancelled.");
+    }
+
+    @Test
+    public void checkNotAcceptedOrdersAndAdmin_Already_Notified() throws Exception {
+        //given
+        String shopId = "id of shop";
+        //order 1
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messagerID");
+        shipping.setBuildingType(BuildingType.HOUSE);
+        order.setShippingData(shipping);
+        order.setSmsSentToShop(true);
+        order.setSmsSentToAdmin(true);
+        order.setCustomerId("customer");
+        order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        Date orderDate = Date.from(LocalDateTime.now().minusMinutes(10).atZone(ZoneId.systemDefault()).toInstant());
+        order.setModifiedDate(orderDate);
+        order.setShopId(shopId);
+        //order 2
+        Order order2 = new Order();
+        order.setBasket(basket);
+
+
+        ShippingData shipping2 = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.COLLECTION);
+        Date pickUpTime = Date.from(LocalDateTime.now().minusMinutes(320).atZone(ZoneId.systemDefault()).toInstant());
+        shipping2.setPickUpTime(pickUpTime);
+        shipping.setMessengerId("messagerID");
+        order2.setShippingData(shipping2);
+        order2.setSmsSentToShop(true);
+        order2.setCustomerId("customer id");
+        order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(5).atZone(ZoneId.systemDefault()).toInstant());
+        order2.setModifiedDate(orderDate2);
+        order2.setShopId(shopId);
+        ArrayList<Order> orders = new ArrayList<>();
+        orders.add(order);
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                businessHours,
+                "ownerId",
+                new Bank());
+        initialProfile.setBusinessHours(new ArrayList<>());
+        initialProfile.setFeatured(true);
+        Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
+        initialProfile.setFeaturedExpiry(date);
+        Bank bank = new Bank();
+        bank.setAccountId("34567890");
+        initialProfile.setBank(bank);
+        //when
+        when(repo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM)).thenReturn(orders);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(initialProfile));
+        sut.checkUnconfirmedOrders();
+        //verify
+        verify(repo).findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        verify(smsNotifcation, times(0))
+                .sendMessage(initialProfile.getMobileNumber(),
+                        "Hello " + initialProfile.getName() + ", Please accept the order " + order.getId() +
+                                " on iZinga app, otherwise the order will be cancelled.");
+        verify(smsNotifcation, times(0))
+                .sendMessage(phoneNumbers.get(0), "Hi, iZinga Admin. " + initialProfile.getName() + ", has not accepted order " + order.getId() +
+                        " on iZinga app, otherwise the order will be cancelled.");
+    }
+
     @Test
     public void checkNotAcceptedOrdersAndNotNotify() throws Exception {
         //given
@@ -1988,7 +2154,7 @@ public class OrderServiceTest {
                 "name",
                 "address",
                 "https://image.url",
-                "081mobilenumb",
+                "0812815707",
                 tags,
                 businessHours,
                 "ownerId",
@@ -2003,13 +2169,15 @@ public class OrderServiceTest {
         sut.checkUnconfirmedOrders();
         //verify
         verify(repo).findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        Assert.assertTrue(order2.getSmsSentToShop());
+        verify(repo).save(order2);
         verify(smsNotifcation, times(1))
                 .sendMessage(initialProfile.getMobileNumber(),
                         "Hello " + initialProfile.getName() + ", Please accept the order " + order2.getId() +
                                 " on iZinga app, otherwise the order will be cancelled.");
     }
     @Test
-    public void checkNotAcceptedCollectionOrdersAndNotNotify() throws Exception {
+    public void checkNotAcceptedCollectionOrdersAnd_NotNotify() throws Exception {
         //given
         String shopId = "id of shop";
         //order 1

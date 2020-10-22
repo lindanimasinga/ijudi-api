@@ -10,6 +10,7 @@ import javax.validation.Validation;
 import javax.validation.Validator;
 import javax.validation.ValidatorFactory;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -27,7 +28,8 @@ public class DeviceServiceImpl implements DeviceService {
     @Override
     public Device create(Device device) throws Exception {
         validate(device);
-        return deviceRepo.save(device);
+        Optional<Device> deviceOptional = deviceRepo.findOneByToken(device.getToken());
+        return deviceOptional.orElseGet(() -> deviceRepo.save(device));
     }
 
     @Override
@@ -42,7 +44,7 @@ public class DeviceServiceImpl implements DeviceService {
 
     @Override
     public Device findByToken(String token) {
-        return deviceRepo.findByToken(token).orElse(null);
+        return deviceRepo.findOneByToken(token).orElse(null);
     }
 
     @Override
@@ -53,11 +55,11 @@ public class DeviceServiceImpl implements DeviceService {
     @Override
     public Device update(String id, Device device) throws Exception {
         validate(device);
-        Device oldDevice = deviceRepo.findById(id).orElse(null);
+        Device oldDevice = deviceRepo.findOneByIdOrToken(id, device.getToken()).orElse(null);
         if(oldDevice == null) {
-            return null;
+            return deviceRepo.save(device);
         }
-        BeanUtils.copyProperties(device, oldDevice);
+        oldDevice.setUserId(device.getUserId());
         return deviceRepo.save(oldDevice);
     }
 

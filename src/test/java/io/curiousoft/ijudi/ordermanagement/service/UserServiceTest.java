@@ -38,6 +38,7 @@ public class UserServiceTest {
         //given
         UserProfile initialProfile = new UserProfile(
                 "name",
+                UserProfile.SignUpReason.BUY,
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -60,6 +61,7 @@ public class UserServiceTest {
         //given
         UserProfile initialProfile = new UserProfile(
                 "name",
+                UserProfile.SignUpReason.BUY,
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -82,6 +84,7 @@ public class UserServiceTest {
         String profileId = "myID";
         UserProfile initialProfile = new UserProfile(
                 "name",
+                UserProfile.SignUpReason.BUY,
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -89,6 +92,7 @@ public class UserServiceTest {
 
         UserProfile patchProfileRequest = new UserProfile(
                 "secondName",
+                UserProfile.SignUpReason.BUY,
                 "address2",
                 "https://image.url2",
                 "078mobilenumb",
@@ -150,6 +154,7 @@ public class UserServiceTest {
 
         UserProfile patchProfileRequest = new UserProfile(
                 "secondName",
+                UserProfile.SignUpReason.BUY,
                 "address2",
                 "https://image.url2",
                 "078mobilenumb",

@@ -8,6 +8,10 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.PositiveOrZero;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @ValidOrderType
 @ValidDeliveryInfo
@@ -35,6 +39,8 @@ public class Order extends BaseModel {
     @PositiveOrZero(message = "service fee was modified")
     private double serviceFee;
     private boolean messengerPaid;
+    private boolean smsSentToShop;
+    private boolean smsSentToAdmin;
 
     public void setStage(OrderStage stage) {
         this.stage = stage;
@@ -93,8 +99,10 @@ public class Order extends BaseModel {
     }
 
     public double getTotalAmount() {
-        return serviceFee + basket.getItems().stream()
-                    .mapToDouble(BasketItem::getPrice).sum() + (shippingData != null? shippingData.getFee() : 0);
+        return BigDecimal.valueOf(serviceFee + basket.getItems().stream()
+                .mapToDouble(BasketItem::getTotalPrice).sum() + (shippingData != null ? shippingData.getFee() : 0))
+                .setScale(2, RoundingMode.HALF_EVEN)
+                .doubleValue();
     }
 
     public OrderType getOrderType() {
@@ -127,8 +135,10 @@ public class Order extends BaseModel {
     }
 
     public double getBasketAmount() {
-        return basket.getItems().stream()
-                .mapToDouble(item -> item.getPrice() * item.getQuantity()).sum();
+        return BigDecimal.valueOf(basket.getItems().stream()
+                .mapToDouble(BasketItem::getTotalPrice).sum())
+                .setScale(2, RoundingMode.HALF_EVEN)
+                .doubleValue();
     }
 
     public double getServiceFee() {
@@ -145,5 +155,25 @@ public class Order extends BaseModel {
 
     public void setMessengerPaid(boolean messengerPaid) {
         this.messengerPaid = messengerPaid;
+    }
+
+    public static String generateId() {
+        return (LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)) + "";
+    }
+
+    public void setSmsSentToShop(boolean smsSentToShop) {
+        this.smsSentToShop = smsSentToShop;
+    }
+
+    public boolean getSmsSentToShop() {
+        return smsSentToShop;
+    }
+
+    public void setSmsSentToAdmin(boolean smsSentToAdmin) {
+        this.smsSentToAdmin = smsSentToAdmin;
+    }
+
+    public boolean getSmsSentToAdmin() {
+        return smsSentToAdmin;
     }
 }
