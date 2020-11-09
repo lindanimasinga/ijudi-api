@@ -48,7 +48,8 @@ public class PaymentService {
     public boolean paymentReceived(Order order) throws Exception {
         PaymentProvider paymentProvider = paymentProviders.stream()
                 .filter(service -> order.getPaymentType() == service.getPaymentType())
-                .findFirst().orElseThrow(() -> new Exception("Your order has no ukheshe type set or the ukheshe provider for " + order.getPaymentType() + " not configured on the server"));
+                .findFirst()
+                .orElseThrow(() -> new Exception("Your order has no ukheshe type set or the ukheshe provider for " + order.getPaymentType() + " not configured on the server"));
         return paymentProvider.paymentReceived(order);
     }
 
