@@ -1,6 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.conroller;
 
 import io.curiousoft.ijudi.ordermanagement.model.Promotion;
+import io.curiousoft.ijudi.ordermanagement.model.StoreType;
 import io.curiousoft.ijudi.ordermanagement.service.PromotionService;
 import org.springframework.beans.factory.annotation.Required;
 import org.springframework.http.ResponseEntity;
@@ -42,7 +43,8 @@ public class PromotionsController {
     }
 
     @GetMapping(produces = "application/json")
-    public ResponseEntity<List<Promotion>> findAllPromotions(@RequestParam(required = false) String storeId) {
+    public ResponseEntity<List<Promotion>> findAllPromotions(@RequestParam(required = false) String storeId,
+                                                             @RequestParam(required = false) StoreType storeType) {
         List<Promotion> promotions = promotionService.findAll(storeId);
         return promotions != null ? ResponseEntity.ok(promotions) : ResponseEntity.notFound().build();
     }
