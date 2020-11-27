@@ -1,9 +1,8 @@
 package io.curiousoft.ijudi.ordermanagement.notification;
 
-
-import com.curiousoft.google.services.FCMMessage;
-import com.curiousoft.google.services.FCMNotification;
-import com.curiousoft.google.services.FirebaseConnectionWrapper;
+import com.curiousoft.alarmsystem.messaging.firebase.FCMMessage;
+import com.curiousoft.alarmsystem.messaging.firebase.FCMNotification;
+import com.curiousoft.alarmsystem.messaging.firebase.FirebaseConnectionWrapper;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import io.curiousoft.ijudi.ordermanagement.model.*;

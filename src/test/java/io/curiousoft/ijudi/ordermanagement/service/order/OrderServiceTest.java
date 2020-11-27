@@ -63,6 +63,7 @@ public class OrderServiceTest {
                 pushNotificationService,
                 smsNotifcation);
     }
+
     @Test
     public void startOrderOnlineDelivery() throws Exception {
         //given
@@ -121,6 +122,73 @@ public class OrderServiceTest {
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
     }
+
+    @Test
+    public void startOrder_store_own_delivery() throws Exception {
+        //given
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile storeProfile = new StoreProfile(
+                StoreType.CLOTHING,
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+
+                businessHours,
+                "ownerId",
+                new Bank());
+        storeProfile.setBusinessHours(new ArrayList<>());
+        storeProfile.setFeatured(true);
+        storeProfile.setHasVat(false);
+
+        Messager messager = new Messager("Postnet", 15.50);
+        storeProfile.setStoreMessenger(messager);
+
+        Set<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("skirt", 2, 10, 0, Collections.emptyList()));
+        stockItems.add(new Stock("shirt", 1, 20, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("skirt", 2, 10, 0));
+        items.add(new BasketItem("shirt", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messagerID");
+        shipping.setBuildingType(BuildingType.HOUSE);
+        order.setShippingData(shipping);
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+        //when
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+        when(repo.save(order)).thenReturn(order);
+
+        //test
+        Order newOrder = sut.startOrder(order);
+
+        //verify
+        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        Assert.assertNotNull(order.getId());
+        Assert.assertEquals(15.5, order.getShippingData().getFee(), 0);
+        Assert.assertEquals(0, order.getServiceFee(), 0);
+        Assert.assertEquals(40.00, order.getBasketAmount(), 0);
+        Assert.assertEquals(false, order.getHasVat());
+        verify(repo).save(order);
+        verify(customerRepo).existsById(order.getCustomerId());
+        verify(storeRepo).findById(order.getShopId());
+    }
+
     @Test
     public void startOrderOnlineDeliveryNoBuildingType() throws Exception {
         //given
@@ -327,6 +395,7 @@ public class OrderServiceTest {
         storeProfile.setBusinessHours(new ArrayList<>());
         storeProfile.setFeatured(true);
         storeProfile.setHasVat(false);
+        //create an order
         Order order = new Order();
         Basket basket = new Basket();
         List<BasketItem> items = new ArrayList<>();
@@ -354,14 +423,14 @@ public class OrderServiceTest {
 
         //verify
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
-        Assert.assertNotNull(order.getId());
-        Assert.assertEquals(1.00, order.getServiceFee(), 0);
-        Assert.assertEquals(0, order.getShippingData().getFee(), 0);
-        Assert.assertEquals(40.00, order.getBasketAmount(), 0);
+        Assert.assertNotNull(newOrder.getId());
+        Assert.assertEquals(1.00, newOrder.getServiceFee(), 0);
+        Assert.assertEquals(0, newOrder.getShippingData().getFee(), 0);
+        Assert.assertEquals(40.00, newOrder.getBasketAmount(), 0);
         //verify total amount paid
-        Assert.assertEquals(order.getServiceFee() + basket.getItems().stream()
-                .mapToDouble(BasketItem::getTotalPrice).sum() + shipping.getFee(), order.getTotalAmount(), 0);
-        Assert.assertFalse(order.getHasVat());
+        Assert.assertEquals(newOrder.getServiceFee() + basket.getItems().stream()
+                .mapToDouble(BasketItem::getTotalPrice).sum() + shipping.getFee(), newOrder.getTotalAmount(), 0);
+        Assert.assertFalse(newOrder.getHasVat());
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
@@ -905,7 +974,7 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
         Assert.assertNull(finalOrder.getShippingData());
-        Assert.assertEquals(1, finalOrder.getServiceFee(), 0);
+        Assert.assertEquals(0, finalOrder.getServiceFee(), 0);
         Assert.assertTrue(finalOrder.getShopPaid());
         Assert.assertNotNull(finalOrder.getDescription());
         Assert.assertTrue(order.getHasVat() == false);

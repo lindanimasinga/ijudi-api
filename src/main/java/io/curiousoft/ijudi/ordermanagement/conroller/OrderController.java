@@ -2,6 +2,8 @@ package io.curiousoft.ijudi.ordermanagement.conroller;
 
 import io.curiousoft.ijudi.ordermanagement.model.Order;
 import io.curiousoft.ijudi.ordermanagement.service.OrderService;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -9,15 +11,18 @@ import org.springframework.web.bind.annotation.*;
 import javax.validation.Valid;
 import java.util.List;
 
+import static io.curiousoft.ijudi.ordermanagement.model.PaymentType.PAYFAST;
+
 @RestController
 @RequestMapping("/order")
 public class OrderController {
 
-
+    private List<String> allowedOrigins;
     private OrderService orderService;
 
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService, @Value("${allowed.origins}") List<String> origins) {
         this.orderService = orderService;
+        this.allowedOrigins = origins;
     }
 
     @PostMapping(consumes = "application/json", produces = "application/json")
@@ -26,7 +31,12 @@ public class OrderController {
     }
 
     @PatchMapping(value = "/{id}", consumes = "application/json", produces = "application/json")
-    public ResponseEntity<Order> finishOrder(@PathVariable String id, @RequestBody @Valid Order order) throws Exception {
+    public ResponseEntity<Order> finishOrder(@PathVariable String id,
+                                             @RequestBody @Valid Order order,
+                                             @RequestHeader(value = "Origin", required = false) String origin) throws Exception {
+        if(order.getPaymentType() == PAYFAST && (origin == null || !allowedOrigins.contains(origin.toLowerCase()))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         return !order.getId().equals(id)? ResponseEntity.badRequest().build() : ResponseEntity.ok(orderService.finishOder(order));
     }
 

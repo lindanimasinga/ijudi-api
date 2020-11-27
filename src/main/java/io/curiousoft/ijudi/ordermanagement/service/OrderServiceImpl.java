@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 
 import static io.curiousoft.ijudi.ordermanagement.model.OrderStage.*;
 import static io.curiousoft.ijudi.ordermanagement.model.OrderType.INSTORE;
+import static java.lang.String.format;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -115,11 +116,21 @@ public class OrderServiceImpl implements OrderService {
         String orderId = Order.generateId();
         order.setId(orderId);
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
-        order.setServiceFee(serviceFeePerc * order.getBasketAmount());
+
+        if(canChargeServiceFees(storeOptional.get())) {
+            order.setServiceFee(serviceFeePerc * order.getBasketAmount());
+        }
+
         if (order.getOrderType() == OrderType.ONLINE && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
+            double deliveryFee = storeOptional.get().getStoreMessenger() != null ?
+                    storeOptional.get().getStoreMessenger().getStandardDeliveryPrice() : this.deliveryFee;
             order.getShippingData().setFee(deliveryFee);
         }
         return orderRepo.save(order);
+    }
+
+    private boolean canChargeServiceFees(StoreProfile storeProfile) {
+        return storeProfile.getStoreType() == StoreType.FOOD || storeProfile.getStoreType() == StoreType.CAR_WASH;
     }
 
     @Override
@@ -131,12 +142,9 @@ public class OrderServiceImpl implements OrderService {
 
         persistedOrder.setDescription(order.getDescription());
         persistedOrder.setPaymentType(order.getPaymentType());
-        persistedOrder.setServiceFee(serviceFeePerc * order.getBasketAmount());
         boolean isDelivery = persistedOrder.getShippingData() != null &&
                 persistedOrder.getShippingData().getType() == ShippingData.ShippingType.DELIVERY;
-        if (isDelivery) {
-            persistedOrder.getShippingData().setFee(deliveryFee);
-        }
+
 
         if (!paymentService.paymentReceived(persistedOrder)) {
             throw new Exception("Payment not cleared yet. please verify again.");
@@ -157,9 +165,6 @@ public class OrderServiceImpl implements OrderService {
         Optional<StoreProfile> optional = storeRepository.findById(persistedOrder.getShopId());
         if (optional.isPresent()) {
             StoreProfile store = optional.get();
-            //notify the shop
-            List<Device> shopDevices = deviceRepo.findByUserId(store.getOwnerId());
-            pushNotificationService.notifyStoreOrderPlaced(shopDevices, persistedOrder);
             Set<Stock> stock = store.getStockList();
             persistedOrder.getBasket()
                     .getItems()
@@ -172,6 +177,10 @@ public class OrderServiceImpl implements OrderService {
             store.setServicesCompleted(store.getServicesCompleted() + 1);
             storeRepository.save(store);
 
+            //notify the shop
+            List<Device> shopDevices = deviceRepo.findByUserId(store.getOwnerId());
+            pushNotificationService.notifyStoreOrderPlaced(shopDevices, persistedOrder);
+            // notify messenger
             if (isDelivery) {
                 List<Device> messengerDevices = deviceRepo.findByUserId(persistedOrder.getShippingData().getMessengerId());
                 pushNotificationService.notifyMessengerOrderPlaced(messengerDevices, persistedOrder, store);
@@ -326,8 +335,8 @@ public class OrderServiceImpl implements OrderService {
     @Scheduled(fixedDelay = 600000)// 10 minutes
     @Override
     public void checkUnconfirmedOrders() {
-        LOGGER.info("Checking unconfirmed orders..");
         List<Order> orders = orderRepo.findByStage(STAGE_1_WAITING_STORE_CONFIRM);
+        LOGGER.info(format("Found %s unconfirmed orders..", +orders.size()));
         orders.forEach(order -> {
             Date checkDate = order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY ?
                     Date.from(LocalDateTime.now()
@@ -346,18 +355,20 @@ public class OrderServiceImpl implements OrderService {
 
             if (isLateDeliveryOrder || isLateCollectionOrder) {
                 StoreProfile store = storeRepository.findById(order.getShopId()).get();
+                LOGGER.info(format("Order %s is late, call shop at %s", order.getId(), store.getMobileNumber()));
                 try {
                     if(!order.getSmsSentToShop()) {
                         smsNotificationService.sendMessage(store.getMobileNumber(), "Hello " + store.getName() + ", Please accept the order " + order.getId() +
                                 " on iZinga app, otherwise the order will be cancelled.");
                         order.setSmsSentToShop(true);
-
+                        LOGGER.info("Sms sent to shop");
                     }else if(!order.getSmsSentToAdmin()) {
                         order.setSmsSentToAdmin(true);
                         for (String number : adminCellNumbers) {
                             smsNotificationService.sendMessage(number, "Hi, iZinga Admin. " + store.getName() + ", has not accepted order " + order.getId() +
                                     " on iZinga app, otherwise the order will be cancelled.");
                         }
+                        LOGGER.info("Sms sent to admin");
                     }else
                      {
                         //reverse the transaction

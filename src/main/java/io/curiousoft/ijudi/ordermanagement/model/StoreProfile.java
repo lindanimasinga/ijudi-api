@@ -27,6 +27,7 @@ public class StoreProfile extends Profile implements GeoPoint {
     private Date featuredExpiry;
     @NotNull(message = "storeType is not valid")
     private StoreType storeType;
+    private Messager storeMessenger;
 
 
     public StoreProfile(
@@ -117,5 +118,13 @@ public class StoreProfile extends Profile implements GeoPoint {
 
     public void setStoreType(StoreType storeType) {
         this.storeType = storeType;
+    }
+
+    public Messager getStoreMessenger() {
+        return storeMessenger;
+    }
+
+    public void setStoreMessenger(Messager storeMessenger) {
+        this.storeMessenger = storeMessenger;
     }
 }

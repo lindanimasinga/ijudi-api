@@ -2,5 +2,5 @@ package io.curiousoft.ijudi.ordermanagement.model;
 
 public enum PaymentType {
 
-    UKHESHE, CASH, OZOW
+    UKHESHE, CASH, OZOW, PAYFAST
 }

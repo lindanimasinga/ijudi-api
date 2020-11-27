@@ -1,6 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.model;
 
 
+import io.curiousoft.ijudi.ordermanagement.validator.ValidMobileNumber;
 import org.springframework.data.mongodb.core.index.Indexed;
 
 import javax.validation.constraints.NotBlank;
@@ -10,6 +11,7 @@ public class Profile extends BaseModel {
 
     @NotBlank(message = "profile name not valid")
     private String name;
+    private String surname;
     private String description;
     private int yearsInService;
     @NotBlank(message = "profile address not valid")
@@ -21,6 +23,7 @@ public class Profile extends BaseModel {
     private int badges;
     @Indexed(unique = true)
     @NotBlank(message = "profile mobile number not valid")
+    @ValidMobileNumber(message = "profile mobile not format is not valid. Please put like +27812815577 or 27812815577")
     private String mobileNumber;
     private String emailAddress;
     @NotNull(message = "role not valid")
@@ -35,8 +38,9 @@ public class Profile extends BaseModel {
     public Profile(@NotBlank(message = "profile name not valid") String name,
                    @NotBlank(message = "profile address not valid") String address,
                    @NotBlank(message = "profile image url not valid") String imageUrl,
-                   @NotBlank(message = "profile mobile number not valid") String mobileNumber,
-                   @NotNull(message = "role not valid") ProfileRoles role) {
+                   @NotBlank(message = "profile mobile not format is not valid. Please put like +27812815577 or 27812815577")
+                   @ValidMobileNumber(message = "profile mobile number not valid") String mobileNumber,
+                   @NotNull(message = "profile role not valid") ProfileRoles role) {
         super();
         this.name = name;
         this.address = address;
@@ -51,6 +55,14 @@ public class Profile extends BaseModel {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getSurname() {
+        return surname;
+    }
+
+    public void setSurname(String surname) {
+        this.surname = surname;
     }
 
     public String getDescription() {

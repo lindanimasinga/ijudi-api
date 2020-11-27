@@ -1,18 +1,26 @@
 package io.curiousoft.ijudi.ordermanagement.utils;
 
+import io.curiousoft.ijudi.ordermanagement.service.zoomsms.ZoomSmsNotificationService;
 import okhttp3.Headers;
 import okhttp3.Request;
 import okhttp3.Response;
 import okio.Buffer;
 import okio.BufferedSource;
 import org.hibernate.validator.internal.constraintvalidators.hv.LuhnCheckValidator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import javax.xml.bind.DatatypeConverter;
 import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 public class IjudiUtils {
+
+    private static Logger LOGGER = LoggerFactory.getLogger(IjudiUtils.class);
 
     public static boolean isIdNumber(String id) {
         String idNumberRegex =
@@ -32,7 +40,8 @@ public class IjudiUtils {
 
 
     public static boolean isSAMobileNumber(String number) {
-        return number != null && number.length() == 10;
+        String idNumberRegex ="(\\+27|27|0)[1-9]\\d{8}";
+        return number.matches(idNumberRegex);
     }
 
     public static String responseAsString(Response response) {
@@ -63,5 +72,14 @@ public class IjudiUtils {
         } catch (final IOException e) {
             return "";
         }
+    }
+
+    public  static String generateMD5Hash(String data) throws NoSuchAlgorithmException {
+        LOGGER.debug("hashing string " + data);
+        MessageDigest md = MessageDigest.getInstance("MD5");
+        md.update(data.getBytes());
+        byte[] digest = md.digest();
+        return DatatypeConverter
+                .printHexBinary(digest).toUpperCase();
     }
 }
