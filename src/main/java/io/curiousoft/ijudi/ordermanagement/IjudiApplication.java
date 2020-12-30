@@ -2,6 +2,7 @@ package io.curiousoft.ijudi.ordermanagement;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
 import org.springframework.data.mongodb.config.EnableMongoAuditing;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -15,7 +16,7 @@ import java.util.TimeZone;
 @EnableScheduling
 @EnableAsync
 @SpringBootApplication
-public class IjudiApplication {
+public class IjudiApplication extends SpringBootServletInitializer {
 
 	public static void main(String[] args) {
 		SpringApplication.run(IjudiApplication.class, args);

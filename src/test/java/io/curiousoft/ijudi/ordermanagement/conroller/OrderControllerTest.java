@@ -8,10 +8,7 @@ import io.curiousoft.ijudi.ordermanagement.model.*;
 import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
 import io.curiousoft.ijudi.ordermanagement.service.payfast.PayFastPaymentData;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -26,6 +23,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
 
+@Ignore
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = IjudiApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)

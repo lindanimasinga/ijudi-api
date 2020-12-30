@@ -11,6 +11,7 @@ import io.curiousoft.ijudi.ordermanagement.service.PaymentService;
 import io.curiousoft.ijudi.ordermanagement.service.SmsNotificationService;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -23,6 +24,8 @@ import java.util.*;
 
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.*;
+
+@Ignore
 @RunWith(MockitoJUnitRunner.class)
 public class OrderServiceTest {
     @Mock
