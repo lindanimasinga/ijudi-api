@@ -45,7 +45,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Autowired
     public OrderServiceImpl(@Value("${service.delivery.fee}") double deliveryFee,
-                            @Value("${service.fee}") double serviceFeePerc,
+                            @Value("${service.fee.perc}") double serviceFeePerc,
                             @Value("${order.cleanup.unpaid.minutes}") long cleanUpMinutes,
                             @Value("${admin.cellNumber}") List<String> adminCellNumbers,
                             OrderRepository orderRepository,
@@ -108,7 +108,7 @@ public class OrderServiceImpl implements OrderService {
                 .collect(Collectors.toList());
 
         boolean isValidBasketItems = stockItemNames.containsAll(basketItemNames);
-        if(!INSTORE.equals(order.getOrderType()) && !isValidBasketItems) {
+        if (!INSTORE.equals(order.getOrderType()) && !isValidBasketItems) {
             throw new Exception("Some basket item are not available in the shop.");
         }
 
@@ -117,7 +117,7 @@ public class OrderServiceImpl implements OrderService {
         order.setId(orderId);
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
 
-        if(canChargeServiceFees(storeOptional.get())) {
+        if (canChargeServiceFees(storeOptional.get())) {
             order.setServiceFee(serviceFeePerc * order.getBasketAmount());
         }
 
@@ -179,7 +179,11 @@ public class OrderServiceImpl implements OrderService {
 
             //notify the shop
             List<Device> shopDevices = deviceRepo.findByUserId(store.getOwnerId());
-            pushNotificationService.notifyStoreOrderPlaced(shopDevices, persistedOrder);
+            if (shopDevices.size() > 0) {
+                pushNotificationService.notifyStoreOrderPlaced(shopDevices, persistedOrder);
+            } else {
+                smsNotificationService.notifyOrderPlaced(store, persistedOrder, userProfileRepo.findById(order.getCustomerId()).get());
+            }
             // notify messenger
             if (isDelivery) {
                 List<Device> messengerDevices = deviceRepo.findByUserId(persistedOrder.getShippingData().getMessengerId());
@@ -278,11 +282,11 @@ public class OrderServiceImpl implements OrderService {
 
                 break;
             case STAGE_6_WITH_CUSTOMER:
-                if(!order.getShopPaid()){
+                if (!order.getShopPaid()) {
                     paymentService.completePaymentToShop(order);
                 }
 
-                if(order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY && !order.getMessengerPaid()){
+                if (order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY && !order.getMessengerPaid()) {
                     paymentService.completePaymentToMessenger(order);
                 }
                 order.setStage(STAGE_7_ALL_PAID);
@@ -336,7 +340,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public void checkUnconfirmedOrders() {
         List<Order> orders = orderRepo.findByStage(STAGE_1_WAITING_STORE_CONFIRM);
-        LOGGER.info(format("Found %s unconfirmed orders..", +orders.size()));
+        LOGGER.info(format("Found %s unconfirmed orders..", orders.size()));
         orders.forEach(order -> {
             Date checkDate = order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY ?
                     Date.from(LocalDateTime.now()
@@ -351,31 +355,30 @@ public class OrderServiceImpl implements OrderService {
             //notify by sms
             boolean isLateDeliveryOrder = order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY && order.getModifiedDate().before(checkDate);
             boolean isLateCollectionOrder = order.getShippingData().getType() == ShippingData.ShippingType.COLLECTION
-                                            && order.getShippingData().getPickUpTime().before(checkDate);
+                    && order.getShippingData().getPickUpTime().before(checkDate);
 
             if (isLateDeliveryOrder || isLateCollectionOrder) {
                 StoreProfile store = storeRepository.findById(order.getShopId()).get();
                 LOGGER.info(format("Order %s is late, call shop at %s", order.getId(), store.getMobileNumber()));
                 try {
-                    if(!order.getSmsSentToShop()) {
+                    if (!order.getSmsSentToShop()) {
                         smsNotificationService.sendMessage(store.getMobileNumber(), "Hello " + store.getName() + ", Please accept the order " + order.getId() +
                                 " on iZinga app, otherwise the order will be cancelled.");
                         order.setSmsSentToShop(true);
                         LOGGER.info("Sms sent to shop");
-                    }else if(!order.getSmsSentToAdmin()) {
+                    } else if (!order.getSmsSentToAdmin()) {
                         order.setSmsSentToAdmin(true);
                         for (String number : adminCellNumbers) {
                             smsNotificationService.sendMessage(number, "Hi, iZinga Admin. " + store.getName() + ", has not accepted order " + order.getId() +
                                     " on iZinga app, otherwise the order will be cancelled.");
                         }
                         LOGGER.info("Sms sent to admin");
-                    }else
-                     {
+                    } else {
                         //reverse the transaction
                     }
                     orderRepo.save(order);
                 } catch (Exception e) {
-                    LOGGER.error("Failed to send sms. ",e);
+                    LOGGER.error("Failed to send sms. ", e);
                 }
             }
         });

@@ -1,8 +1,10 @@
 package io.curiousoft.ijudi.ordermanagement.model;
 
-import javax.validation.constraints.*;
+import javax.validation.constraints.DecimalMin;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -12,6 +14,7 @@ public class Stock {
     @NotBlank(message = "stock name must not be blank")
     private String name;
     private String description;
+    private String detailedDescription;
     @Min(value = 1, message = "stock quantity not valid")
     private int quantity;
     @DecimalMin(value = "0.001", message = "stock price must be greater than or equal to 0.001")
@@ -97,6 +100,14 @@ public class Stock {
 
     public void setOptionalSelection(List<SelectionOption> optionalSelection) {
         this.optionalSelection = optionalSelection;
+    }
+
+    public String getDetailedDescription() {
+        return detailedDescription;
+    }
+
+    public void setDetailedDescription(String detailedDescription) {
+        this.detailedDescription = detailedDescription;
     }
 
     public String getDescription() {

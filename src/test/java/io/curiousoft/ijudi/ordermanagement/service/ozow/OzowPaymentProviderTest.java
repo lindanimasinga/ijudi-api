@@ -145,14 +145,10 @@ public class OzowPaymentProviderTest {
         bank.setPhone("phoneNumber");
         bank.setType("wallet");
         shop.setBank(bank);
-        //when
-        when(ukheshePaymentProvider.makePaymentToShop(order, order.getBasketAmount())).thenReturn(true);
 
-        boolean paid = ozowPaymentProvider.makePaymentToShop(order, order.getBasketAmount());
+        boolean paid = ozowPaymentProvider.makePaymentToShop(null, order, order.getBasketAmount());
 
-        //verify
-        verify(ukheshePaymentProvider).makePaymentToShop(order, order.getBasketAmount());
-        Assert.assertTrue(paid);
+        Assert.assertFalse(paid);
     }
 
     @Test

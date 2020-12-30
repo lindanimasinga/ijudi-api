@@ -18,14 +18,19 @@ public class Promotion {
     private String message;
     @NotBlank(message = "promotion shop id url not valid")
     private String shopId;
+    private String stockId;
+    @NotNull(message = "promotion shop type not valid")
+    private StoreType shopType;
     private Date expiryDate;
 
     public Promotion(@NotBlank(message = "promotion image url not valid") String imageUrl,
-                     @NotBlank(message = "promotion shop id url not valid") String shopId,
+                     @NotBlank(message = "promotion shop id not valid") String shopId,
+                     @NotNull(message = "promotion shop type not valid") StoreType shopType,
                      @NotNull(message = "promotion expiry date not valid") Date expiryDate) {
         this.imageUrl = imageUrl;
         this.expiryDate = expiryDate;
         this.shopId = shopId;
+        this.shopType = shopType;
     }
 
     public String getActionUrl() {
@@ -82,5 +87,21 @@ public class Promotion {
 
     public void setExpiryDate(Date expiryDate) {
         this.expiryDate = expiryDate;
+    }
+
+    public StoreType getShopType() {
+        return shopType;
+    }
+
+    public void setShopType(StoreType shopType) {
+        this.shopType = shopType;
+    }
+
+    public String getStockId() {
+        return stockId;
+    }
+
+    public void setStockId(String stockId) {
+        this.stockId = stockId;
     }
 }

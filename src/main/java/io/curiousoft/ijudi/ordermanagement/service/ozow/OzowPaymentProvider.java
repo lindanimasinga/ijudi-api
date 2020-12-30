@@ -2,6 +2,7 @@ package io.curiousoft.ijudi.ordermanagement.service.ozow;
 
 import io.curiousoft.ijudi.ordermanagement.model.Order;
 import io.curiousoft.ijudi.ordermanagement.model.PaymentType;
+import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
 import io.curiousoft.ijudi.ordermanagement.service.PaymentProvider;
 import io.curiousoft.ijudi.ordermanagement.service.ukheshe.UkheshePaymentProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,8 +71,9 @@ public class OzowPaymentProvider extends PaymentProvider<OzowPaymentData> {
     }
 
     @Override
-    public boolean makePaymentToShop(Order order, double basketAmountExclFees) throws Exception {
-        return ukheshePaymentProvider.makePaymentToShop(order, basketAmountExclFees);
+    public boolean makePaymentToShop(StoreProfile store, Order order, double basketAmountExclFees) throws Exception {
+       // return ukheshePaymentProvider.makePaymentToShop(order, basketAmountExclFees);
+        return false;
     }
 
     @Override

@@ -1,5 +1,8 @@
 package io.curiousoft.ijudi.ordermanagement.service.zoomsms;
 
+import io.curiousoft.ijudi.ordermanagement.model.Order;
+import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
+import io.curiousoft.ijudi.ordermanagement.model.UserProfile;
 import io.curiousoft.ijudi.ordermanagement.service.SmsNotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
+
+import static java.lang.String.format;
 
 @Service
 public class ZoomSmsNotificationService implements SmsNotificationService {
@@ -47,5 +52,17 @@ public class ZoomSmsNotificationService implements SmsNotificationService {
         if(response.getStatusCodeValue() != 200) {
             throw new Exception(String.valueOf(response.getBody()));
         }
+    }
+
+    @Override
+    public void notifyOrderPlaced(StoreProfile store, Order order, UserProfile userProfile) throws Exception {
+        String shopMessage = format("Hello %s. You have received a new order. Please open iZinga app and confirm.", store.getName());
+        String customerMessage = format("Hello %s. Your has been received. Please open iZinga app for status updates.", userProfile.getName());
+        if(store.getOrderUrl() != null) {
+            shopMessage = format("Hello %s. You have received a new order from %s. %s", store.getName(),userProfile.getName(), store.getOrderUrl() + order.getId());
+            customerMessage = format("Hello %s. Your order has been received. For status updates. Visit %s. From %s", userProfile.getName() , store.getOrderUrl() + order.getId(), store.getName());
+        }
+        sendMessage(store.getMobileNumber(), shopMessage);
+        sendMessage(store.getMobileNumber(), customerMessage);
     }
 }

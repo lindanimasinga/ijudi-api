@@ -1,9 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.utils;
 
 import org.junit.Assert;
-import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.Test;
 
 class IjudiUtilsTest {
 

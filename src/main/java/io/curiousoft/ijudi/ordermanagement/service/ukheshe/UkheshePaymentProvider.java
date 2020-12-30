@@ -138,10 +138,8 @@ public class UkheshePaymentProvider extends PaymentProvider<UkheshePaymentData> 
     }
 
     @Override
-    public boolean makePaymentToShop(Order order, double basketAmountExclFees) throws Exception {
+    public boolean makePaymentToShop(StoreProfile shop, Order order, double basketAmountExclFees) throws Exception {
         String fromAccount = mainAccount;
-        StoreProfile shop = storeRepo.findById(order.getShopId())
-                .orElseThrow(() -> new Exception("shop does not exist"));
         String shopAccount = !StringUtils.isEmpty(shop.getBank().getAccountId()) ?
                 shop.getBank().getAccountId() : shop.getBank().getPhone();
 

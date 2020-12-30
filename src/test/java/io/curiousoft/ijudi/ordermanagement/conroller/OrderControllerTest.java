@@ -44,11 +44,11 @@ public class OrderControllerTest {
     @Before
     public void setUp() throws Exception {
         //create user
-        user = new UserProfile("name",
+        user = new UserProfile("TestUser",
                 UserProfile.SignUpReason.BUY,
                 "myaddress",
                 "path to image",
-                "9111111707",
+                "0812815707",
                 ProfileRoles.CUSTOMER);
         userProfileRepo.save(user);
 
@@ -69,7 +69,7 @@ public class OrderControllerTest {
                 "name",
                 "address",
                 "https://image.url",
-                "081mobilenumb",
+                "0812815707",
                 tags,
 
                 businessHours,
@@ -84,6 +84,7 @@ public class OrderControllerTest {
         store.setBusinessHours(new ArrayList<>());
         store.setFeatured(true);
         store.setHasVat(false);
+        store.setStoreWebsiteUrl("https://test.izinga.co.za");
         storeRepository.save(store);
     }
 

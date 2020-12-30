@@ -180,7 +180,7 @@ public class UkheshePaymentProviderTest {
         //when
         when(storeRepository.findById(order.getShopId())).thenReturn(Optional.of(shop));
 
-        boolean paid = ukheshePaymentProvider.makePaymentToShop(order, order.getBasketAmount());
+        boolean paid = ukheshePaymentProvider.makePaymentToShop(shop, order, order.getBasketAmount());
 
         verify(storeRepository).findById(order.getShopId());
         Assert.assertTrue(paid);
@@ -245,54 +245,10 @@ public class UkheshePaymentProviderTest {
         //when
         when(storeRepository.findById(order.getShopId())).thenReturn(Optional.of(shop));
 
-        boolean paid = ukheshePaymentProvider.makePaymentToShop(order, order.getBasketAmount());
+        boolean paid = ukheshePaymentProvider.makePaymentToShop(shop, order, order.getBasketAmount());
 
         verify(storeRepository).findById(order.getShopId());
         Assert.assertTrue(paid);
-    }
-
-    @Test
-    public void makePaymentToShopForOrderNoShopExist() throws ParseException {
-
-        String username = "0812815707";
-        String password = PASSWORD;
-        String baseUrl = "https://ukheshe-sandbox.jini.rocks/ukheshe-conductor/rest/v1";
-        String customerId = "534";
-        String mainAccount = "account";
-
-        ukheshePaymentProvider = new UkheshePaymentProvider(
-                baseUrl, username, customerId, password, mainAccount,
-                storeRepository, userProfileRepo);
-
-        //given an order
-        Order order = new Order();
-        Basket basket = new Basket();
-        List<BasketItem> items = new ArrayList<>();
-        BasketItem item = new BasketItem("bananas", 1, 1, 1);
-        item.setName("item");
-        item.setPrice(25);
-        items.add(item);
-        basket.setItems(items);
-        order.setBasket(basket);
-
-        ShippingData shipping = new ShippingData("shopAddress",
-                "to address",
-                ShippingData.ShippingType.DELIVERY);
-        shipping.setMessengerId("messagerID");
-        order.setShippingData(shipping);
-        order.setCreatedDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
-        order.setPaymentType(PaymentType.UKHESHE);
-        order.setDescription("Payment from 0812815707: order 606071520220511");
-        order.setCustomerId("customerId");
-        order.setStage(OrderStage.STAGE_6_WITH_CUSTOMER);
-        order.setShopId("shopid");
-
-        try {
-            boolean paid = ukheshePaymentProvider.makePaymentToShop(order, order.getBasketAmount());
-            fail();
-        } catch (Exception e) {
-            Assert.assertEquals("shop does not exist", e.getMessage());
-        }
     }
 
     @Test

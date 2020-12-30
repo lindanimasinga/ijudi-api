@@ -2,27 +2,18 @@ package io.curiousoft.ijudi.ordermanagement.service.payfast;
 
 import io.curiousoft.ijudi.ordermanagement.model.Order;
 import io.curiousoft.ijudi.ordermanagement.model.PaymentType;
+import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
 import io.curiousoft.ijudi.ordermanagement.service.PaymentProvider;
 import io.curiousoft.ijudi.ordermanagement.service.ukheshe.UkheshePaymentProvider;
 import io.curiousoft.ijudi.ordermanagement.utils.IjudiUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.client.RestTemplateBuilder;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
-import javax.xml.bind.DatatypeConverter;
 import java.io.UnsupportedEncodingException;
-import java.net.URI;
 import java.net.URLEncoder;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.*;
 import java.util.logging.Logger;
 
@@ -76,7 +67,7 @@ public class PayFastPaymentProvider extends PaymentProvider<PayFastPaymentData> 
     }
 
     @Override
-    public boolean makePaymentToShop(Order order, double basketAmountExclFees) throws Exception {
+    public boolean makePaymentToShop(StoreProfile store, Order order, double basketAmountExclFees) throws Exception {
         return false;//ukheshePaymentProvider.makePaymentToShop(order, basketAmountExclFees);
     }
 

@@ -29,7 +29,7 @@ public class StoreControler {
 
     @PatchMapping(value = "/{id}", consumes = "application/json", produces = "application/json")
     public ResponseEntity<StoreProfile> update(@PathVariable String id, @Valid @RequestBody StoreProfile profile) throws Exception {
-        return ResponseEntity.ok(storeService.update(id, profile));
+        return !id.equals(profile.getId())? ResponseEntity.badRequest().build() : ResponseEntity.ok(storeService.update(id, profile));
     }
 
     @GetMapping(value = "/{id}", produces = "application/json")

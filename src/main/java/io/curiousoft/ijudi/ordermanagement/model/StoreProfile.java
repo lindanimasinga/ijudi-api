@@ -1,6 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.model;
 
 import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.util.StringUtils;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
@@ -28,6 +29,8 @@ public class StoreProfile extends Profile implements GeoPoint {
     @NotNull(message = "storeType is not valid")
     private StoreType storeType;
     private Messager storeMessenger;
+    private String storeWebsiteUrl;
+    private boolean izingaTakesCommission;
 
 
     public StoreProfile(
@@ -126,5 +129,25 @@ public class StoreProfile extends Profile implements GeoPoint {
 
     public void setStoreMessenger(Messager storeMessenger) {
         this.storeMessenger = storeMessenger;
+    }
+
+    public String getOrderUrl() {
+        return !StringUtils.isEmpty(storeWebsiteUrl) ? storeWebsiteUrl + "/order/" : null;
+    }
+
+    public String getStoreWebsiteUrl() {
+        return storeWebsiteUrl;
+    }
+
+    public void setStoreWebsiteUrl(String storeWebsiteUrl) {
+        this.storeWebsiteUrl = storeWebsiteUrl;
+    }
+
+    public boolean getIzingaTakesCommission() {
+        return izingaTakesCommission;
+    }
+
+    public void setIzingaTakesCommission(boolean izingaTakesCommission) {
+        this.izingaTakesCommission = izingaTakesCommission;
     }
 }

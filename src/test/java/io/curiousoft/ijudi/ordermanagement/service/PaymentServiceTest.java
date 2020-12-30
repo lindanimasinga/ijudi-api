@@ -52,7 +52,8 @@ public class PaymentServiceTest {
                 deviceRepo,
                 storeRepository,
                 userProfileRepo,
-                0);
+                0,
+                0.1);
 
         //given an order
         Order order = new Order();
@@ -84,14 +85,14 @@ public class PaymentServiceTest {
     }
 
     @Test
-    public void completePaymentToShop() throws Exception {
+    public void completePaymentToShop_no_commission_for_izinga() throws Exception {
 
         List<PaymentProvider> paymentProviders = new ArrayList<>();
         //adding all ukheshe services
         paymentProviders.add(ukheshePaymentProvider);
         paymentService = new PaymentService(pushNotificationService,
                 paymentProviders, orderRepo, deviceRepo, storeRepository,
-                userProfileRepo,0);
+                userProfileRepo,0, 0.1);
 
         //given an order
         Order order = new Order();
@@ -134,7 +135,7 @@ public class PaymentServiceTest {
 
         //when
         when(ukheshePaymentProvider.getPaymentType()).thenReturn(PaymentType.UKHESHE);
-        when(ukheshePaymentProvider.makePaymentToShop(order, order.getBasketAmount())).thenReturn(true);
+        when(ukheshePaymentProvider.makePaymentToShop(shop, order, order.getBasketAmount())).thenReturn(true);
         when(deviceRepo.findByUserId(shop.getOwnerId())).thenReturn(Collections.singletonList(storeDevice));
         when(storeRepository.findById(order.getShopId())).thenReturn(Optional.of(shop));
 
@@ -144,8 +145,78 @@ public class PaymentServiceTest {
         assertTrue(received);
         assertTrue(order.getShopPaid());
         assertNotNull(order.getPaymentType());
-        verify(ukheshePaymentProvider).makePaymentToShop(order, order.getBasketAmount());
-        verify(ukheshePaymentProvider).makePaymentToShop(order, 40);
+        verify(ukheshePaymentProvider).makePaymentToShop(shop, order, order.getBasketAmount());
+        verify(ukheshePaymentProvider).makePaymentToShop(shop, order, 40);
+        verify(deviceRepo).findByUserId(shop.getOwnerId());
+        verify(storeRepository).findById(order.getShopId());
+        verify(pushNotificationService).sendNotification(storeDevice, message);
+
+    }
+
+    @Test
+    public void completePaymentToShop_commission_for_izinga() throws Exception {
+
+        List<PaymentProvider> paymentProviders = new ArrayList<>();
+        //adding all ukheshe services
+        paymentProviders.add(ukheshePaymentProvider);
+        paymentService = new PaymentService(pushNotificationService,
+                paymentProviders, orderRepo, deviceRepo, storeRepository,
+                userProfileRepo,0, 0.1);
+
+        //given an order
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setFee(10);
+        shipping.setMessengerId("messagerID");
+        order.setShippingData(shipping);
+        order.setPaymentType(PaymentType.UKHESHE);
+        order.setDescription("081281445");
+        order.setCustomerId("customerId");
+        order.setStage(OrderStage.STAGE_6_WITH_CUSTOMER);
+        order.setShopId("shopid");
+        order.setServiceFee(5.00);
+
+        StoreProfile shop = new StoreProfile(
+                StoreType.FOOD,
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                null,
+                null,
+                "ownerId",
+                new Bank());;
+        shop.setIzingaTakesCommission(true);
+
+        Device storeDevice = new Device("token");
+        String content = "Payment of R " + order.getBasketAmount() * 0.9 + " received";
+        PushHeading heading = new PushHeading("Payment of R " + order.getBasketAmount() * 0.9 + " received",
+                "Order Payment Received", null);
+        PushMessage message = new PushMessage(PushMessageType.PAYMENT, heading, content);
+
+        //when
+        when(ukheshePaymentProvider.getPaymentType()).thenReturn(PaymentType.UKHESHE);
+        when(ukheshePaymentProvider.makePaymentToShop(shop, order, order.getBasketAmount() * 0.9)).thenReturn(true);
+        when(deviceRepo.findByUserId(shop.getOwnerId())).thenReturn(Collections.singletonList(storeDevice));
+        when(storeRepository.findById(order.getShopId())).thenReturn(Optional.of(shop));
+
+        boolean received = paymentService.completePaymentToShop(order);
+
+        //verify
+        assertTrue(received);
+        assertTrue(order.getShopPaid());
+        assertNotNull(order.getPaymentType());
+        verify(ukheshePaymentProvider).makePaymentToShop(shop, order, order.getBasketAmount() * 0.9);
+        verify(ukheshePaymentProvider).makePaymentToShop(shop, order, 36);
         verify(deviceRepo).findByUserId(shop.getOwnerId());
         verify(storeRepository).findById(order.getShopId());
         verify(pushNotificationService).sendNotification(storeDevice, message);
@@ -159,7 +230,7 @@ public class PaymentServiceTest {
         //adding all ukheshe services
         paymentProviders.add(ukheshePaymentProvider);
         paymentService = new PaymentService(pushNotificationService,
-                paymentProviders, orderRepo, deviceRepo, storeRepository,userProfileRepo, 0);
+                paymentProviders, orderRepo, deviceRepo, storeRepository,userProfileRepo, 0, 0.1);
 
         //given an order
         Order order = new Order();
@@ -226,7 +297,9 @@ public class PaymentServiceTest {
 
         List<PaymentProvider> paymentProviders = new ArrayList<>();
         //adding all ukheshe services
-        paymentService = new PaymentService(pushNotificationService, paymentProviders, orderRepo, deviceRepo, storeRepository,userProfileRepo, 0);
+        paymentService = new PaymentService(pushNotificationService,
+                paymentProviders, orderRepo, deviceRepo,
+                storeRepository,userProfileRepo, 0, 0.1);
 
         //given an order
         Order order = new Order();

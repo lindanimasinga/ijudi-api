@@ -1,6 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.service;
 
 import io.curiousoft.ijudi.ordermanagement.model.Promotion;
+import io.curiousoft.ijudi.ordermanagement.model.StoreType;
 import io.curiousoft.ijudi.ordermanagement.repo.PromotionRepo;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -50,8 +51,10 @@ public class PromotionService {
         return promotionRepo.findById(profileId).orElse(null);
     }
 
-    public List<Promotion> findAll(String storeId) {
-        return StringUtils.isEmpty(storeId) ? promotionRepo.findByExpiryDateAfter(new Date()) :promotionRepo.findByShopIdAndExpiryDateAfter(storeId, new Date());
+    public List<Promotion> findAll(String storeId, StoreType storeType) {
+        return StringUtils.isEmpty(storeId) ?
+                promotionRepo.findByExpiryDateAfterAndShopType(new Date(), storeType) :
+                promotionRepo.findByShopIdAndExpiryDateAfterAndShopType(storeId, new Date(), storeType);
     }
 
     protected void validate(Object profile) throws Exception {

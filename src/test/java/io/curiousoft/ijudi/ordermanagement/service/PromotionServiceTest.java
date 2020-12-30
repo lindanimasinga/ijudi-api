@@ -1,6 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.service;
 
 import io.curiousoft.ijudi.ordermanagement.model.Promotion;
+import io.curiousoft.ijudi.ordermanagement.model.StoreType;
 import io.curiousoft.ijudi.ordermanagement.repo.PromotionRepo;
 import org.junit.Assert;
 import org.junit.Before;
@@ -22,13 +23,13 @@ import static org.mockito.Mockito.when;
 public class PromotionServiceTest {
 
     //system under test
-    private PromotionService profileService;
+    private PromotionService promotionService;
     @Mock
     private PromotionRepo promotionRepo;
 
     @Before
     public void setUp() {
-        profileService = new PromotionService(promotionRepo);
+        promotionService = new PromotionService(promotionRepo);
     }
 
     @Test
@@ -38,11 +39,12 @@ public class PromotionServiceTest {
         Promotion promotion = new Promotion(
                 "http://image.url",
                 "123456",
+                StoreType.FOOD,
                 new Date());
 
         //when
         when(promotionRepo.save(promotion)).thenReturn(promotion);
-        Promotion newPromotion = profileService.create(promotion);
+        Promotion newPromotion = promotionService.create(promotion);
 
         //verify
         verify(promotionRepo).save(promotion);
@@ -57,18 +59,20 @@ public class PromotionServiceTest {
         Promotion promotion = new Promotion(
                 "http://image.url",
                 "123456",
+                StoreType.FOOD,
                 new Date());
         promotion.setId(profileId);
 
         Promotion promotion2 = new Promotion(
                 "http://image.url2",
                 "123456",
+                StoreType.FOOD,
                 new Date());
 
         //when
         when(promotionRepo.findById(profileId)).thenReturn(Optional.of(promotion));
         when(promotionRepo.save(promotion)).thenReturn(promotion);
-        Promotion updatedPromotion = profileService.update(profileId, promotion2);
+        Promotion updatedPromotion = promotionService.update(profileId, promotion2);
 
         //verify
         verify(promotionRepo).findById(profileId);
@@ -83,7 +87,7 @@ public class PromotionServiceTest {
         String profileId = "myID";
         //when
 
-        profileService.delete(profileId);
+        promotionService.delete(profileId);
 
         //verify
         verify(promotionRepo).deleteById(profileId);
@@ -93,13 +97,13 @@ public class PromotionServiceTest {
     public void find() {
 
         //given
-        String profileId = "myID";
-        //when
+        String promotionId = "myID";
 
-        Promotion profile = profileService.find(profileId);
+        //when
+        promotionService.find(promotionId);
 
         //verify
-        verify(promotionRepo).findById(profileId);
+        verify(promotionRepo).findById(promotionId);
     }
 
     @Test
@@ -107,12 +111,12 @@ public class PromotionServiceTest {
 
         //given
         String profileId = "myID";
+        StoreType storeType = StoreType.FOOD;
         //when
-
-        List<Promotion> profile = profileService.findAll(null);
+        promotionService.findAll(null, storeType);
 
         //verify
-        verify(promotionRepo).findByExpiryDateAfter(any(Date.class));
+        verify(promotionRepo).findByExpiryDateAfterAndShopType(any(Date.class), eq(storeType));
     }
 
     @Test
@@ -121,11 +125,12 @@ public class PromotionServiceTest {
         //given
         String profileId = "myID";
         String storeId = "storeID";
+        StoreType storeType = StoreType.FOOD;
         //when
 
-        List<Promotion> profile = profileService.findAll(storeId);
+        List<Promotion> profile = promotionService.findAll(storeId, storeType);
 
         //verify
-        verify(promotionRepo).findByShopIdAndExpiryDateAfter(eq(storeId), any(Date.class));
+        verify(promotionRepo).findByShopIdAndExpiryDateAfterAndShopType(eq(storeId), any(Date.class), eq(storeType));
     }
 }

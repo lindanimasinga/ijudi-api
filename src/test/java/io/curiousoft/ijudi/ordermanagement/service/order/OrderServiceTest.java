@@ -923,6 +923,92 @@ public class OrderServiceTest {
         verify(pushNotificationService).notifyMessengerOrderPlaced(messengerDevices, order, shop);
         verify(deviceRepo).findByUserId(shop.getOwnerId());
     }
+
+    @Test
+    public void finishOderOnline_notify_by_sms() throws Exception {
+        //given
+        List<Device> storeDevices = Collections.emptyList();
+        List<Device> messengerDevices = Collections.singletonList(new Device("token"));
+        String shopId = "shopid";
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+
+        //customer
+        UserProfile customer = new UserProfile(
+                "name",
+                UserProfile.SignUpReason.BUY,
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                ProfileRoles.CUSTOMER);
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messagerID");
+        shipping.setBuildingType(BuildingType.HOUSE);
+        order.setShippingData(shipping);
+        order.setDescription("081281445");
+        order.setCustomerId("customerId");
+        order.setOrderType(OrderType.ONLINE);
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setShopId(shopId);
+        order.setDescription("desc");
+        List<String> tags = Collections.singletonList("Pizza");
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        StoreProfile shop = new StoreProfile(
+                StoreType.FOOD,
+                "name",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                businessHours,
+                "ownerId",
+                new Bank());
+        shop.setBusinessHours(new ArrayList<>());
+        shop.setFeatured(true);
+        Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
+        shop.setFeaturedExpiry(date);
+        Stock stock1 = new Stock("bananas 1kg", 24, 12, 0, Collections.emptyList());
+        Set<Stock> stockList = new HashSet<>();
+        stockList.add(stock1);
+        shop.setStockList(stockList);
+        shop.setStoreWebsiteUrl("https://test.izinga.co.za");
+
+        //when
+        when(repo.findById(order.getId())).thenReturn(Optional.of(order));
+        when(paymentService.paymentReceived(order)).thenReturn(true);
+        when(repo.save(order)).thenReturn(order);
+        when(storeRepo.findById(shopId)).thenReturn(Optional.of(shop));
+        when(deviceRepo.findByUserId(shop.getOwnerId())).thenReturn(storeDevices);
+        when(customerRepo.findById(order.getCustomerId())).thenReturn(Optional.of(customer));
+        when(deviceRepo.findByUserId(order.getShippingData().getMessengerId())).thenReturn(messengerDevices);
+
+        Order finalOrder = sut.finishOder(order);
+
+        //verify
+        Assert.assertEquals(OrderStage.STAGE_1_WAITING_STORE_CONFIRM, finalOrder.getStage());
+        Assert.assertNotNull(finalOrder.getDescription());
+        Assert.assertFalse(finalOrder.getShopPaid());
+        Assert.assertFalse(order.getHasVat());
+        verify(repo).save(order);
+        verify(paymentService).paymentReceived(order);
+        verify(repo).findById(order.getId());
+        verify(storeRepo).findById(shopId);
+        verify(storeRepo).save(shop);
+        verify(pushNotificationService, times(0)).notifyStoreOrderPlaced(storeDevices, order);
+        verify(pushNotificationService, times(0)).notifyStoreOrderPlaced(storeDevices, order);
+        verify(smsNotifcation).notifyOrderPlaced(shop, order, customer);
+        verify(pushNotificationService).notifyMessengerOrderPlaced(messengerDevices, order, shop);
+        verify(deviceRepo).findByUserId(shop.getOwnerId());
+    }
+
     @Test
     public void finishOderInStore() throws Exception {
         //given
@@ -1179,6 +1265,7 @@ public class OrderServiceTest {
     }
     @Test
     public void finishOderNoStock() throws Exception {
+
         //given
         String shopId = "shopid";
         Order order = new Order();
@@ -1186,6 +1273,15 @@ public class OrderServiceTest {
         BasketItem item = new BasketItem("chips", 10, 1, 0);
         basket.setItems(Collections.singletonList(item));
         order.setBasket(basket);
+
+        //customer
+        UserProfile customer = new UserProfile(
+                "name",
+                UserProfile.SignUpReason.BUY,
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                ProfileRoles.CUSTOMER);
         
         
         ShippingData shipping = new ShippingData("shopAddress",
@@ -1226,6 +1322,8 @@ public class OrderServiceTest {
         when(paymentService.paymentReceived(order)).thenReturn(true);
         when(repo.save(order)).thenReturn(order);
         when(storeRepo.findById(shopId)).thenReturn(Optional.of(shop));
+        when(customerRepo.findById(order.getCustomerId())).thenReturn(Optional.of(customer));
+
         Order finalOrder = sut.finishOder(order);
         //verify
         Assert.assertEquals(OrderStage.STAGE_1_WAITING_STORE_CONFIRM, finalOrder.getStage());
@@ -1883,9 +1981,9 @@ public class OrderServiceTest {
         String shopId = "id of shop";
         //order 1
         Order order = new Order();
+        order.setId("12345");
         Basket basket = new Basket();
         order.setBasket(basket);
-        
         
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
@@ -1921,7 +2019,7 @@ public class OrderServiceTest {
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
-                "name",
+                "Tasty Shop",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -2009,10 +2107,12 @@ public class OrderServiceTest {
         Bank bank = new Bank();
         bank.setAccountId("34567890");
         initialProfile.setBank(bank);
+
         //when
         when(repo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM)).thenReturn(orders);
         when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(initialProfile));
         sut.checkUnconfirmedOrders();
+
         //verify
         verify(repo).findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         verify(repo).save(order);
@@ -2235,7 +2335,9 @@ public class OrderServiceTest {
         //when
         when(repo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM)).thenReturn(orders);
         when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(initialProfile));
+
         sut.checkUnconfirmedOrders();
+
         //verify
         verify(repo).findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Assert.assertTrue(order2.getSmsSentToShop());

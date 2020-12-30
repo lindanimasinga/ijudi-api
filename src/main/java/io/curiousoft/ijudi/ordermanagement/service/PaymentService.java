@@ -29,13 +29,15 @@ public class PaymentService {
     private final DeviceRepository deviceRepo;
     private final StoreRepository storeRepository;
     private final UserProfileRepo userProfileRepo;
+    private double izingaCommissionPerc;
 
     public PaymentService(PushNotificationService pushNotificationService,
                           List<PaymentProvider> paymentProviders, OrderRepository orderRepo,
                           DeviceRepository deviceRepo,
                           StoreRepository storeRepository,
                           UserProfileRepo userProfileRepo,
-                          @Value("${payment.process.pending.minutes}") long processPaymentIntervalMinutes) {
+                          @Value("${payment.process.pending.minutes}") long processPaymentIntervalMinutes,
+                          @Value("${service.commission.perc}") double izingaCommissionPerc) {
         this.paymentProviders = paymentProviders;
         this.orderRepo = orderRepo;
         this.processPaymentIntervalMinutes = processPaymentIntervalMinutes;
@@ -43,6 +45,7 @@ public class PaymentService {
         this.deviceRepo = deviceRepo;
         this.storeRepository = storeRepository;
         this.userProfileRepo = userProfileRepo;
+        this.izingaCommissionPerc = izingaCommissionPerc;
     }
 
     public boolean paymentReceived(Order order) throws Exception {
@@ -57,25 +60,26 @@ public class PaymentService {
     public boolean completePaymentToShop(Order order) throws Exception {
         PaymentProvider paymentProvider = paymentProviders.stream()
                 .filter(service -> order.getPaymentType() == service.getPaymentType())
-                .findFirst().orElseThrow(() -> new Exception("Your order has no ukheshe type set or the ukheshe provider for " + order.getPaymentType() + " not configured on the server"));
+                .findFirst().orElseThrow(() -> new Exception("Your order has no ukheshe type set or the payment provider not configured for " + order.getPaymentType() + " not configured on the server"));
 
-        boolean paid = paymentProvider.makePaymentToShop(order, order.getBasketAmount());
+        StoreProfile shop = storeRepository.findById(order.getShopId())
+                .orElseThrow(() -> new Exception("shop does not exist"));
+
+        double amount = shop.getIzingaTakesCommission() ? order.getBasketAmount() - (order.getBasketAmount() * izingaCommissionPerc) : order.getBasketAmount();
+        boolean paid = paymentProvider.makePaymentToShop(shop, order, amount);
         order.setShopPaid(paid);
-        String content = "Payment of R " + order.getBasketAmount() + " received";
-        PushHeading heading = new PushHeading("Payment of R " + order.getBasketAmount() + " received",
+        String content = "Payment of R " + amount + " received";
+        PushHeading heading = new PushHeading("Payment of R " + amount + " received",
                 "Order Payment Received", null);
         PushMessage message = new PushMessage(PushMessageType.PAYMENT, heading, content);
-        StoreProfile shop = storeRepository.findById(order.getShopId()).orElse(null);
-        if(shop != null) {
-            deviceRepo.findByUserId(shop.getOwnerId())
-                    .forEach(device -> {
-                        try {
-                            pushNotificationService.sendNotification(device, message);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    });
-        }
+        deviceRepo.findByUserId(shop.getOwnerId())
+                .forEach(device -> {
+                    try {
+                        pushNotificationService.sendNotification(device, message);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                });
         return paid;
     }
 
