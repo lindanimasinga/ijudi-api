@@ -119,6 +119,7 @@ public class PaymentServiceTest {
         StoreProfile shop = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortName",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -188,6 +189,7 @@ public class PaymentServiceTest {
         StoreProfile shop = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortName",
                 "address",
                 "https://image.url",
                 "081mobilenumb",

@@ -63,6 +63,6 @@ public class ZoomSmsNotificationService implements SmsNotificationService {
             customerMessage = format("Hello %s. Your order has been received. For status updates. Visit %s. From %s", userProfile.getName() , store.getOrderUrl() + order.getId(), store.getName());
         }
         sendMessage(store.getMobileNumber(), shopMessage);
-        sendMessage(store.getMobileNumber(), customerMessage);
+        sendMessage(userProfile.getMobileNumber(), customerMessage);
     }
 }

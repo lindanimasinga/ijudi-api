@@ -163,6 +163,7 @@ public class UkheshePaymentProviderTest {
         StoreProfile shop = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortName",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -229,6 +230,7 @@ public class UkheshePaymentProviderTest {
         StoreProfile shop = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortName",
                 "address",
                 "https://image.url",
                 "081mobilenumb",

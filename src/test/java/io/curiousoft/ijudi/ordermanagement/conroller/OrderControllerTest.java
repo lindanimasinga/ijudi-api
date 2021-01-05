@@ -65,6 +65,7 @@ public class OrderControllerTest {
         store = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "0812815707",

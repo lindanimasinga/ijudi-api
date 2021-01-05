@@ -59,7 +59,7 @@ public class StoreServiceTest {
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
-                "name",
+                "name", "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -95,7 +95,7 @@ public class StoreServiceTest {
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
-                "name",
+                "name", "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -124,7 +124,7 @@ public class StoreServiceTest {
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
-                "name",
+                "name", "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -151,7 +151,7 @@ public class StoreServiceTest {
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
-                "name",
+                "name", "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -181,7 +181,7 @@ public class StoreServiceTest {
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
-                "name",
+                "name", "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -200,7 +200,7 @@ public class StoreServiceTest {
 
         StoreProfile initialProfile2 = new StoreProfile(
                 StoreType.FOOD,
-                "name",
+                "name", "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -249,7 +249,7 @@ public class StoreServiceTest {
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
-                "name",
+                "name", "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -268,7 +268,7 @@ public class StoreServiceTest {
 
         StoreProfile initialProfile2 = new StoreProfile(
                 StoreType.FOOD,
-                "name",
+                "name", "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -315,7 +315,7 @@ public class StoreServiceTest {
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
-                "name",
+                "name", "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -334,7 +334,7 @@ public class StoreServiceTest {
 
         StoreProfile initialProfile2 = new StoreProfile(
                 StoreType.FOOD,
-                "name",
+                "name", "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -380,7 +380,7 @@ public class StoreServiceTest {
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
-                "name",
+                "name", "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -399,7 +399,7 @@ public class StoreServiceTest {
 
         StoreProfile initialProfile2 = new StoreProfile(
                 StoreType.FOOD,
-                "name",
+                "name", "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -435,7 +435,7 @@ public class StoreServiceTest {
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
-                "name",
+                "name", "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -476,7 +476,7 @@ public class StoreServiceTest {
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
-                "name",
+                "name", "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -511,7 +511,7 @@ public class StoreServiceTest {
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
-                "name",
+                "name", "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -552,7 +552,7 @@ public class StoreServiceTest {
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
-                "name",
+                "name", "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -594,7 +594,7 @@ public class StoreServiceTest {
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
-                "name",
+                "name", "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
