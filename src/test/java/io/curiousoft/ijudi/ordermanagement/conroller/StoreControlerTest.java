@@ -45,6 +45,7 @@ public class StoreControlerTest {
         StoreProfile store = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "myaddress",
                 "path to image",
                 "9111111707",

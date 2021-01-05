@@ -116,6 +116,7 @@ public class FirebaseNotificationServiceTest {
         StoreProfile shop = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",

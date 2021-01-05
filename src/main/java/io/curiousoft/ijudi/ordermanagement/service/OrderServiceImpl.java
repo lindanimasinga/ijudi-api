@@ -315,7 +315,7 @@ public class OrderServiceImpl implements OrderService {
         return orderRepo.findByShopIdAndStageNot(store.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
     }
 
-    @Scheduled(fixedDelay = 900000) // 15 minutes
+    @Scheduled(fixedDelay = 900000, initialDelay = 900000) // 15 minutes
     @Override
     public void cleanUnpaidOrders() {
         Date pastDate = Date.from(LocalDateTime.now()
@@ -336,7 +336,7 @@ public class OrderServiceImpl implements OrderService {
         return orderRepo.findAll();
     }
 
-    @Scheduled(fixedDelay = 600000)// 10 minutes
+    @Scheduled(fixedDelay = 600000, initialDelay = 600000)// 10 minutes
     @Override
     public void checkUnconfirmedOrders() {
         List<Order> orders = orderRepo.findByStage(STAGE_1_WAITING_STORE_CONFIRM);
@@ -358,9 +358,9 @@ public class OrderServiceImpl implements OrderService {
                     && order.getShippingData().getPickUpTime().before(checkDate);
 
             if (isLateDeliveryOrder || isLateCollectionOrder) {
-                StoreProfile store = storeRepository.findById(order.getShopId()).get();
-                LOGGER.info(format("Order %s is late, call shop at %s", order.getId(), store.getMobileNumber()));
                 try {
+                    StoreProfile store = storeRepository.findById(order.getShopId()).get();
+                    LOGGER.info(format("Order %s is late, call shop at %s", order.getId(), store.getMobileNumber()));
                     if (!order.getSmsSentToShop()) {
                         smsNotificationService.sendMessage(store.getMobileNumber(), "Hello " + store.getName() + ", Please accept the order " + order.getId() +
                                 " on iZinga app, otherwise the order will be cancelled.");

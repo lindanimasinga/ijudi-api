@@ -72,6 +72,7 @@ public class OrderServiceTest {
         StoreProfile storeProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -131,6 +132,7 @@ public class OrderServiceTest {
         StoreProfile storeProfile = new StoreProfile(
                 StoreType.CLOTHING,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -197,6 +199,7 @@ public class OrderServiceTest {
         StoreProfile storeProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -239,6 +242,7 @@ public class OrderServiceTest {
         StoreProfile storeProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -283,6 +287,7 @@ public class OrderServiceTest {
         StoreProfile storeProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -328,6 +333,7 @@ public class OrderServiceTest {
         StoreProfile storeProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -378,6 +384,7 @@ public class OrderServiceTest {
         StoreProfile storeProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -446,6 +453,7 @@ public class OrderServiceTest {
         StoreProfile storeProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -498,6 +506,7 @@ public class OrderServiceTest {
         StoreProfile storeProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -619,6 +628,7 @@ public class OrderServiceTest {
         StoreProfile storeProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -884,6 +894,7 @@ public class OrderServiceTest {
         StoreProfile shop = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -964,9 +975,10 @@ public class OrderServiceTest {
         StoreProfile shop = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
-                "081mobilenumb",
+                "081mobilenumbShop",
                 tags,
                 businessHours,
                 "ownerId",
@@ -1032,6 +1044,7 @@ public class OrderServiceTest {
         StoreProfile shop = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -1096,6 +1109,7 @@ public class OrderServiceTest {
         StoreProfile shop = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -1301,6 +1315,7 @@ public class OrderServiceTest {
         StoreProfile shop = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -1382,6 +1397,7 @@ public class OrderServiceTest {
         StoreProfile shop = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -1605,6 +1621,7 @@ public class OrderServiceTest {
         StoreProfile storeProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -1660,6 +1677,7 @@ public class OrderServiceTest {
         StoreProfile storeProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -1777,6 +1795,7 @@ public class OrderServiceTest {
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -1890,6 +1909,7 @@ public class OrderServiceTest {
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -1954,6 +1974,7 @@ public class OrderServiceTest {
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -2020,6 +2041,7 @@ public class OrderServiceTest {
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
                 "Tasty Shop",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -2093,6 +2115,7 @@ public class OrderServiceTest {
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -2173,6 +2196,7 @@ public class OrderServiceTest {
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -2246,6 +2270,7 @@ public class OrderServiceTest {
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
@@ -2321,6 +2346,7 @@ public class OrderServiceTest {
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "0812815707",
@@ -2397,6 +2423,7 @@ public class OrderServiceTest {
         StoreProfile initialProfile = new StoreProfile(
                 StoreType.FOOD,
                 "name",
+                "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",

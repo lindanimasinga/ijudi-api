@@ -16,7 +16,11 @@ public class StoreProfile extends Profile implements GeoPoint {
 
     @Indexed(unique = true)
     private String regNumber;
-    @NotBlank String ownerId;
+    @Indexed(unique = true)
+    @NotBlank(message = "profile short name not valid")q
+    private String shortName;
+    @NotBlank
+    String ownerId;
     @Valid
     private Set<Stock> stockList = new HashSet<>();
     @NotEmpty(message = "profile tags not valid")
@@ -36,6 +40,7 @@ public class StoreProfile extends Profile implements GeoPoint {
     public StoreProfile(
                         @NotNull(message = "storeType is not valid") StoreType storeType,
                         @NotBlank(message = "profile name not valid") String name,
+                        @NotBlank(message = "profile short name not valid") String shortName,
                         @NotBlank(message = "profile address not valid") String address,
                         @NotBlank(message = "profile image url not valid") String imageUrl,
                         @NotBlank(message = "profile mobile number not valid") String mobileNumber,
@@ -48,6 +53,7 @@ public class StoreProfile extends Profile implements GeoPoint {
         this.tags = tags;
         this.ownerId = ownerId;
         this.storeType = storeType;
+        this.shortName = shortName;
         setBank(bank);
     }
 
@@ -149,5 +155,13 @@ public class StoreProfile extends Profile implements GeoPoint {
 
     public void setIzingaTakesCommission(boolean izingaTakesCommission) {
         this.izingaTakesCommission = izingaTakesCommission;
+    }
+
+    public String getShortName() {
+        return shortName;
+    }
+
+    public void setShortName(String shortName) {
+        this.shortName = shortName;
     }
 }
