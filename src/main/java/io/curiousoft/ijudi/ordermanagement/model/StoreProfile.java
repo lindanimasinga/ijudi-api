@@ -17,7 +17,7 @@ public class StoreProfile extends Profile implements GeoPoint {
     @Indexed(unique = true)
     private String regNumber;
     @Indexed(unique = true)
-    @NotBlank(message = "profile short name not valid")q
+    @NotBlank(message = "profile short name not valid")
     private String shortName;
     @NotBlank
     String ownerId;
