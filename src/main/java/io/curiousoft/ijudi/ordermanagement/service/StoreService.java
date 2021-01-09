@@ -32,6 +32,10 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
     public StoreProfile create(StoreProfile profile) throws Exception {
         UserProfile user = userProfileRepo.findById(profile.getOwnerId())
                 .orElseThrow(() -> new Exception("Store owner with user id does not exist."));
+        Optional<StoreProfile> exists = profileRepo.findOneByIdOrShortName(profile.getId(), profile.getShortName());
+        if(exists.isPresent()) {
+            throw new Exception("Shop shortname or id already exists. Please try a different shortname");
+        }
         profile.setBank(user.getBank());
         StoreProfile newStore = super.create(profile);
         user.setRole(ProfileRoles.STORE_ADMIN);
@@ -127,5 +131,9 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
 
         maxLocations = maxLocations <= 0 ? 30 : maxLocations;
         return maxLocations > stores.size() ?  stores : stores.subList(0, maxLocations);
+    }
+
+    public StoreProfile findOneByIdOrShortName(String id, String shortname) throws Exception {
+        return profileRepo.findOneByIdOrShortName(id, shortname).orElseThrow(() -> new Exception("Shop Profile not found"));
     }
 }

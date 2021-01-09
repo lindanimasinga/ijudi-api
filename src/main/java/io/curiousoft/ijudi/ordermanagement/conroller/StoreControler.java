@@ -33,8 +33,8 @@ public class StoreControler {
     }
 
     @GetMapping(value = "/{id}", produces = "application/json")
-    public ResponseEntity<StoreProfile> findStore(@PathVariable String id) {
-        StoreProfile user = storeService.find(id);
+    public ResponseEntity<StoreProfile> findStore(@PathVariable String id) throws Exception {
+        StoreProfile user = storeService.findOneByIdOrShortName(id, id);
         return user != null ? ResponseEntity.ok(user) : ResponseEntity.notFound().build();
     }
 
