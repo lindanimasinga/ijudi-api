@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.*;
 
@@ -72,6 +73,7 @@ public class StoreServiceTest {
 
         //when
         when(userProfileRepo.findById(initialProfile.getOwnerId())).thenReturn(Optional.of(user));
+        when(storeRepository.findOneByIdOrShortName(initialProfile.getId(), initialProfile.getShortName())).thenReturn(Optional.empty());
         when(storeRepository.save(initialProfile)).thenReturn(initialProfile);
         StoreProfile profile = storeService.create(initialProfile);
 
@@ -86,6 +88,59 @@ public class StoreServiceTest {
         Assert.assertEquals(user.getBank().getAccountId(), profile.getBank().getAccountId());
         Assert.assertEquals(user.getBank().getPhone(), profile.getBank().getPhone());
         Assert.assertEquals(ProfileRoles.STORE_ADMIN, user.getRole());
+    }
+
+    @Test
+    public void create_invalid_shortName() throws Exception {
+
+        //given
+        UserProfile user = new UserProfile(
+                "name",
+                UserProfile.SignUpReason.BUY,
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                ProfileRoles.CUSTOMER);
+
+        Bank bank = new Bank();
+        bank.setAccountId("accountId");
+        bank.setName("ukheshe");
+        bank.setPhone("phoneNumber");
+        bank.setType("wallet");
+        user.setBank(bank);
+
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        BusinessHours hours = new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date());
+        businessHours.add(hours);
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile initialProfile = new StoreProfile(
+                StoreType.FOOD,
+                "name", "shortname",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+
+                businessHours,
+                "ownerId",
+                new Bank());
+
+
+        //when
+        when(userProfileRepo.findById(initialProfile.getOwnerId())).thenReturn(Optional.of(user));
+        when(storeRepository.findOneByIdOrShortName(initialProfile.getId(), initialProfile.getShortName())).thenReturn(Optional.of(initialProfile));
+
+        try {
+            StoreProfile profile = storeService.create(initialProfile);
+            fail();
+        }catch (Exception e) {
+            assertEquals("Shop shortname or id already exists. Please try a different shortname", e.getMessage());
+        }
+
+        //verify
+        verify(userProfileRepo).findById(initialProfile.getOwnerId());
+        verify(storeRepository).findOneByIdOrShortName(initialProfile.getId(), initialProfile.getShortName());
+        Assert.assertEquals(ProfileRoles.CUSTOMER, user.getRole());
     }
 
     @Test

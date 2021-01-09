@@ -21,6 +21,7 @@ public class Promotion {
     private String stockId;
     @NotNull(message = "promotion shop type not valid")
     private StoreType shopType;
+    @NotNull(message = "promotion expiry date not valid")
     private Date expiryDate;
 
     public Promotion(@NotBlank(message = "promotion image url not valid") String imageUrl,

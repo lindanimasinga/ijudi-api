@@ -3,8 +3,8 @@ package io.curiousoft.ijudi.ordermanagement.repo;
 import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
 import io.curiousoft.ijudi.ordermanagement.model.StoreType;
 
-import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 public interface StoreRepository extends ProfileRepo<StoreProfile> {
 
@@ -18,4 +18,6 @@ public interface StoreRepository extends ProfileRepo<StoreProfile> {
     List<StoreProfile> findByLatitudeBetweenAndLongitudeBetweenAndStoreType(double minLat, double maxLat,
                                                                             double minLong, double maxLong,
                                                                             StoreType storeType);
+
+    Optional<StoreProfile> findOneByIdOrShortName(String id, String shortname);
 }
