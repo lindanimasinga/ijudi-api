@@ -1,5 +1,11 @@
 package io.curiousoft.ijudi.ordermanagement.utils;
 
+import com.curiousoft.alarmsystem.messaging.domain.directions.GoogleDirectionsResponse;
+import com.curiousoft.alarmsystem.messaging.domain.geofencing.GoogleGeoCodeResponse;
+import com.curiousoft.alarmsystem.messaging.domain.geofencing.Location;
+import com.curiousoft.alarmsystem.messaging.firebase.GoogleServices;
+import io.curiousoft.ijudi.ordermanagement.model.Order;
+import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
 import io.curiousoft.ijudi.ordermanagement.service.zoomsms.ZoomSmsNotificationService;
 import okhttp3.Headers;
 import okhttp3.Request;
@@ -17,6 +23,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 public class IjudiUtils {
 
@@ -81,5 +88,21 @@ public class IjudiUtils {
         byte[] digest = md.digest();
         return DatatypeConverter
                 .printHexBinary(digest).toUpperCase();
+    }
+
+    public static double calculateDrivingDirectionKM(String apiKey, Order order, Optional<StoreProfile> storeOptional) throws java.io.IOException {
+        // store lat long
+        String storeLatLong = storeOptional.get().getLatitude() + "," + storeOptional.get().getLongitude();
+        GoogleServices.GoogleMaps googleMapsInstance = GoogleServices.GoogleMaps.instance;
+        //customer lat long
+        GoogleGeoCodeResponse geoCode = googleMapsInstance.geocodeAddress(apiKey, order.getShippingData().getToAddress(), 100).execute().body();
+        Location location = geoCode.getResults().get(0).getGeometry().getLocation();
+        String customerLatLong = location.getLat() + "," + location.getLng();
+        GoogleDirectionsResponse directions = googleMapsInstance.findDirections(apiKey, storeLatLong, customerLatLong).execute().body();
+        return directions.getRoutes().get(0).getLegs().get(0).getDistance().getValue() / 1000; // kilometers
+    }
+
+    public static double calculateDeliveryFee(double standardFee, double standardDistance, double ratePerKM, double distance) {
+        return distance > standardDistance? standardFee + (ratePerKM * (distance - standardDistance)) : standardFee;
     }
 }

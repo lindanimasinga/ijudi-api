@@ -13,7 +13,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import javax.validation.*;
+import javax.validation.ConstraintViolation;
+import javax.validation.Validation;
+import javax.validation.Validator;
+import javax.validation.ValidatorFactory;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
@@ -21,6 +24,8 @@ import java.util.stream.Collectors;
 
 import static io.curiousoft.ijudi.ordermanagement.model.OrderStage.*;
 import static io.curiousoft.ijudi.ordermanagement.model.OrderType.INSTORE;
+import static io.curiousoft.ijudi.ordermanagement.utils.IjudiUtils.calculateDeliveryFee;
+import static io.curiousoft.ijudi.ordermanagement.utils.IjudiUtils.calculateDrivingDirectionKM;
 import static java.lang.String.format;
 
 @Service
@@ -38,23 +43,31 @@ public class OrderServiceImpl implements OrderService {
     private final DeviceRepository deviceRepo;
     private final PushNotificationService pushNotificationService;
     private final SmsNotificationService smsNotificationService;
-    private final double deliveryFee;
+    private final double starndardDeliveryFee;
     private final double serviceFeePerc;
     private final long cleanUpMinutes;
     private final List<String> adminCellNumbers;
+    private final String googleMapsApiKey;
+    private final double starndardDeliveryKm;
+    private final double ratePerKm;
 
     @Autowired
-    public OrderServiceImpl(@Value("${service.delivery.fee}") double deliveryFee,
+    public OrderServiceImpl(@Value("${service.delivery.standardFee}") double starndardDeliveryFee,
+                            @Value("${service.delivery.standardKm}") double starndardDeliveryKm,
+                            @Value("${service.delivery.ratePerKm}") double ratePerKm,
                             @Value("${service.fee.perc}") double serviceFeePerc,
                             @Value("${order.cleanup.unpaid.minutes}") long cleanUpMinutes,
                             @Value("${admin.cellNumber}") List<String> adminCellNumbers,
+                            @Value("${google.maps.api.key}") String googleMapsApiKey,
                             OrderRepository orderRepository,
                             StoreRepository storeRepository,
                             UserProfileRepo userProfileRepo, PaymentService paymentService,
                             DeviceRepository deviceRepo,
                             PushNotificationService pushNotificationService,
                             SmsNotificationService smsNotifcationService) {
-        this.deliveryFee = deliveryFee;
+        this.starndardDeliveryFee = starndardDeliveryFee;
+        this.starndardDeliveryKm = starndardDeliveryKm;
+        this.ratePerKm = ratePerKm;
         this.serviceFeePerc = serviceFeePerc;
         this.cleanUpMinutes = cleanUpMinutes;
         this.adminCellNumbers = adminCellNumbers;
@@ -65,6 +78,7 @@ public class OrderServiceImpl implements OrderService {
         this.pushNotificationService = pushNotificationService;
         this.smsNotificationService = smsNotifcationService;
         this.deviceRepo = deviceRepo;
+        this.googleMapsApiKey = googleMapsApiKey;
         ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
         validator = factory.getValidator();
 
@@ -100,6 +114,10 @@ public class OrderServiceImpl implements OrderService {
             throw new Exception("shop with id " + order.getShopId() + " does not exist");
         }
 
+        if(!storeOptional.get().getCollectAllowed()) {
+            throw new Exception("Collection not allowed for shop " + storeOptional.get().getName());
+        }
+
         List<String> stockItemNames = storeOptional.get()
                 .getStockList().stream().map(Stock::getName)
                 .collect(Collectors.toList());
@@ -117,15 +135,20 @@ public class OrderServiceImpl implements OrderService {
         order.setId(orderId);
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
 
-        if (canChargeServiceFees(storeOptional.get())) {
-            order.setServiceFee(serviceFeePerc * order.getBasketAmount());
-        }
-
+        double deliveryFee = 0;
         if (order.getOrderType() == OrderType.ONLINE && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
-            double deliveryFee = storeOptional.get().getStoreMessenger() != null ?
-                    storeOptional.get().getStoreMessenger().getStandardDeliveryPrice() : this.deliveryFee;
+            double distance = calculateDrivingDirectionKM(googleMapsApiKey, order, storeOptional);
+            double standardFee = storeOptional.get().getStoreMessenger() != null ? storeOptional.get().getStoreMessenger().getStandardDeliveryPrice() : this.starndardDeliveryFee;
+            double standardDistance = storeOptional.get().getStoreMessenger() != null ? storeOptional.get().getStoreMessenger().getStandardDeliveryKm() : this.starndardDeliveryKm;
+            double ratePerKM = storeOptional.get().getStoreMessenger() != null ? storeOptional.get().getStoreMessenger().getRatePerKm() : this.ratePerKm;
+            deliveryFee =  calculateDeliveryFee(standardFee, standardDistance, ratePerKM, distance);
             order.getShippingData().setFee(deliveryFee);
         }
+
+        if (canChargeServiceFees(storeOptional.get())) {
+            order.setServiceFee(serviceFeePerc * (order.getBasketAmount() + deliveryFee));
+        }
+
         return orderRepo.save(order);
     }
 

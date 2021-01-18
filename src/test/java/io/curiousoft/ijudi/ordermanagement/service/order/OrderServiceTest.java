@@ -49,15 +49,20 @@ public class OrderServiceTest {
 
 
     @Before
-    public void setUp() throws Exception {
-        double deliveryFee = 10;
+    public void setUp() {
+        double standardDeliveryFee = 10;
+        double standardDeliveryKm = 10;
+        double ratePerKm = 1;
         double serviceFee = 0.025;
         long cleanInMinutes = 5;
         sut = new OrderServiceImpl(
-                deliveryFee,
+                standardDeliveryFee,
+                standardDeliveryKm,
+                ratePerKm,
                 serviceFee,
                 cleanInMinutes,
                 phoneNumbers,
+                "AIzaSyAZbvE4NBcJIplfzmy8cSEdSpbocBggylc",
                 repo,
                 storeRepo,
                 customerRepo,
@@ -67,31 +72,40 @@ public class OrderServiceTest {
                 smsNotifcation);
     }
 
-    @Test
-    public void startOrderOnlineDelivery() throws Exception {
-        //given
+    private StoreProfile createStoreProfile(StoreType food) {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile storeProfile = new StoreProfile(
-                StoreType.FOOD,
+                food,
                 "name",
                 "shortname",
                 "address",
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-                
+
                 businessHours,
                 "ownerId",
                 new Bank());
         storeProfile.setBusinessHours(new ArrayList<>());
         storeProfile.setFeatured(true);
         storeProfile.setHasVat(false);
+        storeProfile.setLatitude(-29.7287185);
+        storeProfile.setLongitude(30.9344252);
+        storeProfile.setId("shopid");
+        return storeProfile;
+    }
+
+    @Test
+    public void startOrderOnlineDelivery() throws Exception {
+        //given
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+
         Set<Stock> stockItems = new HashSet<>();
         stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
         stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
         storeProfile.setStockList(stockItems);
-
         Order order = new Order();
         Basket basket = new Basket();
         List<BasketItem> items = new ArrayList<>();
@@ -100,7 +114,7 @@ public class OrderServiceTest {
         basket.setItems(items);
         order.setBasket(basket);
         ShippingData shipping = new ShippingData("shopAddress",
-                "to address",
+                "46 Ududu Rd, Emlandweni, KwaMashu, 4051",
                 ShippingData.ShippingType.DELIVERY);
         shipping.setMessengerId("messagerID");
         shipping.setBuildingType(BuildingType.HOUSE);
@@ -119,7 +133,7 @@ public class OrderServiceTest {
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
         Assert.assertEquals(10, order.getShippingData().getFee(), 0);
-        Assert.assertEquals(1.00, order.getServiceFee(), 0);
+        Assert.assertEquals(1.25, order.getServiceFee(), 0);
         Assert.assertEquals(40.00, order.getBasketAmount(), 0);
         Assert.assertEquals(false, order.getHasVat());
         verify(repo).save(order);
@@ -127,28 +141,14 @@ public class OrderServiceTest {
         verify(storeRepo).findById(order.getShopId());
     }
 
+
+
     @Test
     public void startOrder_store_own_delivery() throws Exception {
         //given
-        ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile storeProfile = new StoreProfile(
-                StoreType.CLOTHING,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
+        StoreProfile storeProfile = createStoreProfile(StoreType.CLOTHING);
 
-                businessHours,
-                "ownerId",
-                new Bank());
-        storeProfile.setBusinessHours(new ArrayList<>());
-        storeProfile.setFeatured(true);
-        storeProfile.setHasVat(false);
-
-        Messager messager = new Messager("Postnet", 15.50);
+        Messager messager = new Messager("Postnet", 20.00, 3, 5);
         storeProfile.setStoreMessenger(messager);
 
         Set<Stock> stockItems = new HashSet<>();
@@ -164,7 +164,7 @@ public class OrderServiceTest {
         basket.setItems(items);
         order.setBasket(basket);
         ShippingData shipping = new ShippingData("shopAddress",
-                "to address",
+                "50 Ududu Rd, Emlandweni, KwaMashu, 4051",
                 ShippingData.ShippingType.DELIVERY);
         shipping.setMessengerId("messagerID");
         shipping.setBuildingType(BuildingType.HOUSE);
@@ -185,7 +185,7 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
-        Assert.assertEquals(15.5, order.getShippingData().getFee(), 0);
+        Assert.assertEquals(45.00, order.getShippingData().getFee(), 0);
         Assert.assertEquals(0, order.getServiceFee(), 0);
         Assert.assertEquals(40.00, order.getBasketAmount(), 0);
         Assert.assertEquals(false, order.getHasVat());
@@ -197,22 +197,8 @@ public class OrderServiceTest {
     @Test
     public void startOrderOnlineDeliveryNoBuildingType() throws Exception {
         //given
-        ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile storeProfile = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                businessHours,
-                "ownerId",
-                new Bank());
-        storeProfile.setBusinessHours(new ArrayList<>());
-        storeProfile.setFeatured(true);
-        storeProfile.setHasVat(false);
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+
         Order order = new Order();
         Basket basket = new Basket();
         List<BasketItem> items = new ArrayList<>();
@@ -242,20 +228,8 @@ public class OrderServiceTest {
         //given
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile storeProfile = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                businessHours,
-                "ownerId",
-                new Bank());
-        storeProfile.setBusinessHours(new ArrayList<>());
-        storeProfile.setFeatured(true);
-        storeProfile.setHasVat(false);
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+
         Order order = new Order();
         Basket basket = new Basket();
         List<BasketItem> items = new ArrayList<>();
@@ -285,22 +259,8 @@ public class OrderServiceTest {
     @Test
     public void startOrderOnlineDeliveryNoBuildingName() throws Exception {
         //given
-        ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile storeProfile = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                businessHours,
-                "ownerId",
-                new Bank());
-        storeProfile.setBusinessHours(new ArrayList<>());
-        storeProfile.setFeatured(true);
-        storeProfile.setHasVat(false);
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+
         Order order = new Order();
         Basket basket = new Basket();
         List<BasketItem> items = new ArrayList<>();
@@ -333,20 +293,8 @@ public class OrderServiceTest {
         //given
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile storeProfile = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                businessHours,
-                "ownerId",
-                new Bank());
-        storeProfile.setBusinessHours(new ArrayList<>());
-        storeProfile.setFeatured(true);
-        storeProfile.setHasVat(false);
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+
         Order order = new Order();
         Basket basket = new Basket();
         List<BasketItem> items = new ArrayList<>();
@@ -382,20 +330,7 @@ public class OrderServiceTest {
     @Test
     public void startOrderOnlineCollection() throws Exception {
         //given
-        ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile storeProfile = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                
-                businessHours,
-                "ownerId",
-                new Bank());
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
 
         Set<Stock> stockItems = new HashSet<>();
         stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
@@ -449,22 +384,58 @@ public class OrderServiceTest {
     }
 
     @Test
-    public void startOrderOnlineCollectionDateInThePast() throws Exception {
+    public void startOrderCollectionAllowed() throws Exception {
         //given
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile storeProfile = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+        storeProfile.setCollectAllowed(false);
 
-                businessHours,
-                "ownerId",
-                new Bank());
+        Set<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
+        stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+
+        storeProfile.setBusinessHours(new ArrayList<>());
+        storeProfile.setFeatured(true);
+        storeProfile.setHasVat(false);
+        //create an order
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.COLLECTION);
+        Date date = Date.from(LocalDateTime.now().plusMinutes(15).atZone(ZoneId.systemDefault()).toInstant());
+        shipping.setPickUpTime(date);
+        order.setShippingData(shipping);
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+        //when
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+
+        try {
+            Order newOrder = sut.startOrder(order);
+            fail();
+        }catch (Exception e) {
+            Assert.assertEquals("Collection not allowed for shop name", e.getMessage());
+        }
+        verify(storeRepo).findById(order.getShopId());
+        verify(customerRepo).existsById(order.getCustomerId());
+    }
+
+    @Test
+    public void startOrderOnlineCollectionDateInThePast() throws Exception {
+        //given
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
 
         Set<Stock> stockItems = new HashSet<>();
         stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
@@ -504,20 +475,7 @@ public class OrderServiceTest {
     @Test
     public void startOrderStoreWithVAT() throws Exception {
         //given
-        ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile storeProfile = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                
-                businessHours,
-                "ownerId",
-                new Bank());
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
 
         Set<Stock> stockItems = new HashSet<>();
         stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
@@ -537,7 +495,7 @@ public class OrderServiceTest {
         basket.setItems(items);
         order.setBasket(basket);
         ShippingData shipping = new ShippingData("shopAddress",
-                "to address",
+                "46 Ududu Rd, Emlandweni, KwaMashu, 4051",
                 ShippingData.ShippingType.DELIVERY);
         shipping.setMessengerId("messagerID");
         shipping.setBuildingType(BuildingType.HOUSE);
@@ -556,7 +514,7 @@ public class OrderServiceTest {
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
         Assert.assertTrue(order.getHasVat());
-        Assert.assertEquals(1.00, order.getServiceFee(), 0);
+        Assert.assertEquals(1.25, order.getServiceFee(), 0);
         Assert.assertEquals(10.00, order.getShippingData().getFee(), 0);
         Assert.assertEquals(40, order.getBasketAmount(), 0);
         verify(repo).save(order);
@@ -626,23 +584,8 @@ public class OrderServiceTest {
     @Test
     public void startOrderShopNotExist() throws Exception {
         //given
-        ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile storeProfile = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                
-                businessHours,
-                "ownerId",
-                new Bank());
-        storeProfile.setBusinessHours(new ArrayList<>());
-        storeProfile.setFeatured(true);
-        storeProfile.setHasVat(false);
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+
         Order order = new Order();
         Basket basket = new Basket();
         order.setBasket(basket);
@@ -652,7 +595,7 @@ public class OrderServiceTest {
         shipping.setMessengerId("messagerID");
         order.setShippingData(shipping);
         order.setCustomerId("customerId");
-        order.setShopId("shopid");
+        order.setShopId(storeProfile.getId());
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setOrderType(OrderType.ONLINE);
         order.setDescription("description");
@@ -890,24 +833,11 @@ public class OrderServiceTest {
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.ONLINE);
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
-        order.setShopId(shopId);
+        order.setShopId("shopid");
         order.setDescription("desc");
-        List<String> tags = Collections.singletonList("Pizza");
-        ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        StoreProfile shop = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                
-                businessHours,
-                "ownerId",
-                new Bank());
-        shop.setBusinessHours(new ArrayList<>());
-        shop.setFeatured(true);
+
+        StoreProfile shop = createStoreProfile(StoreType.FOOD);
+
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
         shop.setFeaturedExpiry(date);
         Stock stock1 = new Stock("bananas 1kg", 24, 12, 0, Collections.emptyList());
@@ -971,23 +901,12 @@ public class OrderServiceTest {
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.ONLINE);
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
-        order.setShopId(shopId);
+        order.setShopId("shopid");
         order.setDescription("desc");
         List<String> tags = Collections.singletonList("Pizza");
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        StoreProfile shop = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumbShop",
-                tags,
-                businessHours,
-                "ownerId",
-                new Bank());
-        shop.setBusinessHours(new ArrayList<>());
-        shop.setFeatured(true);
+        StoreProfile shop = createStoreProfile(StoreType.FOOD);
+
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
         shop.setFeaturedExpiry(date);
         Stock stock1 = new Stock("bananas 1kg", 24, 12, 0, Collections.emptyList());
@@ -1044,20 +963,8 @@ public class OrderServiceTest {
         order.setDescription("desc");
         List<String> tags = Collections.singletonList("Pizza");
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        StoreProfile shop = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                
-                businessHours,
-                "ownerId",
-                new Bank());
-        shop.setBusinessHours(new ArrayList<>());
-        shop.setFeatured(true);
+        StoreProfile shop = createStoreProfile(StoreType.FOOD);
+
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
         shop.setFeaturedExpiry(date);
         Stock stock1 = new Stock("bananas 1kg", 24, 12, 0, Collections.emptyList());
@@ -1109,20 +1016,8 @@ public class OrderServiceTest {
         order.setDescription("desc");
         List<String> tags = Collections.singletonList("Pizza");
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        StoreProfile shop = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                
-                businessHours,
-                "ownerId",
-                new Bank());
-        shop.setBusinessHours(new ArrayList<>());
-        shop.setFeatured(true);
+        StoreProfile shop = createStoreProfile(StoreType.FOOD);
+
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
         shop.setFeaturedExpiry(date);
         Stock stock1 = new Stock("bananas 1kg", 24, 12, 0, Collections.emptyList());
@@ -1315,20 +1210,8 @@ public class OrderServiceTest {
         order.setDescription("desc");
         List<String> tags = Collections.singletonList("Pizza");
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        StoreProfile shop = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                
-                businessHours,
-                "ownerId",
-                new Bank());
-        shop.setBusinessHours(new ArrayList<>());
-        shop.setFeatured(true);
+        StoreProfile shop = createStoreProfile(StoreType.FOOD);
+
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
         shop.setFeaturedExpiry(date);
         Stock stock1 = new Stock("bananas 1kg", 24, 12, 0, Collections.emptyList());
@@ -1393,21 +1276,8 @@ public class OrderServiceTest {
     public void progressNextStageOnlineDeliveryReadyForCollection() throws Exception {
         //given
         String shopId = "shopid";
-        ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        BusinessHours hours = new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date());
-        businessHours.add(hours);
-        List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile shop = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                businessHours,
-                "ownerId",
-                new Bank());
+        StoreProfile shop = createStoreProfile(StoreType.FOOD);
+
         Order order = new Order();
         Basket basket = new Basket();
         order.setBasket(basket);
@@ -1618,23 +1488,8 @@ public class OrderServiceTest {
     @Test
     public void progressNextStageOnlineCollectionReady() throws Exception {
         //given
-        String shopId = "shopid";
-        ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile storeProfile = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                businessHours,
-                "ownerId",
-                new Bank());
-        storeProfile.setBusinessHours(new ArrayList<>());
-        storeProfile.setFeatured(true);
-        storeProfile.setHasVat(false);
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+
         Order order = new Order();
         Basket basket = new Basket();
         order.setBasket(basket);
@@ -1650,7 +1505,7 @@ public class OrderServiceTest {
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.ONLINE);
         order.setStage(OrderStage.STAGE_2_STORE_PROCESSING);
-        order.setShopId(shopId);
+        order.setShopId(storeProfile.getId());
         order.setDescription("desc");
         Device device = new Device("token");
         PushHeading title = new PushHeading("Food is ready for Collection at " + storeProfile.getName(),
@@ -1677,20 +1532,8 @@ public class OrderServiceTest {
         String shopId = "shopid";
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile storeProfile = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                businessHours,
-                "ownerId",
-                new Bank());
-        storeProfile.setBusinessHours(new ArrayList<>());
-        storeProfile.setFeatured(true);
-        storeProfile.setHasVat(false);
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+
         Order order = new Order();
         Basket basket = new Basket();
         order.setBasket(basket);
@@ -1795,20 +1638,8 @@ public class OrderServiceTest {
         orders.add(order2);
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile initialProfile = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                
-                businessHours,
-                "ownerId",
-                new Bank());
-        initialProfile.setBusinessHours(new ArrayList<>());
-        initialProfile.setFeatured(true);
+        StoreProfile initialProfile = createStoreProfile(StoreType.FOOD);
+
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
         initialProfile.setFeaturedExpiry(date);
         Bank bank = new Bank();
@@ -1828,7 +1659,6 @@ public class OrderServiceTest {
     @Test
     public void findOrderByMessengerId() throws Exception {
         //given
-        String shopId = "id of shop";
         UserProfile patchProfileRequest = new UserProfile(
                 "secondName",
                 UserProfile.SignUpReason.BUY,
@@ -1849,7 +1679,7 @@ public class OrderServiceTest {
         order.setShippingData(shipping);
         order.setCustomerId("customer");
         order.setStage(OrderStage.STAGE_2_STORE_PROCESSING);
-        order.setShopId(shopId);
+        order.setShopId("shopid");
         //order 2
         Order order2 = new Order();
         order.setBasket(basket);
@@ -1861,7 +1691,7 @@ public class OrderServiceTest {
         order2.setShippingData(shipping2);
         order2.setCustomerId("customer id");
         order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
-        order2.setShopId(shopId);
+        order2.setShopId("shopid");
         ArrayList<Order> orders = new ArrayList<>();
         orders.add(order);
         orders.add(order2);
@@ -1876,8 +1706,6 @@ public class OrderServiceTest {
     }
     @Test
     public void findOrderByStoreIdNoUpdaidOrdersRetuned() throws Exception {
-        //given
-        String shopId = "id of shop";
         //order 1
         Order order = new Order();
         Basket basket = new Basket();
@@ -1891,7 +1719,7 @@ public class OrderServiceTest {
         order.setShippingData(shipping);
         order.setCustomerId("customer");
         order.setStage(OrderStage.STAGE_2_STORE_PROCESSING);
-        order.setShopId(shopId);
+        order.setShopId("shopid");
         //order 2
         Order order2 = new Order();
         order.setBasket(basket);
@@ -1904,45 +1732,34 @@ public class OrderServiceTest {
         order2.setShippingData(shipping2);
         order2.setCustomerId("customer id");
         order2.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
-        order2.setShopId(shopId);
+        order2.setShopId("shopid");
         ArrayList<Order> orders = new ArrayList<>();
         orders.add(order);
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile initialProfile = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                businessHours,
-                "ownerId",
-                new Bank());
-        initialProfile.setBusinessHours(new ArrayList<>());
-        initialProfile.setFeatured(true);
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+
+        storeProfile.setBusinessHours(new ArrayList<>());
+        storeProfile.setFeatured(true);
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
-        initialProfile.setFeaturedExpiry(date);
+        storeProfile.setFeaturedExpiry(date);
         Bank bank = new Bank();
         bank.setAccountId("34567890");
-        initialProfile.setBank(bank);
+        storeProfile.setBank(bank);
         //when
-        when(storeRepo.findById(shopId)).thenReturn(Optional.of(initialProfile));
-        when(repo.findByShopIdAndStageNot(initialProfile.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID)).thenReturn(orders);
-        List<Order> finalOrder = sut.findOrderByStoreId(shopId);
+        when(storeRepo.findById("shopid")).thenReturn(Optional.of(storeProfile));
+        when(repo.findByShopIdAndStageNot(storeProfile.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID)).thenReturn(orders);
+        List<Order> finalOrder = sut.findOrderByStoreId("shopid");
         //verify
         Assert.assertNotNull(finalOrder);
         Assert.assertEquals(1, finalOrder.size());
         finalOrder.forEach(data -> Assert.assertNotSame(data.getStage(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID));
-        Assert.assertEquals(shopId, finalOrder.get(0).getShopId());
-        verify(repo).findByShopIdAndStageNot(initialProfile.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
-        verify(storeRepo).findById(shopId);
+        Assert.assertEquals("shopid", finalOrder.get(0).getShopId());
+        verify(repo).findByShopIdAndStageNot(storeProfile.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        verify(storeRepo).findById("shopid");
     }
     @Test
     public void cleanUnPaidOrders() {
-        //given
-        String shopId = "id of shop";
         //order 1
         Order order = new Order();
         Basket basket = new Basket();
@@ -1956,7 +1773,7 @@ public class OrderServiceTest {
         order.setShippingData(shipping);
         order.setCustomerId("customer");
         order.setStage(OrderStage.STAGE_2_STORE_PROCESSING);
-        order.setShopId(shopId);
+        order.setShopId("shopid");
         //order 2
         Order order2 = new Order();
         order.setBasket(basket);
@@ -1969,29 +1786,18 @@ public class OrderServiceTest {
         order2.setShippingData(shipping2);
         order2.setCustomerId("customer id");
         order2.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
-        order2.setShopId(shopId);
+        order2.setShopId("shopid");
         ArrayList<Order> orders = new ArrayList<>();
         orders.add(order);
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile initialProfile = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                businessHours,
-                "ownerId",
-                new Bank());
-        initialProfile.setBusinessHours(new ArrayList<>());
-        initialProfile.setFeatured(true);
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
-        initialProfile.setFeaturedExpiry(date);
+        storeProfile.setFeaturedExpiry(date);
         Bank bank = new Bank();
         bank.setAccountId("34567890");
-        initialProfile.setBank(bank);
+        storeProfile.setBank(bank);
         //when
         sut.cleanUnpaidOrders();
         //verify
@@ -2001,8 +1807,6 @@ public class OrderServiceTest {
 
     @Test
     public void checkNotAcceptedOrdersAndSMS_Sent_To_Shop() throws Exception {
-        //given
-        String shopId = "id of shop";
         //order 1
         Order order = new Order();
         order.setId("12345");
@@ -2019,7 +1823,7 @@ public class OrderServiceTest {
         order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate = Date.from(LocalDateTime.now().minusMinutes(10).atZone(ZoneId.systemDefault()).toInstant());
         order.setModifiedDate(orderDate);
-        order.setShopId(shopId);
+        order.setShopId("shopid");
         //order 2
         Order order2 = new Order();
         order.setBasket(basket);
@@ -2036,45 +1840,32 @@ public class OrderServiceTest {
         order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(5).atZone(ZoneId.systemDefault()).toInstant());
         order2.setModifiedDate(orderDate2);
-        order2.setShopId(shopId);
+        order2.setShopId("shopid");
         ArrayList<Order> orders = new ArrayList<>();
         orders.add(order);
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile initialProfile = new StoreProfile(
-                StoreType.FOOD,
-                "Tasty Shop",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                businessHours,
-                "ownerId",
-                new Bank());
-        initialProfile.setBusinessHours(new ArrayList<>());
-        initialProfile.setFeatured(true);
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
-        initialProfile.setFeaturedExpiry(date);
+        storeProfile.setFeaturedExpiry(date);
         Bank bank = new Bank();
         bank.setAccountId("34567890");
-        initialProfile.setBank(bank);
+        storeProfile.setBank(bank);
         //when
         when(repo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM)).thenReturn(orders);
-        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(initialProfile));
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
         sut.checkUnconfirmedOrders();
         //verify
         verify(repo).findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         verify(smsNotifcation, times(1))
-                .sendMessage(initialProfile.getMobileNumber(),
-                        "Hello " + initialProfile.getName() + ", Please accept the order " + order.getId() +
+                .sendMessage(storeProfile.getMobileNumber(),
+                        "Hello " + storeProfile.getName() + ", Please accept the order " + order.getId() +
                                 " on iZinga app, otherwise the order will be cancelled.");
     }
 
     @Test
     public void checkNotAcceptedOrdersAndSendToAdmin() throws Exception {
-        //given
-        String shopId = "id of shop";
         //order 1
         Order order = new Order();
         Basket basket = new Basket();
@@ -2092,7 +1883,7 @@ public class OrderServiceTest {
         order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate = Date.from(LocalDateTime.now().minusMinutes(10).atZone(ZoneId.systemDefault()).toInstant());
         order.setModifiedDate(orderDate);
-        order.setShopId(shopId);
+        order.setShopId("shopid");
         //order 2
         Order order2 = new Order();
         order.setBasket(basket);
@@ -2110,51 +1901,37 @@ public class OrderServiceTest {
         order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(5).atZone(ZoneId.systemDefault()).toInstant());
         order2.setModifiedDate(orderDate2);
-        order2.setShopId(shopId);
+        order2.setShopId("shopid");
         ArrayList<Order> orders = new ArrayList<>();
         orders.add(order);
-        ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile initialProfile = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                businessHours,
-                "ownerId",
-                new Bank());
-        initialProfile.setBusinessHours(new ArrayList<>());
-        initialProfile.setFeatured(true);
+
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
-        initialProfile.setFeaturedExpiry(date);
+        storeProfile.setFeaturedExpiry(date);
         Bank bank = new Bank();
         bank.setAccountId("34567890");
-        initialProfile.setBank(bank);
+        storeProfile.setBank(bank);
 
         //when
         when(repo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM)).thenReturn(orders);
-        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(initialProfile));
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
         sut.checkUnconfirmedOrders();
 
         //verify
         verify(repo).findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         verify(repo).save(order);
         verify(smsNotifcation, times(0))
-                .sendMessage(initialProfile.getMobileNumber(),
-                        "Hello " + initialProfile.getName() + ", Please accept the order " + order.getId() +
+                .sendMessage(storeProfile.getMobileNumber(),
+                        "Hello " + storeProfile.getName() + ", Please accept the order " + order.getId() +
                                 " on iZinga app, otherwise the order will be cancelled.");
         verify(smsNotifcation, times(1))
-                .sendMessage(phoneNumbers.get(0), "Hi, iZinga Admin. " + initialProfile.getName() + ", has not accepted order " + order.getId() +
+                .sendMessage(phoneNumbers.get(0), "Hi, iZinga Admin. " + storeProfile.getName() + ", has not accepted order " + order.getId() +
                         " on iZinga app, otherwise the order will be cancelled.");
     }
 
     @Test
     public void checkNotAcceptedOrdersAndAdmin_Already_Notified() throws Exception {
-        //given
-        String shopId = "id of shop";
         //order 1
         Order order = new Order();
         Basket basket = new Basket();
@@ -2173,7 +1950,7 @@ public class OrderServiceTest {
         order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate = Date.from(LocalDateTime.now().minusMinutes(10).atZone(ZoneId.systemDefault()).toInstant());
         order.setModifiedDate(orderDate);
-        order.setShopId(shopId);
+        order.setShopId("shopid");
         //order 2
         Order order2 = new Order();
         order.setBasket(basket);
@@ -2191,48 +1968,35 @@ public class OrderServiceTest {
         order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(5).atZone(ZoneId.systemDefault()).toInstant());
         order2.setModifiedDate(orderDate2);
-        order2.setShopId(shopId);
+        order2.setShopId("shopid");
         ArrayList<Order> orders = new ArrayList<>();
         orders.add(order);
-        ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile initialProfile = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                businessHours,
-                "ownerId",
-                new Bank());
-        initialProfile.setBusinessHours(new ArrayList<>());
-        initialProfile.setFeatured(true);
+
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
-        initialProfile.setFeaturedExpiry(date);
+        storeProfile.setFeaturedExpiry(date);
         Bank bank = new Bank();
         bank.setAccountId("34567890");
-        initialProfile.setBank(bank);
+        storeProfile.setBank(bank);
         //when
         when(repo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM)).thenReturn(orders);
-        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(initialProfile));
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
         sut.checkUnconfirmedOrders();
         //verify
         verify(repo).findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         verify(smsNotifcation, times(0))
-                .sendMessage(initialProfile.getMobileNumber(),
-                        "Hello " + initialProfile.getName() + ", Please accept the order " + order.getId() +
+                .sendMessage(storeProfile.getMobileNumber(),
+                        "Hello " + storeProfile.getName() + ", Please accept the order " + order.getId() +
                                 " on iZinga app, otherwise the order will be cancelled.");
         verify(smsNotifcation, times(0))
-                .sendMessage(phoneNumbers.get(0), "Hi, iZinga Admin. " + initialProfile.getName() + ", has not accepted order " + order.getId() +
+                .sendMessage(phoneNumbers.get(0), "Hi, iZinga Admin. " + storeProfile.getName() + ", has not accepted order " + order.getId() +
                         " on iZinga app, otherwise the order will be cancelled.");
     }
 
     @Test
     public void checkNotAcceptedOrdersAndNotNotify() throws Exception {
         //given
-        String shopId = "id of shop";
         //order 1
         Order order = new Order();
         Basket basket = new Basket();
@@ -2248,7 +2012,7 @@ public class OrderServiceTest {
         order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate = Date.from(LocalDateTime.now().minusMinutes(9).atZone(ZoneId.systemDefault()).toInstant());
         order.setModifiedDate(orderDate);
-        order.setShopId(shopId);
+        order.setShopId("shopid");
         //order 2
         Order order2 = new Order();
         order.setBasket(basket);
@@ -2265,24 +2029,11 @@ public class OrderServiceTest {
         order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(5).atZone(ZoneId.systemDefault()).toInstant());
         order2.setModifiedDate(orderDate2);
-        order2.setShopId(shopId);
+        order2.setShopId("shopid");
         ArrayList<Order> orders = new ArrayList<>();
         orders.add(order);
-        ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile initialProfile = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                businessHours,
-                "ownerId",
-                new Bank());
-        initialProfile.setBusinessHours(new ArrayList<>());
-        initialProfile.setFeatured(true);
+
+        StoreProfile initialProfile = createStoreProfile(StoreType.FOOD);
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
         initialProfile.setFeaturedExpiry(date);
         Bank bank = new Bank();
@@ -2301,7 +2052,6 @@ public class OrderServiceTest {
     @Test
     public void checkNotAcceptedCollectionOrdersAndNotify() throws Exception {
         //given
-        String shopId = "id of shop";
         //order 1
         Order order = new Order();
         Basket basket = new Basket();
@@ -2320,7 +2070,7 @@ public class OrderServiceTest {
         order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate = Date.from(LocalDateTime.now().minusMinutes(66).atZone(ZoneId.systemDefault()).toInstant());
         order.setModifiedDate(orderDate);
-        order.setShopId(shopId);
+        order.setShopId("shopid");
         //order 2
         Order order2 = new Order();
         order.setBasket(basket);
@@ -2340,24 +2090,12 @@ public class OrderServiceTest {
         order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(60).atZone(ZoneId.systemDefault()).toInstant());
         order2.setModifiedDate(orderDate2);
-        order2.setShopId(shopId);
+        order2.setShopId("shopid");
         ArrayList<Order> orders = new ArrayList<>();
         orders.add(order);
         orders.add(order2);
-        ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile initialProfile = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "0812815707",
-                tags,
-                businessHours,
-                "ownerId",
-                new Bank());
-        initialProfile.setBusinessHours(new ArrayList<>());
+
+        StoreProfile initialProfile = createStoreProfile(StoreType.FOOD);
         Bank bank = new Bank();
         bank.setAccountId("34567890");
         initialProfile.setBank(bank);
@@ -2376,10 +2114,10 @@ public class OrderServiceTest {
                         "Hello " + initialProfile.getName() + ", Please accept the order " + order2.getId() +
                                 " on iZinga app, otherwise the order will be cancelled.");
     }
+
     @Test
     public void checkNotAcceptedCollectionOrdersAnd_NotNotify() throws Exception {
         //given
-        String shopId = "id of shop";
         //order 1
         Order order = new Order();
         Basket basket = new Basket();
@@ -2397,7 +2135,7 @@ public class OrderServiceTest {
         order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate = Date.from(LocalDateTime.now().minusMinutes(66).atZone(ZoneId.systemDefault()).toInstant());
         order.setModifiedDate(orderDate);
-        order.setShopId(shopId);
+        order.setShopId("shopid");
         //order 2
         Order order2 = new Order();
         order.setBasket(basket);
@@ -2417,35 +2155,24 @@ public class OrderServiceTest {
         order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(60).atZone(ZoneId.systemDefault()).toInstant());
         order2.setModifiedDate(orderDate2);
-        order2.setShopId(shopId);
+        order2.setShopId("shopid");
         ArrayList<Order> orders = new ArrayList<>();
         orders.add(order);
         orders.add(order2);
-        ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        List<String> tags = Collections.singletonList("Pizza");
-        StoreProfile initialProfile = new StoreProfile(
-                StoreType.FOOD,
-                "name",
-                "shortname",
-                "address",
-                "https://image.url",
-                "081mobilenumb",
-                tags,
-                businessHours,
-                "ownerId",
-                new Bank());
-        initialProfile.setBusinessHours(new ArrayList<>());
+
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
         Bank bank = new Bank();
         bank.setAccountId("34567890");
-        initialProfile.setBank(bank);
+        storeProfile.setBank(bank);
+
         //when
         when(repo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM)).thenReturn(orders);
         sut.checkUnconfirmedOrders();
         //verify
         verify(repo).findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         verify(smsNotifcation, times(0))
-                .sendMessage(initialProfile.getMobileNumber(),
-                        "Hello " + initialProfile.getName() + ", Please accept the order " + order2.getId() +
+                .sendMessage(storeProfile.getMobileNumber(),
+                        "Hello " + storeProfile.getName() + ", Please accept the order " + order2.getId() +
                                 " on iZinga app, otherwise the order will be cancelled.");
     }
 }

@@ -2,6 +2,7 @@ package io.curiousoft.ijudi.ordermanagement.model;
 
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.util.StringUtils;
+import sun.reflect.CallerSensitive;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
@@ -35,6 +36,7 @@ public class StoreProfile extends Profile implements GeoPoint {
     private Messager storeMessenger;
     private String storeWebsiteUrl;
     private boolean izingaTakesCommission;
+    private boolean collectAllowed = true;
 
 
     public StoreProfile(
@@ -162,6 +164,14 @@ public class StoreProfile extends Profile implements GeoPoint {
     }
 
     public void setShortName(String shortName) {
-        this.shortName = shortName;
+        this.shortName = shortName != null ? shortName.toLowerCase() : null;
+    }
+
+    public boolean getCollectAllowed() {
+        return collectAllowed;
+    }
+
+    public void setCollectAllowed(boolean collectAllowed) {
+        this.collectAllowed = collectAllowed;
     }
 }
