@@ -2,7 +2,6 @@ package io.curiousoft.ijudi.ordermanagement.model;
 
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.util.StringUtils;
-import sun.reflect.CallerSensitive;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
@@ -37,6 +36,8 @@ public class StoreProfile extends Profile implements GeoPoint {
     private String storeWebsiteUrl;
     private boolean izingaTakesCommission;
     private boolean collectAllowed = true;
+    private String brandPrimaryColor = "#d69447";
+    private String brandSecondaryColor = "#d69447";
 
 
     public StoreProfile(
@@ -173,5 +174,21 @@ public class StoreProfile extends Profile implements GeoPoint {
 
     public void setCollectAllowed(boolean collectAllowed) {
         this.collectAllowed = collectAllowed;
+    }
+
+    public String getBrandPrimaryColor() {
+        return brandPrimaryColor;
+    }
+
+    public void setBrandPrimaryColor(String brandPrimaryColor) {
+        this.brandPrimaryColor = brandPrimaryColor;
+    }
+
+    public String getBrandSecondaryColor() {
+        return brandSecondaryColor;
+    }
+
+    public void setBrandSecondaryColor(String brandSecondaryColor) {
+        this.brandSecondaryColor = brandSecondaryColor;
     }
 }
