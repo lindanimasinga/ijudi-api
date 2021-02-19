@@ -133,7 +133,7 @@ public class OrderServiceImpl implements OrderService {
         order.setHasVat(storeOptional.get().getHasVat());
         String orderId = Order.generateId();
         order.setId(orderId);
-        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setStage(STAGE_0_CUSTOMER_NOT_PAID);
 
         double deliveryFee = 0;
         if (order.getOrderType() == OrderType.ONLINE && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
@@ -144,6 +144,9 @@ public class OrderServiceImpl implements OrderService {
             deliveryFee =  calculateDeliveryFee(standardFee, standardDistance, ratePerKM, distance);
             order.getShippingData().setFee(deliveryFee);
         }
+
+        boolean isEligibleForFreeDelivery = storeOptional.get().isEligibleForFreeDelivery(order);
+        order.setFreeDelivery(isEligibleForFreeDelivery);
 
         if (canChargeServiceFees(storeOptional.get())) {
             order.setServiceFee(serviceFeePerc * (order.getBasketAmount() + deliveryFee));

@@ -133,12 +133,58 @@ public class OrderServiceTest {
         Assert.assertEquals(1.25, order.getServiceFee(), 0);
         Assert.assertEquals(40.00, order.getBasketAmount(), 0);
         Assert.assertEquals(false, order.getHasVat());
+        Assert.assertEquals(false, order.getFreeDelivery());
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
     }
 
+    @Test
+    public void startOrderOnlineFreeDelivery() throws Exception {
+        //given
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+        storeProfile.setFreeDeliveryMinAmount(500);
 
+        Set<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
+        stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 200, 0));
+        items.add(new BasketItem("hotdog", 1, 100, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+        ShippingData shipping = new ShippingData("shopAddress",
+                "46 Ududu Rd, Emlandweni, KwaMashu, 4051",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messagerID");
+        shipping.setBuildingType(BuildingType.HOUSE);
+        order.setShippingData(shipping);
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+        //when
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+        when(repo.save(order)).thenReturn(order);
+        Order newOrder = sut.startOrder(order);
+        //verify
+        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        Assert.assertNotNull(order.getId());
+        Assert.assertEquals(10, order.getShippingData().getFee(), 0);
+        Assert.assertEquals(12.75, order.getServiceFee(), 0);
+        Assert.assertEquals(500.00, order.getBasketAmount(), 0);
+        Assert.assertEquals(false, order.getHasVat());
+        Assert.assertEquals(true, order.getFreeDelivery());
+        verify(repo).save(order);
+        verify(customerRepo).existsById(order.getCustomerId());
+        verify(storeRepo).findById(order.getShopId());
+    }
 
     @Test
     public void startOrder_store_own_delivery() throws Exception {
@@ -1232,6 +1278,7 @@ public class OrderServiceTest {
         verify(storeRepo).findById(shopId);
         verify(storeRepo).save(shop);
     }
+
     @Test
     public void progressNextStageOnlineDelivery() throws Exception {
         //given
@@ -1269,6 +1316,7 @@ public class OrderServiceTest {
         verify(repo).findById(order.getId());
         verify(repo).save(order);
     }
+
     @Test
     public void progressNextStageOnlineDeliveryReadyForCollection() throws Exception {
         //given
