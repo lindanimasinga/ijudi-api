@@ -6,7 +6,6 @@ import com.curiousoft.alarmsystem.messaging.domain.geofencing.Location;
 import com.curiousoft.alarmsystem.messaging.firebase.GoogleServices;
 import io.curiousoft.ijudi.ordermanagement.model.Order;
 import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
-import io.curiousoft.ijudi.ordermanagement.service.zoomsms.ZoomSmsNotificationService;
 import okhttp3.Headers;
 import okhttp3.Request;
 import okhttp3.Response;

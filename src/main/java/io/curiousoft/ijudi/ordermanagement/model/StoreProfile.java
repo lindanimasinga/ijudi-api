@@ -2,12 +2,9 @@ package io.curiousoft.ijudi.ordermanagement.model;
 
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.util.StringUtils;
-import sun.reflect.CallerSensitive;
 
 import javax.validation.Valid;
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotEmpty;
-import javax.validation.constraints.NotNull;
+import javax.validation.constraints.*;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -37,6 +34,10 @@ public class StoreProfile extends Profile implements GeoPoint {
     private String storeWebsiteUrl;
     private boolean izingaTakesCommission;
     private boolean collectAllowed = true;
+    private String brandPrimaryColor = "#d69447";
+    private String brandSecondaryColor = "#d69447";
+    @PositiveOrZero(message = "free delivery min amount must be greater than or equal to 0.01")
+    private double freeDeliveryMinAmount;
 
 
     public StoreProfile(
@@ -173,5 +174,33 @@ public class StoreProfile extends Profile implements GeoPoint {
 
     public void setCollectAllowed(boolean collectAllowed) {
         this.collectAllowed = collectAllowed;
+    }
+
+    public String getBrandPrimaryColor() {
+        return brandPrimaryColor;
+    }
+
+    public void setBrandPrimaryColor(String brandPrimaryColor) {
+        this.brandPrimaryColor = brandPrimaryColor;
+    }
+
+    public String getBrandSecondaryColor() {
+        return brandSecondaryColor;
+    }
+
+    public void setBrandSecondaryColor(String brandSecondaryColor) {
+        this.brandSecondaryColor = brandSecondaryColor;
+    }
+
+    public double getFreeDeliveryMinAmount() {
+        return freeDeliveryMinAmount;
+    }
+
+    public void setFreeDeliveryMinAmount(double freeDeliveryMinAmount) {
+        this.freeDeliveryMinAmount = freeDeliveryMinAmount;
+    }
+
+    public boolean isEligibleForFreeDelivery(Order order) {
+        return freeDeliveryMinAmount > 0  && order.getBasketAmount() >= freeDeliveryMinAmount;
     }
 }
