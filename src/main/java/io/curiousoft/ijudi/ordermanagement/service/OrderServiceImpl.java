@@ -149,7 +149,7 @@ public class OrderServiceImpl implements OrderService {
         order.setFreeDelivery(isEligibleForFreeDelivery);
 
         if (canChargeServiceFees(storeOptional.get())) {
-            order.setServiceFee(serviceFeePerc * (order.getBasketAmount() + deliveryFee));
+            order.setServiceFee(serviceFeePerc * (order.getBasketAmount() + (order.getFreeDelivery() ? 0 : deliveryFee)));
         }
 
         return orderRepo.save(order);

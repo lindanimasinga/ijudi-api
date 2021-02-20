@@ -175,10 +175,7 @@ public class UkheshePaymentProvider extends PaymentProvider<UkheshePaymentData> 
     }
 
     private boolean isSameOrder(Order order, UkhesheTransaction ukhesheTransaction) {
-        double paidAmount = !order.getFreeDelivery() ? order.getTotalAmount() :
-                BigDecimal.valueOf(order.getTotalAmount() - order.getShippingData().getFee())
-                .setScale(2, RoundingMode.HALF_EVEN)
-                .doubleValue();
+        double paidAmount = order.getTotalAmount();
         return ukhesheTransaction.getDescription().contains(order.getId())
                             && paidAmount == ukhesheTransaction.getAmount();
     }

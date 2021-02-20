@@ -188,6 +188,73 @@ public class UkheshePaymentProviderTest {
     }
 
     @Test
+    public void makePaymentToShopForOrderWithFreeDelivery() throws Exception {
+
+        String username = "0812815707";
+        String password = PASSWORD;
+        String baseUrl = "https://ukheshe-sandbox.jini.rocks/ukheshe-conductor/rest/v1";
+        String customerId = "534";
+        String mainAccount = "2885091160";
+
+        ukheshePaymentProvider = new UkheshePaymentProvider(
+                baseUrl, username, customerId, password, mainAccount,
+                storeRepository, userProfileRepo);
+
+        //given an order
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        BasketItem item = new BasketItem("bananas", 1, 1, 1);
+        item.setName("item");
+        item.setPrice(1);
+        items.add(item);
+        basket.setItems(items);
+        order.setBasket(basket);
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messagerID");
+        shipping.setFee(10);
+        order.setShippingData(shipping);
+        order.setCreatedDate(UkheshePaymentProvider.dateFormat.parse("2020-05-22T15:07:27"));
+        order.setPaymentType(PaymentType.UKHESHE);
+        order.setDescription("Payment from 0812815707: order 606071520220511");
+        order.setCustomerId("customerId");
+        order.setStage(OrderStage.STAGE_6_WITH_CUSTOMER);
+        order.setShopId("shopid");
+        order.setServiceFee(5);
+        order.setId(UUID.randomUUID().toString());
+
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile shop = new StoreProfile(
+                StoreType.FOOD,
+                "name",
+                "shortName",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                tags,
+                null,
+                "ownerId",
+                new Bank());
+
+        Bank bank = new Bank();
+        bank.setAccountId("2885091160");
+        bank.setName("ukheshe");
+        bank.setPhone("phoneNumber");
+        bank.setType("wallet");
+        shop.setBank(bank);
+        //when
+        when(storeRepository.findById(order.getShopId())).thenReturn(Optional.of(shop));
+
+        boolean paid = ukheshePaymentProvider.makePaymentToShop(shop, order, order.getBasketAmount());
+
+        verify(storeRepository).findById(order.getShopId());
+        Assert.assertTrue(paid);
+    }
+
+    @Test
     public void makePaymentToShopForOrderPayByPhoneNumber() throws Exception {
 
         String username = "0812815707";
