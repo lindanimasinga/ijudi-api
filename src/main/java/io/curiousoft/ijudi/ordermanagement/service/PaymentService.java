@@ -65,21 +65,24 @@ public class PaymentService {
         StoreProfile shop = storeRepository.findById(order.getShopId())
                 .orElseThrow(() -> new Exception("shop does not exist"));
 
-        double amount = shop.getIzingaTakesCommission() ? order.getBasketAmount() - (order.getBasketAmount() * izingaCommissionPerc) : order.getBasketAmount();
+        double amountAfterFreeDeliveryCosts = order.getFreeDelivery() ? order.getBasketAmount() - order.getShippingData().getFee() : order.getBasketAmount();
+        double amount = shop.getIzingaTakesCommission() ? amountAfterFreeDeliveryCosts - (amountAfterFreeDeliveryCosts * izingaCommissionPerc) : amountAfterFreeDeliveryCosts;
         boolean paid = paymentProvider.makePaymentToShop(shop, order, amount);
-        order.setShopPaid(paid);
-        String content = "Payment of R " + amount + " received";
-        PushHeading heading = new PushHeading("Payment of R " + amount + " received",
-                "Order Payment Received", null);
-        PushMessage message = new PushMessage(PushMessageType.PAYMENT, heading, content);
-        deviceRepo.findByUserId(shop.getOwnerId())
-                .forEach(device -> {
-                    try {
-                        pushNotificationService.sendNotification(device, message);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                });
+        if(paid) {
+            order.setShopPaid(paid);
+            String content = "Payment of R " + amount + " received";
+            PushHeading heading = new PushHeading("Payment of R " + amount + " received",
+                    "Order Payment Received", null);
+            PushMessage message = new PushMessage(PushMessageType.PAYMENT, heading, content);
+            deviceRepo.findByUserId(shop.getOwnerId())
+                    .forEach(device -> {
+                        try {
+                            pushNotificationService.sendNotification(device, message);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    });
+        }
         return paid;
     }
 
