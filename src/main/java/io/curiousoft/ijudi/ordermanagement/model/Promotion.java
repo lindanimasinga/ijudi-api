@@ -23,6 +23,7 @@ public class Promotion {
     private StoreType shopType;
     @NotNull(message = "promotion expiry date not valid")
     private Date expiryDate;
+    private int position;
 
     public Promotion(@NotBlank(message = "promotion image url not valid") String imageUrl,
                      @NotBlank(message = "promotion shop id not valid") String shopId,
@@ -104,5 +105,13 @@ public class Promotion {
 
     public void setStockId(String stockId) {
         this.stockId = stockId;
+    }
+
+    public int getPosition() {
+        return position;
+    }
+
+    public void setPosition(int position) {
+        this.position = position;
     }
 }
