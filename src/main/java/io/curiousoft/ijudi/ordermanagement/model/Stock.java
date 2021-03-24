@@ -17,7 +17,7 @@ public class Stock {
     private String detailedDescription;
     private List<String> tags;
     private String Group;
-    private int position;
+    private int position = 10000;
     @Min(value = 1, message = "stock quantity not valid")
     private int quantity;
     @DecimalMin(value = "0.001", message = "stock price must be greater than or equal to 0.001")

@@ -23,7 +23,7 @@ public class Promotion {
     private StoreType shopType;
     @NotNull(message = "promotion expiry date not valid")
     private Date expiryDate;
-    private int position;
+    private int position = 10000;
 
     public Promotion(@NotBlank(message = "promotion image url not valid") String imageUrl,
                      @NotBlank(message = "promotion shop id not valid") String shopId,

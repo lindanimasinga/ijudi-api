@@ -114,7 +114,7 @@ public class OrderServiceImpl implements OrderService {
             throw new Exception("shop with id " + order.getShopId() + " does not exist");
         }
 
-        if(!storeOptional.get().getCollectAllowed()) {
+        if(!storeOptional.get().getCollectAllowed() && order.getShippingData().getType() == ShippingData.ShippingType.COLLECTION) {
             throw new Exception("Collection not allowed for shop " + storeOptional.get().getName());
         }
 
@@ -362,7 +362,7 @@ public class OrderServiceImpl implements OrderService {
         return orderRepo.findAll();
     }
 
-    @Scheduled(fixedDelay = 600000, initialDelay = 600000)// 10 minutes
+    @Scheduled(fixedDelay = 150000, initialDelay = 150000)// 10 minutes
     @Override
     public void checkUnconfirmedOrders() {
         List<Order> orders = orderRepo.findByStage(STAGE_1_WAITING_STORE_CONFIRM);
