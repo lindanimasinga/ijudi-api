@@ -158,7 +158,7 @@ public class OrderServiceTest {
 
         LocalDateTime dateNow = LocalDateTime.now();
         MockedStatic<LocalDateTime> mocked = mockStatic(LocalDateTime.class);
-        mocked.when(LocalDateTime::now).thenReturn(dateNow.withHour(21).withMinute(46));
+        mocked.when(LocalDateTime::now).thenReturn(dateNow.withHour(6).withMinute(59));
 
         Set<Stock> stockItems = new HashSet<>();
         stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
