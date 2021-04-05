@@ -23,7 +23,7 @@ public class IjudiApplication {
 
 	@PostConstruct
 	public void init() {
-		TimeZone.setDefault(TimeZone.getTimeZone("Africa/Johannesburg"));
+		TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
 	}
 
 }
