@@ -114,8 +114,12 @@ public class OrderServiceImpl implements OrderService {
             throw new Exception("shop with id " + order.getShopId() + " does not exist");
         }
 
-        if(!storeOptional.get().getCollectAllowed()) {
+        if(!storeOptional.get().getCollectAllowed() && order.getShippingData().getType() == ShippingData.ShippingType.COLLECTION) {
             throw new Exception("Collection not allowed for shop " + storeOptional.get().getName());
+        }
+
+        if(storeOptional.get().isStoreOffline()) {
+            throw new Exception("Shop not available " + storeOptional.get().getName());
         }
 
         List<String> stockItemNames = storeOptional.get()
@@ -133,7 +137,7 @@ public class OrderServiceImpl implements OrderService {
         order.setHasVat(storeOptional.get().getHasVat());
         String orderId = Order.generateId();
         order.setId(orderId);
-        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setStage(STAGE_0_CUSTOMER_NOT_PAID);
 
         double deliveryFee = 0;
         if (order.getOrderType() == OrderType.ONLINE && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
@@ -145,8 +149,11 @@ public class OrderServiceImpl implements OrderService {
             order.getShippingData().setFee(deliveryFee);
         }
 
+        boolean isEligibleForFreeDelivery = storeOptional.get().isEligibleForFreeDelivery(order);
+        order.setFreeDelivery(isEligibleForFreeDelivery);
+
         if (canChargeServiceFees(storeOptional.get())) {
-            order.setServiceFee(serviceFeePerc * (order.getBasketAmount() + deliveryFee));
+            order.setServiceFee(serviceFeePerc * (order.getBasketAmount() + (order.getFreeDelivery() ? 0 : deliveryFee)));
         }
 
         return orderRepo.save(order);
@@ -359,7 +366,7 @@ public class OrderServiceImpl implements OrderService {
         return orderRepo.findAll();
     }
 
-    @Scheduled(fixedDelay = 600000, initialDelay = 600000)// 10 minutes
+    @Scheduled(fixedDelay = 150000, initialDelay = 150000)// 10 minutes
     @Override
     public void checkUnconfirmedOrders() {
         List<Order> orders = orderRepo.findByStage(STAGE_1_WAITING_STORE_CONFIRM);

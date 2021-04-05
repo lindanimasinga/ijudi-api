@@ -7,6 +7,9 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.PositiveOrZero;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -36,8 +39,11 @@ public class StoreProfile extends Profile implements GeoPoint {
     private String storeWebsiteUrl;
     private boolean izingaTakesCommission;
     private boolean collectAllowed = true;
+    private AVAILABILITY availability = AVAILABILITY.SPECIFIC_HOURS;
     private String brandPrimaryColor = "#d69447";
     private String brandSecondaryColor = "#d69447";
+    @PositiveOrZero(message = "free delivery min amount must be greater than or equal to 0.01")
+    private double freeDeliveryMinAmount;
 
 
     public StoreProfile(
@@ -191,4 +197,49 @@ public class StoreProfile extends Profile implements GeoPoint {
     public void setBrandSecondaryColor(String brandSecondaryColor) {
         this.brandSecondaryColor = brandSecondaryColor;
     }
+
+    public double getFreeDeliveryMinAmount() {
+        return freeDeliveryMinAmount;
+    }
+
+    public void setFreeDeliveryMinAmount(double freeDeliveryMinAmount) {
+        this.freeDeliveryMinAmount = freeDeliveryMinAmount;
+    }
+
+    public AVAILABILITY getAvailability() {
+        return availability;
+    }
+
+    public void setAvailability(AVAILABILITY availability) {
+        this.availability = availability;
+    }
+
+    public boolean isEligibleForFreeDelivery(Order order) {
+        return freeDeliveryMinAmount > 0  && order.getBasketAmount() >= freeDeliveryMinAmount;
+    }
+
+    public boolean isStoreOffline() {
+        if(availability == AVAILABILITY.OFFLINE) {
+            return true;
+        }
+
+        if(availability == AVAILABILITY.ONLINE24_7 || businessHours == null || businessHours.isEmpty()) {
+            return false;
+        }
+
+        Date lowerBoundTime = Date.from(LocalDateTime.now()
+                .atZone(ZoneId.systemDefault())
+                .toInstant());
+        Date upperBoundTime = Date.from(LocalDateTime.now().plusMinutes(14) //should not accept orders 15 minutes before store closes
+                .atZone(ZoneId.systemDefault())
+                .toInstant());
+        return lowerBoundTime.before(businessHours.get(0).getOpen())
+                || upperBoundTime.after(businessHours.get(0).getClose());
+    }
+
+    public enum AVAILABILITY {
+        OFFLINE, SPECIFIC_HOURS, ONLINE24_7
+    }
 }
+
+

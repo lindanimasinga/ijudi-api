@@ -155,6 +155,147 @@ public class PaymentServiceTest {
     }
 
     @Test
+    public void completePaymentToShop_freeDelivery_no_commission_for_izinga() throws Exception {
+
+        List<PaymentProvider> paymentProviders = new ArrayList<>();
+        //adding all ukheshe services
+        paymentProviders.add(ukheshePaymentProvider);
+        paymentService = new PaymentService(pushNotificationService,
+                paymentProviders, orderRepo, deviceRepo, storeRepository,
+                userProfileRepo,0, 0.1);
+
+        //given an order
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setFee(10);
+        shipping.setMessengerId("messagerID");
+        order.setShippingData(shipping);
+        order.setPaymentType(PaymentType.UKHESHE);
+        order.setDescription("081281445");
+        order.setCustomerId("customerId");
+        order.setStage(OrderStage.STAGE_6_WITH_CUSTOMER);
+        order.setShopId("shopid");
+        order.setServiceFee(5.00);
+        order.setFreeDelivery(true);
+
+        StoreProfile shop = new StoreProfile(
+                StoreType.FOOD,
+                "name",
+                "shortName",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                null,
+                null,
+                "ownerId",
+                new Bank());;
+
+        Device storeDevice = new Device("token");
+        String content = "Payment of R " + 30.0 + " received";
+        PushHeading heading = new PushHeading("Payment of R " + 30.0 + " received",
+                "Order Payment Received", null);
+        PushMessage message = new PushMessage(PushMessageType.PAYMENT, heading, content);
+
+        //when
+        when(ukheshePaymentProvider.getPaymentType()).thenReturn(PaymentType.UKHESHE);
+        when(ukheshePaymentProvider.makePaymentToShop(shop, order, order.getBasketAmount() - order.getShippingData().getFee())).thenReturn(true);
+        when(deviceRepo.findByUserId(shop.getOwnerId())).thenReturn(Collections.singletonList(storeDevice));
+        when(storeRepository.findById(order.getShopId())).thenReturn(Optional.of(shop));
+
+        boolean received = paymentService.completePaymentToShop(order);
+
+        //verify
+        assertTrue(received);
+        assertTrue(order.getShopPaid());
+        assertNotNull(order.getPaymentType());
+        verify(ukheshePaymentProvider).makePaymentToShop(shop, order, order.getBasketAmount() - order.getShippingData().getFee());
+        verify(ukheshePaymentProvider).makePaymentToShop(shop, order, 30);
+        verify(deviceRepo).findByUserId(shop.getOwnerId());
+        verify(storeRepository).findById(order.getShopId());
+        verify(pushNotificationService).sendNotification(storeDevice, message);
+    }
+
+    @Test
+    public void completePaymentToShop_freeDelivery_and_commission_for_izinga() throws Exception {
+
+        List<PaymentProvider> paymentProviders = new ArrayList<>();
+        //adding all ukheshe services
+        paymentProviders.add(ukheshePaymentProvider);
+        paymentService = new PaymentService(pushNotificationService,
+                paymentProviders, orderRepo, deviceRepo, storeRepository,
+                userProfileRepo,0, 0.1);
+
+        //given an order
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setFee(10);
+        shipping.setMessengerId("messagerID");
+        order.setShippingData(shipping);
+        order.setPaymentType(PaymentType.UKHESHE);
+        order.setDescription("081281445");
+        order.setCustomerId("customerId");
+        order.setStage(OrderStage.STAGE_6_WITH_CUSTOMER);
+        order.setShopId("shopid");
+        order.setServiceFee(5.00);
+        order.setFreeDelivery(true);
+
+        StoreProfile shop = new StoreProfile(
+                StoreType.FOOD,
+                "name",
+                "shortName",
+                "address",
+                "https://image.url",
+                "081mobilenumb",
+                null,
+                null,
+                "ownerId",
+                new Bank());;
+        shop.setIzingaTakesCommission(true);
+
+        Device storeDevice = new Device("token");
+        String content = "Payment of R " + 27.0 + " received";
+        PushHeading heading = new PushHeading("Payment of R " + 27.0 + " received",
+                "Order Payment Received", null);
+        PushMessage message = new PushMessage(PushMessageType.PAYMENT, heading, content);
+
+        //when
+        when(ukheshePaymentProvider.getPaymentType()).thenReturn(PaymentType.UKHESHE);
+        when(ukheshePaymentProvider.makePaymentToShop(shop, order, (order.getBasketAmount()- order.getShippingData().getFee()) * 0.9)).thenReturn(true);
+        when(deviceRepo.findByUserId(shop.getOwnerId())).thenReturn(Collections.singletonList(storeDevice));
+        when(storeRepository.findById(order.getShopId())).thenReturn(Optional.of(shop));
+
+        boolean received = paymentService.completePaymentToShop(order);
+
+        //verify
+        assertTrue(received);
+        assertTrue(order.getShopPaid());
+        assertNotNull(order.getPaymentType());
+        verify(ukheshePaymentProvider).makePaymentToShop(shop, order, (order.getBasketAmount() - order.getShippingData().getFee()) * 0.9);
+        verify(ukheshePaymentProvider).makePaymentToShop(shop, order, 27);
+        verify(deviceRepo).findByUserId(shop.getOwnerId());
+        verify(storeRepository).findById(order.getShopId());
+        verify(pushNotificationService).sendNotification(storeDevice, message);
+    }
+
+    @Test
     public void completePaymentToShop_commission_for_izinga() throws Exception {
 
         List<PaymentProvider> paymentProviders = new ArrayList<>();
@@ -222,7 +363,6 @@ public class PaymentServiceTest {
         verify(deviceRepo).findByUserId(shop.getOwnerId());
         verify(storeRepository).findById(order.getShopId());
         verify(pushNotificationService).sendNotification(storeDevice, message);
-
     }
 
     @Test

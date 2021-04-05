@@ -41,6 +41,7 @@ public class Order extends BaseModel {
     private boolean messengerPaid;
     private boolean smsSentToShop;
     private boolean smsSentToAdmin;
+    private boolean freeDelivery;
 
     public void setStage(OrderStage stage) {
         this.stage = stage;
@@ -100,7 +101,7 @@ public class Order extends BaseModel {
 
     public double getTotalAmount() {
         return BigDecimal.valueOf(serviceFee + basket.getItems().stream()
-                .mapToDouble(BasketItem::getTotalPrice).sum() + (shippingData != null ? shippingData.getFee() : 0))
+                .mapToDouble(BasketItem::getTotalPrice).sum() + (!freeDelivery && shippingData != null ? shippingData.getFee() : 0))
                 .setScale(2, RoundingMode.HALF_EVEN)
                 .doubleValue();
     }
@@ -175,5 +176,13 @@ public class Order extends BaseModel {
 
     public boolean getSmsSentToAdmin() {
         return smsSentToAdmin;
+    }
+
+    public boolean getFreeDelivery() {
+        return freeDelivery;
+    }
+
+    public void setFreeDelivery(boolean freeDelivery) {
+        this.freeDelivery = freeDelivery;
     }
 }

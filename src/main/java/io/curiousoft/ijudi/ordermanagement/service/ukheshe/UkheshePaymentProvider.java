@@ -1,10 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.service.ukheshe;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.curiousoft.ijudi.ordermanagement.model.Order;
-import io.curiousoft.ijudi.ordermanagement.model.PaymentType;
-import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
-import io.curiousoft.ijudi.ordermanagement.model.UserProfile;
+import io.curiousoft.ijudi.ordermanagement.model.*;
 import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
 import io.curiousoft.ijudi.ordermanagement.service.PaymentProvider;
@@ -18,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URI;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
@@ -176,9 +175,9 @@ public class UkheshePaymentProvider extends PaymentProvider<UkheshePaymentData> 
     }
 
     private boolean isSameOrder(Order order, UkhesheTransaction ukhesheTransaction) {
-
+        double paidAmount = order.getTotalAmount();
         return ukhesheTransaction.getDescription().contains(order.getId())
-                            && order.getTotalAmount() == ukhesheTransaction.getAmount();
+                            && paidAmount == ukhesheTransaction.getAmount();
     }
 
 

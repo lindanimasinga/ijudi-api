@@ -15,6 +15,9 @@ public class Stock {
     private String name;
     private String description;
     private String detailedDescription;
+    private List<String> tags;
+    private String Group;
+    private int position = 10000;
     @Min(value = 1, message = "stock quantity not valid")
     private int quantity;
     @DecimalMin(value = "0.001", message = "stock price must be greater than or equal to 0.001")
@@ -116,6 +119,30 @@ public class Stock {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public List<String> getTags() {
+        return tags;
+    }
+
+    public void setTags(List<String> tags) {
+        this.tags = tags;
+    }
+
+    public String getGroup() {
+        return Group;
+    }
+
+    public void setGroup(String group) {
+        Group = group;
+    }
+
+    public int getPosition() {
+        return position;
+    }
+
+    public void setPosition(int position) {
+        this.position = position;
     }
 
     @Override
