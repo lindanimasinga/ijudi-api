@@ -226,7 +226,7 @@ public class StoreProfile extends Profile implements GeoPoint {
         if(availability == AVAILABILITY.ONLINE24_7 || businessHours == null || businessHours.isEmpty()) {
             return false;
         }
-
+//ZoneId.of(ZoneOffset.ofHours(2).id)
         Date lowerBoundTime = Date.from(LocalDateTime.now()
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
