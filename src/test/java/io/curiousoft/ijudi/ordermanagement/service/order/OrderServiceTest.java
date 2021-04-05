@@ -14,11 +14,13 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.*;
 
 import static org.junit.Assert.fail;
@@ -70,7 +72,14 @@ public class OrderServiceTest {
     }
 
     private StoreProfile createStoreProfile(StoreType food) {
+
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        LocalDateTime dateTimeOpen  = LocalDateTime.now().withHour(7).withMinute(0);
+        LocalDateTime dateTimeClose  = LocalDateTime.now().withHour(22).withMinute(0);
+        Date open = Date.from(dateTimeOpen.toInstant(ZoneOffset.of("+02:00")));
+        Date close = Date.from(dateTimeClose.toInstant(ZoneOffset.of("+02:00")));
+        businessHours.add(
+                new BusinessHours(DayOfWeek.MONDAY, open, close));
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile storeProfile = new StoreProfile(
                 food,
@@ -80,16 +89,15 @@ public class OrderServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-
                 businessHours,
                 "ownerId",
                 new Bank());
-        storeProfile.setBusinessHours(new ArrayList<>());
         storeProfile.setFeatured(true);
         storeProfile.setHasVat(false);
         storeProfile.setLatitude(-29.7287185);
         storeProfile.setLongitude(30.9344252);
         storeProfile.setId("shopid");
+        storeProfile.setAvailability(StoreProfile.AVAILABILITY.ONLINE24_7);
         return storeProfile;
     }
 
@@ -135,6 +143,57 @@ public class OrderServiceTest {
         Assert.assertEquals(false, order.getHasVat());
         Assert.assertEquals(false, order.getFreeDelivery());
         verify(repo).save(order);
+        verify(customerRepo).existsById(order.getCustomerId());
+        verify(storeRepo).findById(order.getShopId());
+    }
+
+    @Test
+    public void startOrderShop_offline() throws Exception {
+        //given
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+        storeProfile.setAvailability(StoreProfile.AVAILABILITY.SPECIFIC_HOURS);
+
+        LocalDateTime dateNow = LocalDateTime.now();
+        MockedStatic<LocalDateTime> mocked = mockStatic(LocalDateTime.class);
+        mocked.when(LocalDateTime::now).thenReturn(dateNow.withHour(21).withMinute(46));
+
+        Set<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
+        stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+        ShippingData shipping = new ShippingData("shopAddress",
+                "46 Ududu Rd, Emlandweni, KwaMashu, 4051",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messagerID");
+        shipping.setBuildingType(BuildingType.HOUSE);
+        order.setShippingData(shipping);
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+
+        //when
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+        when(repo.save(order)).thenReturn(order);
+
+        try {
+            Order newOrder = sut.startOrder(order);
+            fail();
+        }catch (Exception e) {
+            Assert.assertEquals("Shop not available name", e.getMessage());
+        }
+
+        //verify
+        verify(repo, times(0)).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
     }
@@ -765,6 +824,7 @@ public class OrderServiceTest {
             Assert.assertTrue(isvald);
         }
     }
+
     @Test
     public void startOrderNoCustomer() {
         try {
@@ -795,6 +855,7 @@ public class OrderServiceTest {
             Assert.assertEquals("order customer is not valid", e.getMessage());
         }
     }
+
     @Test
     public void startOrderNoShop() {
         try {

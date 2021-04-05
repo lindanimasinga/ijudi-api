@@ -118,6 +118,10 @@ public class OrderServiceImpl implements OrderService {
             throw new Exception("Collection not allowed for shop " + storeOptional.get().getName());
         }
 
+        if(storeOptional.get().isStoreOffline()) {
+            throw new Exception("Shop not available " + storeOptional.get().getName());
+        }
+
         List<String> stockItemNames = storeOptional.get()
                 .getStockList().stream().map(Stock::getName)
                 .collect(Collectors.toList());
