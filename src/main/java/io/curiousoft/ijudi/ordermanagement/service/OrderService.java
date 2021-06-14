@@ -1,6 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.service;
 
 import io.curiousoft.ijudi.ordermanagement.model.Order;
+import org.springframework.scheduling.annotation.Scheduled;
 
 import java.util.List;
 
@@ -21,6 +22,9 @@ public interface OrderService {
     List<Order> findOrderByStoreId(String shopId) throws Exception;
 
     void cleanUnpaidOrders();
+
+    @Scheduled(fixedDelay = 900000, initialDelay = 900000) // 15 minutes
+    void notifyUnpaidOrders();
 
     List<Order> findOrderByMessengerId(String id);
 
