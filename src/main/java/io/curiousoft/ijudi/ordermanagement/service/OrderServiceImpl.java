@@ -367,8 +367,12 @@ public class OrderServiceImpl implements OrderService {
         unpaidOrders.forEach(order -> {
             for (String admin : adminCellNumbers) {
                 try {
-                    smsNotificationService.sendMessage(admin, "Hi, iZinga Admin. Order " + order.getId() + " has not been paid. The customer may be having issues." +
-                            "View the order on shop.izinga.co.za/"+order.getShopId()+"/order/" + order.getId() + ".");
+                    if(!order.getSmsSentToAdmin()) {
+                        smsNotificationService.sendMessage(admin, "Hi, iZinga Admin. Order " + order.getId() + " has not been paid. The customer may be having issues." +
+                                "View the order on shop.izinga.co.za/" + order.getShopId() + "/order/" + order.getId() + ".");
+                        order.setSmsSentToAdmin(true);
+                        orderRepo.save(order);
+                    }
                 } catch (Exception e) {
                     LOGGER.error("Failed to sent sms to admin", e);
                 }
