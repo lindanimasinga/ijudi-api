@@ -4,11 +4,13 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.util.StringUtils;
 
 import javax.validation.Valid;
-import javax.validation.constraints.*;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.PositiveOrZero;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.*;
 
 public class StoreProfile extends Profile implements GeoPoint {
 
@@ -34,6 +36,7 @@ public class StoreProfile extends Profile implements GeoPoint {
     private String storeWebsiteUrl;
     private boolean izingaTakesCommission;
     private boolean collectAllowed = true;
+    private AVAILABILITY availability = AVAILABILITY.SPECIFIC_HOURS;
     private String brandPrimaryColor = "#d69447";
     private String brandSecondaryColor = "#d69447";
     @PositiveOrZero(message = "free delivery min amount must be greater than or equal to 0.01")
@@ -200,7 +203,56 @@ public class StoreProfile extends Profile implements GeoPoint {
         this.freeDeliveryMinAmount = freeDeliveryMinAmount;
     }
 
+    public AVAILABILITY getAvailability() {
+        return availability;
+    }
+
+    public void setAvailability(AVAILABILITY availability) {
+        this.availability = availability;
+    }
+
     public boolean isEligibleForFreeDelivery(Order order) {
         return freeDeliveryMinAmount > 0  && order.getBasketAmount() >= freeDeliveryMinAmount;
     }
+
+    public boolean isStoreOffline() {
+        if(availability == AVAILABILITY.OFFLINE) {
+            return true;
+        }
+
+        if(availability == AVAILABILITY.ONLINE24_7 || businessHours == null || businessHours.isEmpty()) {
+            return false;
+        }
+//ZoneId.of(ZoneOffset.ofHours(2).id)
+        Calendar calender = new Calendar.Builder().setInstant(businessHours.get(0).getOpen()).build();
+        Date open  = Date.from(LocalDateTime.now()
+                .withHour(calender.get(Calendar.HOUR_OF_DAY))
+                .withMinute(calender.get(Calendar.MINUTE))
+                .withSecond(calender.get(Calendar.SECOND))
+                .atZone(ZoneId.systemDefault())
+                .toInstant());
+
+        calender = new Calendar.Builder().setInstant(businessHours.get(0).getClose()).build();
+        Date close  = Date.from(LocalDateTime.now()
+                .withHour(calender.get(Calendar.HOUR_OF_DAY))
+                .withMinute(calender.get(Calendar.MINUTE))
+                .withSecond(calender.get(Calendar.SECOND))
+                .atZone(ZoneId.systemDefault())
+                .toInstant());
+
+        Date lowerBoundTime = Date.from(LocalDateTime.now()
+                .atZone(ZoneId.systemDefault())
+                .toInstant());
+        Date upperBoundTime = Date.from(LocalDateTime.now().plusMinutes(14) //should not accept orders 15 minutes before store closes
+                .atZone(ZoneId.systemDefault())
+                .toInstant());
+        return lowerBoundTime.before(open)
+                || upperBoundTime.after(close);
+    }
+
+    public enum AVAILABILITY {
+        OFFLINE, SPECIFIC_HOURS, ONLINE24_7
+    }
 }
+
+
