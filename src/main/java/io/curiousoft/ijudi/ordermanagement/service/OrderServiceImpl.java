@@ -114,11 +114,11 @@ public class OrderServiceImpl implements OrderService {
             throw new Exception("shop with id " + order.getShopId() + " does not exist");
         }
 
-        if(!storeOptional.get().getCollectAllowed() && order.getShippingData().getType() == ShippingData.ShippingType.COLLECTION) {
+        if (!storeOptional.get().getCollectAllowed() && order.getShippingData().getType() == ShippingData.ShippingType.COLLECTION) {
             throw new Exception("Collection not allowed for shop " + storeOptional.get().getName());
         }
 
-        if(storeOptional.get().isStoreOffline()) {
+        if (storeOptional.get().isStoreOffline()) {
             throw new Exception("Shop not available " + storeOptional.get().getName());
         }
 
@@ -145,7 +145,7 @@ public class OrderServiceImpl implements OrderService {
             double standardFee = storeOptional.get().getStoreMessenger() != null ? storeOptional.get().getStoreMessenger().getStandardDeliveryPrice() : this.starndardDeliveryFee;
             double standardDistance = storeOptional.get().getStoreMessenger() != null ? storeOptional.get().getStoreMessenger().getStandardDeliveryKm() : this.starndardDeliveryKm;
             double ratePerKM = storeOptional.get().getStoreMessenger() != null ? storeOptional.get().getStoreMessenger().getRatePerKm() : this.ratePerKm;
-            deliveryFee =  calculateDeliveryFee(standardFee, standardDistance, ratePerKM, distance);
+            deliveryFee = calculateDeliveryFee(standardFee, standardDistance, ratePerKM, distance);
             order.getShippingData().setFee(deliveryFee);
         }
 
@@ -354,6 +354,31 @@ public class OrderServiceImpl implements OrderService {
                 .toInstant());
         LOGGER.info("Cleaning up all orders before   s" + pastDate);
         orderRepo.deleteByShopPaidAndStageAndModifiedDateBefore(false, OrderStage.STAGE_0_CUSTOMER_NOT_PAID, pastDate);
+    }
+
+    @Scheduled(fixedDelay = 900000, initialDelay = 420000) // 7 minutes
+    @Override  //TODO tests
+    public void notifyUnpaidOrders() {
+        Date pastDate = Date.from(LocalDateTime.now()
+                .minusMinutes(7)
+                .atZone(ZoneId.systemDefault())
+                .toInstant());
+        List<Order> unpaidOrders = orderRepo.findByShopPaidAndStageAndModifiedDateBefore(false, STAGE_0_CUSTOMER_NOT_PAID, pastDate);
+        unpaidOrders.forEach(order -> {
+            for (String admin : adminCellNumbers) {
+                try {
+                    if(!order.getSmsSentToAdmin()) {
+                        smsNotificationService.sendMessage(admin, "Hi, iZinga Admin. Order " + order.getId() + " has not been paid. The customer may be having issues." +
+                                "View the order on shop.izinga.co.za/" + order.getShopId() + "/order/" + order.getId() + ".");
+                        order.setSmsSentToAdmin(true);
+                        orderRepo.save(order);
+                    }
+                } catch (Exception e) {
+                    LOGGER.error("Failed to sent sms to admin", e);
+                }
+            }
+            LOGGER.info("Sms sent to admin");
+        });
     }
 
     @Override

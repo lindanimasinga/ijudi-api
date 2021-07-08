@@ -35,7 +35,7 @@ public class StoreProfile extends Profile implements GeoPoint {
     private Messager storeMessenger;
     private String storeWebsiteUrl;
     private boolean izingaTakesCommission;
-    private boolean collectAllowed = true;
+    private boolean collectAllowed = false;
     private AVAILABILITY availability = AVAILABILITY.SPECIFIC_HOURS;
     private String brandPrimaryColor = "#d69447";
     private String brandSecondaryColor = "#d69447";
@@ -240,10 +240,10 @@ public class StoreProfile extends Profile implements GeoPoint {
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
 
-        Date lowerBoundTime = Date.from(LocalDateTime.now()
+        Date lowerBoundTime = Date.from(LocalDateTime.now().plusHours(2)
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
-        Date upperBoundTime = Date.from(LocalDateTime.now().plusMinutes(14) //should not accept orders 15 minutes before store closes
+        Date upperBoundTime = Date.from(LocalDateTime.now().plusHours(2).plusMinutes(14) //should not accept orders 15 minutes before store closes
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
         return lowerBoundTime.before(open)
