@@ -104,4 +104,28 @@ public class IjudiUtils {
     public static double calculateDeliveryFee(double standardFee, double standardDistance, double ratePerKM, double distance) {
         return distance > standardDistance? standardFee + (ratePerKM * (distance - standardDistance)) : standardFee;
     }
+
+    /**
+     * Calculates markup price and keep original decimals or cents
+     * @param storePrice
+     * @param markPercentage
+     * @return markup price
+     */
+    public static double calculateMarkupPrice(double storePrice, double markPercentage) {
+        double cents = storePrice - (int) storePrice;
+        double markupPrice = storePrice + (storePrice * markPercentage);
+        return ((int) markupPrice) + (cents > 0.45 ? cents : 1 + cents);
+    }
+
+    public static void calculateMarkupPrice(StoreProfile newStore, double markupPercentage) {
+        newStore.getStockList().forEach(stock -> {
+            boolean shouldMarkUp = newStore.getMarkUpPrice();
+            if(stock.getStorePrice() == 0) {
+                double storePrice = stock.getPrice();
+                stock.setStorePrice(storePrice);
+            }
+            double markupPrice = shouldMarkUp ? IjudiUtils.calculateMarkupPrice(stock.getStorePrice(), markupPercentage) : stock.getStorePrice();
+            stock.setPrice(markupPrice);
+        });
+    }
 }

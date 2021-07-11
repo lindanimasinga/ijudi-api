@@ -29,9 +29,7 @@ public class Profile extends BaseModel {
     private String emailAddress;
     @NotNull(message = "role not valid")
     private ProfileRoles role;
-    @JsonIgnore
     private int responseTimeMinutes;
-    @JsonIgnore
     private Bank bank;
     private double latitude;
     private double longitude;
