@@ -3,6 +3,7 @@ package io.curiousoft.ijudi.ordermanagement.service;
 import io.curiousoft.ijudi.ordermanagement.model.*;
 import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
+import io.curiousoft.ijudi.ordermanagement.utils.IjudiUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -42,14 +43,14 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         profile.setBank(user.getBank());
         StoreProfile newStore = super.create(profile);
         user.setRole(ProfileRoles.STORE_ADMIN);
-        calculateMarkupPrice(newStore);
+        IjudiUtils.calculateMarkupPrice(newStore, markupPercentage);
         userProfileRepo.save(user);
         return newStore;
     }
 
     @Override
     public StoreProfile update(String profileId, StoreProfile profile) throws Exception {
-        calculateMarkupPrice(profile);
+        IjudiUtils.calculateMarkupPrice(profile, markupPercentage);
         return super.update(profileId, profile);
     }
 
@@ -102,7 +103,7 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
 
     public void addStockForShop(String profileId, Stock stock) throws Exception {
         validate(stock);
-        double markupPrice = calculateMarkupPrice(stock.getStorePrice(), markupPercentage);
+        double markupPrice = IjudiUtils.calculateMarkupPrice(stock.getStorePrice(), markupPercentage);
         stock.setPrice(markupPrice);
         StoreProfile store = profileRepo.findById(profileId).orElseThrow(() -> new Exception("Profile not found"));
         Optional<Stock> stockOptional = store.getStockList().stream()
@@ -117,26 +118,6 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
             store.getStockList().add(stock);
         }
         profileRepo.save(store);
-    }
-
-    /**
-     * Calculates markup price and keep original decimals or cents
-     * @param storePrice
-     * @param markPercentage
-     * @return markup price
-     */
-    private double calculateMarkupPrice(double storePrice, double markPercentage) {
-        double cents = storePrice - (int) storePrice;
-        double markupPrice = storePrice + (storePrice * markPercentage);
-        return ((int) markupPrice) + (cents > 0.45 ? cents : 1 + cents);
-    }
-
-    private void calculateMarkupPrice(StoreProfile newStore) {
-        newStore.getStockList().forEach(stock -> {
-            boolean shouldMarkUp = newStore.getMarkUpPrice();
-            double markupPrice = shouldMarkUp ? calculateMarkupPrice(stock.getStorePrice(), markupPercentage) : stock.getStorePrice();
-            stock.setPrice(markupPrice);
-        });
     }
 
     public List<StoreProfile> findNearbyStores(double latitude,

@@ -1,7 +1,5 @@
 package io.curiousoft.ijudi.ordermanagement.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
 import javax.validation.constraints.DecimalMin;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
@@ -22,7 +20,7 @@ public class Stock {
     private int position = 10000;
     @Min(value = 0, message = "stock quantity not valid")
     private int quantity;
-    @DecimalMin(value = "0.001", message = "stock price must be greater than or equal to 0.001")
+    @DecimalMin(value = "0.000", message = "stock price must be greater than or equal to 0.001")
     private double storePrice;
     @Min(value = 0, message = "discount % must be >= 0")
     private double discountPerc;
@@ -32,9 +30,12 @@ public class Stock {
     private List<SelectionOption> optionalSelection;
     private double price;
 
+    public Stock() {
+    }
+
     public Stock(@NotBlank(message = "stock name must not be blank") String name,
                  @Min(value = 0) int quantity,
-                 @DecimalMin(value = "0.01") double storePrice,
+                 @DecimalMin(value = "0.000", message = "stock price must be greater than or equal to 0.001") double storePrice,
                  @Min(value = 0) double discountPerc,
                  @NotNull List<SelectionOption> mandatorySelection) {
         this.name = name;
@@ -72,7 +73,6 @@ public class Stock {
         return price;
     }
 
-    @JsonIgnore
     public void setPrice(double price) {
         this.price = price;
     }
