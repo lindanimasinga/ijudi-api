@@ -41,6 +41,7 @@ public class StoreProfile extends Profile implements GeoPoint {
     private String brandSecondaryColor = "#d69447";
     @PositiveOrZero(message = "free delivery min amount must be greater than or equal to 0.01")
     private double freeDeliveryMinAmount;
+    private boolean markUpPrice = true;
 
 
     public StoreProfile(
@@ -201,6 +202,14 @@ public class StoreProfile extends Profile implements GeoPoint {
 
     public void setFreeDeliveryMinAmount(double freeDeliveryMinAmount) {
         this.freeDeliveryMinAmount = freeDeliveryMinAmount;
+    }
+
+    public boolean getMarkUpPrice() {
+        return markUpPrice;
+    }
+
+    public void setMarkUpPrice(boolean markUpPrice) {
+        this.markUpPrice = markUpPrice;
     }
 
     public AVAILABILITY getAvailability() {
