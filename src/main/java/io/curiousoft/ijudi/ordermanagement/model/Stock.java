@@ -1,5 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import javax.validation.constraints.DecimalMin;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
@@ -18,25 +20,26 @@ public class Stock {
     private List<String> tags;
     private String Group;
     private int position = 10000;
-    @Min(value = 1, message = "stock quantity not valid")
+    @Min(value = 0, message = "stock quantity not valid")
     private int quantity;
     @DecimalMin(value = "0.001", message = "stock price must be greater than or equal to 0.001")
-    private double price;
+    private double storePrice;
     @Min(value = 0, message = "discount % must be >= 0")
     private double discountPerc;
     private List<String> images;
     @NotNull(message = "mandatorySelection not valid")
     private List<SelectionOption> mandatorySelection;
     private List<SelectionOption> optionalSelection;
+    private double price;
 
     public Stock(@NotBlank(message = "stock name must not be blank") String name,
-                 @Min(value = 1) int quantity,
-                 @DecimalMin(value = "0.01") double price,
+                 @Min(value = 0) int quantity,
+                 @DecimalMin(value = "0.01") double storePrice,
                  @Min(value = 0) double discountPerc,
                  @NotNull List<SelectionOption> mandatorySelection) {
         this.name = name;
         this.quantity = quantity;
-        this.price = price;
+        this.storePrice = storePrice;
         this.discountPerc = discountPerc;
         this.mandatorySelection = mandatorySelection;
     }
@@ -69,8 +72,17 @@ public class Stock {
         return price;
     }
 
+    @JsonIgnore
     public void setPrice(double price) {
         this.price = price;
+    }
+
+    public double getStorePrice() {
+        return storePrice;
+    }
+
+    public void setStorePrice(double storePrice) {
+        this.storePrice = storePrice;
     }
 
     public double getDiscountPerc() {

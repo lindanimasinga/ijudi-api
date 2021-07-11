@@ -17,6 +17,7 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
@@ -75,10 +76,14 @@ public class OrderServiceTest {
     }
 
     private StoreProfile createStoreProfile(StoreType food) {
+        return createStoreProfile(food, 7, 22);
+    }
+
+    private StoreProfile createStoreProfile(StoreType food, int openHour, int closeHour) {
 
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
-        LocalDateTime dateTimeOpen  = LocalDateTime.now().withHour(7).withMinute(0);
-        LocalDateTime dateTimeClose  = LocalDateTime.now().withHour(22).withMinute(0);
+        LocalDateTime dateTimeOpen  = LocalDateTime.now().withHour(openHour).withMinute(0);
+        LocalDateTime dateTimeClose  = LocalDateTime.now().withHour(closeHour).withMinute(0);
         Date open = Date.from(dateTimeOpen.toInstant(ZoneOffset.of("+02:00")));
         Date close = Date.from(dateTimeClose.toInstant(ZoneOffset.of("+02:00")));
         businessHours.add(
@@ -153,7 +158,9 @@ public class OrderServiceTest {
     @Test
     public void startOrderShop_offline() throws Exception {
         //given
-        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+        LocalDateTime open = LocalDateTime.now().minusHours(3);
+        LocalDateTime close = LocalDateTime.now().minusHours(1);
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD, open.getHour(), close.getHour());
         storeProfile.setAvailability(StoreProfile.AVAILABILITY.SPECIFIC_HOURS);
 
         LocalDateTime dateNow = LocalDateTime.now();

@@ -19,13 +19,16 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
 
     private UserProfileRepo userProfileRepo;
     private String mainPayAccount;
+    private double markupPercentage;
 
     public  StoreService(StoreRepository storeRepository,
                         UserProfileRepo userProfileRepo,
-                        @Value("${ukheshe.main.account}") String mainPayAccount) {
+                        @Value("${ukheshe.main.account}") String mainPayAccount,
+                        @Value("${service.markup.perc}") double markupPercentage) {
         super(storeRepository);
         this.userProfileRepo = userProfileRepo;
         this.mainPayAccount = mainPayAccount;
+        this.markupPercentage = markupPercentage;
     }
 
     @Override
@@ -39,8 +42,15 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         profile.setBank(user.getBank());
         StoreProfile newStore = super.create(profile);
         user.setRole(ProfileRoles.STORE_ADMIN);
+        calculateMarkupPrice(newStore);
         userProfileRepo.save(user);
         return newStore;
+    }
+
+    @Override
+    public StoreProfile update(String profileId, StoreProfile profile) throws Exception {
+        calculateMarkupPrice(profile);
+        return super.update(profileId, profile);
     }
 
     @Override
@@ -92,6 +102,8 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
 
     public void addStockForShop(String profileId, Stock stock) throws Exception {
         validate(stock);
+        double markupPrice = calculateMarkupPrice(stock.getStorePrice(), markupPercentage);
+        stock.setPrice(markupPrice);
         StoreProfile store = profileRepo.findById(profileId).orElseThrow(() -> new Exception("Profile not found"));
         Optional<Stock> stockOptional = store.getStockList().stream()
                 .filter(item -> stock.getName().equals(item.getName()))
@@ -107,6 +119,26 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         profileRepo.save(store);
     }
 
+    /**
+     * Calculates markup price and keep original decimals or cents
+     * @param storePrice
+     * @param markPercentage
+     * @return markup price
+     */
+    private double calculateMarkupPrice(double storePrice, double markPercentage) {
+        double cents = storePrice - (int) storePrice;
+        double markupPrice = storePrice + (storePrice * markPercentage);
+        return ((int) markupPrice) + (cents > 0.45 ? cents : 1 + cents);
+    }
+
+    private void calculateMarkupPrice(StoreProfile newStore) {
+        newStore.getStockList().forEach(stock -> {
+            boolean shouldMarkUp = newStore.getMarkUpPrice();
+            double markupPrice = shouldMarkUp ? calculateMarkupPrice(stock.getStorePrice(), markupPercentage) : stock.getStorePrice();
+            stock.setPrice(markupPrice);
+        });
+    }
+
     public List<StoreProfile> findNearbyStores(double latitude,
                                                double longitude,
                                                StoreType storeType,
@@ -117,8 +149,8 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         double maxLat = latitude + range,
                 minLat = latitude - range;
 
-        List<StoreProfile> stores = profileRepo.findByLatitudeBetweenAndLongitudeBetweenAndStoreType(minLat,
-                maxLat, minLong, maxLong, storeType).stream()
+        List<StoreProfile> stores = profileRepo.findByLatitudeBetweenAndLongitudeBetweenAndStoreType(
+                minLat,maxLat, minLong, maxLong, storeType).stream()
                 .peek(profile -> profile.getBank().setAccountId(mainPayAccount))
                 .collect(Collectors.toList());
 

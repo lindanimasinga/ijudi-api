@@ -24,7 +24,7 @@ public class IjudiApplication extends SpringBootServletInitializer {
 
 	@PostConstruct
 	public void init() {
-		TimeZone.setDefault(TimeZone.getTimeZone("Africa/Johannesburg"));
+		TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
 	}
 
 }

@@ -1,6 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.model;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.curiousoft.ijudi.ordermanagement.validator.ValidMobileNumber;
 import org.springframework.data.mongodb.core.index.Indexed;
 
@@ -28,8 +29,9 @@ public class Profile extends BaseModel {
     private String emailAddress;
     @NotNull(message = "role not valid")
     private ProfileRoles role;
+    @JsonIgnore
     private int responseTimeMinutes;
-    private String verificationCode;
+    @JsonIgnore
     private Bank bank;
     private double latitude;
     private double longitude;
@@ -109,6 +111,7 @@ public class Profile extends BaseModel {
         return servicesCompleted;
     }
 
+    @JsonIgnore
     public void setServicesCompleted(int servicesCompleted) {
         this.servicesCompleted = servicesCompleted;
     }
@@ -117,6 +120,7 @@ public class Profile extends BaseModel {
         return badges;
     }
 
+    @JsonIgnore
     public void setBadges(int badges) {
         this.badges = badges;
     }
@@ -141,16 +145,9 @@ public class Profile extends BaseModel {
         return responseTimeMinutes;
     }
 
+    @JsonIgnore
     public void setResponseTimeMinutes(int responseTimeMinutes) {
         this.responseTimeMinutes = responseTimeMinutes;
-    }
-
-    public String getVerificationCode() {
-        return verificationCode;
-    }
-
-    public void setVerificationCode(String verificationCode) {
-        this.verificationCode = verificationCode;
     }
 
     public Bank getBank() {
