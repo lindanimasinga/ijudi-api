@@ -114,7 +114,7 @@ public class OrderServiceImpl implements OrderService {
             throw new Exception("shop with id " + order.getShopId() + " does not exist");
         }
 
-        if (!storeOptional.get().getCollectAllowed() && order.getShippingData().getType() == ShippingData.ShippingType.COLLECTION) {
+        if (!storeOptional.get().getScheduledDeliveryAllowed() && order.getShippingData().getType() == ShippingData.ShippingType.COLLECTION) {
             throw new Exception("Collection not allowed for shop " + storeOptional.get().getName());
         }
 

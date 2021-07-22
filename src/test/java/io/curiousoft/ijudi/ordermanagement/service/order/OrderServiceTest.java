@@ -16,7 +16,6 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
-import org.springframework.boot.test.mock.mockito.MockBean;
 
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
@@ -498,7 +497,7 @@ public class OrderServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
-        storeProfile.setCollectAllowed(false);
+        storeProfile.setScheduledDeliveryAllowed(false);
 
         Set<Stock> stockItems = new HashSet<>();
         stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));

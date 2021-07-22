@@ -35,7 +35,7 @@ public class StoreProfile extends Profile implements GeoPoint {
     private Messager storeMessenger;
     private String storeWebsiteUrl;
     private boolean izingaTakesCommission;
-    private boolean collectAllowed = true;
+    private boolean scheduledDeliveryAllowed = false;
     private AVAILABILITY availability = AVAILABILITY.SPECIFIC_HOURS;
     private String brandPrimaryColor = "#d69447";
     private String brandSecondaryColor = "#d69447";
@@ -172,12 +172,12 @@ public class StoreProfile extends Profile implements GeoPoint {
         this.shortName = shortName != null ? shortName.toLowerCase() : null;
     }
 
-    public boolean getCollectAllowed() {
-        return collectAllowed;
+    public boolean getScheduledDeliveryAllowed() {
+        return scheduledDeliveryAllowed;
     }
 
-    public void setCollectAllowed(boolean collectAllowed) {
-        this.collectAllowed = collectAllowed;
+    public void setScheduledDeliveryAllowed(boolean scheduledDeliveryAllowed) {
+        this.scheduledDeliveryAllowed = scheduledDeliveryAllowed;
     }
 
     public String getBrandPrimaryColor() {
