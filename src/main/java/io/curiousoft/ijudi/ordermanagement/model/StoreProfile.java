@@ -232,7 +232,11 @@ public class StoreProfile extends Profile implements GeoPoint {
         if(availability == AVAILABILITY.ONLINE24_7 || businessHours == null || businessHours.isEmpty()) {
             return false;
         }
-//ZoneId.of(ZoneOffset.ofHours(2).id)
+
+        if(scheduledDeliveryAllowed) {
+            return false;
+        }
+
         Calendar calender = new Calendar.Builder().setInstant(businessHours.get(0).getOpen()).build();
         Date open  = Date.from(LocalDateTime.now()
                 .withHour(calender.get(Calendar.HOUR_OF_DAY))

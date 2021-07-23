@@ -402,6 +402,7 @@ public class OrderServiceTest {
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+        storeProfile.setScheduledDeliveryAllowed(true);
 
         Order order = new Order();
         Basket basket = new Basket();
@@ -436,7 +437,7 @@ public class OrderServiceTest {
     }
 
     @Test
-    public void startOrderOnlineCollection() throws Exception {
+    public void startScheduledOrderOnline() throws Exception {
         //given
         StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
 
@@ -444,7 +445,7 @@ public class OrderServiceTest {
         stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
         stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
         storeProfile.setStockList(stockItems);
-        
+        storeProfile.setScheduledDeliveryAllowed(true);
         storeProfile.setBusinessHours(new ArrayList<>());
         storeProfile.setFeatured(true);
         storeProfile.setHasVat(false);
@@ -534,7 +535,7 @@ public class OrderServiceTest {
             Order newOrder = sut.startOrder(order);
             fail();
         }catch (Exception e) {
-            Assert.assertEquals("Collection not allowed for shop name", e.getMessage());
+            Assert.assertEquals("Collection or scheduled orders not allowed for name", e.getMessage());
         }
         verify(storeRepo).findById(order.getShopId());
         verify(customerRepo).existsById(order.getCustomerId());

@@ -115,7 +115,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         if (!storeOptional.get().getScheduledDeliveryAllowed() && order.getShippingData().getType() == ShippingData.ShippingType.COLLECTION) {
-            throw new Exception("Collection not allowed for shop " + storeOptional.get().getName());
+            throw new Exception("Collection or scheduled orders not allowed for " + storeOptional.get().getName());
         }
 
         if (storeOptional.get().isStoreOffline()) {

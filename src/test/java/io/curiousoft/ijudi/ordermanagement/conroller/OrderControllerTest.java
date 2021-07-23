@@ -81,7 +81,7 @@ public class OrderControllerTest {
         stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
         stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
         store.setStockList(stockItems);
-
+        store.setScheduledDeliveryAllowed(true);
         store.setBusinessHours(new ArrayList<>());
         store.setFeatured(true);
         store.setHasVat(false);
