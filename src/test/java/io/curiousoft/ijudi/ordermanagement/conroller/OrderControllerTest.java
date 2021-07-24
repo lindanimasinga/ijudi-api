@@ -7,6 +7,7 @@ import io.curiousoft.ijudi.ordermanagement.IjudiApplication;
 import io.curiousoft.ijudi.ordermanagement.model.*;
 import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
+import org.junit.*;
 import io.curiousoft.ijudi.ordermanagement.service.payfast.PayFastPaymentData;
 import org.junit.*;
 import org.junit.runner.RunWith;
@@ -79,7 +80,7 @@ public class OrderControllerTest {
         stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
         stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
         store.setStockList(stockItems);
-
+        store.setScheduledDeliveryAllowed(true);
         store.setBusinessHours(new ArrayList<>());
         store.setFeatured(true);
         store.setHasVat(false);
@@ -99,7 +100,7 @@ public class OrderControllerTest {
         order.setBasket(basket);
         ShippingData shipping = new ShippingData(store.getAddress(),
                 user.getAddress(),
-                ShippingData.ShippingType.COLLECTION);
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
         Date date = Date.from(LocalDateTime.now().plusMinutes(15).atZone(ZoneId.systemDefault()).toInstant());
         shipping.setPickUpTime(date);
         order.setShippingData(shipping);
@@ -140,7 +141,7 @@ public class OrderControllerTest {
         order.setBasket(basket);
         ShippingData shipping = new ShippingData(store.getAddress(),
                 user.getAddress(),
-                ShippingData.ShippingType.COLLECTION);
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
         Date date = Date.from(LocalDateTime.now().plusMinutes(15).atZone(ZoneId.systemDefault()).toInstant());
         shipping.setPickUpTime(date);
         order.setShippingData(shipping);
@@ -182,7 +183,7 @@ public class OrderControllerTest {
         order.setBasket(basket);
         ShippingData shipping = new ShippingData(store.getAddress(),
                 user.getAddress(),
-                ShippingData.ShippingType.COLLECTION);
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
         Date date = Date.from(LocalDateTime.now().plusMinutes(15).atZone(ZoneId.systemDefault()).toInstant());
         shipping.setPickUpTime(date);
         order.setShippingData(shipping);
@@ -223,7 +224,7 @@ public class OrderControllerTest {
         order.setBasket(basket);
         ShippingData shipping = new ShippingData(store.getAddress(),
                 user.getAddress(),
-                ShippingData.ShippingType.COLLECTION);
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
         Date date = Date.from(LocalDateTime.now().plusMinutes(15).atZone(ZoneId.systemDefault()).toInstant());
         shipping.setPickUpTime(date);
         order.setShippingData(shipping);

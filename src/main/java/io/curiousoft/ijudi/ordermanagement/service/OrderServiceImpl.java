@@ -114,8 +114,8 @@ public class OrderServiceImpl implements OrderService {
             throw new Exception("shop with id " + order.getShopId() + " does not exist");
         }
 
-        if (!storeOptional.get().getCollectAllowed() && order.getShippingData().getType() == ShippingData.ShippingType.COLLECTION) {
-            throw new Exception("Collection not allowed for shop " + storeOptional.get().getName());
+        if (!storeOptional.get().getScheduledDeliveryAllowed() && order.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY) {
+            throw new Exception("Collection or scheduled orders not allowed for " + storeOptional.get().getName());
         }
 
         if (storeOptional.get().isStoreOffline()) {
@@ -174,7 +174,6 @@ public class OrderServiceImpl implements OrderService {
         persistedOrder.setPaymentType(order.getPaymentType());
         boolean isDelivery = persistedOrder.getShippingData() != null &&
                 persistedOrder.getShippingData().getType() == ShippingData.ShippingType.DELIVERY;
-
 
         if (!paymentService.paymentReceived(persistedOrder)) {
             throw new Exception("Payment not cleared yet. please verify again.");
@@ -245,7 +244,7 @@ public class OrderServiceImpl implements OrderService {
                 OrderStage stage = onlineDeliveryStages.get(index + 1);
                 order.setStage(stage);
                 break;
-            case COLLECTION:
+            case SCHEDULED_DELIVERY:
                 OrderStage collectionStage = onlineCollectionStages.get(index + 1);
                 order.setStage(collectionStage);
                 break;
@@ -268,7 +267,7 @@ public class OrderServiceImpl implements OrderService {
                 break;
             case STAGE_3_READY_FOR_COLLECTION:
                 StoreProfile shop = storeRepository.findById(order.getShopId()).get();
-                List<Device> devices = order.getShippingData().getType() == ShippingData.ShippingType.COLLECTION ?
+                List<Device> devices = order.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY ?
                         deviceRepo.findByUserId(order.getCustomerId()) :
                         deviceRepo.findByUserId(order.getShippingData().getMessengerId());
 
@@ -409,7 +408,7 @@ public class OrderServiceImpl implements OrderService {
 
             //notify by sms
             boolean isLateDeliveryOrder = order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY && order.getModifiedDate().before(checkDate);
-            boolean isLateCollectionOrder = order.getShippingData().getType() == ShippingData.ShippingType.COLLECTION
+            boolean isLateCollectionOrder = order.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY
                     && order.getShippingData().getPickUpTime().before(checkDate);
 
             if (isLateDeliveryOrder || isLateCollectionOrder) {

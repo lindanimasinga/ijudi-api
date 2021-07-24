@@ -125,7 +125,8 @@ public class ShippingData {
 
     public enum ShippingType {
         COLLECTION,
-        DELIVERY
+        DELIVERY,
+        SCHEDULED_DELIVERY
     }
 }
 

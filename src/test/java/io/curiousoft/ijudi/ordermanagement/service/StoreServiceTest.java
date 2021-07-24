@@ -900,12 +900,13 @@ public class StoreServiceTest {
                 "https://image.url",
                 "081mobilenumb",
                 tags,
-
                 businessHours,
                 "ownerId",
                 new Bank());
         initialProfile.setBusinessHours(new ArrayList<>());
         initialProfile.setFeatured(true);
+        initialProfile.setId(profileId);
+
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
         initialProfile.setFeaturedExpiry(date);
 
@@ -916,17 +917,18 @@ public class StoreServiceTest {
 
         Stock stock2 = new Stock("bananas 1kg", 24, 0, 0, Collections.emptyList());
 
+        when(storeRepository.findById(profileId)).thenReturn(Optional.of(initialProfile));
+        when(storeRepository.save(initialProfile)).thenReturn(initialProfile);
+
         //when
         try {
             storeService.addStockForShop(profileId, stock2);
-            fail();
-        } catch (Exception e) {
-            e.printStackTrace();
-            Assert.assertEquals("stock price must be greater than or equal to 0.001", e.getMessage());
+        } catch (Exception ignored) {
         }
-        //verify
-        verifyNoInteractions(storeRepository);
 
+        //verify
+        verify(storeRepository).findById(profileId);
+        verify(storeRepository).save(initialProfile);
     }
 
     @Test

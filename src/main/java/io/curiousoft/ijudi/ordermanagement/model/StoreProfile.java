@@ -35,7 +35,7 @@ public class StoreProfile extends Profile implements GeoPoint {
     private Messager storeMessenger;
     private String storeWebsiteUrl;
     private boolean izingaTakesCommission;
-    private boolean collectAllowed = false;
+    private boolean scheduledDeliveryAllowed = false;
     private AVAILABILITY availability = AVAILABILITY.SPECIFIC_HOURS;
     private String brandPrimaryColor = "#d69447";
     private String brandSecondaryColor = "#d69447";
@@ -172,12 +172,12 @@ public class StoreProfile extends Profile implements GeoPoint {
         this.shortName = shortName != null ? shortName.toLowerCase() : null;
     }
 
-    public boolean getCollectAllowed() {
-        return collectAllowed;
+    public boolean getScheduledDeliveryAllowed() {
+        return scheduledDeliveryAllowed;
     }
 
-    public void setCollectAllowed(boolean collectAllowed) {
-        this.collectAllowed = collectAllowed;
+    public void setScheduledDeliveryAllowed(boolean scheduledDeliveryAllowed) {
+        this.scheduledDeliveryAllowed = scheduledDeliveryAllowed;
     }
 
     public String getBrandPrimaryColor() {
@@ -232,7 +232,11 @@ public class StoreProfile extends Profile implements GeoPoint {
         if(availability == AVAILABILITY.ONLINE24_7 || businessHours == null || businessHours.isEmpty()) {
             return false;
         }
-//ZoneId.of(ZoneOffset.ofHours(2).id)
+
+        if(scheduledDeliveryAllowed) {
+            return false;
+        }
+
         Calendar calender = new Calendar.Builder().setInstant(businessHours.get(0).getOpen()).build();
         Date open  = Date.from(LocalDateTime.now()
                 .withHour(calender.get(Calendar.HOUR_OF_DAY))
