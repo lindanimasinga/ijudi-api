@@ -459,7 +459,7 @@ public class OrderServiceTest {
         order.setBasket(basket);
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.COLLECTION);
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
         Date date = Date.from(LocalDateTime.now().plusMinutes(15).atZone(ZoneId.systemDefault()).toInstant());
         shipping.setPickUpTime(date);
         order.setShippingData(shipping);
@@ -518,7 +518,7 @@ public class OrderServiceTest {
         order.setBasket(basket);
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.COLLECTION);
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
         Date date = Date.from(LocalDateTime.now().plusMinutes(15).atZone(ZoneId.systemDefault()).toInstant());
         shipping.setPickUpTime(date);
         order.setShippingData(shipping);
@@ -563,7 +563,7 @@ public class OrderServiceTest {
         order.setBasket(basket);
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.COLLECTION);
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
         Date date = Date.from(LocalDateTime.now().minusMinutes(15).atZone(ZoneId.systemDefault()).toInstant());
         shipping.setPickUpTime(date);
         order.setShippingData(shipping);
@@ -1610,7 +1610,7 @@ public class OrderServiceTest {
         
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.COLLECTION);
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
         shipping.setMessengerId("messagerID");
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -1654,7 +1654,7 @@ public class OrderServiceTest {
 
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.COLLECTION);
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
         shipping.setMessengerId("messagerID");
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -1692,7 +1692,7 @@ public class OrderServiceTest {
         
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.COLLECTION);
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
         shipping.setMessengerId("messagerID");
         order.setShippingData(shipping);
         Date orderDate = Date.from(LocalDateTime.now().minusSeconds(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -1944,7 +1944,7 @@ public class OrderServiceTest {
         
         ShippingData shipping2 = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.COLLECTION);
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
         Date pickUpTime = Date.from(LocalDateTime.now().minusMinutes(320).atZone(ZoneId.systemDefault()).toInstant());
         shipping2.setPickUpTime(pickUpTime);
         shipping.setMessengerId("messagerID");
@@ -2004,7 +2004,7 @@ public class OrderServiceTest {
 
         ShippingData shipping2 = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.COLLECTION);
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
         Date pickUpTime = Date.from(LocalDateTime.now().minusMinutes(320).atZone(ZoneId.systemDefault()).toInstant());
         shipping2.setPickUpTime(pickUpTime);
         shipping.setMessengerId("messagerID");
@@ -2071,7 +2071,7 @@ public class OrderServiceTest {
 
         ShippingData shipping2 = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.COLLECTION);
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
         Date pickUpTime = Date.from(LocalDateTime.now().minusMinutes(320).atZone(ZoneId.systemDefault()).toInstant());
         shipping2.setPickUpTime(pickUpTime);
         shipping.setMessengerId("messagerID");
@@ -2133,7 +2133,7 @@ public class OrderServiceTest {
         
         ShippingData shipping2 = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.COLLECTION);
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
         Date pickUpTime = Date.from(LocalDateTime.now().minusMinutes(320).atZone(ZoneId.systemDefault()).toInstant());
         shipping2.setPickUpTime(pickUpTime);
         shipping.setMessengerId("messagerID");
@@ -2173,7 +2173,7 @@ public class OrderServiceTest {
         
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.COLLECTION);
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
         shipping.setMessengerId("messagerID");
         Date pickUpTime = Date.from(LocalDateTime.now().plusMinutes(320).atZone(ZoneId.systemDefault()).toInstant());
         shipping.setPickUpTime(pickUpTime);
@@ -2191,7 +2191,7 @@ public class OrderServiceTest {
         
         ShippingData shipping2 = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.COLLECTION);
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
         shipping.setMessengerId("messagerID");
         Date pickUpTime2 = Date.from(LocalDateTime.now()
                 .plusMinutes(60)
@@ -2239,7 +2239,7 @@ public class OrderServiceTest {
         
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.COLLECTION);
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
         shipping.setMessengerId("messagerID");
         Date pickUpTime = Date.from(LocalDateTime.now().plusMinutes(320).atZone(ZoneId.systemDefault()).toInstant());
         shipping.setPickUpTime(pickUpTime);
@@ -2256,7 +2256,7 @@ public class OrderServiceTest {
         
         ShippingData shipping2 = new ShippingData("shopAddress",
                 "to address",
-                ShippingData.ShippingType.COLLECTION);
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
         shipping.setMessengerId("messagerID");
         Date pickUpTime2 = Date.from(LocalDateTime.now()
                 .plusMinutes(61)

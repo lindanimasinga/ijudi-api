@@ -15,10 +15,10 @@ public class ShippingValidator implements ConstraintValidator<ValidDeliveryInfo,
         public boolean isValid(Order order, ConstraintValidatorContext context) {
             ShippingData value = order.getShippingData();
             if(value == null) return true;
-            boolean isValidBuildingType = value.getType() == ShippingData.ShippingType.COLLECTION
+            boolean isValidBuildingType = value.getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY
                     || value.getBuildingType() == BuildingType.HOUSE ||
                     (!StringUtils.isEmpty(value.getUnitNumber()) && !StringUtils.isEmpty(value.getBuildingName()));
-            boolean isValidPickup = value.getType() == ShippingData.ShippingType.COLLECTION
+            boolean isValidPickup = value.getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY
                     && value.getPickUpTime() != null && value.getPickUpTime().after(new Date());
             boolean hasMessengerForDelivery = value.getMessengerId() != null;
             return isValidBuildingType && ( isValidPickup || hasMessengerForDelivery);
