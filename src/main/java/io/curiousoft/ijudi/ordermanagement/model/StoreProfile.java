@@ -237,7 +237,15 @@ public class StoreProfile extends Profile implements GeoPoint {
             return false;
         }
 
-        Calendar calender = new Calendar.Builder().setInstant(businessHours.get(0).getOpen()).build();
+        Optional<BusinessHours> businessDay = businessHours.stream()
+                .filter(day -> LocalDateTime.now().getDayOfWeek() == day.getDay())
+                .findFirst();
+
+        if(!businessDay.isPresent()) {
+            return true;
+        }
+
+        Calendar calender = new Calendar.Builder().setInstant(businessDay.get().getOpen()).build();
         Date open  = Date.from(LocalDateTime.now()
                 .withHour(calender.get(Calendar.HOUR_OF_DAY))
                 .withMinute(calender.get(Calendar.MINUTE))
@@ -245,7 +253,7 @@ public class StoreProfile extends Profile implements GeoPoint {
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
 
-        calender = new Calendar.Builder().setInstant(businessHours.get(0).getClose()).build();
+        calender = new Calendar.Builder().setInstant(businessDay.get().getClose()).build();
         Date close  = Date.from(LocalDateTime.now()
                 .withHour(calender.get(Calendar.HOUR_OF_DAY))
                 .withMinute(calender.get(Calendar.MINUTE))
