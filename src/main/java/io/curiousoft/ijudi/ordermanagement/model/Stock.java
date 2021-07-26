@@ -16,7 +16,7 @@ public class Stock {
     private String description;
     private String detailedDescription;
     private List<String> tags;
-    private String Group;
+    private String group;
     private int position = 10000;
     @Min(value = 0, message = "stock quantity not valid")
     private int quantity;
@@ -142,11 +142,11 @@ public class Stock {
     }
 
     public String getGroup() {
-        return Group;
+        return group;
     }
 
     public void setGroup(String group) {
-        Group = group;
+        this.group = group;
     }
 
     public int getPosition() {
