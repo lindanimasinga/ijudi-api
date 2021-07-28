@@ -116,16 +116,4 @@ public class IjudiUtils {
         double markupPrice = storePrice + (storePrice * markPercentage);
         return ((int) markupPrice) + (cents > 0.45 ? cents : 1 + cents);
     }
-
-    public static void calculateMarkupPrice(StoreProfile newStore, double markupPercentage) {
-        newStore.getStockList().forEach(stock -> {
-            boolean shouldMarkUp = newStore.getMarkUpPrice();
-            if(stock.getStorePrice() == 0) {
-                double storePrice = stock.getPrice();
-                stock.setStorePrice(storePrice);
-            }
-            double markupPrice = shouldMarkUp ? IjudiUtils.calculateMarkupPrice(stock.getStorePrice(), markupPercentage) : stock.getStorePrice();
-            stock.setPrice(markupPrice);
-        });
-    }
 }

@@ -1,8 +1,10 @@
 package io.curiousoft.ijudi.ordermanagement.model;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.util.StringUtils;
 
+import javax.annotation.PostConstruct;
 import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotEmpty;
@@ -62,6 +64,12 @@ public class StoreProfile extends Profile implements GeoPoint {
         this.storeType = storeType;
         this.shortName = shortName;
         setBank(bank);
+    }
+
+    public void setMarkUp(double markupPerc) {
+        if(markUpPrice) {
+            stockList.forEach(it -> it.setMarkupPercentage(markupPerc));
+        }
     }
 
     public String getRegNumber() {
