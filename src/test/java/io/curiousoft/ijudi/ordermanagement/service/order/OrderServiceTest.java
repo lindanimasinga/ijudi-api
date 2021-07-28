@@ -142,6 +142,7 @@ public class OrderServiceTest {
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
         Assert.assertEquals(10, order.getShippingData().getFee(), 0);
+        Assert.assertEquals(8, order.getShippingData().getDistance(), 0);
         Assert.assertEquals(1.25, order.getServiceFee(), 0);
         Assert.assertEquals(40.00, order.getBasketAmount(), 0);
         Assert.assertEquals(false, order.getHasVat());

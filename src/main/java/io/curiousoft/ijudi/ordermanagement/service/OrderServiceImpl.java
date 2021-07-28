@@ -147,6 +147,7 @@ public class OrderServiceImpl implements OrderService {
             double ratePerKM = storeOptional.get().getStoreMessenger() != null ? storeOptional.get().getStoreMessenger().getRatePerKm() : this.ratePerKm;
             deliveryFee = calculateDeliveryFee(standardFee, standardDistance, ratePerKM, distance);
             order.getShippingData().setFee(deliveryFee);
+            order.getShippingData().setDistance(distance);
         }
 
         boolean isEligibleForFreeDelivery = storeOptional.get().isEligibleForFreeDelivery(order);
