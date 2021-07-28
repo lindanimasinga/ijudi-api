@@ -43,14 +43,14 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         profile.setBank(user.getBank());
         StoreProfile newStore = super.create(profile);
         user.setRole(ProfileRoles.STORE_ADMIN);
-        IjudiUtils.calculateMarkupPrice(newStore, markupPercentage);
+        newStore.setMarkUp(markupPercentage);
         userProfileRepo.save(user);
         return newStore;
     }
 
     @Override
     public StoreProfile update(String profileId, StoreProfile profile) throws Exception {
-        IjudiUtils.calculateMarkupPrice(profile, markupPercentage);
+        profile.setMarkUp(markupPercentage);
         return super.update(profileId, profile);
     }
 
@@ -58,7 +58,10 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
     public List<StoreProfile> findAll() {
         return super.findAll()
                 .stream()
-                .peek(profile -> profile.getBank().setAccountId(mainPayAccount))
+                .peek(profile -> {
+                    profile.getBank().setAccountId(mainPayAccount);
+                    profile.setMarkUp(markupPercentage);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -74,6 +77,9 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
             hours.add(new BusinessHours(DayOfWeek.MONDAY, instance1.getTime(), instance2.getTime()));
             store.setBusinessHours(hours);
             profileRepo.save(store);
+        }
+        if (store != null) {
+            store.setMarkUp(markupPercentage);
         }
         return store;
     }
@@ -98,13 +104,12 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
 
     public Set<Stock> findStockForShop(String profileId) throws Exception {
         StoreProfile store = profileRepo.findById(profileId).orElseThrow(() -> new Exception("Profile not found"));
+        store.setMarkUp(markupPercentage);
         return store.getStockList();
     }
 
     public void addStockForShop(String profileId, Stock stock) throws Exception {
         validate(stock);
-        double markupPrice = IjudiUtils.calculateMarkupPrice(stock.getStorePrice(), markupPercentage);
-        stock.setPrice(markupPrice);
         StoreProfile store = profileRepo.findById(profileId).orElseThrow(() -> new Exception("Profile not found"));
         Optional<Stock> stockOptional = store.getStockList().stream()
                 .filter(item -> stock.getName().equals(item.getName()))
@@ -117,6 +122,7 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         } else {
             store.getStockList().add(stock);
         }
+        store.setMarkUp(markupPercentage);
         profileRepo.save(store);
     }
 
@@ -132,7 +138,10 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
 
         List<StoreProfile> stores = profileRepo.findByLatitudeBetweenAndLongitudeBetweenAndStoreType(
                 minLat,maxLat, minLong, maxLong, storeType).stream()
-                .peek(profile -> profile.getBank().setAccountId(mainPayAccount))
+                .peek(profile -> {
+                    profile.getBank().setAccountId(mainPayAccount);
+                    profile.setMarkUp(markupPercentage);
+                })
                 .collect(Collectors.toList());
 
         GeoPoint origin = new GeoPointImpl(latitude, longitude);

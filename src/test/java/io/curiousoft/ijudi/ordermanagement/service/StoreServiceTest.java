@@ -661,8 +661,6 @@ public class StoreServiceTest {
 
         Stock stock1 = new Stock("bananas 1kg", 24, 15, 0, Collections.emptyList());
         Stock stock2 = new Stock("bananas 1kg", 24, 16, 0, Collections.emptyList());
-        stock1.setPrice(15.0);
-        stock2.setPrice(16.0);
         Set<Stock> stockList = new HashSet<>();
         stockList.add(stock1);
         stockList.add(stock2);
@@ -676,7 +674,7 @@ public class StoreServiceTest {
         verify(storeRepository).findById(profileId);
         Assert.assertNotNull(stockForShop);
         Assert.assertEquals(1, stockForShop.size());
-        Assert.assertEquals(15, stockForShop.iterator().next().getPrice(), 0);
+        Assert.assertEquals(17, stockForShop.iterator().next().getPrice(), 0);
         Assert.assertEquals(15, stockForShop.iterator().next().getStorePrice(), 0);
 
     }

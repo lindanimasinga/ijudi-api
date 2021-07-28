@@ -1,5 +1,8 @@
 package io.curiousoft.ijudi.ordermanagement.model;
 
+import io.curiousoft.ijudi.ordermanagement.utils.IjudiUtils;
+import org.springframework.data.annotation.Transient;
+
 import javax.validation.constraints.DecimalMin;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
@@ -28,7 +31,8 @@ public class Stock {
     @NotNull(message = "mandatorySelection not valid")
     private List<SelectionOption> mandatorySelection;
     private List<SelectionOption> optionalSelection;
-    private double price;
+    @Transient
+    private double markupPercentage;
 
     public Stock() {
     }
@@ -70,11 +74,7 @@ public class Stock {
     }
 
     public double getPrice() {
-        return price;
-    }
-
-    public void setPrice(double price) {
-        this.price = price;
+        return markupPercentage > 0 ? IjudiUtils.calculateMarkupPrice(storePrice, markupPercentage) : storePrice;
     }
 
     public double getStorePrice() {
@@ -168,5 +168,9 @@ public class Stock {
     @Override
     public int hashCode() {
         return Objects.hash(name);
+    }
+
+    public void setMarkupPercentage(double markupPercentage) {
+        this.markupPercentage = markupPercentage;
     }
 }
