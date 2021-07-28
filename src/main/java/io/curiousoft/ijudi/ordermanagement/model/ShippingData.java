@@ -23,6 +23,7 @@ public class ShippingData {
     private String messengerId;
     @Future(message = "pickup date must be at least 15 minutes ahead")
     private Date pickUpTime;
+    private double distance;
 
     public ShippingData() {
     }
@@ -121,6 +122,14 @@ public class ShippingData {
 
     public void setBuildingName(String buildingName) {
         this.buildingName = buildingName;
+    }
+
+    public double getDistance() {
+        return distance;
+    }
+
+    public void setDistance(double distance) {
+        this.distance = distance;
     }
 
     public enum ShippingType {
