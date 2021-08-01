@@ -7,6 +7,7 @@ public class BasketItem {
     private String name;
     private int quantity;
     private double price;
+    private double storePrice;
     private double discountPerc;
     private List<SelectionOption> options;
 
@@ -67,5 +68,13 @@ public class BasketItem {
         if (o == null || getClass() != o.getClass()) return false;
         BasketItem that = (BasketItem) o;
         return name.equals(that.name);
+    }
+
+    public double getStorePrice() {
+        return storePrice;
+    }
+
+    public void setStorePrice(double storePrice) {
+        this.storePrice = storePrice;
     }
 }
