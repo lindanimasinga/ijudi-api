@@ -1,6 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.utils;
 
 import com.curiousoft.alarmsystem.messaging.domain.directions.GoogleDirectionsResponse;
+import com.curiousoft.alarmsystem.messaging.domain.directions.Leg;
 import com.curiousoft.alarmsystem.messaging.domain.geofencing.GoogleGeoCodeResponse;
 import com.curiousoft.alarmsystem.messaging.domain.geofencing.Location;
 import com.curiousoft.alarmsystem.messaging.firebase.GoogleServices;
@@ -19,10 +20,7 @@ import javax.xml.bind.DatatypeConverter;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 public class IjudiUtils {
 
@@ -98,7 +96,11 @@ public class IjudiUtils {
         Location location = geoCode.getResults().get(0).getGeometry().getLocation();
         String customerLatLong = location.getLat() + "," + location.getLng();
         GoogleDirectionsResponse directions = googleMapsInstance.findDirections(apiKey, storeLatLong, customerLatLong).execute().body();
-        return directions.getRoutes().get(0).getLegs().get(0).getDistance().getValue() / 1000; // kilometers
+
+        return directions.getRoutes().stream()
+                .flatMap(route -> route.getLegs().stream())
+                .min(Comparator.comparingInt(leg1 -> leg1.getDistance().getValue()))
+                .map(value -> value.getDistance().getValue() / 1000).orElse(0); // kilometers
     }
 
     public static double calculateDeliveryFee(double standardFee, double standardDistance, double ratePerKM, double distance) {
