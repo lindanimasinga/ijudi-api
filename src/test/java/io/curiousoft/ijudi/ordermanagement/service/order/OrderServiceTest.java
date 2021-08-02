@@ -72,14 +72,14 @@ public class OrderServiceTest {
     }
 
     private StoreProfile createStoreProfile(StoreType food) {
-        return createStoreProfile(food, 1, 23);
+        return createStoreProfile(food, 0, 23);
     }
 
     private StoreProfile createStoreProfile(StoreType food, int openHour, int closeHour) {
 
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         LocalDateTime dateTimeOpen  = LocalDateTime.now().withHour(openHour).withMinute(0);
-        LocalDateTime dateTimeClose  = LocalDateTime.now().withHour(closeHour).withMinute(0);
+        LocalDateTime dateTimeClose  = LocalDateTime.now().withHour(closeHour).withMinute(59);
         Date open = Date.from(dateTimeOpen.toInstant(ZoneOffset.of("+02:00")));
         Date close = Date.from(dateTimeClose.toInstant(ZoneOffset.of("+02:00")));
         businessHours.add(new BusinessHours(DayOfWeek.MONDAY, open, close));
@@ -213,7 +213,6 @@ public class OrderServiceTest {
     @Test
     public void startOrderOnlineFreeDelivery() throws Exception {
         //given
-        ArrayList<BusinessHours> businessHours = new ArrayList<>();
         StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
         storeProfile.setFreeDeliveryMinAmount(500);
 
