@@ -211,6 +211,60 @@ public class OrderServiceTest {
     }
 
     @Test
+    public void startOrderShop_scheduling_not_allowed_this_time() throws Exception {
+        //given
+        LocalDateTime open = LocalDateTime.now().withHour(3);
+        LocalDateTime close = LocalDateTime.now().withHour(5);
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD, open.getHour(), close.getHour());
+        storeProfile.setAvailability(StoreProfile.AVAILABILITY.SPECIFIC_HOURS);
+        storeProfile.setScheduledDeliveryAllowed(true);
+
+        LocalDateTime dateNow = LocalDateTime.now();
+        MockedStatic<LocalDateTime> mocked = mockStatic(LocalDateTime.class);
+        mocked.when(LocalDateTime::now).thenReturn(dateNow.withHour(2).withMinute(59));
+
+        Set<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
+        stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+        ShippingData shipping = new ShippingData("shopAddress",
+                "46 Ududu Rd, Emlandweni, KwaMashu, 4051",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messagerID");
+        shipping.setBuildingType(BuildingType.HOUSE);
+        order.setShippingData(shipping);
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+
+        //when
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+        when(repo.save(order)).thenReturn(order);
+
+        try {
+            Order newOrder = sut.startOrder(order);
+            fail();
+        }catch (Exception e) {
+            Assert.assertEquals("Only Scheduled delivery is allowed at this time", e.getMessage());
+        }
+
+        //verify
+        verify(repo, times(0)).save(order);
+        verify(customerRepo).existsById(order.getCustomerId());
+        verify(storeRepo).findById(order.getShopId());
+    }
+
+    @Test
     public void startOrderOnlineFreeDelivery() throws Exception {
         //given
         StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
