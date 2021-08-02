@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 
 import static io.curiousoft.ijudi.ordermanagement.model.OrderStage.*;
 import static io.curiousoft.ijudi.ordermanagement.model.OrderType.INSTORE;
+import static io.curiousoft.ijudi.ordermanagement.model.OrderType.ONLINE;
 import static io.curiousoft.ijudi.ordermanagement.utils.IjudiUtils.calculateDeliveryFee;
 import static io.curiousoft.ijudi.ordermanagement.utils.IjudiUtils.calculateDrivingDirectionKM;
 import static java.lang.String.format;
@@ -122,7 +123,8 @@ public class OrderServiceImpl implements OrderService {
             throw new Exception("Shop not available " + storeOptional.get().getName());
         }
 
-        if(order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
+        if(order.getOrderType() == ONLINE
+                && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
                 && !storeOptional.get().isDeliverNowAllowed()) {
             throw new Exception("Only Scheduled delivery is allowed at this time");
         }

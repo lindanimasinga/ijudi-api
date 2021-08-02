@@ -75,7 +75,7 @@ public class OrderServiceTest {
     }
 
     private StoreProfile createStoreProfile(StoreType food) {
-        return createStoreProfile(food, 7, 22);
+        return createStoreProfile(food, 1, 23);
     }
 
     private StoreProfile createStoreProfile(StoreType food, int openHour, int closeHour) {
@@ -85,8 +85,13 @@ public class OrderServiceTest {
         LocalDateTime dateTimeClose  = LocalDateTime.now().withHour(closeHour).withMinute(0);
         Date open = Date.from(dateTimeOpen.toInstant(ZoneOffset.of("+02:00")));
         Date close = Date.from(dateTimeClose.toInstant(ZoneOffset.of("+02:00")));
-        businessHours.add(
-                new BusinessHours(DayOfWeek.MONDAY, open, close));
+        businessHours.add(new BusinessHours(DayOfWeek.MONDAY, open, close));
+        businessHours.add(new BusinessHours(DayOfWeek.TUESDAY, open, close));
+        businessHours.add(new BusinessHours(DayOfWeek.WEDNESDAY, open, close));
+        businessHours.add(new BusinessHours(DayOfWeek.THURSDAY, open, close));
+        businessHours.add(new BusinessHours(DayOfWeek.FRIDAY, open, close));
+        businessHours.add(new BusinessHours(DayOfWeek.SATURDAY, open, close));
+        businessHours.add(new BusinessHours(DayOfWeek.SUNDAY, open, close));
         List<String> tags = Collections.singletonList("Pizza");
         StoreProfile storeProfile = new StoreProfile(
                 food,
@@ -597,7 +602,6 @@ public class OrderServiceTest {
         stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
         storeProfile.setStockList(stockItems);
 
-        storeProfile.setBusinessHours(new ArrayList<>());
         storeProfile.setFeatured(true);
         storeProfile.setHasVat(true);
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
@@ -625,6 +629,7 @@ public class OrderServiceTest {
         when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
         when(repo.save(order)).thenReturn(order);
         Order newOrder = sut.startOrder(order);
+
         //verify
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
