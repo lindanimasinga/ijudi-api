@@ -309,10 +309,10 @@ public class StoreProfile extends Profile implements GeoPoint {
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
 
-        Date lowerBoundTime = Date.from(LocalDateTime.now().plusHours(2)
+        Date lowerBoundTime = Date.from(LocalDateTime.now()
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
-        Date upperBoundTime = Date.from(LocalDateTime.now().plusHours(2).plusMinutes(14) //should not accept orders 15 minutes before store closes
+        Date upperBoundTime = Date.from(LocalDateTime.now().plusMinutes(14) //should not accept orders 15 minutes before store closes
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
         return lowerBoundTime.after(open)
