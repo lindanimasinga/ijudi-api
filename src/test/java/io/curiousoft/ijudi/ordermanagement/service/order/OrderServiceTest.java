@@ -469,7 +469,7 @@ public class OrderServiceTest {
         basket.setItems(items);
         order.setBasket(basket);
         ShippingData shipping = new ShippingData("shopAddress",
-                "to address",
+                "46 Ududu Rd, Emlandweni, KwaMashu, 4051",
                 ShippingData.ShippingType.SCHEDULED_DELIVERY);
         Date date = Date.from(LocalDateTime.now().plusMinutes(15).atZone(ZoneId.systemDefault()).toInstant());
         shipping.setPickUpTime(date);
@@ -489,8 +489,8 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(newOrder.getId());
-        Assert.assertEquals(1.00, newOrder.getServiceFee(), 0);
-        Assert.assertEquals(0, newOrder.getShippingData().getFee(), 0);
+        Assert.assertEquals(1.75, newOrder.getServiceFee(), 0);
+        Assert.assertEquals(30, newOrder.getShippingData().getFee(), 0);
         Assert.assertEquals(40.00, newOrder.getBasketAmount(), 0);
         //verify total amount paid
         Assert.assertEquals(newOrder.getServiceFee() + basket.getItems().stream()

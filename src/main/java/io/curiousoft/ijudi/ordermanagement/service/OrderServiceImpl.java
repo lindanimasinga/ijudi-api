@@ -147,7 +147,7 @@ public class OrderServiceImpl implements OrderService {
         order.setStage(STAGE_0_CUSTOMER_NOT_PAID);
 
         double deliveryFee = 0;
-        if (order.getOrderType() == OrderType.ONLINE && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY) {
+        if (order.getOrderType() == OrderType.ONLINE) {
             double distance = calculateDrivingDirectionKM(googleMapsApiKey, order, storeOptional);
             double standardFee = storeOptional.get().getStoreMessenger() != null ? storeOptional.get().getStoreMessenger().getStandardDeliveryPrice() : this.starndardDeliveryFee;
             double standardDistance = storeOptional.get().getStoreMessenger() != null ? storeOptional.get().getStoreMessenger().getStandardDeliveryKm() : this.starndardDeliveryKm;
