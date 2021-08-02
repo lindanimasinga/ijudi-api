@@ -122,6 +122,11 @@ public class OrderServiceImpl implements OrderService {
             throw new Exception("Shop not available " + storeOptional.get().getName());
         }
 
+        if(order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
+                && !storeOptional.get().isDeliverNowAllowed()) {
+            throw new Exception("Only Scheduled delivery is allowed at this time");
+        }
+
         List<String> stockItemNames = storeOptional.get()
                 .getStockList().stream().map(Stock::getName)
                 .collect(Collectors.toList());

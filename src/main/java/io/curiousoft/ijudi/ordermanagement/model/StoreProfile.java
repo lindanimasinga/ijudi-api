@@ -279,6 +279,46 @@ public class StoreProfile extends Profile implements GeoPoint {
                 || upperBoundTime.after(close);
     }
 
+    public boolean isDeliverNowAllowed() {
+
+        if(businessHours == null || businessHours.isEmpty()) {
+            return false;
+        }
+
+        Optional<BusinessHours> businessDay = businessHours.stream()
+                .filter(day -> LocalDateTime.now().getDayOfWeek() == day.getDay())
+                .findFirst();
+
+        if(!businessDay.isPresent()) {
+            return false;
+        }
+
+        Calendar calender = new Calendar.Builder().setInstant(businessDay.get().getOpen()).build();
+        Date open  = Date.from(LocalDateTime.now()
+                .withHour(calender.get(Calendar.HOUR_OF_DAY))
+                .withMinute(calender.get(Calendar.MINUTE))
+                .withSecond(calender.get(Calendar.SECOND))
+                .atZone(ZoneId.systemDefault())
+                .toInstant());
+
+        calender = new Calendar.Builder().setInstant(businessDay.get().getClose()).build();
+        Date close  = Date.from(LocalDateTime.now()
+                .withHour(calender.get(Calendar.HOUR_OF_DAY))
+                .withMinute(calender.get(Calendar.MINUTE))
+                .withSecond(calender.get(Calendar.SECOND))
+                .atZone(ZoneId.systemDefault())
+                .toInstant());
+
+        Date lowerBoundTime = Date.from(LocalDateTime.now().plusHours(2)
+                .atZone(ZoneId.systemDefault())
+                .toInstant());
+        Date upperBoundTime = Date.from(LocalDateTime.now().plusHours(2).plusMinutes(14) //should not accept orders 15 minutes before store closes
+                .atZone(ZoneId.systemDefault())
+                .toInstant());
+        return lowerBoundTime.after(open)
+                || upperBoundTime.before(close);
+    }
+
     public enum AVAILABILITY {
         OFFLINE, SPECIFIC_HOURS, ONLINE24_7
     }
