@@ -316,7 +316,7 @@ public class StoreProfile extends Profile implements GeoPoint {
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
         return lowerBoundTime.after(open)
-                || upperBoundTime.before(close);
+                && upperBoundTime.before(close);
     }
 
     public enum AVAILABILITY {
