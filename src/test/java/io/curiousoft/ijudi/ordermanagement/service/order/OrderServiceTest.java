@@ -52,9 +52,9 @@ public class OrderServiceTest {
 
     @Before
     public void setUp() {
-        double standardDeliveryFee = 10;
-        double standardDeliveryKm = 10;
-        double ratePerKm = 1;
+        double standardDeliveryFee = 15;
+        double standardDeliveryKm = 3;
+        double ratePerKm = 5;
         double serviceFee = 0.025;
         long cleanInMinutes = 5;
         sut = new OrderServiceImpl(
@@ -101,8 +101,8 @@ public class OrderServiceTest {
                 new Bank());
         storeProfile.setFeatured(true);
         storeProfile.setHasVat(false);
-        storeProfile.setLatitude(-29.7287185);
-        storeProfile.setLongitude(30.9344252);
+        storeProfile.setLatitude(-29.7828761);
+        storeProfile.setLongitude(31.0012573);
         storeProfile.setId("shopid");
         storeProfile.setAvailability(StoreProfile.AVAILABILITY.ONLINE24_7);
         return storeProfile;
@@ -126,7 +126,7 @@ public class OrderServiceTest {
         basket.setItems(items);
         order.setBasket(basket);
         ShippingData shipping = new ShippingData("shopAddress",
-                "46 Ududu Rd, Emlandweni, KwaMashu, 4051",
+                "25 Mgobhozi Rd, Enkanyisweni, KwaMashu, 4051",
                 ShippingData.ShippingType.DELIVERY);
         shipping.setMessengerId("messagerID");
         shipping.setBuildingType(BuildingType.HOUSE);
@@ -144,9 +144,9 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
-        Assert.assertEquals(10, order.getShippingData().getFee(), 0);
-        Assert.assertEquals(8, order.getShippingData().getDistance(), 0);
-        Assert.assertEquals(1.25, order.getServiceFee(), 0);
+        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
+        Assert.assertEquals(30, order.getShippingData().getFee(), 0);
+        Assert.assertEquals(1.75, order.getServiceFee(), 0);
         Assert.assertEquals(40.00, order.getBasketAmount(), 0);
         Assert.assertEquals(false, order.getHasVat());
         Assert.assertEquals(false, order.getFreeDelivery());
@@ -245,7 +245,8 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
-        Assert.assertEquals(10, order.getShippingData().getFee(), 0);
+        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
+        Assert.assertEquals(30, order.getShippingData().getFee(), 0);
         Assert.assertEquals(12.5, order.getServiceFee(), 0);
         Assert.assertEquals(500.00, order.getBasketAmount(), 0);
         Assert.assertEquals(false, order.getHasVat());
@@ -297,7 +298,8 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
-        Assert.assertEquals(45.00, order.getShippingData().getFee(), 0);
+        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
+        Assert.assertEquals(35, order.getShippingData().getFee(), 0);
         Assert.assertEquals(0, order.getServiceFee(), 0);
         Assert.assertEquals(40.00, order.getBasketAmount(), 0);
         Assert.assertEquals(false, order.getHasVat());
@@ -497,7 +499,7 @@ public class OrderServiceTest {
     }
 
     @Test
-    public void startOrderCollectionAllowed() throws Exception {
+    public void startOrder_shceduled_delivery() throws Exception {
         //given
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
         List<String> tags = Collections.singletonList("Pizza");
@@ -546,7 +548,7 @@ public class OrderServiceTest {
     }
 
     @Test
-    public void startOrderOnlineCollectionDateInThePast() throws Exception {
+    public void startOrderOnline_scheduled_Date_InThePast() throws Exception {
         //given
         StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
 
@@ -627,8 +629,9 @@ public class OrderServiceTest {
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
         Assert.assertTrue(order.getHasVat());
-        Assert.assertEquals(1.25, order.getServiceFee(), 0);
-        Assert.assertEquals(10.00, order.getShippingData().getFee(), 0);
+        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
+        Assert.assertEquals(30, order.getShippingData().getFee(), 0);
+        Assert.assertEquals(1.75, order.getServiceFee(), 0);
         Assert.assertEquals(40, order.getBasketAmount(), 0);
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
