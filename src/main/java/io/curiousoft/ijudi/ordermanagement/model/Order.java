@@ -198,4 +198,8 @@ public class Order extends BaseModel {
     public void setMinimumDepositAllowedPerc(double minimumDepositAllowedPerc) {
         this.minimumDepositAllowedPerc = minimumDepositAllowedPerc;
     }
+
+    public double getMinimumDepositAllowedPerc() {
+        return minimumDepositAllowedPerc;
+    }
 }
