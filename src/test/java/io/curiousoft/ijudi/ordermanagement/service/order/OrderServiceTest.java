@@ -554,6 +554,71 @@ public class OrderServiceTest {
     }
 
     @Test
+    public void startScheduledOrderOnline_pay_deposit_amount() throws Exception {
+        //given
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+
+        Set<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
+        stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+        storeProfile.setScheduledDeliveryAllowed(true);
+        storeProfile.setBusinessHours(new ArrayList<>());
+        storeProfile.setFeatured(true);
+        storeProfile.setHasVat(false);
+        storeProfile.setMinimumDepositAllowedPerc(0.3);
+
+        //create an order
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+        ShippingData shipping = new ShippingData("shopAddress",
+                "46 Ududu Rd, Emlandweni, KwaMashu, 4051",
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
+        Date date = Date.from(LocalDateTime.now().plusMinutes(15).atZone(ZoneId.systemDefault()).toInstant());
+        shipping.setPickUpTime(date);
+        order.setShippingData(shipping);
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+        //when
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+        when(repo.save(order)).thenReturn(order);
+
+        Order newOrder = sut.startOrder(order);
+
+        //verify
+        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        Assert.assertNotNull(newOrder.getId());
+        Assert.assertEquals(1.75, newOrder.getServiceFee(), 0);
+        Assert.assertEquals(30, newOrder.getShippingData().getFee(), 0);
+        Assert.assertEquals(40.00, newOrder.getBasketAmount(), 0);
+        //verify total amount paid
+        Assert.assertEquals(newOrder.getServiceFee()
+                + basket.getItems().stream().mapToDouble(BasketItem::getTotalPrice).sum()
+                + shipping.getFee()
+                , newOrder.getTotalAmount(), 0);
+        //verify deposit amount to be paid
+        Assert.assertEquals(newOrder.getServiceFee()
+                        + basket.getItems().stream().mapToDouble(BasketItem::getTotalPrice).sum() * 0.3
+                        + shipping.getFee()
+                , newOrder.getDepositAmount(), 0);
+        Assert.assertFalse(newOrder.getHasVat());
+        verify(repo).save(order);
+        verify(customerRepo).existsById(order.getCustomerId());
+        verify(storeRepo).findById(order.getShopId());
+
+        System.out.println(order.getId());
+    }
+
+    @Test
     public void startOrder_shceduled_delivery() throws Exception {
         //given
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
@@ -641,6 +706,7 @@ public class OrderServiceTest {
             Assert.assertEquals("Order shipping is null or pickup time or messenger not valid or shipping address not valid", e.getMessage());
         }
     }
+
 
     @Test
     public void startOrderStoreWithVAT() throws Exception {

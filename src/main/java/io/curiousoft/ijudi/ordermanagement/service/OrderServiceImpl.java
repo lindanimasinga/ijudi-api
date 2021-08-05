@@ -145,6 +145,7 @@ public class OrderServiceImpl implements OrderService {
         String orderId = Order.generateId();
         order.setId(orderId);
         order.setStage(STAGE_0_CUSTOMER_NOT_PAID);
+        order.setMinimumDepositAllowedPerc(storeOptional.get().getMinimumDepositAllowedPerc());
 
         double deliveryFee = 0;
         if (order.getOrderType() == OrderType.ONLINE) {

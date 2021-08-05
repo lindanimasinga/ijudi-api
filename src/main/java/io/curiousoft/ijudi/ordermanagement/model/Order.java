@@ -42,6 +42,7 @@ public class Order extends BaseModel {
     private boolean smsSentToShop;
     private boolean smsSentToAdmin;
     private boolean freeDelivery;
+    private double minimumDepositAllowedPerc;
 
     public void setStage(OrderStage stage) {
         this.stage = stage;
@@ -184,5 +185,17 @@ public class Order extends BaseModel {
 
     public void setFreeDelivery(boolean freeDelivery) {
         this.freeDelivery = freeDelivery;
+    }
+
+    public double getDepositAmount() {
+        return BigDecimal.valueOf(serviceFee
+                + basket.getItems().stream().mapToDouble(BasketItem::getTotalPrice).sum() * minimumDepositAllowedPerc
+                + (!freeDelivery && shippingData != null ? shippingData.getFee() : 0))
+                .setScale(2, RoundingMode.HALF_EVEN)
+                .doubleValue();
+    }
+
+    public void setMinimumDepositAllowedPerc(double minimumDepositAllowedPerc) {
+        this.minimumDepositAllowedPerc = minimumDepositAllowedPerc;
     }
 }
