@@ -1,10 +1,8 @@
 package io.curiousoft.ijudi.ordermanagement.model;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.util.StringUtils;
 
-import javax.annotation.PostConstruct;
 import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotEmpty;
@@ -44,6 +42,7 @@ public class StoreProfile extends Profile implements GeoPoint {
     @PositiveOrZero(message = "free delivery min amount must be greater than or equal to 0.01")
     private double freeDeliveryMinAmount;
     private boolean markUpPrice = true;
+    private double minimumDepositAllowedPerc = 1;
 
 
     public StoreProfile(
@@ -309,14 +308,22 @@ public class StoreProfile extends Profile implements GeoPoint {
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
 
-        Date lowerBoundTime = Date.from(LocalDateTime.now()
+        Date lowerBoundTime = Date.from(LocalDateTime.now().plusHours(2)
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
-        Date upperBoundTime = Date.from(LocalDateTime.now().plusMinutes(14) //should not accept orders 15 minutes before store closes
+        Date upperBoundTime = Date.from(LocalDateTime.now().plusHours(2).plusMinutes(14) //should not accept orders 15 minutes before store closes
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
         return lowerBoundTime.after(open)
                 && upperBoundTime.before(close);
+    }
+
+    public void setMinimumDepositAllowedPerc(double minimumDepositAllowedPerc) {
+        this.minimumDepositAllowedPerc = minimumDepositAllowedPerc;
+    }
+
+    public double getMinimumDepositAllowedPerc() {
+        return minimumDepositAllowedPerc;
     }
 
     public enum AVAILABILITY {
