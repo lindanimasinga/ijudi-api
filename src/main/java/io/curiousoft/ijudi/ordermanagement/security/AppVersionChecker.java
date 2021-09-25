@@ -28,7 +28,7 @@ public class AppVersionChecker implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response,
                              Object handler) throws Exception  {
         int appVersion = versionNumberAsInt(request.getHeader("app-version"));
-        if(appVersion < minSupportedVersion) {
+        if(!request.getServletPath().equals("/") && appVersion < minSupportedVersion) {
             throw new ServletException("Please download a new version of iZinga from the app store.");
         }
         return true;
