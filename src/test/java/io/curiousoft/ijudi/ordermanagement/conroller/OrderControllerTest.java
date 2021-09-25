@@ -45,7 +45,7 @@ public class OrderControllerTest {
         //create user
         user = new UserProfile("TestUser",
                 UserProfile.SignUpReason.BUY,
-                "myaddress",
+                "21 Mgobhozi Rd, Enkanyisweni, KwaMashu, 4051",
                 "path to image",
                 "0812815707",
                 ProfileRoles.CUSTOMER);
@@ -120,8 +120,8 @@ public class OrderControllerTest {
         //verify
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, orderResponse.getStage());
         Assert.assertNotNull(orderResponse.getId());
-        Assert.assertEquals(1.00, orderResponse.getServiceFee(), 0);
-        Assert.assertEquals(0, orderResponse.getShippingData().getFee(), 0);
+        Assert.assertEquals(1.75, orderResponse.getServiceFee(), 0);
+        Assert.assertEquals(30.0, orderResponse.getShippingData().getFee(), 0);
         Assert.assertEquals(40.00, orderResponse.getBasketAmount(), 0);
         //verify total amount paid
         Assert.assertEquals(orderResponse.getServiceFee() + basket.getItems().stream()
@@ -163,6 +163,7 @@ public class OrderControllerTest {
         orderResponse.setPaymentType(PaymentType.PAYFAST);
         HttpHeaders headers = new HttpHeaders();
         headers.set("Origin", "app://izinga");
+        headers.set("app-version", "1.9.2");
         final HttpEntity<Order> entity = new HttpEntity<>(orderResponse, headers);
         orderResponse = rest.exchange(new URI("/order/" + orderResponse.getId()), HttpMethod.PATCH, entity, Order.class).getBody();
 
