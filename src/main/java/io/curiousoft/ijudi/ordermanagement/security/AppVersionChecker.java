@@ -28,7 +28,7 @@ public class AppVersionChecker implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response,
                              Object handler) throws Exception  {
         int appVersion = versionNumberAsInt(request.getHeader("app-version"));
-        if(!request.getServletPath().equals("/") && appVersion < minSupportedVersion) {
+        if(!allowUrl(request.getServletPath()) && appVersion < minSupportedVersion) {
             throw new ServletException("Please download a new version of iZinga from the app store.");
         }
         return true;
@@ -49,5 +49,16 @@ public class AppVersionChecker implements HandlerInterceptor {
 
         versionSupportedString = Arrays.stream(versionSupportedString.split("\\.")).reduce((a,b) -> a+b).get();
         return Integer.parseInt(versionSupportedString);
+    }
+
+    private boolean allowUrl(String path) {
+        switch (path) {
+            case "/":
+            case "/store":
+            case "/device" :
+            case "/promotion": return true;
+            default: return false;
+
+        }
     }
 }
