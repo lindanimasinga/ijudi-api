@@ -14,6 +14,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Locale;
 
 @Component
 public class AppVersionChecker implements HandlerInterceptor {
@@ -28,10 +29,14 @@ public class AppVersionChecker implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response,
                              Object handler) throws Exception  {
         int appVersion = versionNumberAsInt(request.getHeader("app-version"));
-        if(!allowUrl(request.getServletPath()) && appVersion < minSupportedVersion) {
+        if(!isOptionsMethod(request.getMethod()) && !allowUrl(request.getServletPath()) && appVersion < minSupportedVersion) {
             throw new ServletException("Please download a new version of iZinga from the app store.");
         }
         return true;
+    }
+
+    private boolean isOptionsMethod(String method) {
+        return "options".equalsIgnoreCase(method);
     }
 
     @Override
