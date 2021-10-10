@@ -2,6 +2,9 @@ package io.curiousoft.ijudi.ordermanagement.conroller;
 
 import io.curiousoft.ijudi.ordermanagement.model.Order;
 import io.curiousoft.ijudi.ordermanagement.service.OrderService;
+import io.curiousoft.ijudi.ordermanagement.service.OrderServiceImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +19,8 @@ import static io.curiousoft.ijudi.ordermanagement.model.PaymentType.PAYFAST;
 @RestController
 @RequestMapping("/order")
 public class OrderController {
+
+    private static Logger LOGGER = LoggerFactory.getLogger(OrderController.class);
 
     private List<String> allowedOrigins;
     private OrderService orderService;
@@ -35,6 +40,7 @@ public class OrderController {
                                              @RequestBody @Valid Order order,
                                              @RequestHeader(value = "Origin", required = false) String origin) throws Exception {
         if(order.getPaymentType() == PAYFAST && (origin == null || !allowedOrigins.contains(origin.toLowerCase()))) {
+            LOGGER.error("Unknown origin " + origin + ". Request not allowed");
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         return !order.getId().equals(id)? ResponseEntity.badRequest().build() : ResponseEntity.ok(orderService.finishOder(order));
