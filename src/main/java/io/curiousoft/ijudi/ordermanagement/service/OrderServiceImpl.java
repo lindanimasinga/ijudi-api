@@ -179,6 +179,10 @@ public class OrderServiceImpl implements OrderService {
         Order persistedOrder = orderRepo.findById(order.getId())
                 .orElseThrow(() -> new Exception("Order with id " + order.getId() + " not found."));
 
+        if(order.getStage() != STAGE_0_CUSTOMER_NOT_PAID) {
+            return persistedOrder;
+        }
+
         persistedOrder.setDescription(order.getDescription());
         persistedOrder.setPaymentType(order.getPaymentType());
         boolean isDelivery = persistedOrder.getShippingData() != null &&
