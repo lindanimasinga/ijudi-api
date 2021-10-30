@@ -58,11 +58,8 @@ public class AppVersionChecker implements HandlerInterceptor {
 
     private boolean allowUrl(String path) {
         switch (path) {
-            case "/":
-            case "/store":
-            case "/device" :
-            case "/promotion": return true;
-            default: return false;
+            case "/order": return false;
+            default: return true;
 
         }
     }
