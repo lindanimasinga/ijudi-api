@@ -37,8 +37,6 @@ public class StoreProfile extends Profile implements GeoPoint {
     private boolean izingaTakesCommission;
     private boolean scheduledDeliveryAllowed = false;
     private AVAILABILITY availability = AVAILABILITY.SPECIFIC_HOURS;
-    private String brandPrimaryColor = "#d69447";
-    private String brandSecondaryColor = "#d69447";
     @PositiveOrZero(message = "free delivery min amount must be greater than or equal to 0.01")
     private double freeDeliveryMinAmount;
     private boolean markUpPrice = true;
@@ -185,22 +183,6 @@ public class StoreProfile extends Profile implements GeoPoint {
 
     public void setScheduledDeliveryAllowed(boolean scheduledDeliveryAllowed) {
         this.scheduledDeliveryAllowed = scheduledDeliveryAllowed;
-    }
-
-    public String getBrandPrimaryColor() {
-        return brandPrimaryColor;
-    }
-
-    public void setBrandPrimaryColor(String brandPrimaryColor) {
-        this.brandPrimaryColor = brandPrimaryColor;
-    }
-
-    public String getBrandSecondaryColor() {
-        return brandSecondaryColor;
-    }
-
-    public void setBrandSecondaryColor(String brandSecondaryColor) {
-        this.brandSecondaryColor = brandSecondaryColor;
     }
 
     public double getFreeDeliveryMinAmount() {

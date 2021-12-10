@@ -5,8 +5,7 @@ import io.curiousoft.ijudi.ordermanagement.model.Order;
 import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
 import io.curiousoft.ijudi.ordermanagement.model.UserProfile;
 
-public interface SmsNotificationService {
-
+public interface AdminOnlyNotificationService {
 
     void sendMessage(String mobileNumber, String message) throws Exception;
 

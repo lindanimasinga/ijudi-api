@@ -18,7 +18,7 @@ public class PayFastPaymentProviderTest {
         headers.add("version", "v1");
         String passphrase = "passphrase";
 
-        String hash = PayFastPaymentProvider.generateSignature(headers, passphrase);
+        String hash = YocoPaymentProvider.generateSignature(headers, passphrase);
         Assert.assertEquals("", hash);
     }
 }

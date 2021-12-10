@@ -43,7 +43,7 @@ public class OrderServiceImpl implements OrderService {
     private final PaymentService paymentService;
     private final DeviceRepository deviceRepo;
     private final PushNotificationService pushNotificationService;
-    private final SmsNotificationService smsNotificationService;
+    private final AdminOnlyNotificationService smsNotificationService;
     private final double starndardDeliveryFee;
     private final double serviceFeePerc;
     private final long cleanUpMinutes;
@@ -65,7 +65,7 @@ public class OrderServiceImpl implements OrderService {
                             UserProfileRepo userProfileRepo, PaymentService paymentService,
                             DeviceRepository deviceRepo,
                             PushNotificationService pushNotificationService,
-                            SmsNotificationService smsNotifcationService) {
+                            AdminOnlyNotificationService smsNotifcationService) {
         this.starndardDeliveryFee = starndardDeliveryFee;
         this.starndardDeliveryKm = starndardDeliveryKm;
         this.ratePerKm = ratePerKm;

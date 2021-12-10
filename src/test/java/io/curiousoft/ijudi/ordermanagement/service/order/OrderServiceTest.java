@@ -8,7 +8,7 @@ import io.curiousoft.ijudi.ordermanagement.repo.StoreRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
 import io.curiousoft.ijudi.ordermanagement.service.OrderServiceImpl;
 import io.curiousoft.ijudi.ordermanagement.service.PaymentService;
-import io.curiousoft.ijudi.ordermanagement.service.SmsNotificationService;
+import io.curiousoft.ijudi.ordermanagement.service.AdminOnlyNotificationService;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -38,7 +38,7 @@ public class OrderServiceTest {
     @Mock
     private PushNotificationService pushNotificationService;
     @Mock
-    private SmsNotificationService smsNotifcation;
+    private AdminOnlyNotificationService smsNotifcation;
     @Mock
     private DeviceRepository deviceRepo;
     List<String> phoneNumbers = Collections.singletonList("08128155660");

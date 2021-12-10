@@ -1,4 +1,4 @@
-package io.curiousoft.ijudi.ordermanagement.service.payfast;
+package io.curiousoft.ijudi.ordermanagement.service.yoco;
 
 import io.curiousoft.ijudi.ordermanagement.model.Order;
 import io.curiousoft.ijudi.ordermanagement.model.PaymentType;
@@ -14,11 +14,11 @@ import org.springframework.stereotype.Service;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.security.NoSuchAlgorithmException;
-import java.util.*;
+import java.util.List;
 import java.util.logging.Logger;
 
 @Service
-public class PayFastPaymentProvider extends PaymentProvider<PayFastPaymentData> {
+public class PayFastPaymentProvider extends PaymentProvider<YocoPaymentData> {
 
     private static Logger logger = Logger.getLogger(UkheshePaymentProvider.class.getName());
     private final String apiKey;
@@ -53,7 +53,7 @@ public class PayFastPaymentProvider extends PaymentProvider<PayFastPaymentData> 
         headers.set("Content-type", "application/json");
         //Create a new HttpEntity
         final HttpEntity<String> entity = new HttpEntity<>(headers);
-        ResponseEntity<PayFastPaymentData> response = rest.exchange(url, HttpMethod.GET, entity, PayFastPaymentData.class);
+        ResponseEntity<YocoPaymentData> response = rest.exchange(url, HttpMethod.GET, entity, YocoPaymentData.class);
         return response.getBody() != null;
            //     && response.getBody().amount == order.getTotalAmount()
            //     && response.getBody().getTransactionReference().contains(order.getId())
@@ -62,7 +62,7 @@ public class PayFastPaymentProvider extends PaymentProvider<PayFastPaymentData> 
     }
 
     @Override
-    public boolean makePaymentToShop(PayFastPaymentData paymentData) throws Exception {
+    public boolean makePaymentToShop(YocoPaymentData paymentData) throws Exception {
         return false;
     }
 
