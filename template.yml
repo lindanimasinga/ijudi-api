@@ -1,0 +1,30 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: AWS Serverless Spring Boot API - izinga::api
+Globals:
+  Api:
+    EndpointConfiguration: REGIONAL
+
+Resources:
+  IzingaOrderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: io.curiousoft.ijudi.ordermanagement.StreamLambdaHandler::handleRequest
+      Runtime: java8
+      CodeUri: ./target/ijudi-api-0.0.1-SNAPSHOT-lambda-package.zip
+      MemorySize: 1024
+      Policies: AWSLambdaBasicExecutionRole
+      Timeout: 60
+      Events:
+        GetResource:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: any
+
+Outputs:
+  iZingaOrderApi:
+    Description: URL for application
+    Value: !Sub 'https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/'
+    Export:
+      Name: iZingaOrderApi
