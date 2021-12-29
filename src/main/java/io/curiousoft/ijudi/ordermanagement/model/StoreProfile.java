@@ -32,7 +32,7 @@ public class StoreProfile extends Profile implements GeoPoint {
     private Date featuredExpiry;
     @NotNull(message = "storeType is not valid")
     private StoreType storeType;
-    private Messager storeMessenger;
+    private Set<Messager> storeMessengers;
     private String storeWebsiteUrl;
     private boolean izingaTakesCommission;
     private boolean scheduledDeliveryAllowed = false;
@@ -143,12 +143,12 @@ public class StoreProfile extends Profile implements GeoPoint {
         this.storeType = storeType;
     }
 
-    public Messager getStoreMessenger() {
-        return storeMessenger;
+    public Set<Messager> getStoreMessenger() {
+        return storeMessengers;
     }
 
-    public void setStoreMessenger(Messager storeMessenger) {
-        this.storeMessenger = storeMessenger;
+    public void setStoreMessenger(Set<Messager> storeMessengers) {
+        this.storeMessengers = storeMessengers;
     }
 
     public String getOrderUrl() {
