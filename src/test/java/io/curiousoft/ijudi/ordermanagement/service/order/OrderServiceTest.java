@@ -1,5 +1,6 @@
 package io.curiousoft.ijudi.ordermanagement.service.order;
 
+import com.google.common.collect.Sets;
 import io.curiousoft.ijudi.ordermanagement.model.*;
 import io.curiousoft.ijudi.ordermanagement.notification.PushNotificationService;
 import io.curiousoft.ijudi.ordermanagement.repo.DeviceRepository;
@@ -9,6 +10,7 @@ import io.curiousoft.ijudi.ordermanagement.repo.UserProfileRepo;
 import io.curiousoft.ijudi.ordermanagement.service.OrderServiceImpl;
 import io.curiousoft.ijudi.ordermanagement.service.PaymentService;
 import io.curiousoft.ijudi.ordermanagement.service.SmsNotificationService;
+import org.assertj.core.util.Lists;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -316,8 +318,9 @@ public class OrderServiceTest {
         //given
         StoreProfile storeProfile = createStoreProfile(StoreType.CLOTHING);
 
-        Messager messager = new Messager("Postnet", 20.00, 3, 5);
-        storeProfile.setStoreMessenger(messager);
+        storeProfile.setStandardDeliveryPrice(20.00);
+        storeProfile.setStandardDeliveryKm(3);
+        storeProfile.setRatePerKm(5);
 
         Set<Stock> stockItems = new HashSet<>();
         stockItems.add(new Stock("skirt", 2, 10, 0, Collections.emptyList()));

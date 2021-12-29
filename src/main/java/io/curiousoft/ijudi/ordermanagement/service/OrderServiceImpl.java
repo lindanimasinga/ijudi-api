@@ -150,9 +150,9 @@ public class OrderServiceImpl implements OrderService {
         double deliveryFee = 0;
         if (order.getOrderType() == OrderType.ONLINE) {
             double distance = calculateDrivingDirectionKM(googleMapsApiKey, order, storeOptional);
-            double standardFee = storeOptional.get().getStoreMessenger() != null ? storeOptional.get().getStoreMessenger().getStandardDeliveryPrice() : this.starndardDeliveryFee;
-            double standardDistance = storeOptional.get().getStoreMessenger() != null ? storeOptional.get().getStoreMessenger().getStandardDeliveryKm() : this.starndardDeliveryKm;
-            double ratePerKM = storeOptional.get().getStoreMessenger() != null ? storeOptional.get().getStoreMessenger().getRatePerKm() : this.ratePerKm;
+            double standardFee = storeOptional.get().getStoreMessenger() != null ? storeOptional.get().getStandardDeliveryPrice() : this.starndardDeliveryFee;
+            double standardDistance = storeOptional.get().getStoreMessenger() != null ? storeOptional.get().getStandardDeliveryKm() : this.starndardDeliveryKm;
+            double ratePerKM = storeOptional.get().getStoreMessenger() != null ? storeOptional.get().getRatePerKm() : this.ratePerKm;
             deliveryFee = calculateDeliveryFee(standardFee, standardDistance, ratePerKM, distance);
             order.getShippingData().setFee(deliveryFee);
             order.getShippingData().setDistance(distance);

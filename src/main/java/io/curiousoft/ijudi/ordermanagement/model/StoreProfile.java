@@ -43,6 +43,9 @@ public class StoreProfile extends Profile implements GeoPoint {
     private double freeDeliveryMinAmount;
     private boolean markUpPrice = true;
     private double minimumDepositAllowedPerc = 1;
+    private double standardDeliveryPrice;
+    private double standardDeliveryKm;
+    private double ratePerKm;
 
 
     public StoreProfile(
@@ -324,6 +327,30 @@ public class StoreProfile extends Profile implements GeoPoint {
 
     public double getMinimumDepositAllowedPerc() {
         return minimumDepositAllowedPerc;
+    }
+
+    public double getStandardDeliveryPrice() {
+        return standardDeliveryPrice;
+    }
+
+    public void setStandardDeliveryPrice(double standardDeliveryPrice) {
+        this.standardDeliveryPrice = standardDeliveryPrice;
+    }
+
+    public double getStandardDeliveryKm() {
+        return standardDeliveryKm;
+    }
+
+    public void setStandardDeliveryKm(double standardDeliveryKm) {
+        this.standardDeliveryKm = standardDeliveryKm;
+    }
+
+    public double getRatePerKm() {
+        return ratePerKm;
+    }
+
+    public void setRatePerKm(double ratePerKm) {
+        this.ratePerKm = ratePerKm;
     }
 
     public enum AVAILABILITY {
