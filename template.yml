@@ -12,7 +12,7 @@ Resources:
       Handler: io.curiousoft.ijudi.ordermanagement.StreamLambdaHandler::handleRequest
       Runtime: java8
       CodeUri: ./target/ijudi-api-0.0.1-SNAPSHOT-lambda-package.zip
-      MemorySize: 1024
+      MemorySize: 2048
       Policies: AWSLambdaBasicExecutionRole
       Timeout: 60
       Events:
