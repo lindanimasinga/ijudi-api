@@ -46,6 +46,7 @@ public class StoreProfile extends Profile implements GeoPoint {
     private double standardDeliveryPrice;
     private double standardDeliveryKm;
     private double ratePerKm;
+    private String franchiseName;
 
 
     public StoreProfile(
@@ -351,6 +352,14 @@ public class StoreProfile extends Profile implements GeoPoint {
 
     public void setRatePerKm(double ratePerKm) {
         this.ratePerKm = ratePerKm;
+    }
+
+    public String getFranchiseName() {
+        return franchiseName;
+    }
+
+    public void setFranchiseName(String franchiseName) {
+        this.franchiseName = franchiseName;
     }
 
     public enum AVAILABILITY {
