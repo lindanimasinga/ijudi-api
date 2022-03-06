@@ -3,10 +3,7 @@ package io.curiousoft.ijudi.ordermanagement.model;
 import io.curiousoft.ijudi.ordermanagement.utils.IjudiUtils;
 import org.springframework.data.annotation.Transient;
 
-import javax.validation.constraints.DecimalMin;
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
+import javax.validation.constraints.*;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -26,6 +23,7 @@ public class Stock {
     @DecimalMin(value = "0.000", message = "stock price must be greater than or equal to 0.001")
     private double storePrice;
     @Min(value = 0, message = "discount % must be >= 0")
+    @Max(value = 1, message = "discount % must be <= 1")
     private double discountPerc;
     private List<String> images;
     @NotNull(message = "mandatorySelection not valid")
