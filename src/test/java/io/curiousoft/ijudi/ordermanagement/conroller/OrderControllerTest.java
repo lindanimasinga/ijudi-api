@@ -131,7 +131,7 @@ public class OrderControllerTest {
         Assert.assertEquals(40.00, orderResponse.getBasketAmount(), 0);
         //verify total amount paid
         Assert.assertEquals(orderResponse.getServiceFee() + basket.getItems().stream()
-                .mapToDouble(BasketItem::getTotalPrice).sum() + shipping.getFee(), orderResponse.getTotalAmount(), 0);
+                .mapToDouble(BasketItem::getTotalPrice).sum() + orderResponse.getShippingData().getFee(), orderResponse.getTotalAmount(), 0);
     }
 
     @Test

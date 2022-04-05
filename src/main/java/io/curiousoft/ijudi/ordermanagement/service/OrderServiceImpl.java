@@ -222,7 +222,7 @@ public class OrderServiceImpl implements OrderService {
             //notify the shop
             List<Device> shopDevices = deviceRepo.findByUserId(store.getOwnerId());
             if (shopDevices.size() > 0) {
-                pushNotificationService.notifyStoreOrderPlaced(shopDevices, persistedOrder);
+                pushNotificationService.notifyStoreOrderPlaced(store.getName(), shopDevices, persistedOrder);
             } else {
                 smsNotificationService.notifyOrderPlaced(store, persistedOrder, userProfileRepo.findById(order.getCustomerId()).get());
             }
@@ -377,18 +377,18 @@ public class OrderServiceImpl implements OrderService {
                 .toInstant());
         List<Order> unpaidOrders = orderRepo.findByShopPaidAndStageAndModifiedDateBefore(false, STAGE_0_CUSTOMER_NOT_PAID, pastDate);
         unpaidOrders.forEach(order -> {
-            for (String admin : adminCellNumbers) {
-                try {
-                    if(!order.getSmsSentToAdmin()) {
-                        smsNotificationService.sendMessage(admin, "Hi, iZinga Admin. Order " + order.getId() + " has not been paid. The customer may be having issues." +
-                                "View the order on shop.izinga.co.za/" + order.getShopId() + "/order/" + order.getId() + ".");
-                        order.setSmsSentToAdmin(true);
-                        orderRepo.save(order);
+                    if (!order.getSmsSentToAdmin()) {
+                        for (String admin : adminCellNumbers) {
+                            try {
+                                smsNotificationService.sendMessage(admin, "Hi, iZinga Admin. Order " + order.getId() + " has not been paid. The customer may be having issues." +
+                                        "View the order on shop.izinga.co.za/" + order.getShopId() + "/order/" + order.getId() + ".");
+                                order.setSmsSentToAdmin(true);
+                                orderRepo.save(order);
+                            } catch(Exception e){
+                                LOGGER.error("Failed to sent sms to admin", e);
+                            }
                     }
-                } catch (Exception e) {
-                    LOGGER.error("Failed to sent sms to admin", e);
                 }
-            }
             LOGGER.info("Sms sent to admin");
         });
     }

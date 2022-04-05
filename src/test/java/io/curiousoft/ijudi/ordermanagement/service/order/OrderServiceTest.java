@@ -43,7 +43,7 @@ public class OrderServiceTest {
     private SmsNotificationService smsNotifcation;
     @Mock
     private DeviceRepository deviceRepo;
-    List<String> phoneNumbers = Collections.singletonList("08128155660");
+    List<String> phoneNumbers = Lists.list("08128155660", "0812815707");
 
     //system under test
     private OrderServiceImpl sut;
@@ -299,6 +299,7 @@ public class OrderServiceTest {
         when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
         when(repo.save(order)).thenReturn(order);
         Order newOrder = sut.startOrder(order);
+
         //verify
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
@@ -1086,6 +1087,7 @@ public class OrderServiceTest {
         Set<Stock> stockList = new HashSet<>();
         stockList.add(stock1);
         shop.setStockList(stockList);
+
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
         when(paymentService.paymentReceived(order)).thenReturn(true);
@@ -1105,7 +1107,7 @@ public class OrderServiceTest {
         verify(repo).findById(order.getId());
         verify(storeRepo).findById(shopId);
         verify(storeRepo).save(shop);
-        verify(pushNotificationService).notifyStoreOrderPlaced(storeDevices, order);
+        verify(pushNotificationService).notifyStoreOrderPlaced("name", storeDevices, order);
         verify(pushNotificationService).notifyMessengerOrderPlaced(messengerDevices, order, shop);
         verify(deviceRepo).findByUserId(shop.getOwnerId());
     }
@@ -1178,8 +1180,8 @@ public class OrderServiceTest {
         verify(repo).findById(order.getId());
         verify(storeRepo).findById(shopId);
         verify(storeRepo).save(shop);
-        verify(pushNotificationService, times(0)).notifyStoreOrderPlaced(storeDevices, order);
-        verify(pushNotificationService, times(0)).notifyStoreOrderPlaced(storeDevices, order);
+        verify(pushNotificationService, times(0)).notifyStoreOrderPlaced("ShopName", storeDevices, order);
+        verify(pushNotificationService, times(0)).notifyStoreOrderPlaced("ShopName", storeDevices, order);
         verify(smsNotifcation).notifyOrderPlaced(shop, order, customer);
         verify(pushNotificationService).notifyMessengerOrderPlaced(messengerDevices, order, shop);
         verify(deviceRepo).findByUserId(shop.getOwnerId());
@@ -1235,7 +1237,7 @@ public class OrderServiceTest {
         verify(repo).findById(order.getId());
         verify(storeRepo).findById(shopId);
         verify(storeRepo).save(shop);
-        verify(pushNotificationService).notifyStoreOrderPlaced(storeDevices, order);
+        verify(pushNotificationService).notifyStoreOrderPlaced("ShopName", storeDevices, order);
         verify(deviceRepo).findByUserId(shop.getOwnerId());
     }
     @Test
@@ -1270,6 +1272,7 @@ public class OrderServiceTest {
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
         when(paymentService.paymentReceived(order)).thenReturn(true);
         Order finalOrder = sut.finishOder(order);
+
         //verify
         Assert.assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
         Assert.assertTrue(finalOrder.getShopPaid());
@@ -2171,6 +2174,9 @@ public class OrderServiceTest {
                                 " on iZinga app, otherwise the order will be cancelled.");
         verify(smsNotifcation, times(1))
                 .sendMessage(phoneNumbers.get(0), "Hi, iZinga Admin. " + storeProfile.getName() + ", has not accepted order " + order.getId() +
+                        " on iZinga app, otherwise the order will be cancelled.");
+        verify(smsNotifcation, times(1))
+                .sendMessage(phoneNumbers.get(1), "Hi, iZinga Admin. " + storeProfile.getName() + ", has not accepted order " + order.getId() +
                         " on iZinga app, otherwise the order will be cancelled.");
     }
 
