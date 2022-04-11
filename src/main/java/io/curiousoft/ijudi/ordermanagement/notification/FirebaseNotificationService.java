@@ -41,10 +41,10 @@ public class FirebaseNotificationService implements PushNotificationService {
 
     @Async
     @Override
-    public void notifyStoreOrderPlaced(List<Device> devices, Order order) {
+    public void notifyStoreOrderPlaced(String storeName, List<Device> devices, Order order) {
         devices.forEach(device -> {
             PushHeading title = new PushHeading(
-                    "New " + order.getOrderType().toString().toLowerCase() + " order placed. Please confirmed the order.",
+                    "New order placed at "+ storeName +". Please confirm the order.",
                     "New Order Received", null);
             PushMessage message = new PushMessage(PushMessageType.NEW_ORDER, title, order);
             try {

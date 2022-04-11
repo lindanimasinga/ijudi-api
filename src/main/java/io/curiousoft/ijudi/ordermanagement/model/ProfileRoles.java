@@ -5,5 +5,6 @@ public enum ProfileRoles {
     CUSTOMER,
     STORE_ADMIN,
     STORE,
-    MESSENGER
+    MESSENGER,
+    ADMIN
 }

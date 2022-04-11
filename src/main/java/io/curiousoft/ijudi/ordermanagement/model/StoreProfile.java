@@ -32,7 +32,7 @@ public class StoreProfile extends Profile implements GeoPoint {
     private Date featuredExpiry;
     @NotNull(message = "storeType is not valid")
     private StoreType storeType;
-    private Messager storeMessenger;
+    private Set<Messager> storeMessengers;
     private String storeWebsiteUrl;
     private boolean izingaTakesCommission;
     private boolean scheduledDeliveryAllowed = false;
@@ -41,6 +41,10 @@ public class StoreProfile extends Profile implements GeoPoint {
     private double freeDeliveryMinAmount;
     private boolean markUpPrice = true;
     private double minimumDepositAllowedPerc = 1;
+    private double standardDeliveryPrice;
+    private double standardDeliveryKm;
+    private double ratePerKm;
+    private String franchiseName;
 
 
     public StoreProfile(
@@ -141,12 +145,12 @@ public class StoreProfile extends Profile implements GeoPoint {
         this.storeType = storeType;
     }
 
-    public Messager getStoreMessenger() {
-        return storeMessenger;
+    public Set<Messager> getStoreMessenger() {
+        return storeMessengers;
     }
 
-    public void setStoreMessenger(Messager storeMessenger) {
-        this.storeMessenger = storeMessenger;
+    public void setStoreMessenger(Set<Messager> storeMessengers) {
+        this.storeMessengers = storeMessengers;
     }
 
     public String getOrderUrl() {
@@ -306,6 +310,38 @@ public class StoreProfile extends Profile implements GeoPoint {
 
     public double getMinimumDepositAllowedPerc() {
         return minimumDepositAllowedPerc;
+    }
+
+    public double getStandardDeliveryPrice() {
+        return standardDeliveryPrice;
+    }
+
+    public void setStandardDeliveryPrice(double standardDeliveryPrice) {
+        this.standardDeliveryPrice = standardDeliveryPrice;
+    }
+
+    public double getStandardDeliveryKm() {
+        return standardDeliveryKm;
+    }
+
+    public void setStandardDeliveryKm(double standardDeliveryKm) {
+        this.standardDeliveryKm = standardDeliveryKm;
+    }
+
+    public double getRatePerKm() {
+        return ratePerKm;
+    }
+
+    public void setRatePerKm(double ratePerKm) {
+        this.ratePerKm = ratePerKm;
+    }
+
+    public String getFranchiseName() {
+        return franchiseName;
+    }
+
+    public void setFranchiseName(String franchiseName) {
+        this.franchiseName = franchiseName;
     }
 
     public enum AVAILABILITY {

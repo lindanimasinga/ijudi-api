@@ -39,9 +39,13 @@ public class OrderControllerTest {
 
     private StoreProfile store;
     private UserProfile user;
+    private HttpHeaders headers;
 
     @Before
     public void setUp() throws Exception {
+        headers = new HttpHeaders();
+        headers.set("Origin", "app://izinga");
+        headers.set("app-version", "1.9.2");;
         //create user
         user = new UserProfile("TestUser",
                 UserProfile.SignUpReason.BUY,
@@ -111,7 +115,9 @@ public class OrderControllerTest {
         order.setDescription("description");
 
         ResponseEntity<String> result = this.rest.exchange(
-                RequestEntity.post(new URI("/order")).body(order), String.class);
+                RequestEntity.post(new URI("/order"))
+                        .headers(headers)
+                        .body(order), String.class);
 
         System.out.println(new ObjectMapper().writeValueAsString(result.getBody()));
         Assert.assertTrue(result.getStatusCode().is2xxSuccessful());
@@ -125,7 +131,7 @@ public class OrderControllerTest {
         Assert.assertEquals(40.00, orderResponse.getBasketAmount(), 0);
         //verify total amount paid
         Assert.assertEquals(orderResponse.getServiceFee() + basket.getItems().stream()
-                .mapToDouble(BasketItem::getTotalPrice).sum() + shipping.getFee(), orderResponse.getTotalAmount(), 0);
+                .mapToDouble(BasketItem::getTotalPrice).sum() + orderResponse.getShippingData().getFee(), orderResponse.getTotalAmount(), 0);
     }
 
     @Test
@@ -152,7 +158,8 @@ public class OrderControllerTest {
         order.setDescription("description");
 
         ResponseEntity<String> result = this.rest.exchange(
-                RequestEntity.post(new URI("/order")).body(order), String.class);
+                RequestEntity.post(new URI("/order")).headers(headers)
+                        .body(order), String.class);
 
         System.out.println(new ObjectMapper().writeValueAsString(result.getBody()));
         Assert.assertTrue(result.getStatusCode().is2xxSuccessful());
@@ -195,7 +202,8 @@ public class OrderControllerTest {
         order.setDescription("description");
 
         ResponseEntity<String> result = this.rest.exchange(
-                RequestEntity.post(new URI("/order")).body(order), String.class);
+                RequestEntity.post(new URI("/order"))
+                        .headers(headers).body(order), String.class);
 
         System.out.println(new ObjectMapper().writeValueAsString(result.getBody()));
         Assert.assertTrue(result.getStatusCode().is2xxSuccessful());
@@ -236,7 +244,8 @@ public class OrderControllerTest {
         order.setDescription("description");
 
         ResponseEntity<String> result = this.rest.exchange(
-                RequestEntity.post(new URI("/order")).body(order), String.class);
+                RequestEntity.post(new URI("/order"))
+                        .headers(headers).body(order), String.class);
 
         System.out.println(new ObjectMapper().writeValueAsString(result.getBody()));
         Assert.assertTrue(result.getStatusCode().is2xxSuccessful());
