@@ -3,10 +3,10 @@ package io.curiousoft.ijudi.ordermanagement.service.yoco;
 public class YocoPayRequest {
 
     private String token;
-    private double amountInCents;
+    private int amountInCents;
     private String currency;
 
-    public YocoPayRequest(String token, double amountInCents, String currency) {
+    public YocoPayRequest(String token, int amountInCents, String currency) {
         this.token = token;
         this.amountInCents = amountInCents;
         this.currency = currency;
@@ -20,11 +20,11 @@ public class YocoPayRequest {
         this.token = token;
     }
 
-    public double getAmountInCents() {
+    public int getAmountInCents() {
         return amountInCents;
     }
 
-    public void setAmountInCents(double amountInCents) {
+    public void setAmountInCents(int amountInCents) {
         this.amountInCents = amountInCents;
     }
 

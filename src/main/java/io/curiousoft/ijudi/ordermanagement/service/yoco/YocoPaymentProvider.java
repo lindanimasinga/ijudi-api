@@ -13,8 +13,10 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.filter.CommonsRequestLoggingFilter;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
@@ -41,19 +43,20 @@ public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
 
     @Override
     protected boolean paymentReceived(Order order) throws Exception {
-        String transactionId = order.getDescription().replace("yoco-", "");
+        String token = order.getDescription().replace("yoco-", "");
         String url = baseUrl + "/charges/";
         URI uri = new URI(url);
         RestTemplate rest = new RestTemplateBuilder()
-                .defaultHeader("ApiKey", apiKey)
+                .requestFactory(HttpComponentsClientHttpRequestFactory.class)
+                .defaultHeader("X-Auth-Secret-Key", apiKey)
                 .build();
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-type", "application/json");
         //Create a new HttpEntity
-        YocoPayRequest body = new YocoPayRequest(transactionId, order.getTotalAmount() * 100, "ZAR" );
+        YocoPayRequest body = new YocoPayRequest(token, (int) (order.getTotalAmount() * 100), "ZAR" );
         final HttpEntity<YocoPayRequest> entity = new HttpEntity<>(body, headers);
-        ResponseEntity<YocoPaymentResponse> response = rest.exchange(url, HttpMethod.GET, entity, YocoPaymentResponse.class);
+        ResponseEntity<YocoPaymentResponse> response = rest.exchange(url, HttpMethod.POST, entity, YocoPaymentResponse.class);
         return response.getBody() != null && "successful".equalsIgnoreCase(response.getBody().getStatus());
     }
 

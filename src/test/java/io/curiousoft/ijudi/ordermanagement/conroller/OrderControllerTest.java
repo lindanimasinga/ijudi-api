@@ -135,7 +135,7 @@ public class OrderControllerTest {
     }
 
     @Test
-    public void finishOrder_pay_with_payfast() throws JsonProcessingException, URISyntaxException {
+    public void finishOrder_pay_with_yoco() throws JsonProcessingException, URISyntaxException {
 
         //create an order
         Order order = new Order();
@@ -143,6 +143,7 @@ public class OrderControllerTest {
         List<BasketItem> items = new ArrayList<>();
         items.add(new BasketItem("chips", 2, 10, 0));
         items.add(new BasketItem("hotdog", 1, 20, 0));
+        items.add(new BasketItem("hotdog", 1, 208, 0));
         basket.setItems(items);
         order.setBasket(basket);
         ShippingData shipping = new ShippingData(store.getAddress(),
@@ -155,7 +156,7 @@ public class OrderControllerTest {
         order.setShopId(store.getId());
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setOrderType(OrderType.ONLINE);
-        order.setDescription("description");
+        order.setDescription("yoco-tok_WkNeGIXOa9dmJxsPP1ImdiqX");
 
         ResponseEntity<String> result = this.rest.exchange(
                 RequestEntity.post(new URI("/order")).headers(headers)
@@ -167,7 +168,7 @@ public class OrderControllerTest {
         Order orderResponse = new Gson().fromJson(result.getBody(), Order.class);
 
         //pay order
-        orderResponse.setPaymentType(PaymentType.PAYFAST);
+        orderResponse.setPaymentType(PaymentType.YOCO);
         HttpHeaders headers = new HttpHeaders();
         headers.set("Origin", "app://izinga");
         headers.set("app-version", "1.9.2");
@@ -221,7 +222,7 @@ public class OrderControllerTest {
     }
 
     @Test
-    public void finishOrder_pay_with_payfast_invalid_origin() throws JsonProcessingException, URISyntaxException {
+    public void finishOrder_pay_with_yoco_invalid_origin() throws JsonProcessingException, URISyntaxException {
 
         //create an order
         Order order = new Order();
