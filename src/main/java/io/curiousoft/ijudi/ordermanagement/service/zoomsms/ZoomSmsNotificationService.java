@@ -3,7 +3,7 @@ package io.curiousoft.ijudi.ordermanagement.service.zoomsms;
 import io.curiousoft.ijudi.ordermanagement.model.Order;
 import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
 import io.curiousoft.ijudi.ordermanagement.model.UserProfile;
-import io.curiousoft.ijudi.ordermanagement.service.SmsNotificationService;
+import io.curiousoft.ijudi.ordermanagement.service.AdminOnlyNotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,7 +19,7 @@ import java.net.URI;
 import static java.lang.String.format;
 
 @Service
-public class ZoomSmsNotificationService implements SmsNotificationService {
+public class ZoomSmsNotificationService implements AdminOnlyNotificationService {
 
     private static Logger LOGGER = LoggerFactory.getLogger(ZoomSmsNotificationService.class);
 

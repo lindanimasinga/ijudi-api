@@ -1,13 +1,13 @@
 package io.curiousoft.ijudi.ordermanagement.service.pos;
 
-        import io.curiousoft.ijudi.ordermanagement.model.Order;
-        import io.curiousoft.ijudi.ordermanagement.model.PaymentData;
-        import io.curiousoft.ijudi.ordermanagement.model.PaymentType;
-        import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
-        import io.curiousoft.ijudi.ordermanagement.service.PaymentProvider;
-        import org.springframework.stereotype.Service;
+import io.curiousoft.ijudi.ordermanagement.model.Order;
+import io.curiousoft.ijudi.ordermanagement.model.PaymentData;
+import io.curiousoft.ijudi.ordermanagement.model.PaymentType;
+import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
+import io.curiousoft.ijudi.ordermanagement.service.PaymentProvider;
+import org.springframework.stereotype.Service;
 
-        import java.util.List;
+import java.util.List;
 
 @Service
 public class POSPaymentProvider extends PaymentProvider {

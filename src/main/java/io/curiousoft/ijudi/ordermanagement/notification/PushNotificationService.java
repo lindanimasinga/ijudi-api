@@ -15,7 +15,7 @@ public interface PushNotificationService {
     void sendNotification(Device device, PushMessage message) throws Exception;
 
     @Async
-    void notifyStoreOrderPlaced(List<Device> devices, Order order);
+    void notifyStoreOrderPlaced(String storeName, List<Device> devices, Order order);
 
     void registerDevice(Device device);
 

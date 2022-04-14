@@ -1,4 +1,4 @@
-package io.curiousoft.ijudi.ordermanagement.service.payfast;
+package io.curiousoft.ijudi.ordermanagement.service.yoco;
 
 import io.curiousoft.ijudi.ordermanagement.model.Order;
 import io.curiousoft.ijudi.ordermanagement.model.PaymentType;
@@ -8,61 +8,60 @@ import io.curiousoft.ijudi.ordermanagement.service.ukheshe.UkheshePaymentProvide
 import io.curiousoft.ijudi.ordermanagement.utils.IjudiUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.filter.CommonsRequestLoggingFilter;
 
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
 import java.net.URLEncoder;
 import java.security.NoSuchAlgorithmException;
-import java.util.*;
+import java.util.List;
 import java.util.logging.Logger;
 
 @Service
-public class PayFastPaymentProvider extends PaymentProvider<PayFastPaymentData> {
+public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
 
-    private static Logger logger = Logger.getLogger(UkheshePaymentProvider.class.getName());
+    private static Logger logger = Logger.getLogger(YocoPaymentProvider.class.getName());
     private final String apiKey;
     private final String baseUrl;
-    private final UkheshePaymentProvider ukheshePaymentProvider;
 
 
     @Autowired
-    public PayFastPaymentProvider(@Value("${ozow.api.url}") String baseUrl,
-                                  @Value("${ozow.api.key}") String apiKey,
-                                  UkheshePaymentProvider ukheshePaymentProvider) {
-        super(PaymentType.PAYFAST);
+    public YocoPaymentProvider(@Value("${yoco.api.url}") String baseUrl,
+                               @Value("${yoco.api.key}") String apiKey) {
+        super(PaymentType.YOCO);
         this.apiKey = apiKey;
         this.baseUrl = baseUrl;
-        this.ukheshePaymentProvider = ukheshePaymentProvider;
     }
 
     @Override
     protected boolean paymentReceived(Order order) throws Exception {
-/*        //get transactions
-        LocalDateTime fromLocalDate = LocalDateTime.ofInstant(order.getCreatedDate().toInstant(),
-                ZoneId.systemDefault()).minusMinutes(10);
-        Date fromDate = Date.from(fromLocalDate.atZone(ZoneId.systemDefault()).toInstant());
-        String transactionId = order.getDescription().replace("ozow-", "");
-        String url = baseUrl + "/GetTransaction/?siteCode=CUR-CEL-001&transactionId=" + transactionId;
+        String token = order.getDescription().replace("yoco-", "");
+        String url = baseUrl + "/charges/";
         URI uri = new URI(url);
         RestTemplate rest = new RestTemplateBuilder()
-                .defaultHeader("ApiKey", apiKey)
+                .requestFactory(HttpComponentsClientHttpRequestFactory.class)
+                .defaultHeader("X-Auth-Secret-Key", apiKey)
                 .build();
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-type", "application/json");
         //Create a new HttpEntity
-        final HttpEntity<String> entity = new HttpEntity<>(headers);
-        ResponseEntity<PayFastPaymentData> response = rest.exchange(url, HttpMethod.GET, entity, PayFastPaymentData.class);
-        return response.getBody() != null;
-           //     && response.getBody().amount == order.getTotalAmount()
-           //     && response.getBody().getTransactionReference().contains(order.getId())
-           //     && "complete".equals(response.getBody().getStatus().toLowerCase());*/
-        return true;
+        YocoPayRequest body = new YocoPayRequest(token, (int) (order.getTotalAmount() * 100), "ZAR" );
+        final HttpEntity<YocoPayRequest> entity = new HttpEntity<>(body, headers);
+        ResponseEntity<YocoPaymentResponse> response = rest.exchange(url, HttpMethod.POST, entity, YocoPaymentResponse.class);
+        return response.getBody() != null && "successful".equalsIgnoreCase(response.getBody().getStatus());
     }
 
     @Override
-    public boolean makePaymentToShop(PayFastPaymentData paymentData) throws Exception {
+    public boolean makePaymentToShop(YocoPaymentData paymentData) throws Exception {
         return false;
     }
 

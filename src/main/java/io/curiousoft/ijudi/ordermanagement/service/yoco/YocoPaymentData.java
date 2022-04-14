@@ -1,8 +1,8 @@
-package io.curiousoft.ijudi.ordermanagement.service.payfast;
+package io.curiousoft.ijudi.ordermanagement.service.yoco;
 
 import io.curiousoft.ijudi.ordermanagement.model.PaymentData;
 
-public class PayFastPaymentData extends PaymentData {
+public class YocoPaymentData extends PaymentData {
 
     private String m_payment_id;
     private String pf_payment_id;

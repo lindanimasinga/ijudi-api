@@ -79,7 +79,7 @@ public class FirebaseNotificationServiceTest {
         devices.add(device2);
 
         //when
-        firebaseNotificationService.notifyStoreOrderPlaced(devices, order);
+        firebaseNotificationService.notifyStoreOrderPlaced("ShopName", devices, order);
         //then
         verify(wrapper, times(2)).sendMessage(any(FCMMessage.class));
     }
