@@ -81,7 +81,7 @@ public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
 
     @Override
     public boolean reversePayment(Order order) {
-        String url = baseUrl + "/charges/";
+        String url = baseUrl + "/refunds/";
         RestTemplate rest = new RestTemplateBuilder()
                 .requestFactory(HttpComponentsClientHttpRequestFactory.class)
                 .defaultHeader("X-Auth-Secret-Key", apiKey)
