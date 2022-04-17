@@ -38,4 +38,9 @@ public class POSPaymentProvider extends PaymentProvider {
     @Override
     public void makePayments(List ordersList) {
     }
+
+    @Override
+    public boolean reversePayment(Order order) {
+        return true;
+    }
 }

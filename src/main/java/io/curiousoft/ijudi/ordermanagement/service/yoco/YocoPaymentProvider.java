@@ -4,8 +4,6 @@ import io.curiousoft.ijudi.ordermanagement.model.Order;
 import io.curiousoft.ijudi.ordermanagement.model.PaymentType;
 import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
 import io.curiousoft.ijudi.ordermanagement.service.PaymentProvider;
-import io.curiousoft.ijudi.ordermanagement.service.ukheshe.UkheshePaymentProvider;
-import io.curiousoft.ijudi.ordermanagement.utils.IjudiUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
@@ -16,12 +14,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.filter.CommonsRequestLoggingFilter;
 
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
-import java.net.URLEncoder;
-import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -87,7 +81,6 @@ public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
 
     @Override
     public boolean reversePayment(Order order) {
-        String token = order.getDescription().replace("yoco-", "");
         String url = baseUrl + "/charges/";
         RestTemplate rest = new RestTemplateBuilder()
                 .requestFactory(HttpComponentsClientHttpRequestFactory.class)
@@ -97,7 +90,7 @@ public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-type", "application/json");
         //Create a new HttpEntity
-        String chargeId = order.getDescription().split("\\|")[0].replace("charge:", "");
+        String chargeId = order.getDescription().split("\\|")[1].replace("charge:", "");
         YocoReverseRequest body = new YocoReverseRequest(chargeId);
         final HttpEntity<YocoReverseRequest> entity = new HttpEntity<>(body, headers);
         ResponseEntity<YocoPaymentResponse> response = rest.exchange(url, HttpMethod.POST, entity, YocoPaymentResponse.class);
