@@ -57,7 +57,12 @@ public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
         YocoPayRequest body = new YocoPayRequest(token, (int) (order.getTotalAmount() * 100), "ZAR" );
         final HttpEntity<YocoPayRequest> entity = new HttpEntity<>(body, headers);
         ResponseEntity<YocoPaymentResponse> response = rest.exchange(url, HttpMethod.POST, entity, YocoPaymentResponse.class);
-        return response.getBody() != null && "successful".equalsIgnoreCase(response.getBody().getStatus());
+        boolean isSuccessful = response.getBody() != null && "successful".equalsIgnoreCase(response.getBody().getStatus());
+        if(isSuccessful) {
+            String descr = order.getDescription() + "|charge-" + response.getBody().getId();
+            order.setDescription(descr);
+        }
+        return isSuccessful;
     }
 
     @Override
@@ -80,16 +85,22 @@ public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
         //ukheshePaymentProvider.makePaymentToMessenger(order, amount);
     }
 
-    public static String generateSignature(HttpHeaders headers, String passphrase) throws NoSuchAlgorithmException,
-            UnsupportedEncodingException {
-        StringBuilder valuesToHash = new StringBuilder();
-        headers.entrySet()
-                .stream().sorted((item, item2) -> item.getKey().compareTo(item2.getKey()))
-                .forEach(header -> valuesToHash.append(header.getKey())
-                        .append("=")
-                        .append(header.getValue().get(0))
-                        .append("&"));
-        valuesToHash.append("passphrase=").append(URLEncoder.encode(passphrase, "UTF-8"));
-        return IjudiUtils.generateMD5Hash(valuesToHash.toString());
+    @Override
+    public boolean reversePayment(Order order) {
+        String token = order.getDescription().replace("yoco-", "");
+        String url = baseUrl + "/charges/";
+        RestTemplate rest = new RestTemplateBuilder()
+                .requestFactory(HttpComponentsClientHttpRequestFactory.class)
+                .defaultHeader("X-Auth-Secret-Key", apiKey)
+                .build();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Content-type", "application/json");
+        //Create a new HttpEntity
+        String chargeId = order.getDescription().split("\\|")[0].replace("charge:", "");
+        YocoReverseRequest body = new YocoReverseRequest(chargeId);
+        final HttpEntity<YocoReverseRequest> entity = new HttpEntity<>(body, headers);
+        ResponseEntity<YocoPaymentResponse> response = rest.exchange(url, HttpMethod.POST, entity, YocoPaymentResponse.class);
+        return response.getBody() != null && "successful".equalsIgnoreCase(response.getBody().getStatus());
     }
 }

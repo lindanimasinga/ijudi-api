@@ -451,6 +451,33 @@ public class OrderServiceImpl implements OrderService {
         });
     }
 
+    @Override
+    public Order cancelOrder(String id) throws Exception {
+        Order order = orderRepo.findById(id)
+                .orElseThrow(() -> new Exception("Order with id " + id + " not found."));
+
+        if(order.getStage() == STAGE_6_WITH_CUSTOMER || order.getStage() == STAGE_7_ALL_PAID) {
+            throw  new Exception("Cannot cancel this order. Please cancel manually.");
+        }
+        boolean successful = paymentService.reversePayment(order);
+        if(!successful) throw  new Exception("Unable to reserve payment. Please reverse manually.");
+
+        order.setStage(CANCELLED);
+        order = orderRepo.save(order);
+        List<Device> customerDevices = deviceRepo.findByUserId(order.getCustomerId());
+        PushHeading pushMessage = new PushHeading("Order has been cancelled.",
+                "Your order has been cancelled. Payment has been reversed to your bank account.", null);
+        PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, pushMessage, order);
+        customerDevices.forEach(device -> {
+            try {
+                pushNotificationService.sendNotification(device, message);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+        return order;
+    }
+
     private void validate(Order order) throws Exception {
         Set<ConstraintViolation<Order>> violations = validator.validate(order);
         if (violations.size() > 0) {

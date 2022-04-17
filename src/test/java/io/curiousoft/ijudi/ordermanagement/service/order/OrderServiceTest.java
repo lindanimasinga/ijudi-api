@@ -25,6 +25,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.*;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.*;
 @RunWith(MockitoJUnitRunner.class)
@@ -2424,5 +2425,88 @@ public class OrderServiceTest {
                 .sendMessage(storeProfile.getMobileNumber(),
                         "Hello " + storeProfile.getName() + ", Please accept the order " + order2.getId() +
                                 " on iZinga app, otherwise the order will be cancelled.");
+    }
+
+    @Test
+    public void cancelOrder() throws Exception {
+        //given
+        //order 1
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
+        shipping.setMessengerId("messagerID");
+        Date pickUpTime = Date.from(LocalDateTime.now().plusMinutes(320).atZone(ZoneId.systemDefault()).toInstant());
+        shipping.setPickUpTime(pickUpTime);
+        order.setShippingData(shipping);
+        order.setCustomerId("customer");
+        order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        Date orderDate = Date.from(LocalDateTime.now().minusMinutes(66).atZone(ZoneId.systemDefault()).toInstant());
+        order.setModifiedDate(orderDate);
+        order.setShopId("shopid");
+        order.setId("1234567");
+
+        when(repo.findById(order.getId())).thenReturn(Optional.of(order)) ;
+        when(paymentService.reversePayment(order)).thenReturn(true);
+        when(repo.save(order)).thenReturn(order);
+
+        List<Device> devices = Collections.nCopies(2, new Device("token"));
+        when(deviceRepo.findByUserId(order.getCustomerId())).thenReturn(devices);
+
+        //when
+        Order cancelledOrder = sut.cancelOrder(order.getId());
+
+        //then
+        verify(repo).findById(order.getId());
+        verify(paymentService).reversePayment(order);
+        PushHeading title = new PushHeading("Order has been cancelled.",
+                "Your order has been cancelled. Payment has been reversed to your bank account.", null);
+        PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
+        verify(pushNotificationService, times(2)).sendNotification(any(), eq(message));
+        assertEquals(OrderStage.CANCELLED, cancelledOrder.getStage());
+        verify(repo).save(cancelledOrder);
+        verify(deviceRepo).findByUserId(order.getCustomerId());
+
+    }
+
+    @Test
+    public void cancelOrderAlreadyDelivered() {
+        //given
+        //order 1
+        Order order = new Order();
+        Basket basket = new Basket();
+        order.setBasket(basket);
+
+
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.SCHEDULED_DELIVERY);
+        shipping.setMessengerId("messagerID");
+        Date pickUpTime = Date.from(LocalDateTime.now().plusMinutes(320).atZone(ZoneId.systemDefault()).toInstant());
+        shipping.setPickUpTime(pickUpTime);
+        order.setShippingData(shipping);
+        order.setCustomerId("customer");
+        order.setStage(OrderStage.STAGE_6_WITH_CUSTOMER);
+        Date orderDate = Date.from(LocalDateTime.now().minusMinutes(66).atZone(ZoneId.systemDefault()).toInstant());
+        order.setModifiedDate(orderDate);
+        order.setShopId("shopid");
+        order.setId("1234567");
+
+        when(repo.findById(order.getId())).thenReturn(Optional.of(order)) ;
+
+        //when
+        try {
+            sut.cancelOrder(order.getId());
+            fail();
+        } catch (Exception e) {
+           assertEquals("Cannot cancel this order. Please cancel manually.", e.getMessage());
+        }
+
+        //then
+        verify(repo).findById(order.getId());
     }
 }

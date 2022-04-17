@@ -32,4 +32,8 @@ public abstract class PaymentProvider<P extends PaymentData> {
     public abstract void makePayments(List<Order> ordersList);
 
     public abstract void makePaymentToMessenger(Order order, double amount) throws Exception;
+
+    public boolean reversePayment(Order order) {
+        return false;
+    }
 }

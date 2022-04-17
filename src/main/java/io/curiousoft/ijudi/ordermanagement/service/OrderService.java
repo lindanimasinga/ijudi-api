@@ -31,4 +31,6 @@ public interface OrderService {
     List<Order> findAll();
 
     void checkUnconfirmedOrders();
+
+    Order cancelOrder(String id) throws Exception;
 }
