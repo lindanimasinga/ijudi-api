@@ -90,7 +90,7 @@ public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-type", "application/json");
         //Create a new HttpEntity
-        String chargeId = order.getDescription().split("\\|")[1].replace("charge:", "");
+        String chargeId = order.getDescription().split("\\|")[1].replace("charge-", "");
         YocoReverseRequest body = new YocoReverseRequest(chargeId);
         final HttpEntity<YocoReverseRequest> entity = new HttpEntity<>(body, headers);
         ResponseEntity<YocoPaymentResponse> response = rest.exchange(url, HttpMethod.POST, entity, YocoPaymentResponse.class);
