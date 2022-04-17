@@ -57,6 +57,11 @@ public class OrderController {
         return order != null ? ResponseEntity.ok(order) : ResponseEntity.notFound().build();
     }
 
+    @DeleteMapping(value = "/{id}", produces = "application/json")
+    public ResponseEntity<Order> cancelOrder(@PathVariable String id) throws Exception {
+        return ResponseEntity.ok(orderService.cancelOrder(id));
+    }
+
     @GetMapping(produces = "application/json")
     public ResponseEntity<List<Order>> getAllOrders(@RequestParam(required = false) String userId,
                                                     @RequestParam(required = false) String phone,
