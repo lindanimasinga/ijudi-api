@@ -252,6 +252,8 @@ public class OrderServiceImpl implements OrderService {
             return order;
         }
 
+        if(order.getStage() == CANCELLED) throw new Exception("Order with id " + orderId + " has been cancelled");
+
         switch (order.getShippingData().getType()) {
             case DELIVERY:
                 OrderStage stage = onlineDeliveryStages.get(index + 1);
@@ -465,8 +467,8 @@ public class OrderServiceImpl implements OrderService {
         order.setStage(CANCELLED);
         order = orderRepo.save(order);
         List<Device> customerDevices = deviceRepo.findByUserId(order.getCustomerId());
-        PushHeading pushMessage = new PushHeading("Order has been cancelled.",
-                "Your order has been cancelled. Payment has been reversed to your bank account.", null);
+        PushHeading pushMessage = new PushHeading("Your order has been cancelled. Payment has been reversed to your account.",
+                "Your order has been cancelled.", null);
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, pushMessage, order);
         customerDevices.forEach(device -> {
             try {

@@ -2463,8 +2463,8 @@ public class OrderServiceTest {
         //then
         verify(repo).findById(order.getId());
         verify(paymentService).reversePayment(order);
-        PushHeading title = new PushHeading("Order has been cancelled.",
-                "Your order has been cancelled. Payment has been reversed to your bank account.", null);
+        PushHeading title = new PushHeading("Your order has been cancelled. Payment has been reversed to your account.",
+                "Your order has been cancelled.", null);
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
         verify(pushNotificationService, times(2)).sendNotification(any(), eq(message));
         assertEquals(OrderStage.CANCELLED, cancelledOrder.getStage());
