@@ -394,7 +394,7 @@ public class OrderServiceTest {
             Order newOrder = sut.startOrder(order);
             fail();
         }catch (Exception e) {
-            Assert.assertEquals("Order shipping is null or pickup time or messenger not valid or shipping address not valid", e.getMessage());
+            Assert.assertEquals("Delivery address or building or unit number not correct.", e.getMessage());
         }
     }
     @Test
@@ -427,7 +427,7 @@ public class OrderServiceTest {
             Order newOrder = sut.startOrder(order);
             fail();
         }catch (Exception e) {
-            Assert.assertEquals("Order shipping is null or pickup time or messenger not valid or shipping address not valid", e.getMessage());
+            Assert.assertEquals("Delivery address or building or unit number not correct.", e.getMessage());
         }
     }
     @Test
@@ -459,7 +459,7 @@ public class OrderServiceTest {
             Order newOrder = sut.startOrder(order);
             fail();
         }catch (Exception e) {
-            Assert.assertEquals("Order shipping is null or pickup time or messenger not valid or shipping address not valid", e.getMessage());
+            Assert.assertEquals("Delivery address or building or unit number not correct.", e.getMessage());
         }
     }
     @Test
@@ -708,7 +708,7 @@ public class OrderServiceTest {
             sut.startOrder(order);
             fail();
         } catch (Exception e) {
-            Assert.assertEquals("Order shipping is null or pickup time or messenger not valid or shipping address not valid", e.getMessage());
+            Assert.assertEquals("Delivery address or building or unit number not correct.", e.getMessage());
         }
     }
 
@@ -959,7 +959,7 @@ public class OrderServiceTest {
             fail();
         } catch (Exception e) {
             e.printStackTrace();
-            boolean isvald = e.getMessage().equals("Order shipping is null or pickup time or messenger not valid or shipping address not valid") ||
+            boolean isvald = e.getMessage().equals("Delivery address or building or unit number not correct.") ||
                     e.getMessage().equals("shipping address not valid");
             Assert.assertTrue(isvald);
         }
