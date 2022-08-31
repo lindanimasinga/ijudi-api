@@ -1,6 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.service;
 
 import io.curiousoft.ijudi.ordermanagement.model.*;
+import io.curiousoft.ijudi.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.ijudi.ordermanagement.notification.PushNotificationService;
 import io.curiousoft.ijudi.ordermanagement.repo.DeviceRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.OrderRepository;
@@ -44,6 +45,7 @@ public class OrderServiceImpl implements OrderService {
     private final DeviceRepository deviceRepo;
     private final PushNotificationService pushNotificationService;
     private final AdminOnlyNotificationService smsNotificationService;
+    private final EmailNotificationService emailNotificationService;
     private final double starndardDeliveryFee;
     private final double serviceFeePerc;
     private final long cleanUpMinutes;
@@ -65,7 +67,8 @@ public class OrderServiceImpl implements OrderService {
                             UserProfileRepo userProfileRepo, PaymentService paymentService,
                             DeviceRepository deviceRepo,
                             PushNotificationService pushNotificationService,
-                            AdminOnlyNotificationService smsNotifcationService) {
+                            AdminOnlyNotificationService smsNotifcationService,
+                            EmailNotificationService emailNotificationService) {
         this.starndardDeliveryFee = starndardDeliveryFee;
         this.starndardDeliveryKm = starndardDeliveryKm;
         this.ratePerKm = ratePerKm;
@@ -80,6 +83,7 @@ public class OrderServiceImpl implements OrderService {
         this.smsNotificationService = smsNotifcationService;
         this.deviceRepo = deviceRepo;
         this.googleMapsApiKey = googleMapsApiKey;
+        this.emailNotificationService = emailNotificationService;
         ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
         validator = factory.getValidator();
 
@@ -380,19 +384,12 @@ public class OrderServiceImpl implements OrderService {
         List<Order> unpaidOrders = orderRepo.findByShopPaidAndStageAndModifiedDateBefore(false, STAGE_0_CUSTOMER_NOT_PAID, pastDate);
         unpaidOrders.forEach(order -> {
                     if (!order.getSmsSentToAdmin()) {
-                        for (String admin : adminCellNumbers) {
-                            try {
-                                smsNotificationService.sendMessage(admin, "Hi, iZinga Admin. Order " + order.getId() + " has not been paid. The customer may be having issues." +
-                                        "View the order on shop.izinga.co.za/" + order.getShopId() + "/order/" + order.getId() + ".");
-                                order.setSmsSentToAdmin(true);
-                                orderRepo.save(order);
-                            } catch(Exception e){
-                                LOGGER.error("Failed to sent sms to admin", e);
-                            }
+                        emailNotificationService.notifyAdminOrderNotPaid(order);
+                        order.setSmsSentToAdmin(true);
+                        orderRepo.save(order);
                     }
-                }
+                });
             LOGGER.info("Sms sent to admin");
-        });
     }
 
     @Override
@@ -437,10 +434,7 @@ public class OrderServiceImpl implements OrderService {
                         LOGGER.info("Sms sent to shop");
                     } else if (!order.getSmsSentToAdmin()) {
                         order.setSmsSentToAdmin(true);
-                        for (String number : adminCellNumbers) {
-                            smsNotificationService.sendMessage(number, "Hi, iZinga Admin. " + store.getName() + ", has not accepted order " + order.getId() +
-                                    " on iZinga app, otherwise the order will be cancelled.");
-                        }
+                        emailNotificationService.notifyAdminNewOrder(order);
                         LOGGER.info("Sms sent to admin");
                     } else {
                         //reverse the transaction

@@ -1,7 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.service.order;
 
-import com.google.common.collect.Sets;
 import io.curiousoft.ijudi.ordermanagement.model.*;
+import io.curiousoft.ijudi.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.ijudi.ordermanagement.notification.PushNotificationService;
 import io.curiousoft.ijudi.ordermanagement.repo.DeviceRepository;
 import io.curiousoft.ijudi.ordermanagement.repo.OrderRepository;
@@ -43,6 +43,8 @@ public class OrderServiceTest {
     @Mock
     private AdminOnlyNotificationService smsNotifcation;
     @Mock
+    private EmailNotificationService emailNotificationService;
+    @Mock
     private DeviceRepository deviceRepo;
     List<String> phoneNumbers = Lists.list("08128155660", "0812815707");
 
@@ -71,7 +73,7 @@ public class OrderServiceTest {
                 paymentService,
                 deviceRepo,
                 pushNotificationService,
-                smsNotifcation);
+                smsNotifcation, emailNotificationService);
     }
 
     private StoreProfile createStoreProfile(StoreType food) {
@@ -528,6 +530,7 @@ public class OrderServiceTest {
                 ShippingData.ShippingType.SCHEDULED_DELIVERY);
         Date date = Date.from(LocalDateTime.now().plusMinutes(15).atZone(ZoneId.systemDefault()).toInstant());
         shipping.setPickUpTime(date);
+        shipping.setBuildingType(BuildingType.HOUSE);
         order.setShippingData(shipping);
         order.setCustomerId("customerId");
         order.setShopId("shopid");
@@ -1224,6 +1227,7 @@ public class OrderServiceTest {
         when(repo.save(order)).thenReturn(order);
         when(storeRepo.findById(shopId)).thenReturn(Optional.of(shop));
         when(deviceRepo.findByUserId(shop.getOwnerId())).thenReturn(storeDevices);
+
         Order finalOrder = sut.finishOder(order);
         //verify
         Assert.assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
@@ -2100,10 +2104,12 @@ public class OrderServiceTest {
         Bank bank = new Bank();
         bank.setAccountId("34567890");
         storeProfile.setBank(bank);
+
         //when
         when(repo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM)).thenReturn(orders);
         when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
         sut.checkUnconfirmedOrders();
+
         //verify
         verify(repo).findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         verify(smsNotifcation, times(1))
@@ -2167,18 +2173,13 @@ public class OrderServiceTest {
         sut.checkUnconfirmedOrders();
 
         //verify
-        verify(repo).findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
-        verify(repo).save(order);
         verify(smsNotifcation, times(0))
                 .sendMessage(storeProfile.getMobileNumber(),
                         "Hello " + storeProfile.getName() + ", Please accept the order " + order.getId() +
                                 " on iZinga app, otherwise the order will be cancelled.");
-        verify(smsNotifcation, times(1))
-                .sendMessage(phoneNumbers.get(0), "Hi, iZinga Admin. " + storeProfile.getName() + ", has not accepted order " + order.getId() +
-                        " on iZinga app, otherwise the order will be cancelled.");
-        verify(smsNotifcation, times(1))
-                .sendMessage(phoneNumbers.get(1), "Hi, iZinga Admin. " + storeProfile.getName() + ", has not accepted order " + order.getId() +
-                        " on iZinga app, otherwise the order will be cancelled.");
+        verify(emailNotificationService).notifyAdminNewOrder(order);
+        verify(repo).findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        verify(repo).save(order);
     }
 
     @Test

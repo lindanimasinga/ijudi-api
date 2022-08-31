@@ -1,6 +1,8 @@
 package io.curiousoft.ijudi.ordermanagement.service;
 
 import io.curiousoft.ijudi.ordermanagement.model.Profile;
+import io.curiousoft.ijudi.ordermanagement.model.ProfileRoles;
+import io.curiousoft.ijudi.ordermanagement.model.UserProfile;
 import io.curiousoft.ijudi.ordermanagement.repo.ProfileRepo;
 import org.springframework.beans.BeanUtils;
 
@@ -60,5 +62,9 @@ public abstract class ProfileServiceImpl<E extends ProfileRepo<U>, U extends Pro
         if(violations.size() > 0) {
             throw new Exception(violations.iterator().next().getMessage());
         }
+    }
+
+    public List<U> findByRole(ProfileRoles role) {
+        return profileRepo.findByRole(role);
     }
 }
