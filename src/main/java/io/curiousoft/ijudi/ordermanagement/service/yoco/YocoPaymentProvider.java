@@ -1,5 +1,7 @@
 package io.curiousoft.ijudi.ordermanagement.service.yoco;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.ijudi.ordermanagement.model.Order;
 import io.curiousoft.ijudi.ordermanagement.model.PaymentType;
 import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
@@ -13,6 +15,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
@@ -80,7 +84,7 @@ public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
     }
 
     @Override
-    public boolean reversePayment(Order order) {
+    public boolean reversePayment(Order order) throws JsonProcessingException {
         String url = baseUrl + "/refunds/";
         RestTemplate rest = new RestTemplateBuilder()
                 .requestFactory(HttpComponentsClientHttpRequestFactory.class)
@@ -93,7 +97,13 @@ public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
         String chargeId = order.getDescription().split("\\|")[1].replace("charge-", "");
         YocoReverseRequest body = new YocoReverseRequest(chargeId);
         final HttpEntity<YocoReverseRequest> entity = new HttpEntity<>(body, headers);
-        ResponseEntity<YocoPaymentResponse> response = rest.exchange(url, HttpMethod.POST, entity, YocoPaymentResponse.class);
+        ResponseEntity<YocoPaymentResponse> response;
+        try {
+            response = rest.exchange(url, HttpMethod.POST, entity, YocoPaymentResponse.class);
+        } catch (HttpClientErrorException.BadRequest e) {
+            YocoErrorResponse error = new ObjectMapper().readValue(e.getResponseBodyAsString(), YocoErrorResponse.class);
+            return  "refund_already_processed".equalsIgnoreCase(error.getErrorCode());
+        }
         return response.getBody() != null && "successful".equalsIgnoreCase(response.getBody().getStatus());
     }
 }

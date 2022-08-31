@@ -1,9 +1,8 @@
 package io.curiousoft.ijudi.ordermanagement.conroller;
 
-import io.curiousoft.ijudi.ordermanagement.model.Stock;
-import io.curiousoft.ijudi.ordermanagement.model.StoreProfile;
-import io.curiousoft.ijudi.ordermanagement.model.StoreType;
+import io.curiousoft.ijudi.ordermanagement.model.*;
 import io.curiousoft.ijudi.ordermanagement.service.StoreService;
+import io.curiousoft.ijudi.ordermanagement.service.UserProfileService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -17,9 +16,11 @@ import java.util.Set;
 public class StoreControler {
 
     private StoreService storeService;
+    private UserProfileService userProfileService;
 
-    public StoreControler(StoreService storeService) {
+    public StoreControler(StoreService storeService, UserProfileService userProfileService) {
         this.storeService = storeService;
+        this.userProfileService = userProfileService;
     }
 
     @RequestMapping(method = RequestMethod.POST, consumes = "application/json", produces = "application/json")
@@ -64,9 +65,14 @@ public class StoreControler {
                                                             @RequestParam(required = false, defaultValue = "0") double longitude,
                                                             @RequestParam(required = false, defaultValue = "0") double range,
                                                             @RequestParam(required = false, defaultValue = "0") int size) {
+        UserProfile profile = null;
+        if(ownerId != null) profile = userProfileService.find(ownerId);
+        boolean isAdmin = profile != null && profile.getRole() == ProfileRoles.ADMIN;
         List<StoreProfile> stores = featured ?
-                storeService.findFeatured(latitude, longitude, storeType, range, size) : !StringUtils.isEmpty(ownerId) ?
-                storeService.findByOwner(ownerId) : storeService.findNearbyStores(latitude, longitude, storeType, range, size);
+                storeService.findFeatured(latitude, longitude, storeType, range, size) :
+                !StringUtils.isEmpty(ownerId) && !isAdmin ? storeService.findByOwner(ownerId) :
+                !StringUtils.isEmpty(ownerId) && isAdmin ?  storeService.findNearbyStores(0, 0, storeType, 100, 1000)
+                        : storeService.findNearbyStores(latitude, longitude, storeType, range, size);
         return stores != null ? ResponseEntity.ok(stores) : ResponseEntity.notFound().build();
     }
 }

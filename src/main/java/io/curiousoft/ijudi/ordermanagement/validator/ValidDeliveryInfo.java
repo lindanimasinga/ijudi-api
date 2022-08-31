@@ -17,7 +17,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 public @interface ValidDeliveryInfo {
 
-    String message() default "Order shipping is null or pickup time or messenger not valid or shipping address not valid";
+    String message() default "Delivery address or building or unit number not correct.";
 
     Class<?>[] groups() default { };
 

@@ -8,7 +8,7 @@ public class YocoPaymentProviderTest {
 
     @Test
     public void get_charge_id_from_description() {
-        String descrition = "yoco:1233435_token|charge:12345sdfsdf_charge";
+        String descrition = "yoco:1233435_token|12345sdfsdf_charge";
 
         //when
         String chargeId = descrition.split("\\|")[1].replace("charge-", "");

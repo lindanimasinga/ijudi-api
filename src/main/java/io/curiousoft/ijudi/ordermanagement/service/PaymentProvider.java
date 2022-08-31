@@ -1,5 +1,6 @@
 package io.curiousoft.ijudi.ordermanagement.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import io.curiousoft.ijudi.ordermanagement.model.Order;
 import io.curiousoft.ijudi.ordermanagement.model.PaymentData;
 import io.curiousoft.ijudi.ordermanagement.model.PaymentType;
@@ -33,7 +34,7 @@ public abstract class PaymentProvider<P extends PaymentData> {
 
     public abstract void makePaymentToMessenger(Order order, double amount) throws Exception;
 
-    public boolean reversePayment(Order order) {
+    public boolean reversePayment(Order order) throws JsonProcessingException {
         return false;
     }
 }
