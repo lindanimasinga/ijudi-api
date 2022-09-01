@@ -1,7 +1,6 @@
 package io.curiousoft.ijudi.ordermanagement.utils;
 
 import com.curiousoft.alarmsystem.messaging.domain.directions.GoogleDirectionsResponse;
-import com.curiousoft.alarmsystem.messaging.domain.directions.Leg;
 import com.curiousoft.alarmsystem.messaging.domain.geofencing.GoogleGeoCodeResponse;
 import com.curiousoft.alarmsystem.messaging.domain.geofencing.Location;
 import com.curiousoft.alarmsystem.messaging.firebase.GoogleServices;
@@ -16,10 +15,7 @@ import org.hibernate.validator.internal.constraintvalidators.hv.LuhnCheckValidat
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.xml.bind.DatatypeConverter;
 import java.io.IOException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
 public class IjudiUtils {
@@ -76,15 +72,6 @@ public class IjudiUtils {
         } catch (final IOException e) {
             return "";
         }
-    }
-
-    public  static String generateMD5Hash(String data) throws NoSuchAlgorithmException {
-        LOGGER.debug("hashing string " + data);
-        MessageDigest md = MessageDigest.getInstance("MD5");
-        md.update(data.getBytes());
-        byte[] digest = md.digest();
-        return DatatypeConverter
-                .printHexBinary(digest).toUpperCase();
     }
 
     public static double calculateDrivingDirectionKM(String apiKey, Order order, Optional<StoreProfile> storeOptional) throws java.io.IOException {
