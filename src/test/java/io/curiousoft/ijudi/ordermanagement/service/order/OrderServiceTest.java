@@ -2153,7 +2153,7 @@ public class OrderServiceTest {
         order2.setSmsSentToShop(true);
         order2.setCustomerId("customer id");
         order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
-        Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(5).atZone(ZoneId.systemDefault()).toInstant());
+        Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(2).atZone(ZoneId.systemDefault()).toInstant());
         order2.setModifiedDate(orderDate2);
         order2.setShopId("shopid");
         ArrayList<Order> orders = new ArrayList<>();
@@ -2218,7 +2218,7 @@ public class OrderServiceTest {
         order2.setSmsSentToShop(true);
         order2.setCustomerId("customer id");
         order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
-        Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(5).atZone(ZoneId.systemDefault()).toInstant());
+        Date orderDate2 = Date.from(LocalDateTime.now().minusMinutes(2).atZone(ZoneId.systemDefault()).toInstant());
         order2.setModifiedDate(orderDate2);
         order2.setShopId("shopid");
         ArrayList<Order> orders = new ArrayList<>();
@@ -2286,7 +2286,7 @@ public class OrderServiceTest {
         orders.add(order);
 
         StoreProfile initialProfile = createStoreProfile(StoreType.FOOD);
-        Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
+        Date date = Date.from(LocalDateTime.now().plusDays(2).atZone(ZoneId.systemDefault()).toInstant());
         initialProfile.setFeaturedExpiry(date);
         Bank bank = new Bank();
         bank.setAccountId("34567890");

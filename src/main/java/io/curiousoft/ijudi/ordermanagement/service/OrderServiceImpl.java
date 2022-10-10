@@ -410,7 +410,7 @@ public class OrderServiceImpl implements OrderService {
         orders.forEach(order -> {
             Date checkDate = order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY ?
                     Date.from(LocalDateTime.now()
-                            .minusMinutes(10)
+                            .minusMinutes(3)
                             .atZone(ZoneId.systemDefault())
                             .toInstant())
                     : Date.from(LocalDateTime.now()
