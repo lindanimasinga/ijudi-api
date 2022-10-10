@@ -236,7 +236,8 @@ public class OrderServiceImpl implements OrderService {
                 pushNotificationService.notifyMessengerOrderPlaced(messengerDevices, persistedOrder, store);
             }
         }
-
+        LOGGER.info("New order placed. Order No. " + order.getId() + ", Basket Amount. R"+order.getBasketAmount());
+        LOGGER.info("New order placed. Order No. " + order.getId() + ", Delivery Fee. R"+order.getShippingData().getFee());
         return orderRepo.save(persistedOrder);
     }
 
