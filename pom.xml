@@ -2,20 +2,25 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+    <modules>
+        <module>izinga-recon</module>
+        <module>izinga-ordermanager</module>
+        <module>izinga-commons</module>
+    </modules>
 
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.4.4</version>
+        <version>2.5.4</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
-    <groupId>io.curiousoft.ordermanagement</groupId>
-    <artifactId>ijudi-api</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-    <name>ijudi-api</name>
-    <packaging>jar</packaging>
-    <description>Demo project for Spring Boot</description>
+    <groupId>io.curiousoft.izinga</groupId>
+    <artifactId>izinga-parent</artifactId>
+    <version>1.2.0</version>
+    <name>izinga-parent</name>
+    <packaging>pom</packaging>
+    <description>izinga applications</description>
 
     <properties>
         <java.version>1.8</java.version>
@@ -23,6 +28,7 @@
         <spring-cloud-function.version>1.0.1.RELEASE</spring-cloud-function.version>
         <aws-lambda-events.version>2.0.2</aws-lambda-events.version>
         <aws-lambda-java-core.version>1.1.0</aws-lambda-java-core.version>
+        <kotlin.version>1.7.20</kotlin.version>
     </properties>
 
     <repositories>
@@ -39,42 +45,14 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-mongodb</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.mockito</groupId>
-                    <artifactId>mockito-core</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpclient</artifactId>
-            <version>4.5.12</version>
-        </dependency>
-        <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-inline</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-validation</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.github.mailersend</groupId>
-            <artifactId>mailersend-java</artifactId>
-            <version>v0.0.3</version>
         </dependency>
 
         <dependency>
@@ -84,45 +62,10 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>io.springfox</groupId>
-            <artifactId>springfox-swagger2</artifactId>
-            <version>2.9.2</version>
-        </dependency>
-        <dependency>
-            <groupId>io.springfox</groupId>
-            <artifactId>springfox-swagger-ui</artifactId>
-            <version>2.9.2</version>
-        </dependency>
-        <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
             <version>2.8.5</version>
         </dependency>
-        <dependency>
-            <groupId>com.curiousoft.alarmsystem</groupId>
-            <artifactId>alarmsystem-messaging</artifactId>
-            <version>1.0.16</version>
-        </dependency>
-        <dependency>
-            <groupId>com.curiousoft.alarmsystem</groupId>
-            <artifactId>alarmsystem-amazon-sns</artifactId>
-            <version>1.0.16</version>
-        </dependency>
     </dependencies>
-
-
-    <build>
-        <testSourceDirectory>${project.basedir}/src/test/java</testSourceDirectory>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-            </plugin>
-        </plugins>
-    </build>
 
 </project>
