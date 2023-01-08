@@ -5,10 +5,6 @@ import com.curiousoft.alarmsystem.messaging.domain.directions.Route
 import com.curiousoft.alarmsystem.messaging.firebase.GoogleServices.GoogleMaps
 import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.commons.model.StoreProfile
-import okhttp3.Headers
-import okhttp3.Request
-import okhttp3.Response
-import okio.Buffer
 import org.hibernate.validator.internal.constraintvalidators.hv.LuhnCheckValidator
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -73,3 +69,5 @@ fun calculateDeliveryFee(
 ): Double {
     return if (distance > standardDistance) standardFee + ratePerKM * (distance - standardDistance) else standardFee
 }
+
+fun isNullOrEmpty(collection: Collection<Any>?) = collection?.isEmpty() ?: true

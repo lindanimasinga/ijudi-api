@@ -26,8 +26,7 @@ import static io.curiousoft.izinga.commons.model.OrderKt.generateId;
 import static io.curiousoft.izinga.commons.model.OrderStage.*;
 import static io.curiousoft.izinga.commons.model.OrderType.INSTORE;
 import static io.curiousoft.izinga.commons.model.OrderType.ONLINE;
-import static io.curiousoft.izinga.commons.utils.IjudiUtilsKt.calculateDeliveryFee;
-import static io.curiousoft.izinga.commons.utils.IjudiUtilsKt.calculateDrivingDirectionKM;
+import static io.curiousoft.izinga.commons.utils.IjudiUtilsKt.*;
 import static java.lang.String.format;
 
 @Service
@@ -152,9 +151,9 @@ public class OrderServiceImpl implements OrderService {
         double deliveryFee = 0;
         if (order.getOrderType() == OrderType.ONLINE) {
             double distance = calculateDrivingDirectionKM(googleMapsApiKey, order, storeOptional);
-            double standardFee = storeOptional.get().getStoreMessenger() != null ? storeOptional.get().getStandardDeliveryPrice() : this.starndardDeliveryFee;
-            double standardDistance = storeOptional.get().getStoreMessenger() != null ? storeOptional.get().getStandardDeliveryKm() : this.starndardDeliveryKm;
-            double ratePerKM = storeOptional.get().getStoreMessenger() != null ? storeOptional.get().getRatePerKm() : this.ratePerKm;
+            double standardFee = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ? storeOptional.get().getStandardDeliveryPrice() : this.starndardDeliveryFee;
+            double standardDistance = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ? storeOptional.get().getStandardDeliveryKm() : this.starndardDeliveryKm;
+            double ratePerKM = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ? storeOptional.get().getRatePerKm() : this.ratePerKm;
             deliveryFee = calculateDeliveryFee(standardFee, standardDistance, ratePerKM, distance);
             order.getShippingData().setFee(deliveryFee);
             order.getShippingData().setDistance(distance);
