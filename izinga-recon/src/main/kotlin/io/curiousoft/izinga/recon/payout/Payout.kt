@@ -17,6 +17,7 @@ abstract class Payout(
     var emailNotify: String,
     var emailAddress: String,
     var emailSubject: String,
+    var orders: List<Order>
 ): BaseModel() {
     abstract var paid: Boolean
     abstract var total: BigDecimal
@@ -28,16 +29,16 @@ class MessengerPayout(
     toBankName: String,
     toType: BankAccType,
     toAccountNumber: String,
-    var orders: List<Order>,
     toBranchCode: String,
     fromReference: String,
     toReference: String,
     emailNotify: String,
+    orders: List<Order>,
     emailAddress: String,
     emailSubject: String ) : Payout(
     toId = toId, toName = toName, toType = toType, toBankName = toBankName, toAccountNumber = toAccountNumber,
     toBranchCode = toBranchCode, fromReference = fromReference, toReference = toReference,
-    emailNotify = emailNotify, emailAddress = emailAddress, emailSubject = emailSubject) {
+    emailNotify = emailNotify, emailAddress = emailAddress, emailSubject = emailSubject, orders = orders) {
     override var paid: Boolean = false
     @org.springframework.data.annotation.Transient
     override var total: BigDecimal = orders.sumOf { it.shippingData?.fee!! }.toBigDecimal()
@@ -49,13 +50,13 @@ class ShopPayout(
     toBankName: String,
     toType: BankAccType,
     toAccountNumber: String,
-    var orders: List<Order>,
+    orders: List<Order>,
     toBranchCode: String, fromReference: String, toReference: String, emailNotify: String, emailAddress: String,
     emailSubject: String
 ) : Payout(
     toId = toId, toName = toName, toType = toType, toBankName = toBankName, toAccountNumber = toAccountNumber,
     toBranchCode = toBranchCode, fromReference = fromReference, toReference = toReference,
-    emailNotify = emailNotify, emailAddress = emailAddress, emailSubject = emailSubject) {
+    emailNotify = emailNotify, emailAddress = emailAddress, emailSubject = emailSubject, orders = orders) {
 
     @org.springframework.data.annotation.Transient
     override var total: BigDecimal = orders.sumOf { it.basketAmount }.toBigDecimal()

@@ -197,9 +197,7 @@ public class OrderServiceImpl implements OrderService {
             if (persistedOrder.getShopPaid()) {
                 return order;
             }
-            paymentService.completePaymentToShop(persistedOrder);
             persistedOrder.setStage(OrderStage.STAGE_7_ALL_PAID);
-            persistedOrder.setShopPaid(true);
         } else {
             persistedOrder.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         }
@@ -301,7 +299,6 @@ public class OrderServiceImpl implements OrderService {
 
                 break;
             case STAGE_4_ON_THE_ROAD:
-                paymentService.completePaymentToShop(order);
                 deviceRepo.findByUserId(order.getCustomerId()).forEach(device -> {
                     PushHeading title = new PushHeading("The driver is on the way",
                             order_status_updated, null);
@@ -328,13 +325,6 @@ public class OrderServiceImpl implements OrderService {
 
                 break;
             case STAGE_6_WITH_CUSTOMER:
-                if (!order.getShopPaid()) {
-                    paymentService.completePaymentToShop(order);
-                }
-
-                if (order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY && !order.getMessengerPaid()) {
-                    paymentService.completePaymentToMessenger(order);
-                }
                 order.setStage(STAGE_7_ALL_PAID);
                 break;
 

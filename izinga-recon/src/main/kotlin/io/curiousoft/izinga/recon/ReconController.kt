@@ -14,14 +14,19 @@ class ReconController(val reconService: ReconService) {
     @GetMapping("/shopPayoutBundle")
     fun shopPayoutBundle() = reconService.generateNextPayoutsToShop()
 
+    @PatchMapping("/shopPayoutBundle")
+    fun shopPayoutBundle(@RequestBody payoutResults: PayoutBundleResults) = reconService.updatePayoutStatus(payoutResults)
+
     @GetMapping("/messengerPayoutBundle")
     fun messengerPayoutBundle() = reconService.generateNextPayoutsToMessenger()
 
     @PatchMapping("/messengerPayoutBundle")
-    fun messengerPayoutBundle(payoutResults: PayoutBundleResults) = reconService.updatePayoutStatus(payoutResults)
+    fun messengerPayoutBundle(@RequestBody payoutResults: PayoutBundleResults) = reconService.updatePayoutStatus(payoutResults)
 
+    @GetMapping("/payoutBundle")
     fun getAllPayouts(@RequestParam payoutType: PayoutType, @RequestParam from: Date,
-                      @RequestParam toDate: Date): List<PayoutBundle> {
-        return reconService.getAllPayouts(payoutType, from, toDate)
-    }
+                      @RequestParam toDate: Date): List<PayoutBundle> = reconService.getAllPayouts(payoutType, from, toDate)
+
+    @GetMapping("/payoutBundle/{payoutId}")
+    fun getPayouts(@PathVariable payoutId: String): PayoutBundle? = reconService.findPayout(payoutId)
 }
