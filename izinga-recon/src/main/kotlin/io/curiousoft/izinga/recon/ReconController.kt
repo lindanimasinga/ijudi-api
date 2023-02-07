@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.recon
 
+import io.curiousoft.izinga.recon.payout.Payout
 import io.curiousoft.izinga.recon.payout.PayoutBundle
 import io.curiousoft.izinga.recon.payout.PayoutBundleResults
 import io.curiousoft.izinga.recon.payout.PayoutType
@@ -27,6 +28,6 @@ class ReconController(val reconService: ReconService) {
     fun getAllPayouts(@RequestParam payoutType: PayoutType, @RequestParam from: Date,
                       @RequestParam toDate: Date): List<PayoutBundle> = reconService.getAllPayouts(payoutType, from, toDate)
 
-    @GetMapping("/payoutBundle/{payoutId}")
-    fun getPayouts(@PathVariable payoutId: String): PayoutBundle? = reconService.findPayout(payoutId)
+    @GetMapping("/payout")
+    fun getPayouts(@RequestParam payoutBundleId: String, @RequestParam payoutId: String): Payout? = reconService.findPayout(payoutBundleId, payoutId)
 }

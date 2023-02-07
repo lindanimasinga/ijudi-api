@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.recon
 
+import io.curiousoft.izinga.recon.payout.Payout
 import io.curiousoft.izinga.recon.payout.PayoutBundle
 import io.curiousoft.izinga.recon.payout.PayoutBundleResults
 import io.curiousoft.izinga.recon.payout.PayoutType
@@ -16,5 +17,5 @@ interface ReconService {
 
     fun getAllPayouts(payoutType: PayoutType, from: Date, toDate: Date): List<PayoutBundle>
 
-    fun findPayout(payoutId: String): PayoutBundle?
+    fun findPayout(bundleId: String, payoutId: String): Payout?
 }

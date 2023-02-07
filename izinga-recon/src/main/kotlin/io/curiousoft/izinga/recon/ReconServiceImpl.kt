@@ -79,5 +79,5 @@ class ReconServiceImpl(
         return payoutBundleRepo.findByCreatedDateBeforeAndCreatedDateAfterAndType(fromDate, toDate, payoutType)
     }
 
-    override fun findPayout(payoutId: String): PayoutBundle? = payoutRepo.findByIdOrNull(payoutId)
+    override fun findPayout(bundleId: String, payoutId: String): Payout? = payoutRepo.findByIdOrNull(bundleId)?.let { it.payouts.firstOrNull { a -> a.toId == payoutId } }
 }
