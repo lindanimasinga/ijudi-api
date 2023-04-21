@@ -5,6 +5,7 @@ import com.curiousoft.alarmsystem.messaging.domain.directions.Route
 import com.curiousoft.alarmsystem.messaging.firebase.GoogleServices.GoogleMaps
 import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.commons.model.StoreProfile
+import io.curiousoft.izinga.commons.model.StoreType
 import org.hibernate.validator.internal.constraintvalidators.hv.LuhnCheckValidator
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -45,15 +46,20 @@ fun calculateMarkupPrice(storePrice: Double, markPercentage: Double): Double {
 }
 
 @Throws(IOException::class)
-fun calculateDrivingDirectionKM(apiKey: String?, order: Order, storeOptional: Optional<StoreProfile>): Double {
-    // store lat long
-    val storeLatLong = storeOptional.get().latitude.toString() + "," + storeOptional.get().longitude
+fun calculateDrivingDirectionKM(apiKey: String?, order: Order, store: StoreProfile): Double {
     val googleMapsInstance = GoogleMaps.instance
-    //customer lat long
+    // from lat long
+    val fromLatLong = if (store.storeType == StoreType.MOVERS)
+        googleMapsInstance.geocodeAddress(apiKey, order.shippingData?.fromAddress, 100.0).execute().body()
+            .let { it.results[0].geometry.location }
+            .let { it.lat.toString() + "," + it.lng }
+        else store.latitude.toString() + "," + store.longitude
+
+    //to lat long
     val geoCode = googleMapsInstance.geocodeAddress(apiKey, order.shippingData?.toAddress, 100.0).execute().body()
     val location = geoCode.results[0].geometry.location
-    val customerLatLong = location.lat.toString() + "," + location.lng
-    val directions = googleMapsInstance.findDirections(apiKey, storeLatLong, customerLatLong).execute().body()
+    val toLatLong = location.lat.toString() + "," + location.lng
+    val directions = googleMapsInstance.findDirections(apiKey, fromLatLong, toLatLong).execute().body()
     return directions.routes.stream()
         .flatMap { route: Route -> route.legs.stream() }
         .min(Comparator.comparingInt { leg1: Leg -> leg1.distance.value })

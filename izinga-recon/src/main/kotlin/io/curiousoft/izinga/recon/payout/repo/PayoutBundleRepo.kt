@@ -8,9 +8,6 @@ import java.util.*
 interface PayoutBundleRepo: MongoRepository<PayoutBundle, String> {
 
     fun findOneByTypeAndExecuted(type: PayoutType, executed: Boolean = false): PayoutBundle?
-    fun findByCreatedDateBeforeAndCreatedDateAfterAndType(
-        fromDate: Date,
-        toDate: Date,
-        payoutType: PayoutType
-    ): List<PayoutBundle>
+
+    fun findByCreatedDateBetweenAndType(fromDate: Date, toDate: Date, payoutType: PayoutType): List<PayoutBundle>
 }

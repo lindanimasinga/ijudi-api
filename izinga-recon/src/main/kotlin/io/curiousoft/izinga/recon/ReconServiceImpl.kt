@@ -75,9 +75,16 @@ class ReconServiceImpl(
         }
     }
 
-    override fun getAllPayouts(payoutType: PayoutType, fromDate: Date, toDate: Date): List<PayoutBundle> {
-        return payoutBundleRepo.findByCreatedDateBeforeAndCreatedDateAfterAndType(fromDate, toDate, payoutType)
+    override fun getAllPayoutBundles(payoutType: PayoutType, fromDate: Date, toDate: Date): List<PayoutBundle> {
+        return payoutBundleRepo.findByCreatedDateBetweenAndType(fromDate, toDate, payoutType)
     }
 
-    override fun findPayout(bundleId: String, payoutId: String): Payout? = payoutRepo.findByIdOrNull(bundleId)?.let { it.payouts.firstOrNull { a -> a.toId == payoutId } }
+    override fun getAllPayouts(payoutType: PayoutType, fromDate: Date, toDate: Date, toId: String): List<Payout> =
+        getAllPayoutBundles(payoutType, fromDate, toDate)
+            .filter { it.executed }
+            .flatMap { it.payouts }
+            .filter { it.toId == toId }
+
+    override fun findPayout(bundleId: String, payoutId: String): Payout? =
+        payoutRepo.findByIdOrNull(bundleId)?.let { it.payouts.firstOrNull { a -> a.toId == payoutId } }
 }

@@ -22,6 +22,7 @@ class Stock: Comparable<Stock> {
     var images: List<String>? = null
     var mandatorySelection: @NotNull(message = "mandatorySelection not valid") MutableList<SelectionOption>? = null
     var optionalSelection: List<SelectionOption>? = null
+    var externalUrlPath: String? = null
 
     @Transient
     private var markupPercentage = 0.0
@@ -32,8 +33,7 @@ class Stock: Comparable<Stock> {
         quantity: @Min(value = 0) Int,
         storePrice: @DecimalMin(value = "0.000", message = "stock price must be greater than or equal to 0.001") Double,
         discountPerc: @Min(value = 0) Double,
-        mandatorySelection: @NotNull MutableList<SelectionOption>?
-    ) {
+        mandatorySelection: @NotNull MutableList<SelectionOption>?) {
         this.name = name
         this.quantity = quantity
         this.storePrice = storePrice

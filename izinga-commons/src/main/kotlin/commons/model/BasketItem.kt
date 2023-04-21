@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.commons.model
 
 class BasketItem(var name: String, var quantity: Int, var price: Double, var discountPerc: Double) {
+    var externalUrl: String? = null
     var storePrice = 0.0
     var options: List<SelectionOption>? = null
 

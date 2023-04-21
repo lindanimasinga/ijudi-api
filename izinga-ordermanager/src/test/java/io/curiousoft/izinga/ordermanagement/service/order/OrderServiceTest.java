@@ -112,6 +112,7 @@ public class OrderServiceTest {
         storeProfile.setLongitude(31.0012573);
         storeProfile.setId("shopid");
         storeProfile.setAvailability(StoreProfile.AVAILABILITY.ONLINE24_7);
+        storeProfile.setStoreWebsiteUrl("http://localhost/");
         return storeProfile;
     }
 
@@ -1064,8 +1065,8 @@ public class OrderServiceTest {
         Order order = new Order();
         Basket basket = new Basket();
         List<BasketItem> items = new ArrayList<>();
-        items.add(new BasketItem("chips", 2, 10, 0));
-        items.add(new BasketItem("hotdog", 1, 20, 0));
+        items.add(new BasketItem("bananas 1kg", 2, 10, 0));
+        items.add(new BasketItem("bananas 1kg", 1, 20, 0));
         basket.setItems(items);
         order.setBasket(basket);
         
@@ -1088,6 +1089,7 @@ public class OrderServiceTest {
         Date date = Date.from(LocalDateTime.now().plusDays(5).atZone(ZoneId.systemDefault()).toInstant());
         shop.setFeaturedExpiry(date);
         Stock stock1 = new Stock("bananas 1kg", 24, 12, 0, Collections.emptyList());
+        stock1.setExternalUrlPath("/path/to/item");
         HashSet<Stock> stockList = new HashSet<>();
         stockList.add(stock1);
         shop.setStockList(stockList);
@@ -1106,6 +1108,8 @@ public class OrderServiceTest {
         Assert.assertNotNull(finalOrder.getDescription());
         Assert.assertFalse(finalOrder.getShopPaid());
         Assert.assertFalse(order.getHasVat());
+        Assert.assertEquals("http://localhost/path/to/item",
+                order.getBasket().getItems().stream().findFirst().get().getExternalUrl());
         verify(repo).save(order);
         verify(paymentService).paymentReceived(order);
         verify(repo).findById(order.getId());

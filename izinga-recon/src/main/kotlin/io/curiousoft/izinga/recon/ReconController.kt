@@ -5,7 +5,6 @@ import io.curiousoft.izinga.recon.payout.PayoutBundle
 import io.curiousoft.izinga.recon.payout.PayoutBundleResults
 import io.curiousoft.izinga.recon.payout.PayoutType
 import org.springframework.web.bind.annotation.*
-import java.time.LocalDate
 import java.util.*
 
 @RestController
@@ -25,9 +24,13 @@ class ReconController(val reconService: ReconService) {
     fun messengerPayoutBundle(@RequestBody payoutResults: PayoutBundleResults) = reconService.updatePayoutStatus(payoutResults)
 
     @GetMapping("/payoutBundle")
-    fun getAllPayouts(@RequestParam payoutType: PayoutType, @RequestParam from: Date,
-                      @RequestParam toDate: Date): List<PayoutBundle> = reconService.getAllPayouts(payoutType, from, toDate)
+    fun getAllPayoutBundles(@RequestParam payoutType: PayoutType, @RequestParam from: Date,
+                      @RequestParam toDate: Date): List<PayoutBundle> = reconService.getAllPayoutBundles(payoutType, from, toDate)
 
     @GetMapping("/payout")
-    fun getPayouts(@RequestParam payoutBundleId: String, @RequestParam payoutId: String): Payout? = reconService.findPayout(payoutBundleId, payoutId)
+    fun getAllPayouts(@RequestParam payoutType: PayoutType, @RequestParam fromDate: Date,
+                      @RequestParam toDate: Date, @RequestParam toId: String): List<Payout> = reconService.getAllPayouts(payoutType, fromDate, toDate, toId)
+
+    @GetMapping("/payoutBundle/{bundleId}/payout/{payoutId}")
+    fun getPayouts(@PathVariable bundleId: String, @PathVariable payoutId: String): Payout? = reconService.findPayout(bundleId, payoutId)
 }

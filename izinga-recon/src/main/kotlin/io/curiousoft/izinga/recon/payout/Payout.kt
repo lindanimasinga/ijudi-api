@@ -7,6 +7,7 @@ import java.math.BigDecimal
 
 abstract class Payout(
     var toId: String,
+    var bundleId: String?,
     var toName: String,
     var toType: BankAccType,
     var toBankName: String,
@@ -35,10 +36,11 @@ class MessengerPayout(
     emailNotify: String,
     orders: List<Order>,
     emailAddress: String,
+    bundleId: String? = null,
     emailSubject: String ) : Payout(
     toId = toId, toName = toName, toType = toType, toBankName = toBankName, toAccountNumber = toAccountNumber,
-    toBranchCode = toBranchCode, fromReference = fromReference, toReference = toReference,
-    emailNotify = emailNotify, emailAddress = emailAddress, emailSubject = emailSubject, orders = orders) {
+    toBranchCode = toBranchCode, fromReference = fromReference, toReference = toReference, emailNotify = emailNotify,
+    emailAddress = emailAddress, emailSubject = emailSubject, orders = orders, bundleId = bundleId) {
     override var paid: Boolean = false
     @org.springframework.data.annotation.Transient
     override var total: BigDecimal = orders.sumOf { it.shippingData?.fee!! }.toBigDecimal()
@@ -52,11 +54,12 @@ class ShopPayout(
     toAccountNumber: String,
     orders: List<Order>,
     toBranchCode: String, fromReference: String, toReference: String, emailNotify: String, emailAddress: String,
-    emailSubject: String
+    emailSubject: String,
+    bundleId: String? = null,
 ) : Payout(
     toId = toId, toName = toName, toType = toType, toBankName = toBankName, toAccountNumber = toAccountNumber,
     toBranchCode = toBranchCode, fromReference = fromReference, toReference = toReference,
-    emailNotify = emailNotify, emailAddress = emailAddress, emailSubject = emailSubject, orders = orders) {
+    emailNotify = emailNotify, emailAddress = emailAddress, emailSubject = emailSubject, orders = orders, bundleId = bundleId) {
 
     @org.springframework.data.annotation.Transient
     override var total: BigDecimal = orders.sumOf { it.basketAmount }.toBigDecimal()

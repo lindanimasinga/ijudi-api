@@ -150,7 +150,7 @@ public class OrderServiceImpl implements OrderService {
 
         double deliveryFee = 0;
         if (order.getOrderType() == OrderType.ONLINE) {
-            double distance = calculateDrivingDirectionKM(googleMapsApiKey, order, storeOptional);
+            double distance = calculateDrivingDirectionKM(googleMapsApiKey, order, storeOptional.get());
             double standardFee = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ? storeOptional.get().getStandardDeliveryPrice() : this.starndardDeliveryFee;
             double standardDistance = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ? storeOptional.get().getStandardDeliveryKm() : this.starndardDeliveryKm;
             double ratePerKM = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ? storeOptional.get().getRatePerKm() : this.ratePerKm;
@@ -209,11 +209,18 @@ public class OrderServiceImpl implements OrderService {
             Set<Stock> stock = store.getStockList();
             persistedOrder.getBasket()
                     .getItems()
-                    .stream()
                     .forEach(item -> {
                         stock.stream()
                                 .filter(sto -> sto.getName().equals(item.getName()))
-                                .forEach(stockItem -> stockItem.setQuantity(stockItem.getQuantity() - item.getQuantity()));
+                                .findFirst()
+                                .ifPresent(stockItem -> {
+                                    stockItem.setQuantity(stockItem.getQuantity() - item.getQuantity());
+                                    if(store.getStoreWebsiteUrl() != null) {
+                                        String fullUrl = (store.getStoreWebsiteUrl() + "/" + stockItem.getExternalUrlPath())
+                                                .replaceAll("(/){2,}", "/").replaceAll(":/", "://");
+                                        item.setExternalUrl(fullUrl);
+                                    }
+                                });
                     });
             store.setServicesCompleted(store.getServicesCompleted() + 1);
             storeRepository.save(store);
