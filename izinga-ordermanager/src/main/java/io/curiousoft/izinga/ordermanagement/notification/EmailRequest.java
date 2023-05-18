@@ -1,6 +1,9 @@
 package io.curiousoft.izinga.ordermanagement.notification;
 
-import io.curiousoft.izinga.commons.model.*;
+import io.curiousoft.izinga.commons.model.BasketItem;
+import io.curiousoft.izinga.commons.model.Order;
+import io.curiousoft.izinga.commons.model.StoreProfile;
+import io.curiousoft.izinga.commons.model.UserProfile;
 
 import java.util.ArrayList;
 import java.util.List;

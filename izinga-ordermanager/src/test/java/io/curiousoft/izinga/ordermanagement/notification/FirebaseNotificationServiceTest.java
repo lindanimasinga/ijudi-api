@@ -1,9 +1,9 @@
 package io.curiousoft.izinga.ordermanagement.notification;
 
-import com.curiousoft.alarmsystem.messaging.firebase.FCMMessage;
-import com.curiousoft.alarmsystem.messaging.firebase.FCMNotification;
-import com.curiousoft.alarmsystem.messaging.firebase.FirebaseConnectionWrapper;
 import io.curiousoft.izinga.commons.model.*;
+import io.curiousoft.izinga.messaging.firebase.FCMMessage;
+import io.curiousoft.izinga.messaging.firebase.FCMNotification;
+import io.curiousoft.izinga.messaging.firebase.FirebaseConnectionWrapper;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;

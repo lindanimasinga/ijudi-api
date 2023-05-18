@@ -6,6 +6,7 @@
         <module>izinga-recon</module>
         <module>izinga-ordermanager</module>
         <module>izinga-commons</module>
+        <module>izinga-messaging</module>
     </modules>
 
     <parent>

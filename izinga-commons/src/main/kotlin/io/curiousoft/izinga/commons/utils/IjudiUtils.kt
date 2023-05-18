@@ -1,8 +1,8 @@
 package io.curiousoft.izinga.commons.utils
 
-import com.curiousoft.alarmsystem.messaging.domain.directions.Leg
-import com.curiousoft.alarmsystem.messaging.domain.directions.Route
-import com.curiousoft.alarmsystem.messaging.firebase.GoogleServices.GoogleMaps
+import io.curiousoft.izinga.messaging.domain.directions.Leg
+import io.curiousoft.izinga.messaging.domain.directions.Route
+import io.curiousoft.izinga.messaging.firebase.GoogleServices.GoogleMaps
 import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.commons.model.StoreProfile
 import io.curiousoft.izinga.commons.model.StoreType

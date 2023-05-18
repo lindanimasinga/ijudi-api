@@ -23,7 +23,6 @@ import java.time.ZoneId;
 import java.util.*;
 
 import static io.curiousoft.izinga.commons.model.OrderKt.generateId;
-import static io.curiousoft.izinga.commons.model.OrderStage.*;
 import static io.curiousoft.izinga.commons.model.OrderType.INSTORE;
 import static io.curiousoft.izinga.commons.model.OrderType.ONLINE;
 import static io.curiousoft.izinga.commons.utils.IjudiUtilsKt.*;
@@ -89,7 +88,7 @@ public class OrderServiceImpl implements OrderService {
         onlineDeliveryStages = new LinkedList<>();
         onlineDeliveryStages.add(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         onlineDeliveryStages.add(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
-        onlineDeliveryStages.add(STAGE_2_STORE_PROCESSING);
+        onlineDeliveryStages.add(OrderStage.STAGE_2_STORE_PROCESSING);
         onlineDeliveryStages.add(OrderStage.STAGE_3_READY_FOR_COLLECTION);
         onlineDeliveryStages.add(OrderStage.STAGE_4_ON_THE_ROAD);
         onlineDeliveryStages.add(OrderStage.STAGE_5_ARRIVED);
@@ -99,7 +98,7 @@ public class OrderServiceImpl implements OrderService {
         onlineCollectionStages = new LinkedList<>();
         onlineCollectionStages.add(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         onlineCollectionStages.add(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
-        onlineCollectionStages.add(STAGE_2_STORE_PROCESSING);
+        onlineCollectionStages.add(OrderStage.STAGE_2_STORE_PROCESSING);
         onlineCollectionStages.add(OrderStage.STAGE_3_READY_FOR_COLLECTION);
         onlineCollectionStages.add(OrderStage.STAGE_6_WITH_CUSTOMER);
         onlineCollectionStages.add(OrderStage.STAGE_7_ALL_PAID);
@@ -145,7 +144,7 @@ public class OrderServiceImpl implements OrderService {
         order.setHasVat(storeOptional.get().getHasVat());
         String orderId = generateId();
         order.setId(orderId);
-        order.setStage(STAGE_0_CUSTOMER_NOT_PAID);
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setMinimumDepositAllowedPerc(storeOptional.get().getMinimumDepositAllowedPerc());
 
         double deliveryFee = 0;
@@ -180,7 +179,7 @@ public class OrderServiceImpl implements OrderService {
         Order persistedOrder = orderRepo.findById(order.getId())
                 .orElseThrow(() -> new Exception("Order with id " + order.getId() + " not found."));
 
-        if(order.getStage() != STAGE_0_CUSTOMER_NOT_PAID) {
+        if(order.getStage() != OrderStage.STAGE_0_CUSTOMER_NOT_PAID) {
             return persistedOrder;
         }
 
@@ -254,12 +253,12 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new Exception("Order with id " + orderId + " not found."));
         int index = onlineDeliveryStages.indexOf(order.getStage());
 
-        if (order.getOrderType() == INSTORE || order.getStage() == STAGE_0_CUSTOMER_NOT_PAID
-                || order.getStage() == STAGE_7_ALL_PAID) {
+        if (order.getOrderType() == INSTORE || order.getStage() == OrderStage.STAGE_0_CUSTOMER_NOT_PAID
+                || order.getStage() == OrderStage.STAGE_7_ALL_PAID) {
             return order;
         }
 
-        if(order.getStage() == CANCELLED) throw new Exception("Order with id " + orderId + " has been cancelled");
+        if(order.getStage() == OrderStage.CANCELLED) throw new Exception("Order with id " + orderId + " has been cancelled");
 
         switch (order.getShippingData().getType()) {
             case DELIVERY:
@@ -332,7 +331,7 @@ public class OrderServiceImpl implements OrderService {
 
                 break;
             case STAGE_6_WITH_CUSTOMER:
-                order.setStage(STAGE_7_ALL_PAID);
+                order.setStage(OrderStage.STAGE_7_ALL_PAID);
                 break;
 
         }
@@ -376,7 +375,7 @@ public class OrderServiceImpl implements OrderService {
                 .minusMinutes(7)
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
-        List<Order> unpaidOrders = orderRepo.findByShopPaidAndStageAndModifiedDateBefore(false, STAGE_0_CUSTOMER_NOT_PAID, pastDate);
+        List<Order> unpaidOrders = orderRepo.findByShopPaidAndStageAndModifiedDateBefore(false, OrderStage.STAGE_0_CUSTOMER_NOT_PAID, pastDate);
         unpaidOrders.forEach(order -> {
                     if (!order.getSmsSentToAdmin()) {
                         emailNotificationService.notifyAdminOrderNotPaid(order);
@@ -400,7 +399,7 @@ public class OrderServiceImpl implements OrderService {
     @Scheduled(fixedDelay = 150000, initialDelay = 150000)// 10 minutes
     @Override
     public void checkUnconfirmedOrders() {
-        List<Order> orders = orderRepo.findByStage(STAGE_1_WAITING_STORE_CONFIRM);
+        List<Order> orders = orderRepo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         LOGGER.info(format("Found %s unconfirmed orders..", orders.size()));
         orders.forEach(order -> {
             Date checkDate = order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY ?
@@ -447,13 +446,13 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepo.findById(id)
                 .orElseThrow(() -> new Exception("Order with id " + id + " not found."));
 
-        if(order.getStage() == STAGE_6_WITH_CUSTOMER || order.getStage() == STAGE_7_ALL_PAID) {
+        if(order.getStage() == OrderStage.STAGE_6_WITH_CUSTOMER || order.getStage() == OrderStage.STAGE_7_ALL_PAID) {
             throw  new Exception("Cannot cancel this order. Please cancel manually.");
         }
         boolean successful = paymentService.reversePayment(order);
         if(!successful) throw  new Exception("Unable to reserve payment. Please reverse manually.");
 
-        order.setStage(CANCELLED);
+        order.setStage(OrderStage.CANCELLED);
         order = orderRepo.save(order);
         List<Device> customerDevices = deviceRepo.findByUserId(order.getCustomerId());
         PushHeading pushMessage = new PushHeading("Your order has been cancelled. Payment has been reversed to your account.",

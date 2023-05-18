@@ -16,9 +16,9 @@ import java.util.TimeZone;
 @EnableMongoAuditing
 @EnableScheduling
 @EnableAsync
-@SpringBootApplication(scanBasePackages = {"io.curiousoft.izinga.ordermanagement", "io.curiousoft.izinga.commons", "io.curiousoft.izinga.recon"})
-@EntityScan({"io.curiousoft.izinga.ordermanagement", "io.curiousoft.izinga.commons", "io.curiousoft.izinga.recon"})
-@EnableMongoRepositories({"io.curiousoft.izinga.ordermanagement", "io.curiousoft.izinga.commons", "io.curiousoft.izinga.recon"})
+@SpringBootApplication(scanBasePackages = {"io.curiousoft.izinga.ordermanagement", "io.curiousoft.izinga.commons", "io.curiousoft.izinga.recon", "io.curiousoft.izinga.messaging"})
+@EntityScan({"io.curiousoft.izinga.ordermanagement", "io.curiousoft.izinga.commons", "io.curiousoft.izinga.recon", "io.curiousoft.izinga.messaging"})
+@EnableMongoRepositories({"io.curiousoft.izinga.ordermanagement", "io.curiousoft.izinga.commons", "io.curiousoft.izinga.recon", "io.curiousoft.izinga.messaging"})
 public class IjudiApplication {
 
 	public static void main(String[] args) {

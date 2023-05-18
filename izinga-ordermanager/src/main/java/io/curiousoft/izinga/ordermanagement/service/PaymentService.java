@@ -1,6 +1,6 @@
 package io.curiousoft.izinga.ordermanagement.service;
 
-import io.curiousoft.izinga.commons.model.*;
+import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.repo.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
@@ -9,12 +9,8 @@ import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.Date;
 import java.util.List;
 
 @Service
