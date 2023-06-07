@@ -3,6 +3,7 @@ package io.curiousoft.izinga.recon.notification;
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.ReconService
+import io.curiousoft.izinga.recon.payout.Payout
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
@@ -21,10 +22,17 @@ class DailyPayoutEmailNotificationService(
     //val Logger = LoggerFactory.getLogger(EmailNotificationService.javaClass)
     private val restTemplate = RestTemplate()
 
-    @Scheduled(cron = "0 0 19 1/1 * ?") // every day at 7pm
-    fun notifyDailyShopPayout() {
-        val bundle = reconService.generateNextPayoutsToShop()
-        bundle?.payouts?.map {
+    @Scheduled(cron = "0 0 17 1/1 * ?") // every day at 7pm
+    fun notifyDailyPayouts() {
+        val allPayouts = mutableListOf<Payout>()
+        reconService.generateNextPayoutsToShop()?.payouts?.let {
+            allPayouts.addAll(it)
+        }
+        reconService.generateNextPayoutsToMessenger()?.payouts?.let {
+            allPayouts.addAll(it)
+        }
+
+        allPayouts.map {
             val emailMessage = EmailRequest();
             emailMessage.template_id = dailyPayoutTemplate
             emailMessage.to = listOf(To(it.emailAddress))

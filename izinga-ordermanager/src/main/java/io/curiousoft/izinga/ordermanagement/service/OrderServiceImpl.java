@@ -18,6 +18,7 @@ import javax.validation.ConstraintViolation;
 import javax.validation.Validation;
 import javax.validation.Validator;
 import javax.validation.ValidatorFactory;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
@@ -149,11 +150,20 @@ public class OrderServiceImpl implements OrderService {
 
         double deliveryFee = 0;
         if (order.getOrderType() == OrderType.ONLINE) {
+            //if there are orders in progress going to the same location for the same customer and same messenger then add a discount
+            List<Order> allOrdersCurrentForCustomer = findAllOrdersWithStateForCustomer(order.getCustomerId(), order.getShippingData().getMessengerId(), OrderStage.STAGE_3_READY_FOR_COLLECTION,
+                    OrderStage.STAGE_2_STORE_PROCESSING, OrderStage.STAGE_2_STORE_PROCESSING);
+
+            // if there are current orders for this user and its same messenger than don't charge a delivery fee.
             double distance = calculateDrivingDirectionKM(googleMapsApiKey, order, storeOptional.get());
-            double standardFee = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ? storeOptional.get().getStandardDeliveryPrice() : this.starndardDeliveryFee;
-            double standardDistance = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ? storeOptional.get().getStandardDeliveryKm() : this.starndardDeliveryKm;
-            double ratePerKM = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ? storeOptional.get().getRatePerKm() : this.ratePerKm;
-            deliveryFee = calculateDeliveryFee(standardFee, standardDistance, ratePerKM, distance);
+            if(allOrdersCurrentForCustomer.isEmpty()) {
+                double standardFee = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ? storeOptional.get().getStandardDeliveryPrice() : this.starndardDeliveryFee;
+                double standardDistance = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ? storeOptional.get().getStandardDeliveryKm() : this.starndardDeliveryKm;
+                double ratePerKM = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ? storeOptional.get().getRatePerKm() : this.ratePerKm;
+                deliveryFee = calculateDeliveryFee(standardFee, standardDistance, ratePerKM, distance);
+                //if the customer has already paid delivery in the previous orders going the same direction, then
+                deliveryFee = deliveryFee - allOrdersCurrentForCustomer.stream().map(o -> o.getShippingData().getFee()).reduce(Double::sum).orElse(0.0);
+            }
             order.getShippingData().setFee(deliveryFee);
             order.getShippingData().setDistance(distance);
         }
@@ -166,6 +176,10 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return orderRepo.save(order);
+    }
+
+    private List<Order> findAllOrdersWithStateForCustomer(String customerId, String messengerId, OrderStage... stages) {
+        return orderRepo.findByCustomerIdAndShippingDataMessengerIdAndStageIn(customerId, messengerId,  stages);
     }
 
     private boolean canChargeServiceFees(StoreProfile storeProfile) {

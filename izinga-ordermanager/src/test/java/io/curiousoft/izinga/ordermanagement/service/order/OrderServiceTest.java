@@ -164,6 +164,61 @@ public class OrderServiceTest {
     }
 
     @Test
+    public void startSecondOrderOnlineDelivery_while_other_collected_is_processed_sameMessenger() throws Exception {
+        //given
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+        Order order = new Order();
+        List<Order> currentOrders = List.of(order, order, order);
+
+        HashSet<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
+        stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+        ShippingData shipping = new ShippingData("shopAddress",
+                "25 Mgobhozi Rd, Enkanyisweni, KwaMashu, 4051",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messagerID");
+        shipping.setBuildingType(BuildingType.HOUSE);
+        order.setShippingData(shipping);
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+
+        //when
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+        when(repo.save(order)).thenReturn(order);
+        when(repo.findByCustomerIdAndShippingDataMessengerIdAndStageIn("customerId", "messagerID",  List.of(OrderStage.STAGE_3_READY_FOR_COLLECTION,
+                OrderStage.STAGE_2_STORE_PROCESSING, OrderStage.STAGE_2_STORE_PROCESSING).toArray(OrderStage[]::new))).thenReturn(currentOrders);
+
+        Order newOrder = sut.startOrder(order);
+        //verify
+        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        Assert.assertNotNull(order.getId());
+        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
+        Assert.assertEquals(0, order.getShippingData().getFee(), 0);
+        Assert.assertEquals(1, order.getServiceFee(), 0);
+        Assert.assertEquals(40.00, order.getBasketAmount(), 0);
+        Assert.assertEquals(false, order.getHasVat());
+        Assert.assertEquals(false, order.getFreeDelivery());
+        verify(repo).save(order);
+        verify(customerRepo).existsById(order.getCustomerId());
+        verify(storeRepo).findById(order.getShopId());
+        verify(repo).findByCustomerIdAndShippingDataMessengerIdAndStageIn("customerId", "messagerID",  List.of(OrderStage.STAGE_3_READY_FOR_COLLECTION,
+                OrderStage.STAGE_2_STORE_PROCESSING, OrderStage.STAGE_2_STORE_PROCESSING).toArray(OrderStage[]::new));
+
+    }
+
+    @Test
     public void startOrderShop_offline() throws Exception {
         //given
         LocalDateTime open = LocalDateTime.now().minusHours(3);
