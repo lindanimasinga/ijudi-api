@@ -7,6 +7,7 @@ import java.math.BigDecimal
 
 abstract class Payout(
     var toId: String,
+    var bundleId: String?,
     var toName: String,
     var toType: BankAccType,
     var toBankName: String,
@@ -17,6 +18,7 @@ abstract class Payout(
     var emailNotify: String,
     var emailAddress: String,
     var emailSubject: String,
+    var orders: List<Order>
 ): BaseModel() {
     abstract var paid: Boolean
     abstract var total: BigDecimal
@@ -28,16 +30,17 @@ class MessengerPayout(
     toBankName: String,
     toType: BankAccType,
     toAccountNumber: String,
-    var orders: List<Order>,
     toBranchCode: String,
     fromReference: String,
     toReference: String,
     emailNotify: String,
+    orders: List<Order>,
     emailAddress: String,
+    bundleId: String? = null,
     emailSubject: String ) : Payout(
     toId = toId, toName = toName, toType = toType, toBankName = toBankName, toAccountNumber = toAccountNumber,
-    toBranchCode = toBranchCode, fromReference = fromReference, toReference = toReference,
-    emailNotify = emailNotify, emailAddress = emailAddress, emailSubject = emailSubject) {
+    toBranchCode = toBranchCode, fromReference = fromReference, toReference = toReference, emailNotify = emailNotify,
+    emailAddress = emailAddress, emailSubject = emailSubject, orders = orders, bundleId = bundleId) {
     override var paid: Boolean = false
     @org.springframework.data.annotation.Transient
     override var total: BigDecimal = orders.sumOf { it.shippingData?.fee!! }.toBigDecimal()
@@ -49,13 +52,14 @@ class ShopPayout(
     toBankName: String,
     toType: BankAccType,
     toAccountNumber: String,
-    var orders: List<Order>,
+    orders: List<Order>,
     toBranchCode: String, fromReference: String, toReference: String, emailNotify: String, emailAddress: String,
-    emailSubject: String
+    emailSubject: String,
+    bundleId: String? = null,
 ) : Payout(
     toId = toId, toName = toName, toType = toType, toBankName = toBankName, toAccountNumber = toAccountNumber,
     toBranchCode = toBranchCode, fromReference = fromReference, toReference = toReference,
-    emailNotify = emailNotify, emailAddress = emailAddress, emailSubject = emailSubject) {
+    emailNotify = emailNotify, emailAddress = emailAddress, emailSubject = emailSubject, orders = orders, bundleId = bundleId) {
 
     @org.springframework.data.annotation.Transient
     override var total: BigDecimal = orders.sumOf { it.basketAmount }.toBigDecimal()

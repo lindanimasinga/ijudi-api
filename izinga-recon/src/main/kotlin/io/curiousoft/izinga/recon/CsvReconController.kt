@@ -13,15 +13,23 @@ import javax.servlet.http.HttpServletResponse
 @RequestMapping("/reconcsv")
 class CsvReconController(val reconService: ReconService) {
 
-    @GetMapping(value = ["/shop-payout-bundle"] , produces = ["text/csv"])
+    @GetMapping(value = ["/shop-payout-bundle"] , produces = ["application/csv"])
     fun shopPayoutBundle(response: HttpServletResponse) {
+        response.apply {
+            contentType = "application/csv"
+            addHeader("Content-Disposition", "attachment; filename=\"shop-payout-bundle.csv\"")
+        }
         reconService.generateNextPayoutsToShop()?.let {
             payoutBundleToCsv(response.writer, it)
         }
     }
 
-    @GetMapping(value = ["/messenger-payout-bundle"], produces = ["text/csv"])
+    @GetMapping(value = ["/messenger-payout-bundle"], produces = ["application/csv"])
     fun messengerPayoutBundle(response: HttpServletResponse) {
+        response.apply {
+            contentType = "application/csv"
+            addHeader("Content-Disposition", "attachment; filename=\"messenger-payout-bundle.csv\"")
+        }
         reconService.generateNextPayoutsToMessenger()?.let {
             payoutBundleToCsv(response.writer, it)
         }

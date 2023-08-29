@@ -6,6 +6,7 @@
         <module>izinga-recon</module>
         <module>izinga-ordermanager</module>
         <module>izinga-commons</module>
+        <module>izinga-messaging</module>
     </modules>
 
     <parent>
@@ -23,9 +24,7 @@
     <description>izinga applications</description>
 
     <properties>
-        <java.version>1.8</java.version>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
+        <java.version>17</java.version>
         <spring-cloud.version>Hoxton.SR4</spring-cloud.version>
         <spring-cloud-function.version>1.0.1.RELEASE</spring-cloud-function.version>
         <aws-lambda-events.version>2.0.2</aws-lambda-events.version>

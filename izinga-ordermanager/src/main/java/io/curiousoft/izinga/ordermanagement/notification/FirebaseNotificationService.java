@@ -1,14 +1,13 @@
 package io.curiousoft.izinga.ordermanagement.notification;
 
-import com.curiousoft.alarmsystem.messaging.firebase.FCMMessage;
-import com.curiousoft.alarmsystem.messaging.firebase.FCMNotification;
-import com.curiousoft.alarmsystem.messaging.firebase.FirebaseConnectionWrapper;
+import io.curiousoft.izinga.commons.model.*;
+import io.curiousoft.izinga.messaging.firebase.FCMMessage;
+import io.curiousoft.izinga.messaging.firebase.FCMNotification;
+import io.curiousoft.izinga.messaging.firebase.FirebaseConnectionWrapper;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import io.curiousoft.izinga.commons.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.BeanUtils;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
