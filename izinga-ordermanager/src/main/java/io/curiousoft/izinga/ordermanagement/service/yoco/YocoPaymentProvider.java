@@ -28,14 +28,16 @@ public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
     private static final Logger logger = Logger.getLogger(YocoPaymentProvider.class.getName());
     private final String apiKey;
     private final String baseUrl;
+    private final ObjectMapper mapper;
 
 
     @Autowired
     public YocoPaymentProvider(@Value("${yoco.api.url}") String baseUrl,
-                               @Value("${yoco.api.key}") String apiKey) {
+                               @Value("${yoco.api.key}") String apiKey, ObjectMapper mapper) {
         super(PaymentType.YOCO);
         this.apiKey = apiKey;
         this.baseUrl = baseUrl;
+        this.mapper = mapper;
     }
 
     @Override
@@ -100,7 +102,7 @@ public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
         try {
             response = rest.exchange(url, HttpMethod.POST, entity, YocoPaymentResponse.class);
         } catch (HttpClientErrorException.BadRequest e) {
-            YocoErrorResponse error = new ObjectMapper().readValue(e.getResponseBodyAsString(), YocoErrorResponse.class);
+            YocoErrorResponse error = mapper.readValue(e.getResponseBodyAsString(), YocoErrorResponse.class);
             return  "refund_already_processed".equalsIgnoreCase(error.getErrorCode());
         }
         return response.getBody() != null && "successful".equalsIgnoreCase(response.getBody().getStatus());

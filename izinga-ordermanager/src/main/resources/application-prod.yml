@@ -1,0 +1,79 @@
+admin:
+    cellNumber: 0812815707,0815546658,0734534709
+allowed:
+    origins: https://www.celestemonique.com,https://celestemonique.com,https://api.izinga.co.za,app://izinga,https://shop.izinga.co.za,app://izinga-lambda
+amz:
+    accessKey: AKIAUTE3KPBGHYXR3V6C
+    secretKey: 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
+google:
+    api:
+        key: AAAASXcChds:APA91bGMdjB7knpWAtdyHELx9lvMiar2pHQ-_aZjky9YSphe1cJCEQe8ks5qy1e5W6T8mrPMxtPTCGrMNCjqxGM4eKzw0xPZCOWDRp9XAqID3SWhkcNx1HWcRK9Oo2ODMunaSU_n3X4X
+    maps:
+        api:
+            key: AIzaSyAZbvE4NBcJIplfzmy8cSEdSpbocBggylc
+logging:
+    level:
+        io:
+            curiousoft: DEBUG
+        root: INFO
+mailersend:
+    apikey: eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIxIiwianRpIjoiZmVjZGY1ZDE5MjdiMzNkNTgzYTRlYzMyMTU2MThjZjE1ZDc3ZjdlN2UzYmY5NzhlZTdmOTIwMDJhNzBjYTY0YWI0MTI2NTkwZjY4MTY5ZDciLCJpYXQiOjE2NjE5NTI5MjUuNDU5NzUsIm5iZiI6MTY2MTk1MjkyNS40NTk3NTQsImV4cCI6NDgxNzYyNjUyNS40NTQwNDMsInN1YiI6IjMzNTY5Iiwic2NvcGVzIjpbImVtYWlsX2Z1bGwiLCJkb21haW5zX2Z1bGwiLCJhY3Rpdml0eV9mdWxsIiwiYW5hbHl0aWNzX2Z1bGwiLCJ0b2tlbnNfZnVsbCIsIndlYmhvb2tzX2Z1bGwiLCJ0ZW1wbGF0ZXNfZnVsbCIsInN1cHByZXNzaW9uc19mdWxsIiwic21zX2Z1bGwiLCJlbWFpbF92ZXJpZmljYXRpb25fZnVsbCJdfQ.bKPCCKZjtktQpY4KOVbOg-QPmthmVEn3s0mGRQu9bcZVqgwy0mZnofCn2SHOb8Ztfh6uFZZhjuUlTgRcIE1B-wHb4hu1U2I6h28QshD3-r_e5GJhqbY5df5d9juCC001-FlqT5ra9guZ47fuNoab7sLg6_wtXzHceEwzhdwIrSHmySBgey8hJ9gG25fULitEmhffFX1IFr1CXLHsYwMzKP0wXVbGKnjGAbG28UdHBIWCKH3WX6jWbKiup5LnyxeCC7WcgmRjkEcZSSL2YzmFll9BjovR2KW7hy-uIzZkeEbnvxJmQU3IIcYXoDv0mViIxvgLoQsSPAmy4IsheNOusJpT3WI_kNuiBrn5cWaJhuCTch8IjyB-EeP-5gXxJ86Urz2SQJUdGuKkvSTZWZlb-SJ7Qx_4-VufZS8ttdTR2-m47bm2VY4Ne5NrQuJ0_yOkoRSPAjhjtSVtdeOWNXHxnL6RTb07dp0AynoPMzz5vJUQXjAfIqctsGoMYpTsaxu07O9D6f2sw6QP40Weuii0EIVrLGR4hbL8L7J03dwFCWb825OQ7yDa7d8EI6R69KZqOLvL42nYa47dFrmtQ8W7UwdtyYMW9d64McV6RAZsj9eXxZniTAXJgcSXKQKR_OMVBcd7CPun7UrK15B7P9klBl7yEvMVGwE1loEr4xyheD4
+    template:
+        new-order: ynrw7gymyyjg2k8e
+        notpaid-order: yzkq340ede6gd796
+order:
+    cleanup:
+        unpaid:
+            minutes: 30
+ozow:
+    api:
+        key: 760c42eec84640cf98aa1558135a9d90
+        url: https://api.ozow.com
+payfast:
+    api:
+        merchant:
+            id: 11522007
+        passphrase: izinga-For-clothing1
+        url: https://api.payfast.co.za
+payment:
+    process:
+        pending:
+            minutes: 60
+server:
+    port: 80
+service:
+    active: true
+    commission:
+        perc: 0.1
+    delivery:
+        ratePerKm: 7.5
+        standardFee: 25.0
+        standardKm: 3
+    fee:
+        perc: 0.065
+    markup:
+        perc: 0.1
+    supportedApp:
+        min: 2.1.1
+spring:
+    data:
+        mongodb:
+            uri: mongodb+srv://onusmongouser:wfsuser@cluster0-7odiz.mongodb.net/izinga-prod?retryWrites=true&w=majority
+ukheshe:
+    apiUrl: https://api2.ukheshe.co.za/ukheshe-conductor/rest/v1
+    customerId: 318930
+    main:
+        account: 6900576239
+    password: Csd0148()1
+    username: 812815707
+yoco:
+    api:
+        key: sk_test_b03f2c6bMP0k5GY10ad45ddbb5dc
+        url: https://payments.yoco.com/api/
+        webhooksec: M0JGQUI3MTcwODQxMDg2MUMyNjk2OUQ4MzA1NTI0QUE=
+zoomconnectsms:
+    api:
+        email: lindanimasinga@gmail.com
+        endpoint: https://www.zoomconnect.com/app/api/rest/v1/sms/send
+        key: c0217d42-dd53-4d6b-811c-a79b584e5177
+    enable: true

@@ -1,0 +1,71 @@
+admin:
+    cellNumber: 0812815707,0815546658
+allowed:
+    origins: http://localhost:4200,https://dev.celestemonique.com,https://api-uat.izinga.co.za,app://izinga
+amz:
+    accessKey: AKIAUTE3KPBGHYXR3V6C
+    secretKey: 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
+google:
+    api:
+        key: AIzaSyCvhRKdFBDc0xNCugU21RW_Lc3e3eHSnPE
+    maps:
+        api:
+            key: AIzaSyAZbvE4NBcJIplfzmy8cSEdSpbocBggylc
+logging:
+    level:
+        httpclient:
+            wire: DEBUG
+        org:
+            apache:
+                http: DEBUG
+mailersend:
+    apikey: token
+    template:
+        new-order: ynrw7gymyyjg2k8e
+        notpaid-order: ynrw7gymyyjg2k8e
+order:
+    cleanup:
+        unpaid:
+            minutes: 60
+ozow:
+    api:
+        key: 760c42eec84640cf98aa1558135a9d90
+        url: https://api.ozow.com
+payment:
+    process:
+        pending:
+            minutes: 15
+service:
+    commission:
+        perc: 0.1
+    delivery:
+        ratePerKm: 5
+        standardFee: 30.0
+        standardKm: 10
+    fee:
+        perc: 0.025
+    markup:
+        perc: 0.1
+    supportedApp:
+        min: 1.9.1
+spring:
+    data:
+        mongodb:
+            uri: mongodb+srv://onusmongouser:wfsuser@cluster0-7odiz.mongodb.net/ijudi-test?retryWrites=true&w=majority
+ukheshe:
+    apiUrl: https://ukheshe-sandbox.jini.rocks/ukheshe-conductor/rest/v1
+    customerId: 534
+    main:
+        account: 2885091160
+    password: 111111
+    username: 812815707
+yoco:
+    api:
+        key: sk_test_b03f2c6bMP0k5GY10ad45ddbb5dc
+        url: https://online.yoco.com/v1/
+zoomconnectsms:
+    api:
+        email: lindanimasinga@gmail.com
+        endpoint: https://www.zoomconnect.com/app/api/rest/v1/sms/send
+        key: c0217d42-dd53-4d6b-811c-a79b584e5177
+    enable: true

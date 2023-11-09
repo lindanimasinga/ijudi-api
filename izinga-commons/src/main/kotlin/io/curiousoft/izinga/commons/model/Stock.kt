@@ -9,7 +9,7 @@ import javax.validation.constraints.NotBlank
 import javax.validation.constraints.NotNull
 
 class Stock: Comparable<Stock> {
-    var id = UUID.randomUUID().toString()
+    var id: String? = UUID.randomUUID().toString()
     lateinit var name: @NotBlank(message = "stock name must not be blank") String
     var description: String? = null
     var detailedDescription: String? = null

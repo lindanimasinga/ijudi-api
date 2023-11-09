@@ -9,7 +9,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>izinga-recon</artifactId>
+    <artifactId>izinga-yoco-pay</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
 

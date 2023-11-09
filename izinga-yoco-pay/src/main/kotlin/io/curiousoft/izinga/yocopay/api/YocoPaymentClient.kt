@@ -1,0 +1,17 @@
+package io.curiousoft.izinga.yocopay.api
+
+import io.curiousoft.izinga.yocopay.YocoPaymentInitiateResponse
+import org.springframework.cloud.openfeign.FeignClient
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
+
+@FeignClient(value = "yoco-api", url = "\${yoco.api.url}")
+interface YocoPaymentClient {
+
+    @PostMapping(value = ["checkouts"], consumes = ["application/json"])
+    fun checkout(@RequestBody yocoPayRequest: YocoPaymentInitiate): YocoPaymentInitiateResponse?
+
+    @PostMapping(value = ["checkouts/{checkoutId}/refund"], consumes = ["application/json"])
+    fun reverse(@PathVariable checkoutId: String, @RequestBody yocoReverseRequest: YocoReverseRequest)
+}
