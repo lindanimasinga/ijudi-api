@@ -1,0 +1,71 @@
+admin:
+    cellNumber: 0812815707,0734396642,0815546658
+allowed:
+    origins: http://localhost:4200,https://dev.celestemonique.com,https://api-uat.izinga.co.za,app://izinga,https://shop.izinga.co.za,app://izinga-lambda
+google:
+    api:
+        key: AAAASXcChds:APA91bGMdjB7knpWAtdyHELx9lvMiar2pHQ-_aZjky9YSphe1cJCEQe8ks5qy1e5W6T8mrPMxtPTCGrMNCjqxGM4eKzw0xPZCOWDRp9XAqID3SWhkcNx1HWcRK9Oo2ODMunaSU_n3X4X
+    maps:
+        api:
+            key: AIzaSyAZbvE4NBcJIplfzmy8cSEdSpbocBggylc
+logging:
+    level:
+        io:
+            curiousoft: INFO
+        root: INFO
+order:
+    cleanup:
+        unpaid:
+            minutes: 60
+ozow:
+    api:
+        key: 760c42eec84640cf98aa1558135a9d90
+        url: https://api.ozow.com
+payfast:
+    api:
+        merchant:
+            id: 11522007
+        passphrase: izinga-For-clothing1
+        url: https://api.payfast.co.za
+payment:
+    process:
+        pending:
+            minutes: 15
+server:
+    port: 80
+service:
+    active: true
+    commission:
+        perc: 0.1
+    delivery:
+        ratePerKm: 7.5
+        standardFee: 25.0
+        standardKm: 3
+    fee:
+        perc: 0.065
+    markup:
+        perc: 0.1
+    supportedApp:
+        min: 2.1.1
+spring:
+    data:
+        mongodb:
+            uri: mongodb+srv://onusmongouser:wfsuser@cluster0-7odiz.mongodb.net/ijudi?retryWrites=true&w=majority
+ukheshe:
+    apiUrl: https://ukheshe-sandbox.jini.rocks/ukheshe-conductor/rest/v1
+    customerId: 534
+    main:
+        account: 2885091160
+    password: 111111
+    username: 812815707
+yoco:
+    api:
+        key: sk_test_b03f2c6bMP0k5GY10ad45ddbb5dc
+        url: https://payments.yoco.com/api/
+        webhooksec: M0JGQUI3MTcwODQxMDg2MUMyNjk2OUQ4MzA1NTI0QUE=
+zoomconnectsms:
+    api:
+        email: lindanimasinga@gmail.com
+        endpoint: https://www.zoomconnect.com/app/api/rest/v1/sms/send
+        key: c0217d42-dd53-4d6b-811c-a79b584e5177
+    enable: true

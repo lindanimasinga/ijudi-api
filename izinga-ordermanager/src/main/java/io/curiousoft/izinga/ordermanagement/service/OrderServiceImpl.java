@@ -18,7 +18,6 @@ import javax.validation.ConstraintViolation;
 import javax.validation.Validation;
 import javax.validation.Validator;
 import javax.validation.ValidatorFactory;
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
@@ -32,7 +31,7 @@ import static java.lang.String.format;
 @Service
 public class OrderServiceImpl implements OrderService {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(OrderServiceImpl.class);
+    private static final Logger LOG = LoggerFactory.getLogger(OrderServiceImpl.class);
 
     private final LinkedList<OrderStage> onlineCollectionStages;
     private final LinkedList<OrderStage> onlineDeliveryStages;
@@ -151,8 +150,9 @@ public class OrderServiceImpl implements OrderService {
         double deliveryFee = 0;
         if (order.getOrderType() == OrderType.ONLINE) {
             //if there are orders in progress going to the same location for the same customer and same messenger then add a discount
-            List<Order> allOrdersCurrentForCustomer = findAllOrdersWithStateForCustomer(order.getCustomerId(), order.getShippingData().getMessengerId(), OrderStage.STAGE_3_READY_FOR_COLLECTION,
-                    OrderStage.STAGE_2_STORE_PROCESSING, OrderStage.STAGE_2_STORE_PROCESSING);
+            List<Order> allOrdersCurrentForCustomer = order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY ?
+                    findAllOrdersWithStateForCustomer(order.getCustomerId(), order.getShippingData().getMessengerId(), OrderStage.STAGE_3_READY_FOR_COLLECTION,
+                    OrderStage.STAGE_2_STORE_PROCESSING, OrderStage.STAGE_2_STORE_PROCESSING) : List.of();
 
             // if there are current orders for this user and its same messenger than don't charge a delivery fee.
             double distance = calculateDrivingDirectionKM(googleMapsApiKey, order, storeOptional.get());
@@ -251,8 +251,8 @@ public class OrderServiceImpl implements OrderService {
                 pushNotificationService.notifyMessengerOrderPlaced(messengerDevices, persistedOrder, store);
             }
         }
-        LOGGER.info("New order placed. Order No. " + order.getId() + ", Basket Amount. R"+order.getBasketAmount());
-        LOGGER.info("New order placed. Order No. " + order.getId() + ", Delivery Fee. R"+order.getShippingData().getFee());
+        LOG.info("New order placed. Order No. " + order.getId() + ", Basket Amount. R"+order.getBasketAmount());
+        LOG.info("New order placed. Order No. " + order.getId() + ", Delivery Fee. R"+order.getShippingData().getFee());
         return orderRepo.save(persistedOrder);
     }
 
@@ -378,7 +378,7 @@ public class OrderServiceImpl implements OrderService {
                 .minusMinutes(cleanUpMinutes)
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
-        LOGGER.info("Cleaning up all orders before   s" + pastDate);
+        LOG.info("Cleaning up all orders before   s" + pastDate);
         orderRepo.deleteByShopPaidAndStageAndModifiedDateBefore(false, OrderStage.STAGE_0_CUSTOMER_NOT_PAID, pastDate);
     }
 
@@ -397,7 +397,7 @@ public class OrderServiceImpl implements OrderService {
                         orderRepo.save(order);
                     }
                 });
-            LOGGER.info("Sms sent to admin");
+            LOG.info("Sms sent to admin");
     }
 
     @Override
@@ -414,7 +414,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public void checkUnconfirmedOrders() {
         List<Order> orders = orderRepo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
-        LOGGER.info(format("Found %s unconfirmed orders..", orders.size()));
+        LOG.info(format("Found %s unconfirmed orders..", orders.size()));
         orders.forEach(order -> {
             Date checkDate = order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY ?
                     Date.from(LocalDateTime.now()
@@ -434,22 +434,22 @@ public class OrderServiceImpl implements OrderService {
             if (isLateDeliveryOrder || isLateCollectionOrder) {
                 try {
                     StoreProfile store = storeRepository.findById(order.getShopId()).get();
-                    LOGGER.info(format("Order %s is late, call shop at %s", order.getId(), store.getMobileNumber()));
+                    LOG.info(format("Order %s is late, call shop at %s", order.getId(), store.getMobileNumber()));
                     if (!order.getSmsSentToShop()) {
                         smsNotificationService.sendMessage(store.getMobileNumber(), "Hello " + store.getName() + ", Please accept the order " + order.getId() +
                                 " on iZinga app, otherwise the order will be cancelled.");
                         order.setSmsSentToShop(true);
-                        LOGGER.info("Sms sent to shop");
+                        LOG.info("Sms sent to shop");
                     } else if (!order.getSmsSentToAdmin()) {
                         order.setSmsSentToAdmin(true);
                         emailNotificationService.notifyAdminNewOrder(order);
-                        LOGGER.info("Sms sent to admin");
+                        LOG.info("Sms sent to admin");
                     } else {
                         //reverse the transaction
                     }
                     orderRepo.save(order);
                 } catch (Exception e) {
-                    LOGGER.error("Failed to send sms. ", e);
+                    LOG.error("Failed to send sms. ", e);
                 }
             }
         });

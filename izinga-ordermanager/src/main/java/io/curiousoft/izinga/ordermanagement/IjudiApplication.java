@@ -3,6 +3,11 @@ package io.curiousoft.izinga.ordermanagement;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
+import org.springframework.cloud.openfeign.EnableFeignClients;
+import org.springframework.context.ApplicationContext;
 import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,22 +19,25 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 import springfox.documentation.swagger2.annotations.EnableSwagger2;
 
 import javax.annotation.PostConstruct;
+import java.util.Optional ;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.Collections;
 import java.util.TimeZone;
 
-@EnableSwagger2
 @EnableMongoAuditing
 @EnableScheduling
 @EnableAsync
-@SpringBootApplication(scanBasePackages = {"io.curiousoft.izinga.ordermanagement", "io.curiousoft.izinga.commons", "io.curiousoft.izinga.recon", "io.curiousoft.izinga.messaging"})
-@EntityScan({"io.curiousoft.izinga.ordermanagement", "io.curiousoft.izinga.commons", "io.curiousoft.izinga.recon", "io.curiousoft.izinga.messaging"})
-@EnableMongoRepositories({"io.curiousoft.izinga.ordermanagement", "io.curiousoft.izinga.commons", "io.curiousoft.izinga.recon", "io.curiousoft.izinga.messaging"})
+@SpringBootApplication(scanBasePackages = {"io.curiousoft.izinga.ordermanagement", "io.curiousoft.izinga.commons", "io.curiousoft.izinga.recon", "io.curiousoft.izinga.messaging", "io.curiousoft.izinga.yocopay"})
+@EntityScan({"io.curiousoft.izinga.ordermanagement", "io.curiousoft.izinga.commons", "io.curiousoft.izinga.recon", "io.curiousoft.izinga.messaging", "io.curiousoft.izinga.yocopay"})
+@EnableMongoRepositories({"io.curiousoft.izinga.ordermanagement", "io.curiousoft.izinga.commons", "io.curiousoft.izinga.recon", "io.curiousoft.izinga.messaging", "io.curiousoft.izinga.yocopay"})
+@ConfigurationPropertiesScan({"io.curiousoft.izinga.ordermanagement","io.curiousoft.izinga.yocopay"})
+@EnableFeignClients({"io.curiousoft.izinga.ordermanagement", "io.curiousoft.izinga.commons", "io.curiousoft.izinga.recon", "io.curiousoft.izinga.messaging", "io.curiousoft.izinga.yocopay"})
 public class IjudiApplication extends SpringBootServletInitializer {
 
+	static Optional<ApplicationContext> app = Optional.empty();
 	public static void main(String[] args) {
-		SpringApplication.run(IjudiApplication.class, args);
+		app = Optional.of(SpringApplication.run(IjudiApplication.class, args));
 	}
 
 	@PostConstruct

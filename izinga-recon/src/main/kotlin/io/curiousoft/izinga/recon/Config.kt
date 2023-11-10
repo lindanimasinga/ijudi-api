@@ -1,20 +1,25 @@
 package io.curiousoft.izinga.recon
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.JavaType
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
+import com.fasterxml.jackson.databind.ser.std.DateSerializer
 import com.fasterxml.jackson.databind.type.TypeFactory
 import com.fasterxml.jackson.databind.util.Converter
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.datatype.jsr310.ser.OffsetDateTimeSerializer
 import com.fasterxml.jackson.datatype.jsr310.ser.ZonedDateTimeSerializer
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Primary
 import org.springframework.data.convert.ReadingConverter
 import org.springframework.data.convert.WritingConverter
 import org.springframework.data.mongodb.core.convert.MongoCustomConversions
+import java.text.DateFormat
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -26,17 +31,9 @@ import kotlin.collections.ArrayList
 open class ReconConfig {
 
     @Bean
-    open fun provideObjectMapper() = ObjectMapper().also {
-        it.registerKotlinModule()
-        it.registerModule(
-            JavaTimeModule().also {
-                it.addSerializer(ZonedDateTime::class.java, ZonedDateTimeSerializer.INSTANCE)
-                it.addSerializer(OffsetDateTime::class.java, OffsetDateTimeSerializer.INSTANCE)
-            }
-        )
-        it.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-        it.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-    }
+    open fun provideObjectMapper(it: ObjectMapper) = it.apply {
+            registerKotlinModule()
+        }
 
 /*    @Bean
     open fun customConversions(): MongoCustomConversions? {
