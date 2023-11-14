@@ -1,4 +1,4 @@
-FROM openjdk:17-alpine
-ADD ../target/izinga-ordermanager-1.2.0.jar ijudi.jar
-EXPOSE 80
-ENTRYPOINT ["java", "-jar", "-Dspring.profiles.active=prod", "--add-opens", "java.base/java.util=ALL-UNNAMED", "--add-opens", "java.base/java.lang=ALL-UNNAMED", "ijudi.jar"]
+FROM public.ecr.aws/lambda/java:17
+# Copy function code and runtime dependencies from Maven layout
+COPY target/izinga-ordermanager-1.2.0.jar ${LAMBDA_TASK_ROOT}/lib/
+CMD [ "io.curiousoft.izinga.ordermanagement.StreamLambdaHandler::handleRequest" ]

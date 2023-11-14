@@ -17,7 +17,7 @@ public class StreamLambdaHandler implements RequestStreamHandler {
     private static SpringBootLambdaContainerHandler<AwsProxyRequest, AwsProxyResponse> handler;
 
     static {
-            LambdaContainerHandler.getContainerConfig().setInitializationTimeout(60_000);
+            LambdaContainerHandler.getContainerConfig().setInitializationTimeout(120_000);
              try {
 //                 SpringBootLambdaContainerHandler.getAwsProxyHandler(DailySchedulerApp::class.java)
                 // For applications that take longer than 10 seconds to start, use the async builder:

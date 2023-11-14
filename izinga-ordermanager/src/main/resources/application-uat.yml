@@ -62,7 +62,7 @@ yoco:
     api:
         key: sk_test_b03f2c6bMP0k5GY10ad45ddbb5dc
         url: https://payments.yoco.com/api/
-        webhooksec: M0JGQUI3MTcwODQxMDg2MUMyNjk2OUQ4MzA1NTI0QUE=
+        webhooksec: OEI0MTQ5ODAwQ0UxMzc0RDM3RDNENkE1RkVDMjI4QTk=
 zoomconnectsms:
     api:
         email: lindanimasinga@gmail.com

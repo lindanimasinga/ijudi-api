@@ -11,7 +11,7 @@ Resources:
   izingaordermanager:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ./izinga-ordermanager
+      CodeUri: .
       Description: ''
       MemorySize: 2048
       Timeout: 60
@@ -39,11 +39,6 @@ Resources:
           Type: Api
           Properties:
             Path: /
-            Method: ANY
-        Api4:
-          Type: Api
-          Properties:
-            Path: /MyResource
             Method: ANY
         Schedule1:
           Type: Schedule

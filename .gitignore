@@ -29,3 +29,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+###aws
+.aws-sam
+/izinga-ordermanager/.aws-sam
