@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.ordermanagement.notification;
 
 import io.curiousoft.izinga.commons.model.*;
+import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.messaging.firebase.FCMMessage;
 import io.curiousoft.izinga.messaging.firebase.FCMNotification;
 import io.curiousoft.izinga.messaging.firebase.FirebaseConnectionWrapper;
@@ -23,10 +24,12 @@ public class FirebaseNotificationServiceTest {
     private FirebaseNotificationService firebaseNotificationService;
     @Mock
     private FirebaseConnectionWrapper wrapper;
+    @Mock
+    DeviceRepository deviceRepo;
 
     @Before
     public void setUp() throws Exception {
-        firebaseNotificationService = new FirebaseNotificationService(wrapper);
+        firebaseNotificationService = new FirebaseNotificationService(wrapper, deviceRepo);
     }
 
     @Test

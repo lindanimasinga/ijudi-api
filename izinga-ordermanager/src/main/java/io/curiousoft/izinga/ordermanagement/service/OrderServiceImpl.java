@@ -371,35 +371,6 @@ public class OrderServiceImpl implements OrderService {
         return orderRepo.findByShopIdAndStageNot(store.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
     }
 
-    @Scheduled(fixedDelay = 900000, initialDelay = 900000) // 15 minutes
-    @Override
-    public void cleanUnpaidOrders() {
-        Date pastDate = Date.from(LocalDateTime.now()
-                .minusMinutes(cleanUpMinutes)
-                .atZone(ZoneId.systemDefault())
-                .toInstant());
-        LOG.info("Cleaning up all orders before   s" + pastDate);
-        orderRepo.deleteByShopPaidAndStageAndModifiedDateBefore(false, OrderStage.STAGE_0_CUSTOMER_NOT_PAID, pastDate);
-    }
-
-    @Scheduled(fixedDelay = 900000, initialDelay = 420000) // 7 minutes
-    @Override  //TODO tests
-    public void notifyUnpaidOrders() {
-        Date pastDate = Date.from(LocalDateTime.now()
-                .minusMinutes(7)
-                .atZone(ZoneId.systemDefault())
-                .toInstant());
-        List<Order> unpaidOrders = orderRepo.findByShopPaidAndStageAndModifiedDateBefore(false, OrderStage.STAGE_0_CUSTOMER_NOT_PAID, pastDate);
-        unpaidOrders.forEach(order -> {
-                    if (!order.getSmsSentToAdmin()) {
-                        emailNotificationService.notifyAdminOrderNotPaid(order);
-                        order.setSmsSentToAdmin(true);
-                        orderRepo.save(order);
-                    }
-                });
-            LOG.info("Sms sent to admin");
-    }
-
     @Override
     public List<Order> findOrderByMessengerId(String id) {
         return orderRepo.findByShippingDataMessengerIdAndStageNot(id, OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
@@ -408,51 +379,6 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public List<Order> findAll() {
         return orderRepo.findAll();
-    }
-
-    @Scheduled(fixedDelay = 150000, initialDelay = 150000)// 10 minutes
-    @Override
-    public void checkUnconfirmedOrders() {
-        List<Order> orders = orderRepo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
-        LOG.info(format("Found %s unconfirmed orders..", orders.size()));
-        orders.forEach(order -> {
-            Date checkDate = order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY ?
-                    Date.from(LocalDateTime.now()
-                            .minusMinutes(3)
-                            .atZone(ZoneId.systemDefault())
-                            .toInstant())
-                    : Date.from(LocalDateTime.now()
-                    .plusMinutes(60)
-                    .atZone(ZoneId.systemDefault())
-                    .toInstant());
-
-            //notify by sms
-            boolean isLateDeliveryOrder = order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY && order.getModifiedDate().before(checkDate);
-            boolean isLateCollectionOrder = order.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY
-                    && order.getShippingData().getPickUpTime().before(checkDate);
-
-            if (isLateDeliveryOrder || isLateCollectionOrder) {
-                try {
-                    StoreProfile store = storeRepository.findById(order.getShopId()).get();
-                    LOG.info(format("Order %s is late, call shop at %s", order.getId(), store.getMobileNumber()));
-                    if (!order.getSmsSentToShop()) {
-                        smsNotificationService.sendMessage(store.getMobileNumber(), "Hello " + store.getName() + ", Please accept the order " + order.getId() +
-                                " on iZinga app, otherwise the order will be cancelled.");
-                        order.setSmsSentToShop(true);
-                        LOG.info("Sms sent to shop");
-                    } else if (!order.getSmsSentToAdmin()) {
-                        order.setSmsSentToAdmin(true);
-                        emailNotificationService.notifyAdminNewOrder(order);
-                        LOG.info("Sms sent to admin");
-                    } else {
-                        //reverse the transaction
-                    }
-                    orderRepo.save(order);
-                } catch (Exception e) {
-                    LOG.error("Failed to send sms. ", e);
-                }
-            }
-        });
     }
 
     @Override

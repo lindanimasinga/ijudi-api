@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.ordermanagement.notification;
 
 import io.curiousoft.izinga.commons.model.*;
+import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.messaging.firebase.FCMMessage;
 import io.curiousoft.izinga.messaging.firebase.FCMNotification;
 import io.curiousoft.izinga.messaging.firebase.FirebaseConnectionWrapper;
@@ -25,17 +26,35 @@ public class FirebaseNotificationService implements PushNotificationService {
     public static final String TOPICS = "/topics/";
 
     private final FirebaseConnectionWrapper firebaseConnectionWrapper;
+    private final DeviceRepository deviceRepository;
 
-    public FirebaseNotificationService(FirebaseConnectionWrapper firebaseConnectionWrapper) {
+    public FirebaseNotificationService(FirebaseConnectionWrapper firebaseConnectionWrapper, DeviceRepository deviceRepo) {
         this.firebaseConnectionWrapper = firebaseConnectionWrapper;
+        this.deviceRepository = deviceRepo;
     }
 
     @Async
     @Override
-    public void sendNotification(Device device, PushMessage message) throws Exception {
+    public Map sendNotification(Device device, PushMessage message) throws Exception {
         FCMMessage fcmMessage = getFcmMessage(device.getToken(), message);
         LOGGER.debug(GSON.toJson(fcmMessage));
-        firebaseConnectionWrapper.sendMessage(fcmMessage);
+        return firebaseConnectionWrapper.sendMessage(fcmMessage);
+    }
+
+    @Override
+    public void sendNotifications(List<Device> device, PushMessage message) {
+        device.forEach(d -> {
+            try {
+                Map response = sendNotification(d, message);
+                if(isDeviceNoLongerRegistered(response.get("results").toString())) deviceRepository.delete(d);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    private boolean isDeviceNoLongerRegistered(String firebaseResults) {
+        return firebaseResults != null && firebaseResults.contains("NotRegistered");
     }
 
     @Async

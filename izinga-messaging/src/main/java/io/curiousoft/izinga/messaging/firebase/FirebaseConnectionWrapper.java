@@ -34,11 +34,12 @@ public class FirebaseConnectionWrapper {
         this.apiKey = "key=" + apiKey;
     }
 
-    public void sendMessage(FCMMessage fcmMessage) throws Exception {
+    public Map sendMessage(FCMMessage fcmMessage) throws Exception {
         Call<Map> requestCall = firebaseMessagingHttpService.sendMessage(apiKey, fcmMessage);
-        processRequest(requestCall);
+        Map response = processRequest(requestCall);
         LOGGER.info("Message sent to " + fcmMessage.getTo());
         LOGGER.info("Message data " + fcmMessage.getData());
+        return response;
     }
 
     public String createTopic(String topicName, String deviceToken) throws Exception {
@@ -47,14 +48,15 @@ public class FirebaseConnectionWrapper {
         return topicName;
     }
 
-    public void processRequest(Call<Map> requestCall) throws Exception {
+    public <T> T processRequest(Call<T> requestCall) throws Exception {
         LOGGER.info("FCM Request " + requestCall.request().toString());
-        Response<Map> response = requestCall.execute();
+        Response<T> response = requestCall.execute();
         if (!response.isSuccessful()) {
-            System.out.println("FCM response code: " + response.code() + " Body " + response.errorBody().string());
+            LOGGER.error("FCM response code: " + response.code() + " Body " + response.errorBody().string());
             throw new Exception(response.errorBody().string());
         }
         LOGGER.info("FCM Response success! code: " + response.code() + " body: " + response.body());
+        return response.body();
     }
 
     public void subscribeTopic(String topicName, String deviceToken) throws Exception {

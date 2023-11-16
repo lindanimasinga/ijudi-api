@@ -8,11 +8,14 @@ import io.curiousoft.izinga.commons.model.StoreProfile;
 import org.springframework.scheduling.annotation.Async;
 
 import java.util.List;
+import java.util.Map;
 
 
 public interface PushNotificationService {
 
-    void sendNotification(Device device, PushMessage message) throws Exception;
+    Map sendNotification(Device device, PushMessage message) throws Exception;
+
+    void sendNotifications(List<Device> device, PushMessage message);
 
     @Async
     void notifyStoreOrderPlaced(String storeName, List<Device> devices, Order order);

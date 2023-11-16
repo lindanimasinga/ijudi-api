@@ -63,4 +63,8 @@ public class PromotionService {
             throw new Exception(violations.iterator().next().getMessage());
         }
     }
+
+    public List<Promotion> finAllPromotions(StoreType storeType) {
+        return promotionRepo.findByExpiryDateAfterAndShopType(new Date(), storeType);
+    }
 }

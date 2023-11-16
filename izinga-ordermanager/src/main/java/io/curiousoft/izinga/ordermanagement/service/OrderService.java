@@ -21,16 +21,9 @@ public interface OrderService {
 
     List<Order> findOrderByStoreId(String shopId) throws Exception;
 
-    void cleanUnpaidOrders();
-
-    @Scheduled(fixedDelay = 900000, initialDelay = 900000) // 15 minutes
-    void notifyUnpaidOrders();
-
     List<Order> findOrderByMessengerId(String id);
 
     List<Order> findAll();
-
-    void checkUnconfirmedOrders();
 
     Order cancelOrder(String id) throws Exception;
 }
