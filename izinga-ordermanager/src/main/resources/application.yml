@@ -61,6 +61,10 @@ service:
         perc: 0.1
     supportedApp:
         min: 2.1.2
+
+feign:
+    okhttp:
+        enabled: true
 spring:
     cloud:
         openfeign:

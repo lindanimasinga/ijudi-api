@@ -63,6 +63,8 @@ yoco:
         key: sk_test_b03f2c6bMP0k5GY10ad45ddbb5dc
         url: https://payments.yoco.com/api/
         webhooksec: M0JGQUI3MTcwODQxMDg2MUMyNjk2OUQ4MzA1NTI0QUE=
+    verifier:
+        order-manager-url: https://api-uat.izinga.co.za
 zoomconnectsms:
     api:
         email: lindanimasinga@gmail.com

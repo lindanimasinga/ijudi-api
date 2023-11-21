@@ -19,8 +19,15 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
+import java.util.Objects;
 import java.util.logging.Logger;
+
+import static java.lang.String.format;
 
 @Service
 public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
@@ -42,26 +49,19 @@ public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
 
     @Override
     protected boolean paymentReceived(Order order) throws Exception {
-        String token = order.getDescription().replace("yoco-", "");
-        String url = baseUrl + "/charges/";
-        URI uri = new URI(url);
-        RestTemplate rest = new RestTemplateBuilder()
-                .requestFactory(HttpComponentsClientHttpRequestFactory.class)
-                .defaultHeader("X-Auth-Secret-Key", apiKey)
-                .build();
+        var computed = checksum(format("%s%s%s", order.getId(),order.getTotalAmount(), order.getCustomerId()));
+        return Arrays.stream(Objects.requireNonNull(order.getDescription())
+                .split(":"))
+                .filter(i -> i.startsWith("yoco-"))
+                .findFirst()
+                .map(i -> i.replace("yoco-", ""))
+                .map(i -> i.equals(computed)).orElse(false);
+    }
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Content-type", "application/json");
-        //Create a new HttpEntity
-        YocoPayRequest body = new YocoPayRequest(token, (int) (order.getTotalAmount() * 100), "ZAR" );
-        final HttpEntity<YocoPayRequest> entity = new HttpEntity<>(body, headers);
-        ResponseEntity<YocoPaymentResponse> response = rest.exchange(url, HttpMethod.POST, entity, YocoPaymentResponse.class);
-        boolean isSuccessful = response.getBody() != null && "successful".equalsIgnoreCase(response.getBody().getStatus());
-        if(isSuccessful) {
-            String descr = order.getDescription() + "|charge-" + response.getBody().getId();
-            order.setDescription(descr);
-        }
-        return isSuccessful;
+    String checksum(String data) throws NoSuchAlgorithmException {
+        var digest = MessageDigest.getInstance("MD5")
+                .digest(format("%s%s", data, apiKey).getBytes());
+        return new String(Base64.getEncoder().encode(digest));
     }
 
     @Override

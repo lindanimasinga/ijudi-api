@@ -16,7 +16,7 @@ import java.util.List;
 import static io.curiousoft.izinga.commons.model.PaymentType.PAYFAST;
 
 @RestController
-@RequestMapping("/order")
+@RequestMapping({"/order", "//order"})
 public class OrderController {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OrderController.class);

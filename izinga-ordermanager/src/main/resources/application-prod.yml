@@ -68,9 +68,11 @@ ukheshe:
     username: 812815707
 yoco:
     api:
-        key: sk_test_b03f2c6bMP0k5GY10ad45ddbb5dc
+        key: sk_live_9c9d51f7MP0k5GYc73647408c0e4
         url: https://payments.yoco.com/api/
-        webhooksec: M0JGQUI3MTcwODQxMDg2MUMyNjk2OUQ4MzA1NTI0QUE=
+        webhooksec: NTkwQTgyQzJGRUZFM0M3RTQzM0IzODlBMDE1MDE0OEQ=
+    verifier:
+        order-manager-url: https://api.izinga.co.za
 zoomconnectsms:
     api:
         email: lindanimasinga@gmail.com

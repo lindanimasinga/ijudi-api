@@ -132,7 +132,7 @@ public class SchedulerService {
         LOG.info("Sms sent to admin");
     }
 
-    @Scheduled(cron = "* 5 6,10 * * *")// 10 minutes
+    @Scheduled(cron = "* 30 6,10 * * *")// 10 minutes
     public void publishPromosOfTheDay() {
         LOG.info("Finding today's promotions ...");
         var activeUserUserId = orderRepo.findAll()

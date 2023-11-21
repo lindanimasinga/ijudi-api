@@ -6,9 +6,7 @@ import io.curiousoft.izinga.yocopay.api.YocoPaymentClient
 import io.curiousoft.izinga.yocopay.api.YocoPaymentInitiate
 import io.curiousoft.izinga.yocopay.config.YocoConfiguration
 import io.curiousoft.izinga.yocopay.config.checksum
-import io.curiousoft.izinga.yocopay.config.isValidOrigin
 import io.curiousoft.izinga.yocopay.config.yocoHash
-import okhttp3.internal.notify
 import org.slf4j.LoggerFactory
 import org.springframework.http.*
 import org.springframework.web.bind.annotation.*
@@ -58,7 +56,8 @@ class YocoPaymentController(private val yocoConfiguration: YocoConfiguration,
                 izingaOrderMananger.findOrder(orderId)
             }
             .map {
-                it.description = "${it.description}:yoco-$yocoHash:"
+                var checksum = yocoConfiguration.checksum("$orderId${it.totalAmount}${it.customerId}")
+                it.description = "${it.description}:yoco-$checksum:"
                 it.paymentType = PaymentType.YOCO
                 log.info("finishing order $orderId")
                 izingaOrderMananger.finishOrder(it.id!!, it)

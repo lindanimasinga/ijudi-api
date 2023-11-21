@@ -1,10 +1,10 @@
 package io.curiousoft.izinga.yocopay.config
 
 import feign.RequestInterceptor
+import okhttp3.OkHttpClient
 import org.bouncycastle.crypto.digests.SHA256Digest
 import org.bouncycastle.crypto.macs.HMac
 import org.bouncycastle.crypto.params.KeyParameter
-import org.bouncycastle.util.encoders.Base64Encoder
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.context.properties.ConfigurationProperties
@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import java.math.BigInteger
 import java.security.MessageDigest
-import java.util.Base64
+import java.util.*
 
 
 @ConstructorBinding
@@ -24,7 +24,7 @@ private val logger = LoggerFactory.getLogger(YocoConfiguration::class.java)
 
 fun YocoConfiguration.checksum(data: String)= MessageDigest.getInstance("MD5")
     .digest("$data$key".toByteArray())
-    .let {  convertToHex(it)}
+    .let {  String(Base64.getEncoder().encode(it))}
 
 fun YocoConfiguration.isValidOrigin(webhookId: String, webhookTimestamp: String, body: String, signature: String): Boolean {
     return yocoHash(webhookId = webhookId, webhookTimestamp = webhookTimestamp, body = body)
