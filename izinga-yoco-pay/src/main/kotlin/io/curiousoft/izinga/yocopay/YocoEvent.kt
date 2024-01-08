@@ -4,10 +4,10 @@ import org.codehaus.jackson.annotate.JsonIgnoreProperties
 import java.math.BigDecimal
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-class YocoPaymentSuccess {
+class YocoEvent {
     var createdDate: String? = null
     var id: String? = null
-    var payload: PaymentData? = null
+    var payload: PaymentData = null
     var type: String? = null
 
     constructor()

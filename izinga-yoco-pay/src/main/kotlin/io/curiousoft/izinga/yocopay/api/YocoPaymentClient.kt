@@ -13,5 +13,5 @@ interface YocoPaymentClient {
     fun checkout(@RequestBody yocoPayRequest: YocoPaymentInitiate): YocoPaymentInitiateResponse?
 
     @PostMapping(value = ["checkouts/{checkoutId}/refund"], consumes = ["application/json"])
-    fun reverse(@PathVariable checkoutId: String, @RequestBody yocoReverseRequest: YocoReverseRequest)
+    fun refund(@PathVariable checkoutId: String): YocoRefundResponse?
 }

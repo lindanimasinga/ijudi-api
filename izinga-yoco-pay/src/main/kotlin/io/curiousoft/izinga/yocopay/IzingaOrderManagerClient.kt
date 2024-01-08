@@ -13,4 +13,7 @@ interface IzingaOrderManagerClient {
     @PatchMapping(value = ["order/{orderId}"], consumes = ["application/json"], produces = ["application/json"])
     fun finishOrder(@PathVariable orderId: String, @RequestBody order: Order): Order
 
+    @DeleteMapping(value = ["order/{orderId}"], consumes = ["application/json"], produces = ["application/json"])
+    fun cancelOrder(orderId: String)
+
 }

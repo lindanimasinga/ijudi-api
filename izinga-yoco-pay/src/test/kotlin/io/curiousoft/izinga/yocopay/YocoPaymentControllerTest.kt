@@ -7,14 +7,12 @@ import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.yocopay.api.YocoPaymentClient
 import io.curiousoft.izinga.yocopay.api.YocoPaymentInitiate
 import io.curiousoft.izinga.yocopay.config.YocoConfiguration
-import io.curiousoft.izinga.yocopay.config.checksum
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.Assertions
-import java.util.*
 
 
 class YocoPaymentControllerTest {
@@ -35,7 +33,7 @@ class YocoPaymentControllerTest {
     fun verifyPaymentSuccess() {
         //given
 
-        val yocoEvent = YocoPaymentSuccess(id = "evt_rLQQMyMj2j1iynQUQJGCPmAL", type = "payment.succeeded",
+        val yocoEvent = YocoEvent(id = "evt_rLQQMyMj2j1iynQUQJGCPmAL", type = "payment.succeeded",
             payload = PaymentData(amount = 100.toBigDecimal(), createdDate = "Date()", status = "", id = "", type = "", currency = "ZAR",
                 metadata =  PaymentMetadata(orderId = "new-order-id", checkoutId = "")), createdDate = "202311221")
 

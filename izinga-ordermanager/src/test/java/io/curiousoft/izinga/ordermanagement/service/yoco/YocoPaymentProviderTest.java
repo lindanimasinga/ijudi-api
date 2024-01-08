@@ -17,7 +17,7 @@ import static org.mockito.Mockito.when;
 @RunWith(MockitoJUnitRunner.class)
 public class YocoPaymentProviderTest {
 
-    YocoPaymentProvider sut = new YocoPaymentProvider("https://url.com", "apikey", new ObjectMapper());
+    YocoPaymentProvider sut = new YocoPaymentProvider("https://url.com", "apikey", "https://url.com", new ObjectMapper());
 
     @Test
     public void get_charge_id_from_description() throws Exception {

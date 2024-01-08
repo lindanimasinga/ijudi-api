@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.curiousoft.izinga.commons.model.PaymentType
 import io.curiousoft.izinga.yocopay.api.YocoPaymentClient
 import io.curiousoft.izinga.yocopay.api.YocoPaymentInitiate
+import io.curiousoft.izinga.yocopay.api.YocoRefundRequest
 import io.curiousoft.izinga.yocopay.config.YocoConfiguration
 import io.curiousoft.izinga.yocopay.config.checksum
 import io.curiousoft.izinga.yocopay.config.yocoHash
@@ -32,7 +33,7 @@ class YocoPaymentController(private val yocoConfiguration: YocoConfiguration,
         val webhookId = request.getHeader("webhook-id")
         val webhookTimestamp = request.getHeader("webhook-timestamp")
         val webhookSignature = request.getHeader("webhook-signature").split(" ").map { it.split(",")[1] }
-        val successEvent = mapper.readValue(body, YocoPaymentSuccess::class.java)
+        val successEvent = mapper.readValue(body, YocoEvent::class.java)
 
         val yocoHash = yocoConfiguration.yocoHash(webhookId = webhookId, webhookTimestamp = webhookTimestamp,
             body = body)
@@ -46,29 +47,35 @@ class YocoPaymentController(private val yocoConfiguration: YocoConfiguration,
     }
 
     @PostMapping("/finalise/json")
-    fun verifyPaymentSuccess(@RequestBody successEvent: YocoPaymentSuccess, yocoHash: String): ResponseEntity<Any> {
+    fun verifyPaymentSuccess(@RequestBody successEvent: YocoEvent, yocoHash: String): ResponseEntity<Any> {
         log.info("yoco payment is ${successEvent.type}")
         val paymentSuccessful = successEvent.type == "payment.succeeded"
         val orderId = successEvent.payload?.metadata?.orderId!!
-        return if (paymentSuccessful)
-            Result.runCatching {
-                log.info("fetching order $orderId")
-                izingaOrderMananger.findOrder(orderId)
+        return when(successEvent.type) {
+            "payment.succeeded" -> Result.runCatching {
+                    log.info("fetching order $orderId")
+                    izingaOrderMananger.findOrder(orderId)
+                }
+                .map {
+                    val checksum = yocoConfiguration.checksum("$orderId${it.totalAmount}${it.customerId}")
+                    it.description = "${it.description}:yoco-$checksum:"
+                    it.paymentType = PaymentType.YOCO
+                    it.tag["yoco-checkout-id"] = successEvent.payload.metadata?.checkoutId!!
+                    log.info("finishing order $orderId")
+                    izingaOrderMananger.finishOrder(it.id!!, it)
+                }
+                .fold(
+                    onSuccess = { ResponseEntity.ok().build() },
+                    onFailure = {
+                        log.error(it.message, it)
+                        ResponseEntity.internalServerError().body(it.message)
+                    })
+            "refund.succeeded" -> {
+                izingaOrderMananger.cancelOrder(successEvent.payload.metadata?.orderId!!)
+                ResponseEntity.ok().build()
             }
-            .map {
-                var checksum = yocoConfiguration.checksum("$orderId${it.totalAmount}${it.customerId}")
-                it.description = "${it.description}:yoco-$checksum:"
-                it.paymentType = PaymentType.YOCO
-                log.info("finishing order $orderId")
-                izingaOrderMananger.finishOrder(it.id!!, it)
-            }
-            .fold(
-                onSuccess = { ResponseEntity.ok().build() },
-                onFailure = {
-                    log.error(it.message, it)
-                    ResponseEntity.internalServerError().body(it.message)
-                })
-        else ResponseEntity.internalServerError().build()
+            else -> ResponseEntity.internalServerError().build()
+        }
         
     }
 
@@ -79,6 +86,11 @@ class YocoPaymentController(private val yocoConfiguration: YocoConfiguration,
         } ?: ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()
 
 
-    //@PostMapping("/reverse")
-    //fun reversePayment(@RequestBody payoutResults: YocoPaymentReverse) = reconService.generateNextPayoutsToShop()
+    @PostMapping("/refund-initiate")
+    fun initiatePayment(@RequestBody refundInitiate: YocoRefundRequest): ResponseEntity<Any> =
+        izingaOrderMananger.findOrder(refundInitiate.orderId)
+            .let { it.tag["yoco-checkout-id"] }
+            ?.let { yocoPaymentClient.refund(it) }
+            ?.let {ResponseEntity.ok(it)}
+            ?: ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()
 }

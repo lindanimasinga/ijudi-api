@@ -21,10 +21,7 @@ import org.springframework.web.client.RestTemplate;
 import java.net.URI;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.logging.Logger;
 
 import static java.lang.String.format;
@@ -36,15 +33,19 @@ public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
     private final String apiKey;
     private final String baseUrl;
     private final ObjectMapper mapper;
+    private final String izingaUrl;
 
 
     @Autowired
     public YocoPaymentProvider(@Value("${yoco.api.url}") String baseUrl,
-                               @Value("${yoco.api.key}") String apiKey, ObjectMapper mapper) {
+                               @Value("${yoco.api.key}") String apiKey,
+                               @Value("${yoco.verifier.order-manager-url}") String izingaUrl,
+                               ObjectMapper mapper) {
         super(PaymentType.YOCO);
         this.apiKey = apiKey;
         this.baseUrl = baseUrl;
         this.mapper = mapper;
+        this.izingaUrl = izingaUrl;
     }
 
     @Override
@@ -86,7 +87,7 @@ public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
 
     @Override
     public boolean reversePayment(Order order) throws JsonProcessingException {
-        String url = baseUrl + "/refunds/";
+        String url = izingaUrl + "/refund/initiate";
         RestTemplate rest = new RestTemplateBuilder()
                 .requestFactory(HttpComponentsClientHttpRequestFactory.class)
                 .defaultHeader("X-Auth-Secret-Key", apiKey)
@@ -95,16 +96,16 @@ public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-type", "application/json");
         //Create a new HttpEntity
-        String chargeId = order.getDescription().split("\\|")[1].replace("charge-", "");
-        YocoReverseRequest body = new YocoReverseRequest(chargeId);
+        String checkoutId = order.getTag().get("yoco-checkout-id");
+        YocoReverseRequest body = new YocoReverseRequest(checkoutId);
         final HttpEntity<YocoReverseRequest> entity = new HttpEntity<>(body, headers);
-        ResponseEntity<YocoPaymentResponse> response;
+        ResponseEntity response;
         try {
-            response = rest.exchange(url, HttpMethod.POST, entity, YocoPaymentResponse.class);
+            response = rest.exchange(url, HttpMethod.POST, entity, Map.class);
+            return response.getStatusCode().is2xxSuccessful();
         } catch (HttpClientErrorException.BadRequest e) {
-            YocoErrorResponse error = mapper.readValue(e.getResponseBodyAsString(), YocoErrorResponse.class);
-            return  "refund_already_processed".equalsIgnoreCase(error.getErrorCode());
+            e.printStackTrace();
         }
-        return response.getBody() != null && "successful".equalsIgnoreCase(response.getBody().getStatus());
+        return  false;
     }
 }

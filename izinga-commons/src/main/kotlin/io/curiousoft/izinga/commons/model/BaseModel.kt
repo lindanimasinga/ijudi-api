@@ -6,8 +6,10 @@ import org.springframework.data.annotation.Id
 import org.springframework.data.annotation.LastModifiedDate
 import java.time.LocalDateTime
 import java.util.*
+import kotlin.collections.HashMap
 
 open class BaseModel {
+
     @Id
     var id: String? = null
 
@@ -17,6 +19,8 @@ open class BaseModel {
 
     @LastModifiedDate
     var modifiedDate: Date? = null
+
+    var tag: MutableMap<String, String> = mutableMapOf()
 
     constructor()
     constructor(id: String?) {
