@@ -50,6 +50,7 @@ jobs:
     uses: ./.github/workflows/maven.yml
   deploy:
     name: Deploy
+    needs: ["build"]
     runs-on: ubuntu-latest
     environment: production
 
