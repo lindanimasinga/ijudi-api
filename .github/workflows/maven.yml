@@ -7,7 +7,7 @@ on:
   workflow_call:
     inputs:
       caller-name:
-        required: true
+        required: false
         type: string
   push:
     branches: [ master ]
