@@ -15,6 +15,6 @@ jobs:
     - name: Locate izinga order manager module docker file
       run:  cd ./izinga-ordermanager
     - name: Build the Docker image
-      run: docker build -t ijudi-api . --tag my-image-name:$(date +%s)
+      run: docker build -t ijudi-api .
     - name: Tag Docker image
       run: ijudi-api:latest 316005840972.dkr.ecr.af-south-1.amazonaws.com/ijudi-api:$(date +%s)
