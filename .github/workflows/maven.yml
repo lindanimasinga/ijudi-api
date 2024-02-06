@@ -4,6 +4,11 @@
 name: Java CI with Maven
 
 on:
+  workflow_call:
+    inputs:
+      caller-name:
+        required: true
+        type: string
   push:
     branches: [ master ]
   pull_request:
