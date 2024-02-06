@@ -28,6 +28,7 @@ class Order : BaseModel() {
     var shopPaid = false
     var shopPaidDate: Date? = null
     var serviceFee = 0.0
+    var tip: Double? = null
     var messengerPaid = false
     var messengerPaidDate: Date? = null
     var smsSentToShop = false
@@ -38,10 +39,10 @@ class Order : BaseModel() {
         get() = BigDecimal.valueOf(
             serviceFee + basket.items.stream()
                 .mapToDouble { obj: BasketItem -> obj.totalPrice }
-                .sum() + (!freeDelivery && shippingData != null).isTrue({shippingData?.fee!!}, { 0.00 })
+                .sum() + (!freeDelivery && shippingData != null).isTrue({shippingData?.fee!!}) { 0.00 }
         )
-            .setScale(2, RoundingMode.HALF_EVEN)
-            .toDouble()
+        .setScale(2, RoundingMode.HALF_EVEN)
+        .toDouble()
 
     override fun equals(obj: Any?): Boolean {
         return obj is Order && id == obj.id
@@ -55,7 +56,7 @@ class Order : BaseModel() {
             .toDouble()
     val depositAmount: Double
         get() = BigDecimal.valueOf(serviceFee
-                + basket.items.sumOf { obj: BasketItem -> obj.totalPrice } * minimumDepositAllowedPerc + (!freeDelivery && shippingData != null).isTrue({ shippingData?.fee!! }, { 0.00 })
+                + basket.items.sumOf { obj: BasketItem -> obj.totalPrice } * minimumDepositAllowedPerc + (!freeDelivery && shippingData != null).isTrue({ shippingData?.fee!! }) { 0.00 }
         )
             .setScale(2, RoundingMode.HALF_EVEN)
             .toDouble()

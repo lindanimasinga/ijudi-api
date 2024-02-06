@@ -11,6 +11,7 @@ class UserProfile(
     mobileNumber: @NotBlank(message = "profile mobile number not valid") String?,
     role: @NotNull(message = "role not valid") ProfileRoles?
 ) : Profile(name, address, imageUrl, mobileNumber, role) {
+    var isPermanentEmployed: Boolean = false
     var idNumber: String? = null
 
     enum class SignUpReason {

@@ -1473,7 +1473,7 @@ public class OrderServiceTest {
                 ProfileRoles.CUSTOMER);
         initialProfile.setId("initialID");
         //when
-        when(customerRepo.findByMobileNumber(phoneNumber)).thenReturn(Optional.of(initialProfile));
+        when(customerRepo.findByMobileNumber(phoneNumber)).thenReturn(initialProfile);
         when(repo.findByCustomerId(initialProfile.getId())).thenReturn(Optional.of(orders));
         List<Order> finalOrder = sut.findOrderByPhone(phoneNumber);
         //verify

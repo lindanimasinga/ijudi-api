@@ -8,6 +8,7 @@
         <module>izinga-commons</module>
         <module>izinga-messaging</module>
         <module>izinga-yoco-pay</module>
+        <module>store-menu-to-izinga-menu</module>
     </modules>
 
     <parent>

@@ -7,6 +7,7 @@ import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.payout.*
 import io.curiousoft.izinga.recon.payout.repo.PayoutBundleRepo
 import io.curiousoft.izinga.recon.payout.repo.PayoutRepository
+import io.curiousoft.izinga.recon.tips.TipsService
 import io.mockk.*
 import org.junit.Assert.*
 import org.junit.Before
@@ -25,10 +26,12 @@ class ReconServiceTest {
     private val storeRepo = mockk<StoreRepository>()
     private val messengerRepo = mockk<UserProfileRepo>()
     private val payoutRepo = mockk<PayoutRepository>()
+    private val tipService = mockk<TipsService>()
 
     @Before
     fun setUp() {
-        sut = ReconServiceImpl(orderRepo = orderRepo, payoutBundleRepo = payoutBundleRepo, storeRepo = storeRepo, messengerRepo = messengerRepo, payoutRepo = payoutRepo)
+        sut = ReconServiceImpl(orderRepo = orderRepo, payoutBundleRepo = payoutBundleRepo, storeRepo = storeRepo,
+            messengerRepo = messengerRepo, payoutRepo = payoutRepo, tipsService = tipService)
     }
 
     @Test
@@ -41,7 +44,7 @@ class ReconServiceTest {
         val shop2Name = "shop2name"
         val shop3Name = "shop3name"
 
-        val shop1Orders: List<Order> = mutableListOf(
+        val shop1Orders: MutableSet<Order> = mutableSetOf(
             mockk<Order>().also {
                 every { it.basketAmount } returns 300.0
                 every { it.shopPaid } returns false
@@ -49,7 +52,7 @@ class ReconServiceTest {
                 every { it.shopId } returns shop1
             }
         )
-        val shop2Orders: List<Order> = mutableListOf(
+        val shop2Orders: MutableSet<Order> = mutableSetOf(
             mockk<Order>().also {
                 every { it.basketAmount } returns 300.0
                 every { it.shopPaid } returns false
@@ -57,7 +60,7 @@ class ReconServiceTest {
                 every { it.shopId } returns shop2
             }
         )
-        val shop3Orders: List<Order> = mutableListOf(
+        val shop3Orders: MutableSet<Order> = mutableSetOf(
             mockk<Order>().also {
                 every { it.basketAmount } returns 100.0
                 every { it.shopPaid } returns false
@@ -112,7 +115,7 @@ class ReconServiceTest {
         every { payoutBundleRepo.findOneByTypeAndExecuted(PayoutType.SHOP) } returns PayoutBundle(payouts = listOf(payout1,payout2,payout3),
             createdBy = "Lindani", type = PayoutType.SHOP)
 
-        every { orderRepo.findByShopPaidAndStage(false, OrderStage.STAGE_7_ALL_PAID) } returns shop1Orders.plus(shop2Orders).plus(shop3Orders)
+        every { orderRepo.findByShopPaidAndStage(false, OrderStage.STAGE_7_ALL_PAID) } returns shop1Orders.plus(shop2Orders).plus(shop3Orders).toList()
 
         every { storeRepo.findById(shop1) } returns Optional.of(createStoreProfile(StoreType.FOOD, 8, 18))
         every { storeRepo.findById(shop2) } returns Optional.of(createStoreProfile(StoreType.FOOD, 8, 18))
@@ -213,21 +216,21 @@ class ReconServiceTest {
         val messenger2Name = "messenger2name"
         val messenger3Name = "messenger3name"
 
-        val shop1Orders: List<Order> = mutableListOf(
+        val shop1Orders: MutableSet<Order> = mutableSetOf(
             Order().also {
                 it.description = "order1"
                 it.messengerPaid = false
                 it.shippingData = ShippingData().apply { messengerId = messenger1; fee = 30.0 }
             }
         )
-        val shop2Orders: List<Order> = mutableListOf(
+        val shop2Orders: MutableSet<Order> = mutableSetOf(
             Order().also {
                 it.description = "order2"
                 it.messengerPaid = false
                 it.shippingData = ShippingData().apply { messengerId = messenger2; fee = 40.0 }
             }
         )
-        val shop3Orders: List<Order> = mutableListOf(
+        val shop3Orders: MutableSet<Order> = mutableSetOf(
             Order().also {
                 it.description = "order3"
                 it.messengerPaid = false
@@ -272,7 +275,7 @@ class ReconServiceTest {
         every { payoutBundleRepo.findOneByTypeAndExecuted(PayoutType.MESSENGER) } returns PayoutBundle(payouts = listOf(shopPayout1,payout2,payout3),
             createdBy = "Lindani", type = PayoutType.MESSENGER)
 
-        every { orderRepo.findByMessengerPaidAndStage(false, OrderStage.STAGE_7_ALL_PAID) } returns shop1Orders.plus(shop2Orders).plus(shop3Orders)
+        every { orderRepo.findByMessengerPaidAndStage(false, OrderStage.STAGE_7_ALL_PAID) } returns shop1Orders.plus(shop2Orders).plus(shop3Orders).toList()
 
         every { messengerRepo.findById(messenger1) } returns mockk<UserProfile>().also {
             every { it.emailAddress } returns "l@email.com"
@@ -390,7 +393,7 @@ class ReconServiceTest {
                 toBankName = "Ewallet",
                 toType = BankAccType.CHEQUE,
                 toAccountNumber = "shop1",
-                orders = mutableListOf(),
+                orders = mutableSetOf(),
                 toBranchCode = "codeBranch",
                 fromReference = "fromRef",
                 toReference = "toRef",
@@ -420,7 +423,7 @@ class ReconServiceTest {
         //given
         val a = 0..1
         val payoutBundleResults = PayoutBundleResults(bundleId = "12344554")
-        val shop1Orders: List<Order> = mutableListOf(
+        val shop1Orders: MutableSet<Order> = mutableSetOf(
             mockk<Order>().also {
                 every { it.shippingData } returns ShippingData().apply { fee = 40.0; messengerId = "messenger1" }
                 every { it.messengerPaid } returns false
@@ -470,7 +473,7 @@ class ReconServiceTest {
         ).apply { id = "12344554" }
         every { payoutBundleRepo.findByIdOrNull("12344554") } returns bundle
 
-        every { orderRepo.findByIdIn(listOf("10.00", "30.00", "20.00")) } returns shop1Orders
+        every { orderRepo.findByIdIn(listOf("10.00", "30.00", "20.00")) } returns shop1Orders.toList()
         every { orderRepo.save(match { it.id in listOf("10.00", "30.00", "20.00")}) } returnsArgument 0
         every { payoutBundleRepo.save(match { it.id == "12344554" && it.executed }) } returns bundle
 

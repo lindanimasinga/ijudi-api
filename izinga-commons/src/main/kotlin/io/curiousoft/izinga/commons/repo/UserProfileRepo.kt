@@ -5,7 +5,7 @@ import io.curiousoft.izinga.commons.model.UserProfile
 import java.util.*
 
 interface UserProfileRepo : ProfileRepo<UserProfile> {
-    fun findByMobileNumber(phone: String?): Optional<UserProfile>?
+    fun findByMobileNumber(phone: String): UserProfile?
     fun findByRoleAndLatitudeBetweenAndLongitudeBetween(
         messenger: ProfileRoles,
         latMin: Double,

@@ -15,7 +15,7 @@ public class UserProfileService extends ProfileServiceImpl<UserProfileRepo, User
     }
 
     public UserProfile findUserByPhone(String phone) {
-        return profileRepo.findByMobileNumber(phone).orElse(null);
+        return profileRepo.findByMobileNumber(phone);
     }
 
     public List<UserProfile> findByLocation(ProfileRoles role, double latitude, double longitude, double range) {

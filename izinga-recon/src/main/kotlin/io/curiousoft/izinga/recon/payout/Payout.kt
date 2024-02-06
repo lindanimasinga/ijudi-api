@@ -18,7 +18,8 @@ abstract class Payout(
     var emailNotify: String,
     var emailAddress: String,
     var emailSubject: String,
-    var orders: List<Order>
+    var orders: MutableSet<Order>,
+    var tips: MutableSet<Tip>? = null
 ): BaseModel() {
     abstract var paid: Boolean
     abstract var total: BigDecimal
@@ -34,13 +35,14 @@ class MessengerPayout(
     fromReference: String,
     toReference: String,
     emailNotify: String,
-    orders: List<Order>,
+    orders: MutableSet<Order>,
     emailAddress: String,
     bundleId: String? = null,
-    emailSubject: String ) : Payout(
+    emailSubject: String,
+    tips: MutableSet<Tip>? = null ) : Payout(
     toId = toId, toName = toName, toType = toType, toBankName = toBankName, toAccountNumber = toAccountNumber,
     toBranchCode = toBranchCode, fromReference = fromReference, toReference = toReference, emailNotify = emailNotify,
-    emailAddress = emailAddress, emailSubject = emailSubject, orders = orders, bundleId = bundleId) {
+    emailAddress = emailAddress, emailSubject = emailSubject, orders = orders, bundleId = bundleId, tips = tips) {
     override var paid: Boolean = false
     @org.springframework.data.annotation.Transient
     override var total: BigDecimal = orders.sumOf { it.shippingData?.fee!! }.toBigDecimal()
@@ -52,7 +54,7 @@ class ShopPayout(
     toBankName: String,
     toType: BankAccType,
     toAccountNumber: String,
-    orders: List<Order>,
+    orders: MutableSet<Order>,
     toBranchCode: String, fromReference: String, toReference: String, emailNotify: String, emailAddress: String,
     emailSubject: String,
     bundleId: String? = null,

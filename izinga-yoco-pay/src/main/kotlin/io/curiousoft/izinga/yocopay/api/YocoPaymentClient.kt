@@ -12,6 +12,7 @@ interface YocoPaymentClient {
     @PostMapping(value = ["checkouts"], consumes = ["application/json"])
     fun checkout(@RequestBody yocoPayRequest: YocoPaymentInitiate): YocoPaymentInitiateResponse?
 
-    @PostMapping(value = ["checkouts/{checkoutId}/refund"], consumes = ["application/json"])
+    @PostMapping(value = ["checkouts/{checkoutId}/refund"], consumes = ["application/json"],
+        headers = ["x-auth-token:\${yoco.dashboard-api.token}"])
     fun refund(@PathVariable checkoutId: String): YocoRefundResponse?
 }

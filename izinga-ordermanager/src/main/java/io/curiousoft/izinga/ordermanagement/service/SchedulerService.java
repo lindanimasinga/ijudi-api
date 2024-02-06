@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.ordermanagement.service;
 
+import co.za.izinga.menuupdater.Application;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.repo.OrderRepository;
@@ -14,6 +15,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
@@ -156,5 +158,10 @@ public class SchedulerService {
                     pushNotificationService.sendNotifications(devices, pushMessage);
                     LOG.info(format("promotion \"%s\" sent out as push notification", pushMessage.getPushHeading().getTitle()));
                 });
+    }
+
+    @Scheduled(fixedDelay = 420000)// 10 minutes
+    public void publishMenuOfTheDay() throws IOException {
+        Application.main(new String[]{});
     }
 }

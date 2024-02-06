@@ -73,6 +73,11 @@ yoco:
         webhooksec: NTkwQTgyQzJGRUZFM0M3RTQzM0IzODlBMDE1MDE0OEQ=
     verifier:
         order-manager-url: https://api.izinga.co.za
+    dashboard-api:
+        url: https://portal.yoco.co.za/api/client/v2/
+        user: 1630651512085-9e77be82-cac8-488c-bfe4-f7d3410fdad4
+        token: 1704719870139-3901c9d7-6a60-4aaf-b152-c23dd33b231d|38ea04d5e8011fb713fd69b33c27c8e091d5b1dc5583df93d4eeb115e91ff4e76d
+        businessuuid: 1630651512085-85b0bea4-2c34-4026-a87b-0c68871613c9
 zoomconnectsms:
     api:
         email: lindanimasinga@gmail.com

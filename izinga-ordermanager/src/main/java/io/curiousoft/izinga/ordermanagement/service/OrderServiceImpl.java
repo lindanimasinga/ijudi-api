@@ -359,7 +359,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public List<Order> findOrderByPhone(String phone) throws Exception {
-        UserProfile user = userProfileRepo.findByMobileNumber(phone)
+        UserProfile user = Optional.of(userProfileRepo.findByMobileNumber(phone))
                 .orElseThrow(() -> new Exception("User not found"));
         return orderRepo.findByCustomerId(user.getId()).orElse(new ArrayList<>());
     }

@@ -7,7 +7,7 @@ import java.math.BigDecimal
 class YocoEvent {
     var createdDate: String? = null
     var id: String? = null
-    var payload: PaymentData = null
+    lateinit var payload: PaymentData
     var type: String? = null
 
     constructor()

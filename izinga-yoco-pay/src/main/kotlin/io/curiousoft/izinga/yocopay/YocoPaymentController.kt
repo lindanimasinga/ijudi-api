@@ -71,7 +71,6 @@ class YocoPaymentController(private val yocoConfiguration: YocoConfiguration,
                         ResponseEntity.internalServerError().body(it.message)
                     })
             "refund.succeeded" -> {
-                izingaOrderMananger.cancelOrder(successEvent.payload.metadata?.orderId!!)
                 ResponseEntity.ok().build()
             }
             else -> ResponseEntity.internalServerError().build()
@@ -88,9 +87,7 @@ class YocoPaymentController(private val yocoConfiguration: YocoConfiguration,
 
     @PostMapping("/refund-initiate")
     fun initiatePayment(@RequestBody refundInitiate: YocoRefundRequest): ResponseEntity<Any> =
-        izingaOrderMananger.findOrder(refundInitiate.orderId)
-            .let { it.tag["yoco-checkout-id"] }
-            ?.let { yocoPaymentClient.refund(it) }
+        yocoPaymentClient.refund(refundInitiate.checkoutId)
             ?.let {ResponseEntity.ok(it)}
             ?: ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()
 }

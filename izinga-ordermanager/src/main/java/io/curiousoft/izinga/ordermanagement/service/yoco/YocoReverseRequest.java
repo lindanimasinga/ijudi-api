@@ -1,9 +1,9 @@
 package io.curiousoft.izinga.ordermanagement.service.yoco;
 
 public class YocoReverseRequest {
-    private String id;
+    private String checkoutId;
 
-    public YocoReverseRequest(String id) {
-        this.id = id;
+    public YocoReverseRequest(String checkoutId) {
+        this.checkoutId = checkoutId;
     }
 }

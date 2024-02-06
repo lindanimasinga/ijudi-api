@@ -1,0 +1,3 @@
+[submodule "store-menu-to-izinga-menu"]
+	path = store-menu-to-izinga-menu
+	url = git@github.com:lindanimasinga/store-menu-to-izinga-menu.git

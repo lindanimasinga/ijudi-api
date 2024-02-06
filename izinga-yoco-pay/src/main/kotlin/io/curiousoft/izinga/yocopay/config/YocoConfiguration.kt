@@ -20,6 +20,10 @@ import java.util.*
 @ConfigurationProperties(prefix = "yoco.api")
 data class YocoConfiguration(val url: String, val key: String, val webhooksec: String)
 
+@ConstructorBinding
+@ConfigurationProperties(prefix = "yoco.dashboard-api")
+data class YocoDashBoardConfiguration(val url: String, val user: String, val token: String, val businessuuid: String)
+
 private val logger = LoggerFactory.getLogger(YocoConfiguration::class.java)
 
 fun YocoConfiguration.checksum(data: String)= MessageDigest.getInstance("MD5")
@@ -61,7 +65,10 @@ private fun convertToHex(messageDigest: ByteArray): String {
 @Configuration
 class HeaderConfig {
     @Bean
-    fun basicAuthRequestInterceptor(@Value("\${yoco.api.key}") apiKey: String): RequestInterceptor = RequestInterceptor {
+    fun basicAuthRequestInterceptor(@Value("\${yoco.api.key}") apiKey: String, yocoDashBoard: YocoDashBoardConfiguration): RequestInterceptor = RequestInterceptor {
         it.header("Authorization", "Bearer $apiKey")
+        it.header("x-auth-token", yocoDashBoard.token)
+        it.header("useruuid", yocoDashBoard.user)
+        it.header("businessuuid", yocoDashBoard.businessuuid)
     };
 }

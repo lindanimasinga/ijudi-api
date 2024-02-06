@@ -65,6 +65,10 @@ yoco:
         webhooksec: M0JGQUI3MTcwODQxMDg2MUMyNjk2OUQ4MzA1NTI0QUE=
     verifier:
         order-manager-url: https://api-uat.izinga.co.za
+    dashboard-api:
+        url: https://portal.yoco.co.za/api/client/v2/
+        user: user
+        token: token
 zoomconnectsms:
     api:
         email: lindanimasinga@gmail.com
