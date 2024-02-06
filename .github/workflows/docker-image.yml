@@ -12,6 +12,8 @@ jobs:
     #uses: ./.github/workflows/maven.yml
     steps:
     - uses: actions/checkout@v3
+    - name: Locate izinga order manager module docker file
+      run:  cd ../../izinga-ordermanager
     - name: Build the Docker image
       run: docker build -t ijudi-api . --tag my-image-name:$(date +%s)
     - name: Tag Docker image
