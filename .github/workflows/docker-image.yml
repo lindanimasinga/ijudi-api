@@ -9,8 +9,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    uses: ./.github/workflows/maven.yml
+    #uses: ./.github/workflows/maven.yml
     steps:
     - uses: actions/checkout@v3
     - name: Build the Docker image
       run: docker build . --file ./izinga-ordermanager/Dockerfile --tag my-image-name:$(date +%s)
+      needs: ["Java CI with Maven"]
