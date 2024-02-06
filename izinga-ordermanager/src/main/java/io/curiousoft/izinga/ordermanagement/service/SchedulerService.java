@@ -160,7 +160,7 @@ public class SchedulerService {
                 });
     }
 
-    @Scheduled(fixedDelay = 420000)// 10 minutes
+    @Scheduled(cron = "* 12 7,10 * * *")// 10 minutes
     public void publishMenuOfTheDay() throws IOException {
         Application.main(new String[]{});
     }
