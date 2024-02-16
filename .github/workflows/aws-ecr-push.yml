@@ -46,7 +46,9 @@ permissions:
   contents: read
 
 jobs:
-
+  build:
+    uses: ./.github/workflows/maven.yml
+    
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
