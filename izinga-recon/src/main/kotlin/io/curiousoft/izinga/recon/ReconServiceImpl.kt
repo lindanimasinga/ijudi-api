@@ -50,7 +50,7 @@ class ReconServiceImpl(
             ?.map { map ->
                 messengerRepo.findByIdOrNull(map.key)?.let { messng ->
                     bundle?.payouts?.firstOrNull { it.toId == messng.id }?.also { payout ->
-                        payout.orders.addAll(map.value)
+                        payout.orders = map.value.toMutableSet()
                         tips?.filter { messng.emailAddress == it.emailAddress }
                             ?.toMutableSet()
                             ?.also { payout.tips?.addAll(it) }
