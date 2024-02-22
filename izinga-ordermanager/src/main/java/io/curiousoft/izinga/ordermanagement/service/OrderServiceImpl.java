@@ -253,14 +253,14 @@ public class OrderServiceImpl implements OrderService {
 
             boolean isDelivery = persistedOrder.getShippingData() != null
                     && persistedOrder.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
-                    && store.getStoreType() != StoreType.TIPS;
+                    && (store.getStoreType() != StoreType.TIPS || store.getStoreType() != StoreType.CAR_WASH);
             // notify messenger
             if (isDelivery) {
                 List<Device> messengerDevices = deviceRepo.findByUserId(persistedOrder.getShippingData().getMessengerId());
                 pushNotificationService.notifyMessengerOrderPlaced(messengerDevices, persistedOrder, store);
             }
 
-            if (store.getStoreType() == StoreType.TIPS) {
+            if (store.getStoreType() == StoreType.TIPS || store.getStoreType() == StoreType.CAR_WASH) {
                 persistedOrder.setStage(OrderStage.STAGE_7_ALL_PAID);
             }
         }
