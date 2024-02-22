@@ -45,7 +45,8 @@ public class EmailNotificationService {
     @Async
     public void notifyAdminNewOrder(Order order) {
         try {
-            notifyOrder(order, newOrderTemplateId);
+            List<String> admins = userProfileService.findByRole(ProfileRoles.ADMIN).stream().map(UserProfile::getEmailAddress).toList();
+            notifyOrder(order, newOrderTemplateId, admins);
         } catch (JsonProcessingException e) {
             e.printStackTrace();
         }
@@ -53,31 +54,31 @@ public class EmailNotificationService {
 
     public void notifyAdminOrderNotPaid(Order order) {
         try {
-            notifyOrder(order, notPaidTemplateId);
+            List<String> admins = userProfileService.findByRole(ProfileRoles.ADMIN).stream().map(UserProfile::getEmailAddress).toList();
+            notifyOrder(order, notPaidTemplateId, admins);
         } catch (JsonProcessingException e) {
             e.printStackTrace();
         }
     }
 
     @Async
-    public void notifyOrder(Order order, String templateId) throws JsonProcessingException {
+    public void notifyOrder(Order order, String templateId, List<String> emails) throws JsonProcessingException {
 
         UserProfile customer = userProfileService.find(order.getCustomerId());
         StoreProfile store = storeService.find(order.getShopId());
-        List<UserProfile> admins = userProfileService.findByRole(ProfileRoles.ADMIN);
         EmailRequest emailMessage = new EmailRequest();
         emailMessage.template_id = templateId;
         emailMessage.to = new ArrayList<>();
         emailMessage.personalization = new ArrayList<>();
-        admins.forEach(admin -> {
-            emailMessage.to.add(new To(admin.getEmailAddress()));
+        emails.forEach(email -> {
+            emailMessage.to.add(new To(email));
             Data data = new Data();
             data.order = order;
             data.account_name = "iZinga";
             data.customer = customer;
             data.items = order.getBasket().getItems();
             data.store = store;
-            emailMessage.personalization.add(new Personalization(admin.getEmailAddress(), data));
+            emailMessage.personalization.add(new Personalization(email, data));
         });
 
         try {
@@ -91,6 +92,14 @@ public class EmailNotificationService {
             restTemplate.postForEntity("https://api.mailersend.com/v1/email",
                     entity, String.class);
         } catch (RestClientException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void notifyShops(Order order, List<String> emails) {
+        try {
+            notifyOrder(order, newOrderTemplateId, emails);
+        } catch (JsonProcessingException e) {
             e.printStackTrace();
         }
     }

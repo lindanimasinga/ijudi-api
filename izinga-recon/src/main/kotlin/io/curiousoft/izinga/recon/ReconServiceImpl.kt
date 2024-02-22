@@ -1,7 +1,6 @@
 package io.curiousoft.izinga.recon
 
 import io.curiousoft.izinga.commons.model.OrderStage
-import io.curiousoft.izinga.commons.model.isTrue
 import io.curiousoft.izinga.commons.repo.OrderRepository
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
@@ -46,25 +45,34 @@ class ReconServiceImpl(
         val bundle = payoutBundleRepo.findOneByTypeAndExecuted(PayoutType.MESSENGER)
         val tips = tipsService.getTodayTips()
         return orderRepo.findByMessengerPaidAndStage(false, OrderStage.STAGE_7_ALL_PAID)
-            ?.filter { it.shippingData?.messengerId?.isEmpty() ?: true }
+            ?.filter { it.shippingData?.messengerId?.isNotEmpty() ?: false }
             ?.groupBy { it.shippingData?.messengerId }
             ?.map { map ->
-                val messng = messengerRepo.findByIdOrNull(map.key)!!
-                bundle?.payouts?.first { it.toId == messng.id }?.also { payout ->
-                    if (!messng.isPermanentEmployed) payout.orders.addAll(map.value) else payout.orders = mutableSetOf()
-                    tips?.filter { messng.emailAddress == it.emailAddress }?.toMutableSet()?.also { payout.tips?.addAll(it) }
-                } ?: MessengerPayout(
-                    toId = messng.id!!, toName = messng.name!!, toBankName = messng.bank?.name!!,
-                    toType = messng.bank?.type!!, toAccountNumber = messng.bank?.accountId!!,
-                    orders = if (!messng.isPermanentEmployed) map.value.toMutableSet() else mutableSetOf(),
-                    toBranchCode = messng.bank!!.branchCode!!,
-                    toReference = "Payment from iZinga", fromReference = "Payment to ${messng.name}",
-                    tips = tips?.filter { messng.emailAddress == it.emailAddress }?.toMutableSet(),
-                    emailAddress = messng.emailAddress!!, emailNotify = "", emailSubject = "Payment from iZinga"
-                )
-            }?.toList()
+                messengerRepo.findByIdOrNull(map.key)?.let { messng ->
+                    bundle?.payouts?.firstOrNull { it.toId == messng.id }?.also { payout ->
+                        payout.orders.addAll(map.value)
+                        tips?.filter { messng.emailAddress == it.emailAddress }
+                            ?.toMutableSet()
+                            ?.also { payout.tips?.addAll(it) }
+                    } ?: MessengerPayout(
+                        toId = messng.id!!,
+                        toName = messng.name!!,
+                        toBankName = messng.bank?.name!!,
+                        toType = messng.bank?.type!!,
+                        toAccountNumber = messng.bank?.accountId!!,
+                        orders = map.value.toMutableSet(),
+                        toBranchCode = messng.bank!!.branchCode!!,
+                        toReference = "Payment from iZinga", fromReference = "Payment to ${messng.name}",
+                        tips = tips?.filter { messng.emailAddress == it.emailAddress }?.toMutableSet(),
+                        emailAddress = messng.emailAddress!!, emailNotify = "", emailSubject = "Payment from iZinga"
+                    ).also {
+                        it.isPermEmployed = messng.isPermanentEmployed
+                    }
+                }
+            }?.filterNotNull()
+            ?.toList()
             ?.let {
-                val bundle = bundle ?: PayoutBundle(payouts = it, createdBy = "System", type = PayoutType.MESSENGER)
+                val bundle = bundle?.let { b -> b.payouts = it; b } ?: PayoutBundle(payouts = it, createdBy = "System", type = PayoutType.MESSENGER)
                 payoutBundleRepo.save(bundle)
             }
     }

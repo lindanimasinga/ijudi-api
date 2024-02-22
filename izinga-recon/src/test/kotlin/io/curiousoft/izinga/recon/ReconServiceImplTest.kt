@@ -239,37 +239,37 @@ class ReconServiceTest {
         )
 
         val shopPayout1 = MessengerPayout(
-            toId = messenger1, toName = messenger1Name, toBankName = "Ewallet", toAccountNumber = "messenger1",
-            orders = shop1Orders,
-            toType = BankAccType.CHEQUE,
+            toId = messenger1, toName = messenger1Name, toBankName = "Ewallet", toType = BankAccType.CHEQUE,
+            toAccountNumber = "messenger1",
             toBranchCode = "codeBranch",
             fromReference = "fromRef",
             toReference = "toRef",
-            emailSubject = "email",
+            emailNotify = "email",
+            orders = shop1Orders,
             emailAddress = "email",
-            emailNotify = "email"
+            emailSubject = "email"
         )
         val payout2 = MessengerPayout(
-            toId = messenger2, toName = messenger2Name, toBankName = "FNB", toAccountNumber = "messenger2",
-            orders = shop2Orders,
-            toType = BankAccType.CHEQUE,
+            toId = messenger2, toName = messenger2Name, toBankName = "FNB", toType = BankAccType.CHEQUE,
+            toAccountNumber = "messenger2",
             toBranchCode = "codeBranch",
             fromReference = "fromRef",
             toReference = "toRef",
-            emailSubject = "email",
+            emailNotify = "email",
+            orders = shop2Orders,
             emailAddress = "email",
-            emailNotify = "email"
+            emailSubject = "email"
         )
         val payout3 = MessengerPayout(
-            toId = messenger3, toName = messenger3Name, toBankName = "ABSA", toAccountNumber = "messenger3",
-            orders = shop3Orders,
-            toType = BankAccType.CHEQUE,
+            toId = messenger3, toName = messenger3Name, toBankName = "ABSA", toType = BankAccType.CHEQUE,
+            toAccountNumber = "messenger3",
             toBranchCode = "codeBranch",
             fromReference = "fromRef",
             toReference = "toRef",
-            emailSubject = "email",
+            emailNotify = "email",
+            orders = shop3Orders,
             emailAddress = "email",
-            emailNotify = "email"
+            emailSubject = "email"
         )
 
         every { payoutBundleRepo.findOneByTypeAndExecuted(PayoutType.MESSENGER) } returns PayoutBundle(payouts = listOf(shopPayout1,payout2,payout3),

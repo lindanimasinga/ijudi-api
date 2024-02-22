@@ -5,6 +5,8 @@ import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.repo.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.commons.utils.IjudiUtils;
+import io.curiousoft.izinga.commons.utils.IjudiUtilsKt;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
 import org.slf4j.Logger;
@@ -13,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import javax.validation.ConstraintViolation;
 import javax.validation.Validation;
@@ -199,8 +202,6 @@ public class OrderServiceImpl implements OrderService {
 
         persistedOrder.setDescription(order.getDescription());
         persistedOrder.setPaymentType(order.getPaymentType());
-        boolean isDelivery = persistedOrder.getShippingData() != null &&
-                persistedOrder.getShippingData().getType() == ShippingData.ShippingType.DELIVERY;
 
         if (!paymentService.paymentReceived(persistedOrder)) {
             throw new Exception("Payment not cleared yet. please verify again.");
@@ -245,14 +246,27 @@ public class OrderServiceImpl implements OrderService {
             } else {
                 smsNotificationService.notifyOrderPlaced(store, persistedOrder, userProfileRepo.findById(order.getCustomerId()).get());
             }
+
+            if(StringUtils.hasText(store.getEmailAddress())) {
+                emailNotificationService.notifyShops(order, List.of(store.getEmailAddress()));
+            }
+
+            boolean isDelivery = persistedOrder.getShippingData() != null
+                    && persistedOrder.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
+                    && store.getStoreType() != StoreType.TIPS;
             // notify messenger
             if (isDelivery) {
                 List<Device> messengerDevices = deviceRepo.findByUserId(persistedOrder.getShippingData().getMessengerId());
                 pushNotificationService.notifyMessengerOrderPlaced(messengerDevices, persistedOrder, store);
             }
+
+            if (store.getStoreType() == StoreType.TIPS) {
+                persistedOrder.setStage(OrderStage.STAGE_7_ALL_PAID);
+            }
         }
         LOG.info("New order placed. Order No. " + order.getId() + ", Basket Amount. R"+order.getBasketAmount());
         LOG.info("New order placed. Order No. " + order.getId() + ", Delivery Fee. R"+order.getShippingData().getFee());
+
         return orderRepo.save(persistedOrder);
     }
 

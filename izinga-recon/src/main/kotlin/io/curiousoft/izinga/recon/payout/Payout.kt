@@ -1,10 +1,12 @@
 package io.curiousoft.izinga.recon.payout
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import io.curiousoft.izinga.commons.model.BankAccType
 import io.curiousoft.izinga.commons.model.BaseModel
 import io.curiousoft.izinga.commons.model.Order
 import java.math.BigDecimal
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 abstract class Payout(
     var toId: String,
     var bundleId: String?,
@@ -19,10 +21,10 @@ abstract class Payout(
     var emailAddress: String,
     var emailSubject: String,
     var orders: MutableSet<Order>,
-    var tips: MutableSet<Tip>? = null
+    var tips: MutableSet<Tip>? = null,
 ): BaseModel() {
     abstract var paid: Boolean
-    abstract var total: BigDecimal
+    abstract val total: BigDecimal
 }
 
 class MessengerPayout(
@@ -39,13 +41,16 @@ class MessengerPayout(
     emailAddress: String,
     bundleId: String? = null,
     emailSubject: String,
-    tips: MutableSet<Tip>? = null ) : Payout(
+    tips: MutableSet<Tip>? = null
+) : Payout(
     toId = toId, toName = toName, toType = toType, toBankName = toBankName, toAccountNumber = toAccountNumber,
     toBranchCode = toBranchCode, fromReference = fromReference, toReference = toReference, emailNotify = emailNotify,
     emailAddress = emailAddress, emailSubject = emailSubject, orders = orders, bundleId = bundleId, tips = tips) {
     override var paid: Boolean = false
-    @org.springframework.data.annotation.Transient
-    override var total: BigDecimal = orders.sumOf { it.shippingData?.fee!! }.toBigDecimal()
+    var isPermEmployed: Boolean = false
+
+    override val total: BigDecimal get() = if (isPermEmployed) orders.sumOf { (it.tip ?: 0.00) }.toBigDecimal()
+                                        else orders.sumOf { it.shippingData?.fee!! + (it.tip ?: 0.00) }.toBigDecimal()
 }
 
 class ShopPayout(
@@ -63,7 +68,6 @@ class ShopPayout(
     toBranchCode = toBranchCode, fromReference = fromReference, toReference = toReference,
     emailNotify = emailNotify, emailAddress = emailAddress, emailSubject = emailSubject, orders = orders, bundleId = bundleId) {
 
-    @org.springframework.data.annotation.Transient
-    override var total: BigDecimal = orders.sumOf { it.basketAmount }.toBigDecimal()
+    override val total: BigDecimal get() = orders.sumOf { it.basketAmount }.toBigDecimal()
     override var paid: Boolean = false
 }
