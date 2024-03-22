@@ -259,10 +259,6 @@ public class OrderServiceImpl implements OrderService {
                 List<Device> messengerDevices = deviceRepo.findByUserId(persistedOrder.getShippingData().getMessengerId());
                 pushNotificationService.notifyMessengerOrderPlaced(messengerDevices, persistedOrder, store);
             }
-
-            if (store.getStoreType() == StoreType.TIPS || store.getStoreType() == StoreType.CAR_WASH) {
-                persistedOrder.setStage(OrderStage.STAGE_7_ALL_PAID);
-            }
         }
         LOG.info("New order placed. Order No. " + order.getId() + ", Basket Amount. R"+order.getBasketAmount());
         LOG.info("New order placed. Order No. " + order.getId() + ", Delivery Fee. R"+order.getShippingData().getFee());

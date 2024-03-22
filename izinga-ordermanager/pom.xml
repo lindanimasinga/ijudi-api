@@ -38,6 +38,12 @@
         </dependency>
         <dependency>
             <groupId>io.curiousoft.izinga</groupId>
+            <artifactId>izinga-usermanagement</artifactId>
+            <version>1.0.0</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.curiousoft.izinga</groupId>
             <artifactId>izinga-recon</artifactId>
             <version>1.0.0</version>
             <scope>runtime</scope>
@@ -54,8 +60,6 @@
             <version>1.0-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
-
-
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
@@ -70,6 +74,11 @@
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-ui</artifactId>
             <version>1.7.0</version>
+        </dependency>
+        <dependency>
+            <groupId>de.brendamour</groupId>
+            <artifactId>jpasskit</artifactId>
+            <version>0.3.4</version>
         </dependency>
     </dependencies>
 
