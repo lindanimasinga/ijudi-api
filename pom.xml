@@ -4,12 +4,12 @@
     <modelVersion>4.0.0</modelVersion>
     <modules>
         <module>izinga-recon</module>
+        <module>izinga-usermanagement</module>
         <module>izinga-ordermanager</module>
         <module>izinga-commons</module>
         <module>izinga-messaging</module>
         <module>izinga-yoco-pay</module>
         <module>store-menu-to-izinga-menu</module>
-        <module>izinga-usermanagement</module>
     </modules>
 
     <parent>
