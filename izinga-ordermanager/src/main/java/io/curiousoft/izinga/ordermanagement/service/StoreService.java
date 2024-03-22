@@ -144,7 +144,8 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         stores.sort((a, b) -> {
             double distanceToA = GeoDistance.Companion.getDistanceInKiloMetersBetweenTwoGeoPoints(origin, a);
             double distanceToB = GeoDistance.Companion.getDistanceInKiloMetersBetweenTwoGeoPoints(origin, b);
-            return (int) (distanceToA - distanceToB);
+            var difference = distanceToA - distanceToB;
+            return  difference < 0 ? -1 : difference > 0 ? 1 : 0;
         });
 
         maxLocations = maxLocations <= 0 ? 30 : maxLocations;
