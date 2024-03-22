@@ -17,7 +17,6 @@ import java.util.*
 class UserServiceTest {
     //system under test
     lateinit var profileService: UserProfileService
-
     @Mock
     lateinit var profileRepo: UserProfileRepo
     
