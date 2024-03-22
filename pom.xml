@@ -9,6 +9,7 @@
         <module>izinga-messaging</module>
         <module>izinga-yoco-pay</module>
         <module>store-menu-to-izinga-menu</module>
+        <module>izinga-usermanagement</module>
     </modules>
 
     <parent>

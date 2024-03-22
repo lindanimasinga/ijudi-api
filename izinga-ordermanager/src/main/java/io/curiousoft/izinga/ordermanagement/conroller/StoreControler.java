@@ -1,8 +1,8 @@
 package io.curiousoft.izinga.ordermanagement.conroller;
 
+import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.ordermanagement.service.StoreService;
-import io.curiousoft.izinga.ordermanagement.service.UserProfileService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;

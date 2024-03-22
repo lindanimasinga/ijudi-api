@@ -19,11 +19,33 @@ import java.util.TimeZone;
 @EnableMongoAuditing
 @EnableScheduling
 @EnableAsync
-@SpringBootApplication(scanBasePackages = {"io.curiousoft.izinga.ordermanagement", "io.curiousoft.izinga.commons", "io.curiousoft.izinga.recon", "io.curiousoft.izinga.messaging", "io.curiousoft.izinga.yocopay"})
-@EntityScan({"io.curiousoft.izinga.ordermanagement", "io.curiousoft.izinga.commons", "io.curiousoft.izinga.recon", "io.curiousoft.izinga.messaging", "io.curiousoft.izinga.yocopay"})
-@EnableMongoRepositories({"io.curiousoft.izinga.ordermanagement", "io.curiousoft.izinga.commons", "io.curiousoft.izinga.recon", "io.curiousoft.izinga.messaging", "io.curiousoft.izinga.yocopay"})
-@ConfigurationPropertiesScan({"io.curiousoft.izinga.ordermanagement","io.curiousoft.izinga.yocopay"})
-@EnableFeignClients({"io.curiousoft.izinga.ordermanagement", "io.curiousoft.izinga.commons", "io.curiousoft.izinga.recon", "io.curiousoft.izinga.messaging", "io.curiousoft.izinga.yocopay"})
+@SpringBootApplication(scanBasePackages = {"io.curiousoft.izinga.ordermanagement",
+		"io.curiousoft.izinga.commons",
+		"io.curiousoft.izinga.recon",
+		"io.curiousoft.izinga.messaging",
+		"io.curiousoft.izinga.yocopay",
+		"io.curiousoft.izinga.usermanagement"})
+@EntityScan({"io.curiousoft.izinga.ordermanagement",
+		"io.curiousoft.izinga.commons",
+		"io.curiousoft.izinga.recon",
+		"io.curiousoft.izinga.messaging",
+		"io.curiousoft.izinga.yocopay",
+		"io.curiousoft.izinga.usermanagement"})
+@EnableMongoRepositories({"io.curiousoft.izinga.ordermanagement",
+		"io.curiousoft.izinga.commons",
+		"io.curiousoft.izinga.recon",
+		"io.curiousoft.izinga.messaging",
+		"io.curiousoft.izinga.yocopay",
+		"io.curiousoft.izinga.usermanagement"})
+@ConfigurationPropertiesScan({"io.curiousoft.izinga.ordermanagement"
+		,"io.curiousoft.izinga.yocopay",
+		"io.curiousoft.izinga.usermanagement"})
+@EnableFeignClients({"io.curiousoft.izinga.ordermanagement",
+		"io.curiousoft.izinga.commons",
+		"io.curiousoft.izinga.recon",
+		"io.curiousoft.izinga.messaging",
+		"io.curiousoft.izinga.yocopay",
+		"io.curiousoft.izinga.usermanagement"})
 public class IjudiApplication {
 
 	static Optional<ApplicationContext> app = Optional.empty();
