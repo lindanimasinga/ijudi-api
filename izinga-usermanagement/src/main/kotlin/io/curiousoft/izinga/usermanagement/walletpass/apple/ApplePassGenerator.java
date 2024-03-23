@@ -8,8 +8,11 @@ import de.brendamour.jpasskit.enums.PKPassType;
 import de.brendamour.jpasskit.passes.PKStoreCard;
 import de.brendamour.jpasskit.signing.*;
 import io.curiousoft.izinga.commons.model.UserProfile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -21,6 +24,8 @@ import java.util.UUID;
 
 @Service
 public class ApplePassGenerator {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ApplePassGenerator.class);
 
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy MMM dd");
 
@@ -53,13 +58,13 @@ public class ApplePassGenerator {
                     .foregroundColor("rgb(47,48,49 )")
                     .build();
 
-            String appleWWDRCA = "walletpass/applecert/AppleWWDRCA.pem"; // this is apple's developer relation cert
-            String privateKeyPath = "walletpass/applecert/izinga-user-id-pass.p12"; // the private key you exported from keychain
+            String appleWWDRCA = "./walletpass/applecert/AppleWWDRCA.pem"; // this is apple's developer relation cert
+            String privateKeyPath = "./walletpass/applecert/izinga-user-id-pass.p12"; // the private key you exported from keychain
             String privateKeyPassword = "izinga"; // the password you used to export
-            String templatePath = "walletpass/payme";
+            File templatePathFile =  new File("walletpass/payme");
 
             PKSigningInformation pkSigningInformation = new PKSigningInformationUtil().loadSigningInformationFromPKCS12AndIntermediateCertificate(privateKeyPath,  privateKeyPassword, appleWWDRCA);
-            PKPassTemplateFolder passTemplate = new PKPassTemplateFolder(Paths.get(ClassLoader.getSystemResource(templatePath).toURI()).toString());
+            PKPassTemplateFolder passTemplate = new PKPassTemplateFolder(templatePathFile.exists()? templatePathFile.getAbsolutePath() : Paths.get(ClassLoader.getSystemResource(templatePathFile.getPath()).toURI()).toString());
             PKFileBasedSigningUtil pkSigningUtil = new PKFileBasedSigningUtil();
             return pkSigningUtil.createSignedAndZippedPkPassArchive(pass, passTemplate, pkSigningInformation);
     }
