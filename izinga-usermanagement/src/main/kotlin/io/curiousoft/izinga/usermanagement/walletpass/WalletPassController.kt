@@ -20,14 +20,14 @@ class WalletPassController(private val passGenerator: WalletPassService, private
 
     private val passKitContentType = "application/vnd.apple.pkpass"
 
-    @GetMapping("/{userId}/{deviceType}", consumes = ["application/json"], produces = ["application/json"])
+    @GetMapping("/{userId}/{deviceType}")
     @Throws(Exception::class)
     fun create(@PathVariable userId: String, @PathVariable deviceType: DeviceType): ResponseEntity<ByteArrayResource> {
         return userProfileService.find(userId)?.let { user ->
             val passWalletBytes = passGenerator.generatePass(user, deviceType)?.let { ByteArrayResource(it) }
             ResponseEntity.status(201)
                 .header("Content-Type", passKitContentType)
-                .header(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=%s-%s.jpg", user.name, user.mobileNumber))
+                .header(HttpHeaders.CONTENT_DISPOSITION, String.format("attachment; filename=%s(%s).pkpass", user.name, user.mobileNumber))
                 .body(passWalletBytes)
         } ?: ResponseEntity.notFound().build()
     }
