@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.commons.model
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import javax.validation.constraints.NotBlank
 import javax.validation.constraints.NotNull
 
@@ -9,9 +10,11 @@ class UserProfile(
     address: @NotBlank(message = "profile address not valid") String?,
     imageUrl: @NotBlank(message = "profile image url not valid") String?,
     mobileNumber: @NotBlank(message = "profile mobile number not valid") String?,
-    role: @NotNull(message = "role not valid") ProfileRoles?
-) : Profile(name, address, imageUrl, mobileNumber, role) {
+    role: @NotNull(message = "role not valid") ProfileRoles?) : Profile(name, address, imageUrl, mobileNumber, role) {
+
+    @set:JsonIgnore
     var isPermanentEmployed: Boolean = false
+
     var idNumber: String? = null
 
     enum class SignUpReason {

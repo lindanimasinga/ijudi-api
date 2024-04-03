@@ -70,6 +70,7 @@ class ReconServiceImpl(
                     }
                 }
             }?.filterNotNull()
+            ?.filter { it.total > 0.toBigDecimal() }
             ?.toList()
             ?.let {
                 val bundle = bundle?.let { b -> b.payouts = it; b } ?: PayoutBundle(payouts = it, createdBy = "System", type = PayoutType.MESSENGER)

@@ -10,9 +10,9 @@ open class Profile(
     var name: @NotBlank(message = "profile name not valid") String?,
     var address: @NotBlank(message = "profile address not valid") String?,
     var imageUrl: @NotBlank(message = "profile image url not valid") String?,
-    @field:ValidMobileNumber(message = "profile mobile not format is not valid. Please put like +27812815577 or 27812815577") @field:Indexed(
-        unique = true
-    ) @param:ValidMobileNumber(message = "profile mobile number not valid") var mobileNumber: @NotBlank(message = "profile mobile not format is not valid. Please put like +27812815577 or 27812815577") String?,
+    @field:ValidMobileNumber(message = "profile mobile not format is not valid. Please put like +27812815577 or 27812815577")
+    @field:Indexed(unique = true)
+    @param:ValidMobileNumber(message = "profile mobile number not valid") var mobileNumber: @NotBlank(message = "profile mobile not format is not valid. Please put like +27812815577 or 27812815577") String?,
     var role: @NotNull(message = "profile role not valid") ProfileRoles?
 ) : BaseModel() {
     var surname: String? = null
