@@ -11,5 +11,5 @@ class Bank {
 }
 
 enum class BankAccType(val code: String) {
-    CHEQUE("1"), EWALLET("D"), SAVINGS("2"), TRANSMISSION("3"), wallet(""), string("")
+    CHEQUE("1"), EWALLET("S"), SAVINGS("2"), TRANSMISSION("3"), wallet(""), string("")
 }
