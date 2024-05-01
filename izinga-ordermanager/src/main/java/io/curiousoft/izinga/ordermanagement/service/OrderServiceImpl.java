@@ -188,7 +188,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private boolean canChargeServiceFees(StoreProfile storeProfile) {
-        return storeProfile.getStoreType() == StoreType.FOOD || storeProfile.getStoreType() == StoreType.CAR_WASH;
+        return storeProfile.getStoreType() == StoreType.FOOD || storeProfile.getStoreType() == StoreType.TIPS;
     }
 
     @Override
