@@ -16,6 +16,7 @@ import javax.validation.constraints.NotNull
 @ValidDeliveryInfo
 @Document
 class Order : BaseModel() {
+    var paymentTypesAllowed: MutableList<PaymentType>? = null
     var stage: @NotNull(message = "order stage is not valid") OrderStage? = null
     var shippingData: ShippingData? = null
     lateinit var basket: @Valid @NotNull(message = "order basket is not valid") Basket
