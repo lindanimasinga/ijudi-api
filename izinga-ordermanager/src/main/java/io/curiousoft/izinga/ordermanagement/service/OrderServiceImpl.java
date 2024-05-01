@@ -429,7 +429,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         var pastOrderCount = orderRepo.findByCustomerId(userProfileId).map(List::size).orElse(0);
-        if (pastOrderCount > 0) {
+        if (pastOrderCount > 1000000) {
             paymentsTypes.add(PaymentType.SPEED_POINT);
             paymentsTypes.add(PaymentType.CASH);
         }
