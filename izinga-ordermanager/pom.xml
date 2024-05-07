@@ -10,7 +10,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>izinga-ordermanager</artifactId>
-    <version>1.2.0-test-release</version>
+    <version>1.2.0</version>
     <packaging>jar</packaging>
 
     <properties>
