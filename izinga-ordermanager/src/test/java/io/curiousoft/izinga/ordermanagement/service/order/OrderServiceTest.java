@@ -8,8 +8,7 @@ import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
-import io.curiousoft.izinga.ordermanagement.service.OrderServiceImpl;
-import io.curiousoft.izinga.ordermanagement.service.PaymentService;
+import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
 import org.assertj.core.util.Lists;
 import org.junit.Assert;
 import org.junit.Before;
@@ -18,6 +17,7 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
@@ -46,11 +46,13 @@ public class OrderServiceTest {
     private EmailNotificationService emailNotificationService;
     @Mock
     private DeviceRepository deviceRepo;
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
+
     List<String> phoneNumbers = Lists.list("08128155660", "0812815707");
 
     //system under test
     private OrderServiceImpl sut;
-
 
     @Before
     public void setUp() {
@@ -73,7 +75,8 @@ public class OrderServiceTest {
                 paymentService,
                 deviceRepo,
                 pushNotificationService,
-                smsNotifcation, emailNotificationService);
+                smsNotifcation, emailNotificationService,
+                applicationEventPublisher);
     }
 
     public static StoreProfile createStoreProfile(StoreType food) {

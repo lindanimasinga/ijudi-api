@@ -1,10 +1,10 @@
-package io.curiousoft.izinga.ordermanagement.service.pos;
+package io.curiousoft.izinga.ordermanagement.service.paymentverify.pos;
 
 import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.model.PaymentData;
 import io.curiousoft.izinga.commons.model.PaymentType;
 import io.curiousoft.izinga.commons.model.StoreProfile;
-import io.curiousoft.izinga.ordermanagement.service.PaymentProvider;
+import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

@@ -8,6 +8,7 @@ import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
+import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;

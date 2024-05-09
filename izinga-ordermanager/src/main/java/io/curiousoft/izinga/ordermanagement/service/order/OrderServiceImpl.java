@@ -1,19 +1,21 @@
-package io.curiousoft.izinga.ordermanagement.service;
+package io.curiousoft.izinga.ordermanagement.service.order;
 
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.repo.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
-import io.curiousoft.izinga.commons.utils.IjudiUtils;
-import io.curiousoft.izinga.commons.utils.IjudiUtilsKt;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
+import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
+import io.curiousoft.izinga.ordermanagement.service.order.events.neworder.NewOrderEvent;
+import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.context.ApplicationEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -21,8 +23,6 @@ import javax.validation.ConstraintViolation;
 import javax.validation.Validation;
 import javax.validation.Validator;
 import javax.validation.ValidatorFactory;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.*;
 
 import static io.curiousoft.izinga.commons.model.OrderKt.generateId;
@@ -54,6 +54,7 @@ public class OrderServiceImpl implements OrderService {
     private final String googleMapsApiKey;
     private final double starndardDeliveryKm;
     private final double ratePerKm;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Autowired
     public OrderServiceImpl(@Value("${service.delivery.standardFee}") double starndardDeliveryFee,
@@ -69,7 +70,7 @@ public class OrderServiceImpl implements OrderService {
                             DeviceRepository deviceRepo,
                             PushNotificationService pushNotificationService,
                             AdminOnlyNotificationService smsNotifcationService,
-                            EmailNotificationService emailNotificationService) {
+                            EmailNotificationService emailNotificationService, ApplicationEventPublisher applicationEventPublisher) {
         this.starndardDeliveryFee = starndardDeliveryFee;
         this.starndardDeliveryKm = starndardDeliveryKm;
         this.ratePerKm = ratePerKm;
@@ -85,6 +86,7 @@ public class OrderServiceImpl implements OrderService {
         this.deviceRepo = deviceRepo;
         this.googleMapsApiKey = googleMapsApiKey;
         this.emailNotificationService = emailNotificationService;
+        this.applicationEventPublisher = applicationEventPublisher;
         ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
         validator = factory.getValidator();
 
@@ -194,7 +196,6 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Order finishOder(Order order) throws Exception {
         validate(order);
-
         Order persistedOrder = orderRepo.findById(order.getId())
                 .orElseThrow(() -> new Exception("Order with id " + order.getId() + " not found."));
 
@@ -209,62 +210,39 @@ public class OrderServiceImpl implements OrderService {
             throw new Exception("Payment not cleared yet. please verify again.");
         }
 
-        if (persistedOrder.getOrderType() == INSTORE) {
-            if (persistedOrder.getShopPaid()) {
-                return order;
-            }
-            persistedOrder.setStage(OrderStage.STAGE_7_ALL_PAID);
-        } else {
+        if (persistedOrder.getOrderType() != INSTORE) {
             persistedOrder.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        } else if (persistedOrder.getShopPaid()) {
+            return order;
+        } else {
+            persistedOrder.setStage(OrderStage.STAGE_7_ALL_PAID);
         }
 
         //decrease stock available
         Optional<StoreProfile> optional = storeRepository.findById(persistedOrder.getShopId());
-        if (optional.isPresent()) {
-            StoreProfile store = optional.get();
-            Set<Stock> stock = store.getStockList();
-            persistedOrder.getBasket()
-                    .getItems()
-                    .forEach(item -> {
-                        stock.stream()
-                                .filter(sto -> sto.getName().equals(item.getName()))
-                                .findFirst()
-                                .ifPresent(stockItem -> {
-                                    stockItem.setQuantity(stockItem.getQuantity() - item.getQuantity());
-                                    if(store.getStoreWebsiteUrl() != null) {
-                                        String fullUrl = (store.getStoreWebsiteUrl() + "/" + stockItem.getExternalUrlPath())
-                                                .replaceAll("(/){2,}", "/").replaceAll(":/", "://");
-                                        item.setExternalUrl(fullUrl);
-                                    }
-                                });
-                    });
-            store.setServicesCompleted(store.getServicesCompleted() + 1);
-            storeRepository.save(store);
-
-            //notify the shop
-            List<Device> shopDevices = deviceRepo.findByUserId(store.getOwnerId());
-            if (shopDevices.size() > 0) {
-                pushNotificationService.notifyStoreOrderPlaced(store.getName(), shopDevices, persistedOrder);
-            } else {
-                smsNotificationService.notifyOrderPlaced(store, persistedOrder, userProfileRepo.findById(order.getCustomerId()).get());
-            }
-
-            if(StringUtils.hasText(store.getEmailAddress())) {
-                emailNotificationService.notifyShops(order, List.of(store.getEmailAddress()));
-            }
-
-            boolean isDelivery = persistedOrder.getShippingData() != null
-                    && persistedOrder.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
-                    && (store.getStoreType() != StoreType.TIPS || store.getStoreType() != StoreType.CAR_WASH);
-            // notify messenger
-            if (isDelivery) {
-                List<Device> messengerDevices = deviceRepo.findByUserId(persistedOrder.getShippingData().getMessengerId());
-                pushNotificationService.notifyMessengerOrderPlaced(messengerDevices, persistedOrder, store);
-            }
-        }
+        StoreProfile store = optional.get();
+        Set<Stock> stock = store.getStockList();
+        persistedOrder.getBasket()
+                .getItems()
+                .forEach(item -> {
+                    stock.stream()
+                            .filter(sto -> sto.getName().equals(item.getName()))
+                            .findFirst()
+                            .ifPresent(stockItem -> {
+                                stockItem.setQuantity(stockItem.getQuantity() - item.getQuantity());
+                                if(store.getStoreWebsiteUrl() != null) {
+                                    String fullUrl = (store.getStoreWebsiteUrl() + "/" + stockItem.getExternalUrlPath())
+                                            .replaceAll("(/){2,}", "/").replaceAll(":/", "://");
+                                    item.setExternalUrl(fullUrl);
+                                }
+                            });
+                });
+        store.setServicesCompleted(store.getServicesCompleted() + 1);
+        storeRepository.save(store);
         LOG.info("New order placed. Order No. " + order.getId() + ", Basket Amount. R"+order.getBasketAmount());
         LOG.info("New order placed. Order No. " + order.getId() + ", Delivery Fee. R"+order.getShippingData().getFee());
-
+        NewOrderEvent newOrderEvent = new NewOrderEvent(this, order, persistedOrder.getShippingData().getMessengerId(), store);
+        applicationEventPublisher.publishEvent(newOrderEvent);
         return orderRepo.save(persistedOrder);
     }
 

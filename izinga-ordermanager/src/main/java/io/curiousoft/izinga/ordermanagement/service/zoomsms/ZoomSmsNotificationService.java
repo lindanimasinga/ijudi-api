@@ -65,4 +65,13 @@ public class ZoomSmsNotificationService implements AdminOnlyNotificationService 
         sendMessage(store.getMobileNumber(), shopMessage);
         sendMessage(userProfile.getMobileNumber(), customerMessage);
     }
+
+    @Override
+    public void notifyShopOrderPlaced(StoreProfile store, Order order, UserProfile userProfile) throws Exception {
+        String shopMessage = format("Hello %s. You have received a new order. Please open iZinga app and confirm.", store.getName());
+        if(store.getOrderUrl() != null) {
+            shopMessage = format("Hello %s. You have received a new order from %s. %s", store.getName(),userProfile.getName(), store.getOrderUrl() + order.getId());
+        }
+        sendMessage(store.getMobileNumber(), shopMessage);
+    }
 }

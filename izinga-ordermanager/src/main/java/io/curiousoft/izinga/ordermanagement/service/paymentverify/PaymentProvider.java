@@ -1,4 +1,4 @@
-package io.curiousoft.izinga.ordermanagement.service;
+package io.curiousoft.izinga.ordermanagement.service.paymentverify;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import io.curiousoft.izinga.commons.model.Order;
