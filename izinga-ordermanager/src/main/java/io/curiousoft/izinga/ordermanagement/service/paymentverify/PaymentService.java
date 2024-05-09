@@ -1,4 +1,4 @@
-package io.curiousoft.izinga.ordermanagement.service;
+package io.curiousoft.izinga.ordermanagement.service.paymentverify;
 
 import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;

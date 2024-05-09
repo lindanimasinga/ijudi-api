@@ -1,11 +1,11 @@
-package io.curiousoft.izinga.ordermanagement.service.yoco;
+package io.curiousoft.izinga.ordermanagement.service.paymentverify.yoco;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.model.PaymentType;
 import io.curiousoft.izinga.commons.model.StoreProfile;
-import io.curiousoft.izinga.ordermanagement.service.PaymentProvider;
+import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
-import java.net.URI;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;

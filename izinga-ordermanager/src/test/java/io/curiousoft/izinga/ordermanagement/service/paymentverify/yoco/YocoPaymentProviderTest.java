@@ -1,15 +1,13 @@
-package io.curiousoft.izinga.ordermanagement.service.yoco;
+package io.curiousoft.izinga.ordermanagement.service.paymentverify.yoco;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.izinga.commons.model.Order;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 import org.junit.runner.RunWith;
-import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import static java.lang.String.format;
-import static org.junit.Assert.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
