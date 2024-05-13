@@ -4,6 +4,7 @@ import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.model.PaymentData;
 import io.curiousoft.izinga.commons.model.PaymentType;
 import io.curiousoft.izinga.commons.model.StoreProfile;
+import io.curiousoft.izinga.commons.repo.OrderRepository;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentProvider;
 import org.springframework.stereotype.Service;
 
@@ -12,13 +13,17 @@ import java.util.List;
 @Service
 public class POSPaymentProvider extends PaymentProvider {
 
-    public POSPaymentProvider() {
+    private OrderRepository orderRepo;
+
+    public POSPaymentProvider(final OrderRepository orderRepo) {
         super(PaymentType.SPEED_POINT);
+        this.orderRepo = orderRepo;
     }
 
     @Override
     public boolean paymentReceived(Order order) throws Exception {
-        return true;
+        var pastOrderCount = orderRepo.findByCustomerId(order.getCustomerId()).map(List::size).orElse(0);
+        return pastOrderCount > 2;
     }
 
     @Override
