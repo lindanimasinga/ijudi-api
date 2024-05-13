@@ -12,6 +12,8 @@ import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Service
@@ -38,8 +40,9 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
         }
 
         if (store.getStoreType() == StoreType.TIPS) {
-            String mobileNumber = userProfileService.find(order.getShippingData().getMessengerId()).getMobileNumber();
-            String tipReceivedMessage =  String.format("You have received a tip of R%s. Thank you for your service\n iZinga.", order.getTip());
+            var mobileNumber = userProfileService.find(order.getShippingData().getMessengerId()).getMobileNumber();
+            var tip = BigDecimal.valueOf(order.getTip()).setScale(2, RoundingMode.HALF_UP);
+            var tipReceivedMessage =  String.format("You have received a tip of R%s. Thank you for your service.%niZinga.", tip);
             smsNotificationService.sendMessage(mobileNumber, tipReceivedMessage);
         }
     }

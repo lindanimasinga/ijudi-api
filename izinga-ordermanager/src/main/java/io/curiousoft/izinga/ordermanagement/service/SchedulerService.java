@@ -143,18 +143,22 @@ public class SchedulerService {
                 .map(Order::getCustomerId)
                 .toList();
         var devices = deviceRepo.findByUserIdIn(activeUserUserId);
-        promotionService.finAllPromotions(StoreType.FOOD).stream()
+        promotionService.finAllPromotions(StoreType.FOOD)
+                .stream()
                 .filter(p -> StringUtils.hasText(p.getTitle()) && StringUtils.hasText(p.getMessage()))
                 .filter(p -> new Random().nextBoolean())
                 .limit(1)
                 .map(promotion -> {
-                    var shopName = storeRepository.findById(Objects.requireNonNull(promotion.getShopId()))
-                            .map(sh -> StringUtils.hasText(sh.getFranchiseName())? sh.getFranchiseName() : sh.getName()).orElse("");
+                    var shop = storeRepository.findById(Objects.requireNonNull(promotion.getShopId()));
+                    var shopName = shop.map(sh -> StringUtils.hasText(sh.getFranchiseName())? sh.getFranchiseName() : sh.getName()).orElse("");
+
+                    if (shop.get().isStoreOffline()) return null;
                     PushHeading heading = new PushHeading();
                     heading.setTitle(format("%s: %s",shopName, promotion.getTitle()));
                     heading.setBody(promotion.getMessage());
                     return new PushMessage(PushMessageType.MARKETING, heading, null);
                 })
+                .filter(Objects::nonNull)
                 .forEach(pushMessage -> {
                     pushNotificationService.sendNotifications(devices, pushMessage);
                     LOG.info(format("promotion \"%s\" sent out as push notification", pushMessage.getPushHeading().getTitle()));

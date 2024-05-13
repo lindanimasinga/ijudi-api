@@ -1,6 +1,8 @@
 package io.curiousoft.izinga.ordermanagement.service.paymentverify;
 
 import io.curiousoft.izinga.commons.model.Order;
+import io.curiousoft.izinga.commons.model.PaymentType;
+import io.curiousoft.izinga.commons.model.StoreType;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.repo.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
@@ -11,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -59,4 +62,20 @@ public class PaymentService {
                 .orElseThrow(() -> new Exception("Your order has no ukheshe type set or the ukheshe provider for " + order.getPaymentType() + " not configured on the server"));
         return paymentProvider.reversePayment(order);
     }
+
+    public List<PaymentType> getAllowedPaymentTypes(String customerId, StoreType storeType) {
+            List<PaymentType> paymentsTypes = new ArrayList<>();
+            paymentsTypes.add(PaymentType.YOCO);
+            var pastOrders = orderRepo.findByCustomerId(customerId);
+            if (pastOrders == null || storeType == StoreType.TIPS) {
+                return paymentsTypes;
+            }
+
+            var pastOrderCount = orderRepo.findByCustomerId(customerId).map(List::size).orElse(0);
+            if (pastOrderCount > 2) {
+                paymentsTypes.add(PaymentType.SPEED_POINT);
+                paymentsTypes.add(PaymentType.CASH);
+            }
+            return paymentsTypes;
+        }
 }

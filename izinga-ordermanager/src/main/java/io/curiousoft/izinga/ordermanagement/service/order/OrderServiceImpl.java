@@ -180,7 +180,7 @@ public class OrderServiceImpl implements OrderService {
             order.setServiceFee(serviceFeePerc * (order.getBasketAmount() + (order.getFreeDelivery() ? 0 : deliveryFee)));
         }
 
-        List<PaymentType> paymentTypes = getAllowedPaymentTypes(order.getCustomerId(), storeOptional.get().getStoreType());
+        List<PaymentType> paymentTypes = paymentService.getAllowedPaymentTypes(order.getCustomerId(), storeOptional.get().getStoreType());
         order.setPaymentTypesAllowed(paymentTypes);
         return orderRepo.save(order);
     }
@@ -396,22 +396,6 @@ public class OrderServiceImpl implements OrderService {
             }
         });
         return order;
-    }
-
-    private List<PaymentType> getAllowedPaymentTypes(final String userProfileId, StoreType storeType) {
-        List<PaymentType> paymentsTypes = new ArrayList<>();
-        paymentsTypes.add(PaymentType.YOCO);
-        var pastOrders = orderRepo.findByCustomerId(userProfileId);
-        if (pastOrders == null || storeType == StoreType.TIPS) {
-            return paymentsTypes;
-        }
-
-        var pastOrderCount = orderRepo.findByCustomerId(userProfileId).map(List::size).orElse(0);
-        if (pastOrderCount > 1000000) {
-            paymentsTypes.add(PaymentType.SPEED_POINT);
-            paymentsTypes.add(PaymentType.CASH);
-        }
-        return paymentsTypes;
     }
 
     private void validate(Order order) throws Exception {
