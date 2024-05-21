@@ -147,7 +147,7 @@ public class SchedulerService {
                 .stream()
                 .filter(p -> StringUtils.hasText(p.getTitle()) && StringUtils.hasText(p.getMessage()))
                 .filter(p -> new Random().nextBoolean())
-                .limit(1)
+                .limit(2)
                 .map(promotion -> {
                     var shop = storeRepository.findById(Objects.requireNonNull(promotion.getShopId()));
                     var shopName = shop.map(sh -> StringUtils.hasText(sh.getFranchiseName())? sh.getFranchiseName() : sh.getName()).orElse("");
