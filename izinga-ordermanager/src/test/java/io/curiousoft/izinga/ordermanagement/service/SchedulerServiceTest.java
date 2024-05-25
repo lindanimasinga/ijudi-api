@@ -68,15 +68,12 @@ public class SchedulerServiceTest {
         sut = new SchedulerService(
                 orderRepository,
                 storeRepo,
-                customerRepo,
-                paymentService,
                 deviceRepo,
                 pushNotificationService,
                 adminOnlyNotificationService,
                 emailNotificationService,
                 promotionService,
-                cleaupMinutes,
-                phoneNumbers
+                cleaupMinutes
         );
     }
 
