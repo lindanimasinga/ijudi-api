@@ -23,6 +23,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
+import java.util.random.RandomGenerator;
 
 import static java.lang.String.format;
 
@@ -34,40 +35,32 @@ public class SchedulerService {
 
     private OrderRepository orderRepo;
     private StoreRepository storeRepository;
-    private UserProfileRepo userProfileRepo;
-    private PaymentService paymentService;
     private DeviceRepository deviceRepo;
     private PushNotificationService pushNotificationService;
     private AdminOnlyNotificationService smsNotificationService;
     private EmailNotificationService emailNotificationService;
-    private final List<String> adminCellNumbers;
     private PromotionService promotionService;
 
     public SchedulerService(OrderRepository orderRepo, StoreRepository storeRepository,
-                            UserProfileRepo userProfileRepo, PaymentService paymentService,
                             DeviceRepository deviceRepo, PushNotificationService pushNotificationService,
                             AdminOnlyNotificationService smsNotifcationService,
                             EmailNotificationService emailNotificationService,
                             PromotionService promotionService,
-                            @Value("${order.cleanup.unpaid.minutes}") long cleanUpMinutes,
-                            @Value("${admin.cellNumber}") List<String> adminCellNumbers) {
+                            @Value("${order.cleanup.unpaid.minutes}") long cleanUpMinutes) {
         this.orderRepo = orderRepo;
         this.storeRepository = storeRepository;
-        this.userProfileRepo = userProfileRepo;
-        this.paymentService = paymentService;
         this.deviceRepo = deviceRepo;
         this.pushNotificationService = pushNotificationService;
         this.smsNotificationService = smsNotifcationService;
         this.emailNotificationService = emailNotificationService;
         this.cleanUpMinutes = cleanUpMinutes;
-        this.adminCellNumbers = adminCellNumbers;
         this.promotionService = promotionService;
     }
 
     @Scheduled(fixedDelay = 150000, initialDelay = 150000)// 10 minutes
     public void checkUnconfirmedOrders() {
         List<Order> orders = orderRepo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
-        LOG.info(format("Found %s unconfirmed orders..", orders.size()));
+        LOG.info("Found %s unconfirmed orders..".formatted(orders.size()));
         orders.forEach(order -> {
             Date checkDate = order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY ?
                     Date.from(LocalDateTime.now()
@@ -114,7 +107,7 @@ public class SchedulerService {
                 .minusMinutes(cleanUpMinutes)
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
-        LOG.info("Cleaning up all orders before   s" + pastDate);
+        LOG.info("Cleaning up all orders before   s%s".formatted(pastDate));
         orderRepo.deleteByShopPaidAndStageAndModifiedDateBefore(false, OrderStage.STAGE_0_CUSTOMER_NOT_PAID, pastDate);
     }
 
@@ -143,11 +136,13 @@ public class SchedulerService {
                 .map(Order::getCustomerId)
                 .toList();
         var devices = deviceRepo.findByUserIdIn(activeUserUserId);
+        var promotions = promotionService.finAllPromotions(StoreType.FOOD);
+        var random = RandomGenerator.getDefault();
+        promotions.sort((s,b) -> random.nextInt(-1,2));
         promotionService.finAllPromotions(StoreType.FOOD)
                 .stream()
-                .filter(p -> StringUtils.hasText(p.getTitle()) && StringUtils.hasText(p.getMessage()))
-                .filter(p -> new Random().nextBoolean())
-                .limit(1)
+                .filter(p -> StringUtils.hasText(p.getTitle()) && StringUtils.hasText(p.getMessage()))  
+                .limit(2)
                 .map(promotion -> {
                     var shop = storeRepository.findById(Objects.requireNonNull(promotion.getShopId()));
                     var shopName = shop.map(sh -> StringUtils.hasText(sh.getFranchiseName())? sh.getFranchiseName() : sh.getName()).orElse("");
