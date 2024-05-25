@@ -137,7 +137,7 @@ public class SchedulerService {
                 .toList();
         var devices = deviceRepo.findByUserIdIn(activeUserUserId);
         var promotions = promotionService.finAllPromotions(StoreType.FOOD);
-        var random = RandomGenerator.getDefault();
+        var random = new Random();
         promotions.sort((s,b) -> random.nextInt(-1,2));
         promotionService.finAllPromotions(StoreType.FOOD)
                 .stream()
