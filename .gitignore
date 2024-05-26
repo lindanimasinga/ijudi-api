@@ -31,3 +31,5 @@ build/
 .vscode/
 .aws-sam
 /izinga-ordermanager/.aws-sam
+izinga-ordermanager/src/test/resources/application-secrets.yml
+izinga-ordermanager/src/main/resources/application-secrets.yml

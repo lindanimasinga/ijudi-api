@@ -37,8 +37,8 @@ import java.util.TimeZone;
 		"io.curiousoft.izinga.messaging",
 		"io.curiousoft.izinga.yocopay",
 		"io.curiousoft.izinga.usermanagement"})
-@ConfigurationPropertiesScan({"io.curiousoft.izinga.ordermanagement"
-		,"io.curiousoft.izinga.yocopay",
+@ConfigurationPropertiesScan({"io.curiousoft.izinga.ordermanagement",
+		"io.curiousoft.izinga.yocopay",
 		"io.curiousoft.izinga.usermanagement"})
 @EnableFeignClients({"io.curiousoft.izinga.ordermanagement",
 		"io.curiousoft.izinga.commons",
