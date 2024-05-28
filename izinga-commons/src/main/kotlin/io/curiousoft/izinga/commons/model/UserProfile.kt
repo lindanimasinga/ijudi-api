@@ -13,7 +13,7 @@ class UserProfile(
     role: @NotNull(message = "role not valid") ProfileRoles?) : Profile(name, address, imageUrl, mobileNumber, role) {
 
     @set:JsonIgnore
-    var isPermanentEmployed: Boolean = false
+    var isPermanentEmployed: Boolean? = null
 
     var idNumber: String? = null
 

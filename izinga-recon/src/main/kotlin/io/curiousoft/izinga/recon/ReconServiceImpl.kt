@@ -66,7 +66,7 @@ class ReconServiceImpl(
                         tips = tips?.filter { messng.emailAddress == it.emailAddress }?.toMutableSet(),
                         emailAddress = messng.emailAddress!!, emailNotify = "", emailSubject = "Payment from iZinga"
                     ).also {
-                        it.isPermEmployed = messng.isPermanentEmployed
+                        it.isPermEmployed = messng.isPermanentEmployed ?: false
                     }
                 }
             }?.filterNotNull()
