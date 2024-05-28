@@ -56,6 +56,8 @@ service:
     supportedApp:
         min: 2.1.1
 spring:
+    config:
+        import: aws-secretsmanager:izinga-prod
     data:
         mongodb:
             uri: mongodb+srv://onusmongouser:wfsuser@cluster0-7odiz.mongodb.net/izinga-prod?retryWrites=true&w=majority
