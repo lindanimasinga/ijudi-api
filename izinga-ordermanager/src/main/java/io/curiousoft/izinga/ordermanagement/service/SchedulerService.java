@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Random;
 import java.util.random.RandomGenerator;
+import java.util.stream.IntStream;
 
 import static java.lang.String.format;
 
@@ -135,14 +136,16 @@ public class SchedulerService {
                 .stream()
                 .map(Order::getCustomerId)
                 .toList();
-        var devices = deviceRepo.findByUserIdIn(activeUserUserId);
-        var promotions = promotionService.finAllPromotions(StoreType.FOOD);
+
         var random = new Random();
-        promotions.sort((s,b) -> random.nextInt(-1,2));
-        promotionService.finAllPromotions(StoreType.FOOD)
-                .stream()
-                .filter(p -> StringUtils.hasText(p.getTitle()) && StringUtils.hasText(p.getMessage()))  
-                .limit(2)
+        var devices = deviceRepo.findByUserIdIn(activeUserUserId);
+        var deviceIterator = new LinkedList<>(devices);
+        devices.sort((s,b) -> random.nextBoolean() ? 1 : -1);
+        var promotions = promotionService.finAllPromotions(StoreType.FOOD);
+        promotions.sort((s,b) -> random.nextBoolean() ? 1 : -1);
+
+        promotions.stream()
+                .filter(p -> StringUtils.hasText(p.getTitle()) && StringUtils.hasText(p.getMessage()))
                 .map(promotion -> {
                     var shop = storeRepository.findById(Objects.requireNonNull(promotion.getShopId()));
                     var shopName = shop.map(sh -> StringUtils.hasText(sh.getFranchiseName())? sh.getFranchiseName() : sh.getName()).orElse("");
@@ -154,9 +157,13 @@ public class SchedulerService {
                     return new PushMessage(PushMessageType.MARKETING, heading, null);
                 })
                 .filter(Objects::nonNull)
-                .forEach(pushMessage -> {
-                    pushNotificationService.sendNotifications(devices, pushMessage);
-                    LOG.info(format("promotion \"%s\" sent out as push notification", pushMessage.getPushHeading().getTitle()));
+                .forEachOrdered(pushMessage -> {
+                    int numberOfDevicesPerPromo = devices.size()/promotions.size();
+                    var filteredDevices = IntStream.range(0, numberOfDevicesPerPromo).mapToObj(i -> deviceIterator.pop()).toList();
+                    if (!filteredDevices.isEmpty()) {
+                        pushNotificationService.sendNotifications(filteredDevices, pushMessage);
+                        LOG.info(format("promotion \"%s\" sent out as push notification", pushMessage.getPushHeading().getTitle()));
+                    }
                 });
     }
 
