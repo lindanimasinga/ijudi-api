@@ -135,22 +135,22 @@ public class SchedulerService {
         var devices = deviceRepo.findByUserIdIn(activeUserUserId);
         var deviceIterator = new LinkedList<>(devices);
         devices.sort((s,b) -> random.nextBoolean() ? 1 : -1);
-        var promotions = promotionService.finAllPromotions(StoreType.FOOD);
-        promotions.sort((s,b) -> random.nextBoolean() ? 1 : -1);
+        var promotions = promotionService.finAllPromotions(StoreType.FOOD)
+                .stream()
+                .filter(promotion -> !storeRepository.findById(Objects.requireNonNull(promotion.getShopId())).get().isStoreOffline())
+                .filter(p -> StringUtils.hasText(p.getTitle()) && StringUtils.hasText(p.getMessage()))
+                .sorted((s, b) -> random.nextBoolean() ? 1 : -1)
+                .toList();
 
         promotions.stream()
-                .filter(p -> StringUtils.hasText(p.getTitle()) && StringUtils.hasText(p.getMessage()))
                 .map(promotion -> {
                     var shop = storeRepository.findById(Objects.requireNonNull(promotion.getShopId()));
                     var shopName = shop.map(sh -> StringUtils.hasText(sh.getFranchiseName())? sh.getFranchiseName() : sh.getName()).orElse("");
-
-                    if (shop.get().isStoreOffline()) return null;
                     PushHeading heading = new PushHeading();
                     heading.setTitle(format("%s: %s",shopName, promotion.getTitle()));
                     heading.setBody(promotion.getMessage());
                     return new PushMessage(PushMessageType.MARKETING, heading, null);
                 })
-                .filter(Objects::nonNull)
                 .forEachOrdered(pushMessage -> {
                     int numberOfDevicesPerPromo = devices.size()/promotions.size();
                     var filteredDevices = IntStream.range(0, numberOfDevicesPerPromo).mapToObj(i -> deviceIterator.pop()).toList();
