@@ -29,6 +29,5 @@ class WalletPassService(private val applePassGenerator: ApplePassGenerator, priv
         }
     }
 
-
-    data class PayoutBalanceUpdatedEvent(val userId: String, val balance: BigDecimal, val deviceType: DeviceType, val source: Any) : ApplicationEvent(source)
+    data class PayoutBalanceUpdatedEvent(val userId: String, val balance: BigDecimal, val deviceType: DeviceType, val origin: Any) : ApplicationEvent(origin)
 }
