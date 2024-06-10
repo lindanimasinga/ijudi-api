@@ -9,7 +9,9 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/store")
@@ -74,5 +76,27 @@ public class StoreControler {
                 !StringUtils.isEmpty(ownerId) && isAdmin ?  storeService.findNearbyStores(0, 0, storeType, 100, 1000)
                         : storeService.findNearbyStores(latitude, longitude, storeType, range, size);
         return stores != null ? ResponseEntity.ok(stores) : ResponseEntity.notFound().build();
+    }
+
+    @GetMapping(name = "/names", produces = "application/json")
+    public ResponseEntity<Map<String, String>> findAllStoresNames(@RequestParam(required = false) boolean featured,
+                                                                  @RequestParam(required = false) String ownerId,
+                                                                  @RequestParam(required = false) StoreType storeType,
+                                                                  @RequestParam(required = false, defaultValue = "0") double latitude,
+                                                                  @RequestParam(required = false, defaultValue = "0") double longitude,
+                                                                  @RequestParam(required = false, defaultValue = "0") double range,
+                                                                  @RequestParam(required = false, defaultValue = "0") int size) {
+        UserProfile profile = null;
+        if(ownerId != null) profile = userProfileService.find(ownerId);
+        boolean isAdmin = profile != null && profile.getRole() == ProfileRoles.ADMIN;
+        List<StoreProfile> stores = featured ?
+                storeService.findFeatured(latitude, longitude, storeType, range, size) :
+                !StringUtils.isEmpty(ownerId) && !isAdmin ? storeService.findByOwner(ownerId) :
+                        !StringUtils.isEmpty(ownerId) && isAdmin ?  storeService.findNearbyStores(0, 0, storeType, 100, 1000)
+                                : storeService.findNearbyStores(latitude, longitude, storeType, range, size);
+        var storeNames = stores
+                .stream()
+                .collect(Collectors.toMap(StoreProfile::getName, StoreProfile::getId));
+        return ResponseEntity.ok(storeNames);
     }
 }
