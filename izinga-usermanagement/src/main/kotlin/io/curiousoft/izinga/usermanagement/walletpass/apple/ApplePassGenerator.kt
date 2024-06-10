@@ -8,18 +8,15 @@ import de.brendamour.jpasskit.enums.PKPassType
 import de.brendamour.jpasskit.passes.PKStoreCard
 import de.brendamour.jpasskit.signing.PKFileBasedSigningUtil
 import de.brendamour.jpasskit.signing.PKPassTemplateFolder
-import de.brendamour.jpasskit.signing.PKSigningException
 import de.brendamour.jpasskit.signing.PKSigningInformationUtil
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.usermanagement.walletpass.PassGenerator
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.io.File
-import java.io.IOException
-import java.net.URISyntaxException
+import java.math.BigDecimal
 import java.nio.charset.StandardCharsets
 import java.nio.file.Paths
-import java.security.cert.CertificateException
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.List
@@ -37,27 +34,18 @@ class ApplePassGenerator : PassGenerator<ByteArray> {
                         PKField.builder()
                             .key(String.format("Tips received since %s", dateFormat.format(user.createdDate)))
                             .label(String.format("Tips received since %s", dateFormat.format(user.createdDate)))
-                            .value(user.servicesCompleted).build()
-                    )
+                            .value(user.servicesCompleted).build())
                     .secondaryFields(
-                        List.of(
-                            PKField.builder().key("Name").label("Name").value(user.name).build(),
-                            PKField.builder().key("Contact").label("Contact").value(user.mobileNumber).build()
-                        )
-                    )
+                        listOf(PKField.builder().key("Name").label("Name").value(user.name).build(),
+                            PKField.builder().key("Contact").label("Contact").value(user.mobileNumber).build()))
                     .backFields(
-                        List.of(
-                            PKField.builder().key("Role").label("Role").value(user.role.toString()).build(),
-                            PKField.builder().key("Balance").label("Balance").value(150).currencyCode("ZAR").build()
-                        )
-                    )
+                        List.of(PKField.builder().key("Role").label("Role").value(user.role.toString()).build(),
+                            PKField.builder().key("Balance").label("Balance").value(150).currencyCode("ZAR").build()))
             )
-            .barcodeBuilder(
-                PKBarcode.builder()
-                    .format(PKBarcodeFormat.PKBarcodeFormatQR)
-                    .message("https://tips.izinga.co.za/tip?messengerId=" + user.id)
-                    .messageEncoding(StandardCharsets.UTF_8)
-            )
+            .barcodeBuilder(PKBarcode.builder()
+                .format(PKBarcodeFormat.PKBarcodeFormatQR)
+                .message("https://tips.izinga.co.za/tip?messengerId=" + user.id)
+                .messageEncoding(StandardCharsets.UTF_8))
             .formatVersion(1)
             .passTypeIdentifier("pass.co.za.izinga")
             .serialNumber(UUID.randomUUID().toString())
@@ -69,26 +57,25 @@ class ApplePassGenerator : PassGenerator<ByteArray> {
             .build()
 
         val appleWWDRCA = "./walletpass/applecert/AppleWWDRCA.pem" // this is apple's developer relation cert
-        val privateKeyPath =
-            "./walletpass/applecert/izinga-user-id-pass.p12" // the private key you exported from keychain
+        val privateKeyPath = "./walletpass/applecert/izinga-user-id-pass.p12" // the private key you exported from keychain
         val privateKeyPassword = "izinga" // the password you used to export
         val templatePathFile = File("walletpass/payme")
-        val pkSigningInformation =
-            PKSigningInformationUtil().loadSigningInformationFromPKCS12AndIntermediateCertificate(
+        val pkSigningInformation = PKSigningInformationUtil().loadSigningInformationFromPKCS12AndIntermediateCertificate(
                 privateKeyPath,
                 privateKeyPassword,
-                appleWWDRCA
-            )
+                appleWWDRCA)
         val passTemplate = PKPassTemplateFolder(
-            if (templatePathFile.exists()) templatePathFile.absolutePath else Paths.get(
-                ClassLoader.getSystemResource(templatePathFile.path).toURI()
-            ).toString()
-        )
+            if (templatePathFile.exists()) templatePathFile.absolutePath
+            else Paths.get(ClassLoader.getSystemResource(templatePathFile.path).toURI()).toString())
         val pkSigningUtil = PKFileBasedSigningUtil()
         return pkSigningUtil.createSignedAndZippedPkPassArchive(pass, passTemplate, pkSigningInformation)
     }
 
     companion object {
         private val LOGGER = LoggerFactory.getLogger(ApplePassGenerator::class.java)
+    }
+
+    override fun updateBalance(user: UserProfile, balance: BigDecimal): Boolean {
+        TODO("Not yet implemented")
     }
 }

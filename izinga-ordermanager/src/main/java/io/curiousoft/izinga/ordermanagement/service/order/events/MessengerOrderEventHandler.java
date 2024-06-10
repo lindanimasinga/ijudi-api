@@ -8,20 +8,29 @@ import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService
 import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.DeviceService;
 import io.curiousoft.izinga.ordermanagement.service.order.events.neworder.NewOrderEvent;
+import io.curiousoft.izinga.recon.ReconService;
+import io.curiousoft.izinga.recon.payout.PayoutBundle;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
+import io.curiousoft.izinga.usermanagement.walletpass.DeviceType;
+import io.curiousoft.izinga.usermanagement.walletpass.WalletPassService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public record MessengerOrderEventHandler(PushNotificationService pushNotificationService,
                                          AdminOnlyNotificationService smsNotificationService,
                                          EmailNotificationService emailNotificationService,
                                          DeviceService deviceService,
-                                         UserProfileService userProfileService) implements OrderEventHandler {
+                                         UserProfileService userProfileService,
+                                         ApplicationEventPublisher eventPublisher,
+                                         ReconService reconService) implements OrderEventHandler {
 
     @EventListener
     @Override
@@ -44,6 +53,24 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
             var tip = BigDecimal.valueOf(order.getTip()).setScale(2, RoundingMode.HALF_UP);
             var tipReceivedMessage =  String.format("You have received a tip of R%s. Thank you for your service.%niZinga.", tip);
             smsNotificationService.sendMessage(mobileNumber, tipReceivedMessage);
+            //get payout balance send event to update payout
+            Optional.ofNullable(reconService.generateNextPayoutsToMessenger())
+                    .stream()
+                    .flatMap(pay -> pay.getPayouts().stream())
+                    .filter(pay -> Objects.equals(pay.getToId(), order.getShippingData().getMessengerId()))
+                    .findFirst()
+                    .ifPresent( payout -> {
+                        var balanceEventAndroid  = new WalletPassService.PayoutBalanceUpdatedEvent(order.getShippingData().getMessengerId(),
+                                payout.getTotal(),
+                                DeviceType.ANDROID,
+                                this);
+                        eventPublisher.publishEvent(balanceEventAndroid);
+                        var balanceEventIOS  = new WalletPassService.PayoutBalanceUpdatedEvent(order.getShippingData().getMessengerId(),
+                                payout.getTotal(),
+                                DeviceType.APPLE,
+                                this);
+                        eventPublisher.publishEvent(balanceEventIOS);
+                    });
         }
     }
 

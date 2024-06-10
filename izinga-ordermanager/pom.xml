@@ -46,7 +46,7 @@
             <groupId>io.curiousoft.izinga</groupId>
             <artifactId>izinga-recon</artifactId>
             <version>1.0.0</version>
-            <scope>runtime</scope>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>io.curiousoft.izinga</groupId>

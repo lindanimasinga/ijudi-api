@@ -17,8 +17,7 @@ import io.curiousoft.izinga.usermanagement.walletpass.PassGenerator
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 import java.io.ByteArrayInputStream
-import java.io.IOException
-import java.io.InputStream
+import java.math.BigDecimal
 import java.security.interfaces.RSAPrivateKey
 import java.util.*
 import java.util.List
@@ -30,8 +29,8 @@ import kotlin.collections.set
 @Service
 class GooglePassGenerator : PassGenerator<String> {
 
-    private lateinit var service: Walletobjects
-    private lateinit var credentials: GoogleCredentials
+    private var service: Walletobjects
+    private var credentials: GoogleCredentials
 
     private var googleConfig: GoogleConfig
 
@@ -142,7 +141,7 @@ class GooglePassGenerator : PassGenerator<String> {
                         latitude = 37.424015499999996
                         longitude = -122.09259560000001
                     })
-                    accountId = user.mobileNumber
+                    accountId = user.name
                     accountName = user.name
                     loyaltyPoints = LoyaltyPoints().apply {
                         label = "Points"
@@ -156,6 +155,28 @@ class GooglePassGenerator : PassGenerator<String> {
                 }
                 return service.loyaltyobject().insert(newObject).execute()
             }
+    }
+
+    fun getObject(issuerId: String, classSuffix: String, objectSuffix: String, user: UserProfile): LoyaltyObject? {
+        return run { service.loyaltyobject()["$issuerId.$objectSuffix"].execute() }
+    }
+
+    fun updateObject(issuerId: String, classSuffix: String, objectSuffix: String, loyaltyObject: LoyaltyObject) {
+        return run { service.loyaltyobject().update("$issuerId.$objectSuffix", loyaltyObject).execute() }
+    }
+
+    fun deleteObject(issuerId: String, classSuffix: String, objectSuffix: String, loyaltyObject: LoyaltyObject) {
+        return run { service.loyaltyobject().update("$issuerId.$objectSuffix", loyaltyObject).execute() }
+    }
+
+    override fun updateBalance(user: UserProfile, balance: BigDecimal): Boolean {
+        val objectSuffix = "loyalty-${user.id}"
+        val issuerId = "3388000000021566341"
+        val classSuffix = "io.curiousoft.izinga"
+
+        val loyaltyObject = getObject(issuerId, classSuffix, objectSuffix, user)
+        loyaltyObject?.loyaltyPoints?.balance?.money?.micros = (balance * 1000000.toBigDecimal()).toLong()
+        return loyaltyObject?.let { updateObject(issuerId, classSuffix, objectSuffix, it); true} ?: false
     }
 
 }
