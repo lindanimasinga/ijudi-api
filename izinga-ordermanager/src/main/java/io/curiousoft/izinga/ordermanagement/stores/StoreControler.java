@@ -77,7 +77,7 @@ public class StoreControler {
         return stores != null ? ResponseEntity.ok(stores) : ResponseEntity.notFound().build();
     }
 
-    @GetMapping(name = "/names", produces = "application/json")
+    @GetMapping(path = "/names", produces = "application/json")
     public ResponseEntity<List<StoreNamesMap>> findAllStoresNames(@RequestParam(required = false) boolean featured,
                                                                   @RequestParam(required = false) String ownerId,
                                                                   @RequestParam(required = false) StoreType storeType,
