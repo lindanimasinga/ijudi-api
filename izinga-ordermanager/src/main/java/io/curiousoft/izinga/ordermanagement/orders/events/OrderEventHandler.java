@@ -1,7 +1,6 @@
-package io.curiousoft.izinga.ordermanagement.service.order.events;
+package io.curiousoft.izinga.ordermanagement.orders.events;
 
-import io.curiousoft.izinga.ordermanagement.service.order.events.neworder.NewOrderEvent;
-import org.springframework.context.event.EventListener;
+import io.curiousoft.izinga.ordermanagement.orders.events.neworder.NewOrderEvent;
 
 public interface OrderEventHandler {
 

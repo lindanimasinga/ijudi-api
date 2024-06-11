@@ -1,7 +1,7 @@
 package io.curiousoft.izinga.ordermanagement.conroller;
 
 import io.curiousoft.izinga.commons.model.Order;
-import io.curiousoft.izinga.ordermanagement.service.order.OrderService;
+import io.curiousoft.izinga.ordermanagement.orders.OrderService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;

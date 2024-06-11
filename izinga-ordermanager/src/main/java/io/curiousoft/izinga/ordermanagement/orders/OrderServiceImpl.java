@@ -1,4 +1,4 @@
-package io.curiousoft.izinga.ordermanagement.service.order;
+package io.curiousoft.izinga.ordermanagement.orders;
 
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
@@ -8,16 +8,14 @@ import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
-import io.curiousoft.izinga.ordermanagement.service.order.events.neworder.NewOrderEvent;
+import io.curiousoft.izinga.ordermanagement.orders.events.neworder.NewOrderEvent;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 import javax.validation.ConstraintViolation;
 import javax.validation.Validation;

@@ -3,6 +3,7 @@ package io.curiousoft.izinga.ordermanagement.service;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.ordermanagement.stores.StoreService;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;

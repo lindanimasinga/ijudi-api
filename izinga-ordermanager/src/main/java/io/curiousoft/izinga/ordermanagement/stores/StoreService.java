@@ -1,8 +1,9 @@
-package io.curiousoft.izinga.ordermanagement.service;
+package io.curiousoft.izinga.ordermanagement.stores;
 
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.ordermanagement.service.ProfileServiceImpl;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;

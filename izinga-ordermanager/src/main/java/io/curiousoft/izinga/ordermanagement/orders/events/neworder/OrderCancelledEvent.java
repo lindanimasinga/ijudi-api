@@ -1,4 +1,4 @@
-package io.curiousoft.izinga.ordermanagement.service.order.events.neworder;
+package io.curiousoft.izinga.ordermanagement.orders.events.neworder;
 
 import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.model.StoreProfile;

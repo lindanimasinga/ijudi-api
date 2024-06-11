@@ -1,8 +1,7 @@
-package io.curiousoft.izinga.ordermanagement.conroller;
+package io.curiousoft.izinga.ordermanagement.stores;
 
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import io.curiousoft.izinga.commons.model.*;
-import io.curiousoft.izinga.ordermanagement.service.StoreService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -79,7 +78,7 @@ public class StoreControler {
     }
 
     @GetMapping(name = "/names", produces = "application/json")
-    public ResponseEntity<Map<String, String>> findAllStoresNames(@RequestParam(required = false) boolean featured,
+    public ResponseEntity<List<StoreNamesMap>> findAllStoresNames(@RequestParam(required = false) boolean featured,
                                                                   @RequestParam(required = false) String ownerId,
                                                                   @RequestParam(required = false) StoreType storeType,
                                                                   @RequestParam(required = false, defaultValue = "0") double latitude,
@@ -96,7 +95,8 @@ public class StoreControler {
                                 : storeService.findNearbyStores(latitude, longitude, storeType, range, size);
         var storeNames = stores
                 .stream()
-                .collect(Collectors.toMap(StoreProfile::getName, StoreProfile::getId));
+                .map(store -> new StoreNamesMap(store.getName(), store.getId(), store.getFranchiseName(), store.getLatitude(), store.getLatitude()))
+                .toList();
         return ResponseEntity.ok(storeNames);
     }
 }

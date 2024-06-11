@@ -7,6 +7,7 @@ import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
+import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
 import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
 import org.assertj.core.util.Lists;

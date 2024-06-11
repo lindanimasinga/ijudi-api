@@ -6,7 +6,7 @@ import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.model.ProfileRoles;
 import io.curiousoft.izinga.commons.model.StoreProfile;
 import io.curiousoft.izinga.commons.model.UserProfile;
-import io.curiousoft.izinga.ordermanagement.service.StoreService;
+import io.curiousoft.izinga.ordermanagement.stores.StoreService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
