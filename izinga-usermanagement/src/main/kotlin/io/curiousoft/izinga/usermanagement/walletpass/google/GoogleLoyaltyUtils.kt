@@ -67,7 +67,7 @@ inline fun LoyaltyObject.updateIzingaLoyalty(user: UserProfile): LoyaltyObject {
         balance = LoyaltyPointsBalance().apply {
             money = Money().apply {
                 currencyCode = "ZAR"
-                micros = 10 * 1000000L
+                micros = 0
             }
         }
     }
