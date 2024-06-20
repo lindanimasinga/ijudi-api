@@ -1,4 +1,4 @@
-package io.curiousoft.izinga.usermanager.walletpass.apple;
+package io.curiousoft.izinga.usermanagement.walletpass.apple;
 
 import io.curiousoft.izinga.usermanagement.walletpass.apple.ApplePassGenerator;
 import de.brendamour.jpasskit.signing.PKSigningException;

@@ -44,9 +44,10 @@ class GooglePassGenerator : PassGenerator<String> {
         val httpTransport: HttpTransport = GoogleNetHttpTransport.newTrustedTransport()
 
         // Initialize Google Wallet API service
-        service = Walletobjects.Builder(httpTransport, GsonFactory.getDefaultInstance(), HttpCredentialsAdapter(credentials))
-            .setApplicationName("APPLICATION_NAME")
-            .build()
+        service =
+            Walletobjects.Builder(httpTransport, GsonFactory.getDefaultInstance(), HttpCredentialsAdapter(credentials))
+                .setApplicationName("APPLICATION_NAME")
+                .build()
     }
 
     override fun generatePass(user: UserProfile): String {
@@ -54,12 +55,8 @@ class GooglePassGenerator : PassGenerator<String> {
     }
 
     fun createJWTNewObjects(user: UserProfile): String {
-        val objectSuffix = "loyalty-${user.id}"
-        val issuerId = "3388000000021566341"
-        val classSuffix = "io.curiousoft.izinga"
 
-        val loyaltyObject = createObject(issuerId, classSuffix, objectSuffix, user)
-
+        val loyaltyObject = createObject(issuerId, classSuffix, user.loyaltyId(), user)
 
         // Create the JWT as a HashMap object
         val claims = HashMap<String, Any>()
@@ -76,7 +73,8 @@ class GooglePassGenerator : PassGenerator<String> {
 
         // Loyalty cards
         // The service account credentials are used to sign the JWT
-        val algorithm: Algorithm = Algorithm.RSA256(null, (credentials as ServiceAccountCredentials).privateKey as RSAPrivateKey)
+        val algorithm: Algorithm =
+            Algorithm.RSA256(null, (credentials as ServiceAccountCredentials).privateKey as RSAPrivateKey)
 
         val token = JWT.create().withPayload(claims).sign(algorithm)
         println("Add to Google Wallet link")
@@ -86,74 +84,18 @@ class GooglePassGenerator : PassGenerator<String> {
 
     fun createObject(issuerId: String, classSuffix: String, objectSuffix: String, user: UserProfile): LoyaltyObject? {
         // Check if the object exists
-       return runCatching { service.loyaltyobject()["$issuerId.$objectSuffix"].execute() }
-           .onSuccess { return it }
-           .exceptionOrNull()
-           ?.takeIf { (it as GoogleJsonResponseException).statusCode == 404 }
-           ?.let {
-               // See link below for more information on required properties
-               // https://developers.google.com/wallet/retail/loyalty-cards/rest/v1/loyaltyobject
-               val newObject = LoyaltyObject().apply {
-                    id = "$issuerId.$objectSuffix"
-                    classId = "$issuerId.$classSuffix"
-                    state = ("ACTIVE")
-                    heroImage = Image()
-                        .setSourceUri(
-                            ImageUri()
-                                    .setUri("https://shop.izinga.co.za/assets/images/izinga-logo-magging.png")
-                        )
-                    textModulesData = (listOf())
-                    linksModuleData = (LinksModuleData()
-                        .setUris(
-                            Arrays
-                                .asList(
-                                    Uri()
-                                        .setUri("https://onboard.izinga.co.za/user-lookup/${user.mobileNumber}")
-                                        .setDescription("Update Banking Details")
-                                        .setId("LINK_MODULE_URI_ID"),
-                                    Uri()
-                                        .setUri("tel:+27812815707")
-                                        .setDescription("Contact Support")
-                                        .setId("LINK_MODULE_TEL_ID")
-                                )
-                        ))
-                    imageModulesData = listOf(
-                        ImageModuleData()
-                            .setMainImage(
-                                Image()
-                                    .setSourceUri(
-                                        ImageUri()
-                                            .setUri("http://farm4.staticflickr.com/3738/12440799783_3dc3c20606_b.jpg")
-                                    )
-                                    .setContentDescription(
-                                        LocalizedString()
-                                            .setDefaultValue(
-                                                TranslatedString()
-                                                    .setLanguage("en-US")
-                                                    .setValue("Image module description")
-                                            )
-                                    )
-                            )
-                            .setId("IMAGE_MODULE_ID")
-                    )
-                    barcode = Barcode().setType("QR_CODE").setValue("https://tips.izinga.co.za/tip?messengerId=" + user.id)
-                    locations = listOf(LatLongPoint().apply {
-                        latitude = 37.424015499999996
-                        longitude = -122.09259560000001
-                    })
-                    accountId = user.name
-                    accountName = user.name
-                    loyaltyPoints = LoyaltyPoints().apply {
-                        label = "Points"
-                        balance = LoyaltyPointsBalance().apply {
-                            money = Money().apply {
-                                currencyCode = "ZAR"
-                                micros = 10 * 1000000L
-                            }
-                        }
-                    }
-                }
-                return service.loyaltyobject().insert(newObject).execute()
+        return runCatching { service.loyaltyobject()["$issuerId.$objectSuffix"].execute() }
+            .onSuccess {
+                it.updateIzingaLoyalty(user)
+                return service.loyaltyobject().update(it.id, it).execute()
+            }
+            .exceptionOrNull()
+            ?.takeIf { (it as GoogleJsonResponseException).statusCode == 404 }
+            ?.let { LoyaltyObject() }
+            ?.let {
+                it.updateIzingaLoyalty(user)
+                it.id
+                service.loyaltyobject().insert(it).execute()
             }
     }
 
@@ -170,13 +112,9 @@ class GooglePassGenerator : PassGenerator<String> {
     }
 
     override fun updateBalance(user: UserProfile, balance: BigDecimal): Boolean {
-        val objectSuffix = "loyalty-${user.id}"
-        val issuerId = "3388000000021566341"
-        val classSuffix = "io.curiousoft.izinga"
-
-        val loyaltyObject = getObject(issuerId, classSuffix, objectSuffix, user)
+        val loyaltyObject = getObject(issuerId, classSuffix, user.loyaltyId(), user)
         loyaltyObject?.loyaltyPoints?.balance?.money?.micros = (balance * 1000000.toBigDecimal()).toLong()
-        return loyaltyObject?.let { updateObject(issuerId, classSuffix, objectSuffix, it); true} ?: false
+        return loyaltyObject?.let { updateObject(issuerId, classSuffix, user.loyaltyId(), it); true } ?: false
     }
 
 }

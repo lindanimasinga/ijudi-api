@@ -39,7 +39,7 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
 
         boolean isDelivery = order.getShippingData() != null
                 && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
-                && (store.getStoreType() != StoreType.TIPS || store.getStoreType() != StoreType.CAR_WASH);
+                && store.getStoreType() != StoreType.TIPS && store.getStoreType() != StoreType.CAR_WASH;
 
         // notify messenger
         if (isDelivery) {
