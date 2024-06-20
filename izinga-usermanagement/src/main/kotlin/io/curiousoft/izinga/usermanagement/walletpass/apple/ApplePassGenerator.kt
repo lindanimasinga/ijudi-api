@@ -76,6 +76,7 @@ class ApplePassGenerator : PassGenerator<ByteArray> {
     }
 
     override fun updateBalance(user: UserProfile, balance: BigDecimal): Boolean {
-        TODO("Not yet implemented")
+        //todo update apple pass
+        return true
     }
 }
