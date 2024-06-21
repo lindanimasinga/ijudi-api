@@ -38,24 +38,22 @@ public class ZoomSmsNotificationService implements AdminOnlyNotificationService 
     }
 
     @Override
-    public void sendMessage(String mobileNumber, String message) throws Exception {
-        URI uri = new URI(url + "?email="+ email + "&token=" + token);
-        LOGGER.info("Sending sms to "+ mobileNumber);
+    public void sendMessage(String mobileNumber, String message) {
+        LOGGER.info(mobileNumber.formatted("Sending sms to %s"));
         ZoomSMSMessage smsMessage = new ZoomSMSMessage(mobileNumber, message);
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-Type", "application/json");
         //Create a new HttpEntity
-        final HttpEntity<String> entity = new HttpEntity<>(headers);
-        ResponseEntity<ZoomResponse> response = rest.postForEntity(uri,
+        ResponseEntity<ZoomResponse> response = rest.postForEntity("%s?email=%s&token=%s".formatted(url, email, token),
                 smsMessage, ZoomResponse.class);
 
         if(response.getStatusCodeValue() != 200) {
-            throw new Exception(String.valueOf(response.getBody()));
+            LOGGER.error("Unable to send sms. {}", response.getBody());
         }
     }
 
     @Override
-    public void notifyOrderPlaced(StoreProfile store, Order order, UserProfile userProfile) throws Exception {
+    public void notifyOrderPlaced(StoreProfile store, Order order, UserProfile userProfile) {
         String shopMessage = format("Hello %s. You have received a new order. Please open iZinga app and confirm.", store.getName());
         String customerMessage = format("Hello %s. Your has been received. Please open iZinga app for status updates.", userProfile.getName());
         if(store.getOrderUrl() != null) {
@@ -67,7 +65,7 @@ public class ZoomSmsNotificationService implements AdminOnlyNotificationService 
     }
 
     @Override
-    public void notifyShopOrderPlaced(StoreProfile store, Order order, UserProfile userProfile) throws Exception {
+    public void notifyShopOrderPlaced(StoreProfile store, Order order, UserProfile userProfile) {
         String shopMessage = format("Hello %s. You have received a new order. Please open iZinga app and confirm.", store.getName());
         if(store.getOrderUrl() != null) {
             shopMessage = format("Hello %s. You have received a new order from %s. %s", store.getName(),userProfile.getName(), store.getOrderUrl() + order.getId());

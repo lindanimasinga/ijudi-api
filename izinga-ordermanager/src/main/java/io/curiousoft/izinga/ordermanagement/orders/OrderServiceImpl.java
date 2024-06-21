@@ -240,8 +240,9 @@ public class OrderServiceImpl implements OrderService {
         LOG.info("New order placed. Order No. " + order.getId() + ", Basket Amount. R"+order.getBasketAmount());
         LOG.info("New order placed. Order No. " + order.getId() + ", Delivery Fee. R"+order.getShippingData().getFee());
         NewOrderEvent newOrderEvent = new NewOrderEvent(this, order, persistedOrder.getShippingData().getMessengerId(), store);
+        var orderCompleted = orderRepo.save(persistedOrder);
         applicationEventPublisher.publishEvent(newOrderEvent);
-        return orderRepo.save(persistedOrder);
+        return orderCompleted;
     }
 
     @Override

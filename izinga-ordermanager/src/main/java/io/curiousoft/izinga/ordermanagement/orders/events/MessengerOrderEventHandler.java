@@ -48,10 +48,6 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
         }
 
         if (store.getStoreType() == StoreType.TIPS) {
-            var mobileNumber = userProfileService.find(order.getShippingData().getMessengerId()).getMobileNumber();
-            var tip = BigDecimal.valueOf(order.getTip()).setScale(2, RoundingMode.HALF_UP);
-            var tipReceivedMessage =  String.format("You have received a tip of R%s. Thank you for your service.%niZinga.", tip);
-            smsNotificationService.sendMessage(mobileNumber, tipReceivedMessage);
             //get payout balance send event to update payout
             Optional.ofNullable(reconService.generateNextPayoutsToMessenger())
                     .stream()
@@ -69,6 +65,10 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
                                 DeviceType.APPLE,
                                 this);
                         eventPublisher.publishEvent(balanceEventIOS);
+                        var mobileNumber = userProfileService.find(order.getShippingData().getMessengerId()).getMobileNumber();
+                        var tip = BigDecimal.valueOf(order.getTip()).setScale(2, RoundingMode.HALF_UP);
+                        var tipReceivedMessage =  String.format("You have received a tip of R%s, Your balance is R%s. Thank you for your service.%niZinga.", tip, payout.getTotal());
+                        smsNotificationService.sendMessage(mobileNumber, tipReceivedMessage);
                     });
         }
     }
