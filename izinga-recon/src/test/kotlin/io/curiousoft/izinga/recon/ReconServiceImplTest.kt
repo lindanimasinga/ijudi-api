@@ -380,7 +380,7 @@ class ReconServiceTest {
         val a = 0..1
         val payoutBundleResults = PayoutBundleResults(bundleId = "12344554",
             payoutItemResults = (0..100).mapIndexed { index, it ->
-                PayoutItemResults(payoutId = "$it", paid = index%3==0)
+                PayoutItemResults(toId = "$it", paid = index%3==0)
             } )
 
         every { payoutBundleRepo.findByIdOrNull("12344554") } returns PayoutBundle(
