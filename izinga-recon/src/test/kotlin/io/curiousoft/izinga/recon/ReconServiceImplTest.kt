@@ -1,7 +1,7 @@
 package io.curiousoft.izinga.recon
 
 import io.curiousoft.izinga.commons.model.*
-import io.curiousoft.izinga.commons.repo.OrderRepository
+import io.curiousoft.izinga.commons.order.events.OrderRepository
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.payout.*
@@ -12,6 +12,7 @@ import io.mockk.*
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.repository.findByIdOrNull
 import java.time.DayOfWeek
 import java.time.LocalDateTime
@@ -27,11 +28,13 @@ class ReconServiceTest {
     private val messengerRepo = mockk<UserProfileRepo>()
     private val payoutRepo = mockk<PayoutRepository>()
     private val tipService = mockk<TipsService>()
+    private val applicationEventPublisher = mockk<ApplicationEventPublisher>()
+
 
     @Before
     fun setUp() {
         sut = ReconServiceImpl(orderRepo = orderRepo, payoutBundleRepo = payoutBundleRepo, storeRepo = storeRepo,
-            messengerRepo = messengerRepo, payoutRepo = payoutRepo, tipsService = tipService)
+            messengerRepo = messengerRepo, payoutRepo = payoutRepo, tipsService = tipService, applicationEventPublisher = applicationEventPublisher)
     }
 
     @Test

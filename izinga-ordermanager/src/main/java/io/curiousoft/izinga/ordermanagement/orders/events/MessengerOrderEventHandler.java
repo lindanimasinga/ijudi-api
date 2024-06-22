@@ -3,14 +3,15 @@ package io.curiousoft.izinga.ordermanagement.orders.events;
 import io.curiousoft.izinga.commons.model.Device;
 import io.curiousoft.izinga.commons.model.ShippingData;
 import io.curiousoft.izinga.commons.model.StoreType;
+import io.curiousoft.izinga.commons.payout.events.PayoutBalanceUpdatedEvent;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.DeviceService;
-import io.curiousoft.izinga.ordermanagement.orders.events.neworder.NewOrderEvent;
+import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
 import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
-import io.curiousoft.izinga.usermanagement.walletpass.DeviceType;
+import io.curiousoft.izinga.commons.model.DeviceType;
 import io.curiousoft.izinga.usermanagement.walletpass.WalletPassService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
@@ -56,12 +57,12 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
                     .findFirst()
                     .ifPresent( payout -> {
                         var payoutTotal = payout.getTotal().setScale(2, RoundingMode.HALF_UP);
-                        var balanceEventAndroid  = new WalletPassService.PayoutBalanceUpdatedEvent(order.getShippingData().getMessengerId(),
+                        var balanceEventAndroid  = new PayoutBalanceUpdatedEvent(order.getShippingData().getMessengerId(),
                                 payoutTotal,
                                 DeviceType.ANDROID,
                                 this);
                         eventPublisher.publishEvent(balanceEventAndroid);
-                        var balanceEventIOS  = new WalletPassService.PayoutBalanceUpdatedEvent(order.getShippingData().getMessengerId(),
+                        var balanceEventIOS  = new PayoutBalanceUpdatedEvent(order.getShippingData().getMessengerId(),
                                 payoutTotal,
                                 DeviceType.APPLE,
                                 this);
@@ -76,11 +77,9 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
 
     @Override
     public void handleOrderUpdatedEvent(NewOrderEvent newOrderEvent) {
-
     }
 
     @Override
     public void handleOrderCancelledEvent(NewOrderEvent newOrderEvent) {
-
     }
 }

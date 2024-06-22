@@ -2,13 +2,13 @@ package io.curiousoft.izinga.ordermanagement.orders;
 
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
-import io.curiousoft.izinga.commons.repo.OrderRepository;
+import io.curiousoft.izinga.commons.order.events.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
-import io.curiousoft.izinga.ordermanagement.orders.events.neworder.NewOrderEvent;
+import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

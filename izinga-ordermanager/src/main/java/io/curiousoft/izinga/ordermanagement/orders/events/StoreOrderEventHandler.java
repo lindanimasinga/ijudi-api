@@ -5,7 +5,7 @@ import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationServic
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.DeviceService;
-import io.curiousoft.izinga.ordermanagement.orders.events.neworder.NewOrderEvent;
+import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;

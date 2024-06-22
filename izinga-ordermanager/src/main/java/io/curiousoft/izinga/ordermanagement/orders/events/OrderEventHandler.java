@@ -1,6 +1,6 @@
 package io.curiousoft.izinga.ordermanagement.orders.events;
 
-import io.curiousoft.izinga.ordermanagement.orders.events.neworder.NewOrderEvent;
+import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
 
 public interface OrderEventHandler {
 

@@ -1,13 +1,13 @@
 package io.curiousoft.izinga.usermanagement.walletpass
 
+import io.curiousoft.izinga.commons.model.DeviceType
 import io.curiousoft.izinga.commons.model.UserProfile
+import io.curiousoft.izinga.commons.payout.events.PayoutBalanceUpdatedEvent
 import io.curiousoft.izinga.usermanagement.users.UserProfileService
 import io.curiousoft.izinga.usermanagement.walletpass.apple.ApplePassGenerator
 import io.curiousoft.izinga.usermanagement.walletpass.google.GooglePassGenerator
-import org.springframework.context.ApplicationEvent
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
-import java.math.BigDecimal
 
 @Service
 class WalletPassService(private val applePassGenerator: ApplePassGenerator, private val googlePassGenerator: GooglePassGenerator,
@@ -28,6 +28,4 @@ class WalletPassService(private val applePassGenerator: ApplePassGenerator, priv
             DeviceType.ANDROID -> googlePassGenerator.updateBalance(user, payoutBalanceUpdatedEvent.balance)
         }
     }
-
-    data class PayoutBalanceUpdatedEvent(val userId: String, val balance: BigDecimal, val deviceType: DeviceType, val origin: Any) : ApplicationEvent(origin)
 }

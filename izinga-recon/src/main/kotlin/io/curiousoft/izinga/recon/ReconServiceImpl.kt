@@ -1,13 +1,15 @@
 package io.curiousoft.izinga.recon
 
 import io.curiousoft.izinga.commons.model.OrderStage
-import io.curiousoft.izinga.commons.repo.OrderRepository
+import io.curiousoft.izinga.commons.order.events.OrderRepository
+import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.payout.*
 import io.curiousoft.izinga.recon.payout.repo.PayoutBundleRepo
 import io.curiousoft.izinga.recon.payout.repo.PayoutRepository
 import io.curiousoft.izinga.recon.tips.TipsService
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import java.util.*
@@ -19,7 +21,8 @@ class ReconServiceImpl(
     private val storeRepo: StoreRepository,
     private val messengerRepo: UserProfileRepo,
     private val payoutRepo: PayoutRepository,
-    private val tipsService: TipsService
+    private val tipsService: TipsService,
+    private val applicationEventPublisher: ApplicationEventPublisher
 ) : ReconService {
 
     override fun generateNextPayoutsToShop(): PayoutBundle? {
@@ -28,15 +31,28 @@ class ReconServiceImpl(
             ?.map { map ->
                 storeRepo.findByIdOrNull(map.key)?.let {
                     ShopPayout(
-                    toId = map.key, toName = it.name!!, toBankName = it.bank?.name!!, toAccountNumber = it.bank?.accountId!!, toType = it.bank?.type!!,
-                        orders = map.value.toMutableSet(), toBranchCode = it.bank?.branchCode!!, toReference = "Payment from iZinga", fromReference = "Payment to ${it.name}",
-                        emailAddress = it.emailAddress!!, emailNotify = "", emailSubject = "Payment from iZinga"
+                        toId = map.key,
+                        toName = it.name!!,
+                        toBankName = it.bank?.name!!,
+                        toAccountNumber = it.bank?.accountId?.replace("+27", "0")!!,
+                        toType = it.bank?.type!!,
+                        orders = map.value.toMutableSet(),
+                        toBranchCode = it.bank?.branchCode!!,
+                        toReference = "iZinga pay ${map.value.last().id}",
+                        fromReference = "Payment to ${it.name}",
+                        emailAddress = it.emailAddress!!,
+                        emailNotify = "",
+                        emailSubject = "iZinga pay ${map.value.last().id}"
                     )
                 }
             }
             ?.filterNotNull()?.toList()?.let {
-                val bundle = payoutBundleRepo.findOneByTypeAndExecuted(PayoutType.SHOP)?.apply { payouts = it } ?:
-                PayoutBundle(payouts = it, createdBy = "System", type = PayoutType.SHOP)
+                val bundle =
+                    payoutBundleRepo.findOneByTypeAndExecuted(PayoutType.SHOP)?.apply { payouts = it } ?: PayoutBundle(
+                        payouts = it,
+                        createdBy = "System",
+                        type = PayoutType.SHOP
+                    )
                 payoutBundleRepo.save(bundle)
             }
     }
@@ -62,9 +78,12 @@ class ReconServiceImpl(
                         toAccountNumber = messng.bank?.accountId?.replace("+27", "0")!!,
                         orders = map.value.toMutableSet(),
                         toBranchCode = messng.bank!!.branchCode!!,
-                        toReference = "Payment from iZinga", fromReference = "Payment to ${messng.name}",
+                        toReference = "iZinga pay ${map.value.last().id}",
+                        fromReference = "Payment to ${messng.name}",
                         tips = tips?.filter { messng.emailAddress == it.emailAddress }?.toMutableSet(),
-                        emailAddress = messng.emailAddress!!, emailNotify = "", emailSubject = "Payment from iZinga"
+                        emailAddress = messng.emailAddress!!,
+                        emailNotify = "",
+                        emailSubject = "iZinga pay ${map.value.last().id}"
                     ).also {
                         it.isPermEmployed = messng.isPermanentEmployed ?: false
                     }
@@ -73,7 +92,11 @@ class ReconServiceImpl(
             ?.filter { it.total > 0.toBigDecimal() }
             ?.toList()
             ?.let {
-                val bundle = bundle?.let { b -> b.payouts = it; b } ?: PayoutBundle(payouts = it, createdBy = "System", type = PayoutType.MESSENGER)
+                val bundle = bundle?.let { b -> b.payouts = it; b } ?: PayoutBundle(
+                    payouts = it,
+                    createdBy = "System",
+                    type = PayoutType.MESSENGER
+                )
                 payoutBundleRepo.save(bundle)
             }
     }
@@ -82,19 +105,20 @@ class ReconServiceImpl(
         return payoutBundleRepo.findByIdOrNull(bundleResponse.bundleId)?.also { payoutBundle ->
             val successfulPayouts = bundleResponse.payoutItemResults?.map { payResults ->
                 payoutBundle.payouts.firstOrNull { payResults.toId == it.toId }?.apply { paid = payResults.paid }
-            }?.filter { payout ->  payout?.paid ?: false }
-            ?.filterNotNull()
-            ?: payoutBundle.payouts.onEach { pay -> pay.paid = true }
+            }?.filter { it?.paid ?: false }
+                ?.filterNotNull()
+                ?: payoutBundle.payouts.onEach { it.paid = true }
 
-            successfulPayouts.forEach { payout ->
-               orderRepo.findByIdIn(payout.orders.mapNotNull { it.id })
-                    .onEach {
-                        it.shopPaid = it.shopPaid || payoutBundle.type == PayoutType.SHOP
-                        it.messengerPaid = it.messengerPaid || payoutBundle.type == PayoutType.MESSENGER
-                    }.also {
-                        orderRepo.saveAll(it)
-                    }
-            }
+            successfulPayouts
+                .flatMap { it.orders }
+                .map {
+                    OrderPayoutEvent(
+                        this, it.id,
+                        it.shopPaid || payoutBundle.type == PayoutType.SHOP,
+                        it.messengerPaid || payoutBundle.type == PayoutType.MESSENGER
+                    )
+                }.forEach { applicationEventPublisher.publishEvent(it) }
+
         }?.let {
             it.executed = true
             payoutBundleRepo.save(it)
