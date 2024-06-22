@@ -59,7 +59,7 @@ class ReconServiceImpl(
                         toName = messng.name!!,
                         toBankName = messng.bank?.name!!,
                         toType = messng.bank?.type!!,
-                        toAccountNumber = messng.bank?.accountId!!,
+                        toAccountNumber = messng.bank?.accountId?.replace("+27", "0")!!,
                         orders = map.value.toMutableSet(),
                         toBranchCode = messng.bank!!.branchCode!!,
                         toReference = "Payment from iZinga", fromReference = "Payment to ${messng.name}",
