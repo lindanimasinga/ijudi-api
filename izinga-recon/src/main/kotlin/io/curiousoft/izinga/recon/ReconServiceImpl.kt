@@ -80,15 +80,19 @@ class ReconServiceImpl(
 
     override fun updatePayoutStatus(bundleResponse: PayoutBundleResults): PayoutBundle? {
         return payoutBundleRepo.findByIdOrNull(bundleResponse.bundleId)?.also { payoutBundle ->
-            bundleResponse.payoutItemResults?.forEach { payResults ->
+            val successfulPayouts = bundleResponse.payoutItemResults?.map { payResults ->
                 payoutBundle.payouts.firstOrNull { payResults.toId == it.toId }?.apply { paid = payResults.paid }
-            } ?: payoutBundle.payouts.forEach { payout ->
-                payout.paid = true
-                orderRepo.findByIdIn(payout.orders.mapNotNull { it.id })
-                    .forEach {
+            }?.filter { payout ->  payout?.paid ?: false }
+            ?.filterNotNull()
+            ?: payoutBundle.payouts.onEach { pay -> pay.paid = true }
+
+            successfulPayouts.forEach { payout ->
+               orderRepo.findByIdIn(payout.orders.mapNotNull { it.id })
+                    .onEach {
                         it.shopPaid = it.shopPaid || payoutBundle.type == PayoutType.SHOP
                         it.messengerPaid = it.messengerPaid || payoutBundle.type == PayoutType.MESSENGER
-                        orderRepo.save(it)
+                    }.also {
+                        orderRepo.saveAll(it)
                     }
             }
         }?.let {
