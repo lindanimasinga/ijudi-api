@@ -4,7 +4,7 @@ import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.model.PaymentData;
 import io.curiousoft.izinga.commons.model.PaymentType;
 import io.curiousoft.izinga.commons.model.StoreProfile;
-import io.curiousoft.izinga.commons.order.events.OrderRepository;
+import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentProvider;
 import org.springframework.stereotype.Service;
 

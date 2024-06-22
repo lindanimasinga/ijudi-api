@@ -1,4 +1,4 @@
-package io.curiousoft.izinga.commons.order.events
+package io.curiousoft.izinga.commons.order
 
 import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.commons.model.OrderStage

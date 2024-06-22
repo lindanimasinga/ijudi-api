@@ -1,7 +1,7 @@
 package io.curiousoft.izinga.recon
 
 import io.curiousoft.izinga.commons.model.OrderStage
-import io.curiousoft.izinga.commons.order.events.OrderRepository
+import io.curiousoft.izinga.commons.order.OrderRepository
 import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
@@ -113,7 +113,7 @@ class ReconServiceImpl(
                 .flatMap { it.orders }
                 .map {
                     OrderPayoutEvent(
-                        this, it.id,
+                        this, it.id!!,
                         it.shopPaid || payoutBundle.type == PayoutType.SHOP,
                         it.messengerPaid || payoutBundle.type == PayoutType.MESSENGER
                     )

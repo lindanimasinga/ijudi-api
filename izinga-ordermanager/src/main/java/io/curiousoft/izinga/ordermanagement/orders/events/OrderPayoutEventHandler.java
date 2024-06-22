@@ -1,6 +1,6 @@
 package io.curiousoft.izinga.ordermanagement.orders.events;
 
-import io.curiousoft.izinga.commons.order.events.OrderRepository;
+import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent;
 import io.curiousoft.izinga.commons.payout.events.PayoutBalanceUpdatedEvent;
 import io.curiousoft.izinga.recon.ReconService;

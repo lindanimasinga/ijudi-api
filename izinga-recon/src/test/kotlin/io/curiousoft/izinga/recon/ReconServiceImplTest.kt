@@ -1,7 +1,7 @@
 package io.curiousoft.izinga.recon
 
 import io.curiousoft.izinga.commons.model.*
-import io.curiousoft.izinga.commons.order.events.OrderRepository
+import io.curiousoft.izinga.commons.order.OrderRepository
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.payout.*
