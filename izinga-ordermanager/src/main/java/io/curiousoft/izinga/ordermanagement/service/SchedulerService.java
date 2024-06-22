@@ -3,7 +3,7 @@ package io.curiousoft.izinga.ordermanagement.service;
 import co.za.izinga.menuupdater.Application;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
-import io.curiousoft.izinga.commons.repo.OrderRepository;
+import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
