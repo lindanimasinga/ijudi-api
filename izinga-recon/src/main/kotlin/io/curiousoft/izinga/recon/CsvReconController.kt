@@ -26,11 +26,10 @@ class CsvReconController(val reconService: ReconService) {
 
     @GetMapping(value = ["/messenger-payout-bundle"], produces = ["application/csv"])
     fun messengerPayoutBundle(response: HttpServletResponse) {
-        response.apply {
-            contentType = "application/csv"
-            addHeader("Content-Disposition", "attachment; filename=\"messenger-payout-bundle.csv\"")
-        }
         reconService.generateNextPayoutsToMessenger()?.let {
+            response.contentType = "application/csv"
+            val fileName = "messenger-payout-bundle-${it.createdDate}.csv"
+            response.addHeader("Content-Disposition", "attachment; filename=\"${fileName}\"")
             payoutBundleToCsv(response.writer, it)
         }
     }
