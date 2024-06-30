@@ -25,6 +25,7 @@ abstract class Payout(
 ): BaseModel() {
     abstract var paid: Boolean
     abstract val total: BigDecimal
+    var emailSent = false;
 }
 
 class MessengerPayout(

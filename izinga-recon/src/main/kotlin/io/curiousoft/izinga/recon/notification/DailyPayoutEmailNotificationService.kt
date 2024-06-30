@@ -24,29 +24,39 @@ class DailyPayoutEmailNotificationService(
 
     @Scheduled(cron = "0 0 17 1/1 * ?") // every day at 7pm
     fun notifyDailyPayouts() {
-        val allPayouts = mutableListOf<Payout>()
-        reconService.generateNextPayoutsToShop()?.payouts?.let {
-            allPayouts.addAll(it)
-        }
-        reconService.generateNextPayoutsToMessenger()?.payouts?.let {
-            allPayouts.addAll(it)
-        }
+        val shopPayouts = reconService.generateNextPayoutsToShop()
+        val messagerPayouts = reconService.generateNextPayoutsToMessenger()
 
-        allPayouts.map {
-            val emailMessage = EmailRequest();
-            emailMessage.template_id = dailyPayoutTemplate
-            emailMessage.to = listOf(To(it.emailAddress))
-            val data = Data(it)
-            emailMessage.personalization = listOf(Personalization(it.emailAddress, data))
+        shopPayouts?.payouts
+            ?.filter { !it.emailSent }
+            ?.map {
+                    sendPayoutEmail(it)
+            }
 
-            val headers = HttpHeaders()
-            headers["Content-Type"] = "application/json"
-            headers["Authorization"] = "Bearer $apiKey"
-            val entity: HttpEntity<EmailRequest> = HttpEntity(emailMessage, headers)
-            restTemplate.postForEntity(
-                "https://api.mailersend.com/v1/email",
-                entity, String::class.java
-            )
-        }
+        messagerPayouts?.payouts
+            ?.filter { !it.emailSent }
+            ?.map {
+                sendPayoutEmail(it)
+            }
+        shopPayouts?.let { reconService.updateBundle(it) }
+        messagerPayouts?.let { reconService.updateBundle(it) }
+    }
+
+    private fun sendPayoutEmail(it: Payout) {
+        val emailMessage = EmailRequest();
+        emailMessage.template_id = dailyPayoutTemplate
+        emailMessage.to = listOf(To(it.emailAddress))
+        val data = Data(it)
+        emailMessage.personalization = listOf(Personalization(it.emailAddress, data))
+
+        val headers = HttpHeaders()
+        headers["Content-Type"] = "application/json"
+        headers["Authorization"] = "Bearer $apiKey"
+        val entity: HttpEntity<EmailRequest> = HttpEntity(emailMessage, headers)
+        restTemplate.postForEntity(
+            "https://api.mailersend.com/v1/email",
+            entity, String::class.java
+        )
+        it.emailSent = true
     }
 }

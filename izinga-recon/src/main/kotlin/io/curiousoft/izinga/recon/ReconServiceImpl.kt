@@ -66,6 +66,7 @@ class ReconServiceImpl(
             ?.map { map ->
                 messengerRepo.findByIdOrNull(map.key)?.let { messng ->
                     bundle?.payouts?.firstOrNull { it.toId == messng.id }?.also { payout ->
+                        payout.emailSent = payout.emailSent && payout.orders.size ==  map.value.toMutableSet().size
                         payout.orders = map.value.toMutableSet()
                         tips?.filter { messng.emailAddress == it.emailAddress }
                             ?.toMutableSet()
@@ -123,6 +124,10 @@ class ReconServiceImpl(
             it.executed = true
             payoutBundleRepo.save(it)
         }
+    }
+
+    override fun updateBundle(bundle: PayoutBundle) : PayoutBundle {
+        return payoutBundleRepo.save(bundle)
     }
 
     override fun getAllPayoutBundles(payoutType: PayoutType, fromDate: Date, toDate: Date): List<PayoutBundle> {

@@ -19,4 +19,5 @@ interface ReconService {
     fun getAllPayouts(payoutType: PayoutType, from: Date, toDate: Date, toId: String): List<Payout>
 
     fun findPayout(bundleId: String, payoutId: String): Payout?
+    fun updateBundle(bundle: PayoutBundle): PayoutBundle
 }
