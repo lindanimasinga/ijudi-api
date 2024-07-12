@@ -1,4 +1,4 @@
-FROM openjdk:17-alpine
+FROM amazoncorretto:17
 ADD ./target/izinga-ordermanager-*.jar ijudi.jar
 ADD walletpass walletpass
 EXPOSE 80
