@@ -24,28 +24,33 @@ import java.util.TimeZone;
 		"io.curiousoft.izinga.recon",
 		"io.curiousoft.izinga.messaging",
 		"io.curiousoft.izinga.yocopay",
-		"io.curiousoft.izinga.usermanagement"})
+		"io.curiousoft.izinga.usermanagement",
+		"io.curiousoft.izinga.qrcodegenerator"})
 @EntityScan({"io.curiousoft.izinga.ordermanagement",
 		"io.curiousoft.izinga.commons",
 		"io.curiousoft.izinga.recon",
 		"io.curiousoft.izinga.messaging",
 		"io.curiousoft.izinga.yocopay",
-		"io.curiousoft.izinga.usermanagement"})
+		"io.curiousoft.izinga.usermanagement",
+		"io.curiousoft.izinga.qrcodegenerator"})
 @EnableMongoRepositories({"io.curiousoft.izinga.ordermanagement",
 		"io.curiousoft.izinga.commons",
 		"io.curiousoft.izinga.recon",
 		"io.curiousoft.izinga.messaging",
 		"io.curiousoft.izinga.yocopay",
-		"io.curiousoft.izinga.usermanagement"})
+		"io.curiousoft.izinga.usermanagement",
+		"io.curiousoft.izinga.qrcodegenerator"})
 @ConfigurationPropertiesScan({"io.curiousoft.izinga.ordermanagement",
 		"io.curiousoft.izinga.yocopay",
-		"io.curiousoft.izinga.usermanagement"})
+		"io.curiousoft.izinga.usermanagement",
+		"io.curiousoft.izinga.qrcodegenerator"})
 @EnableFeignClients({"io.curiousoft.izinga.ordermanagement",
 		"io.curiousoft.izinga.commons",
 		"io.curiousoft.izinga.recon",
 		"io.curiousoft.izinga.messaging",
 		"io.curiousoft.izinga.yocopay",
-		"io.curiousoft.izinga.usermanagement"})
+		"io.curiousoft.izinga.usermanagement",
+		"io.curiousoft.izinga.qrcodegenerator"})
 public class IjudiApplication {
 
 	static Optional<ApplicationContext> app = Optional.empty();
