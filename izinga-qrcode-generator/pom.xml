@@ -5,7 +5,7 @@
     <artifactId>izinga-qrcode-generator</artifactId>
     <version>1.0</version>
     <packaging>jar</packaging>
-    
+
     <parent>
         <artifactId>izinga-parent</artifactId>
         <groupId>io.curiousoft.izinga</groupId>
@@ -49,10 +49,6 @@
         <sourceDirectory>src/main/kotlin</sourceDirectory>
         <testSourceDirectory>src/test/kotlin</testSourceDirectory>
         <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-            </plugin>
             <plugin>
                 <groupId>org.jetbrains.kotlin</groupId>
                 <artifactId>kotlin-maven-plugin</artifactId>
