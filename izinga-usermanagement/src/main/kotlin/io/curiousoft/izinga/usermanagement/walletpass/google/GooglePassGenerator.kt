@@ -100,7 +100,7 @@ class GooglePassGenerator : PassGenerator<String> {
     }
 
     fun getObject(issuerId: String, classSuffix: String, objectSuffix: String, user: UserProfile): LoyaltyObject? {
-        return run { service.loyaltyobject()["$issuerId.$objectSuffix"].execute() }
+        return runCatching { service.loyaltyobject()["$issuerId.$objectSuffix"].execute() }.getOrNull()
     }
 
     fun updateObject(issuerId: String, classSuffix: String, objectSuffix: String, loyaltyObject: LoyaltyObject) {
