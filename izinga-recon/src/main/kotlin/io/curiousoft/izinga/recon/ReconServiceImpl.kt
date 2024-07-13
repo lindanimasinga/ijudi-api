@@ -40,7 +40,7 @@ class ReconServiceImpl(
                         toBranchCode = it.bank?.branchCode!!,
                         toReference = "iZinga pay ${map.value.last().id}",
                         fromReference = "Payment to ${it.name}",
-                        emailAddress = it.emailAddress!!,
+                        emailAddress = it.emailAddress,
                         emailNotify = "",
                         emailSubject = "iZinga pay ${map.value.last().id}"
                     )

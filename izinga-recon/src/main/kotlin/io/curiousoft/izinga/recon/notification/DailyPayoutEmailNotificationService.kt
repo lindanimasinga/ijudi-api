@@ -43,20 +43,22 @@ class DailyPayoutEmailNotificationService(
     }
 
     private fun sendPayoutEmail(it: Payout) {
-        val emailMessage = EmailRequest();
-        emailMessage.template_id = dailyPayoutTemplate
-        emailMessage.to = listOf(To(it.emailAddress))
-        val data = Data(it)
-        emailMessage.personalization = listOf(Personalization(it.emailAddress, data))
+        it.emailAddress?.let { emailAddress ->
+            val emailMessage = EmailRequest();
+            emailMessage.template_id = dailyPayoutTemplate
+            emailMessage.to = listOf(To(emailAddress))
+            val data = Data(it)
+            emailMessage.personalization = listOf(Personalization(emailAddress, data))
 
-        val headers = HttpHeaders()
-        headers["Content-Type"] = "application/json"
-        headers["Authorization"] = "Bearer $apiKey"
-        val entity: HttpEntity<EmailRequest> = HttpEntity(emailMessage, headers)
-        restTemplate.postForEntity(
-            "https://api.mailersend.com/v1/email",
-            entity, String::class.java
-        )
-        it.emailSent = true
+            val headers = HttpHeaders()
+            headers["Content-Type"] = "application/json"
+            headers["Authorization"] = "Bearer $apiKey"
+            val entity: HttpEntity<EmailRequest> = HttpEntity(emailMessage, headers)
+            restTemplate.postForEntity(
+                "https://api.mailersend.com/v1/email",
+                entity, String::class.java
+            )
+            it.emailSent = true
+        }
     }
 }
