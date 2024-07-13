@@ -35,7 +35,7 @@ class QRCodeController(@Autowired private val qrCodeService: QRCodeService) {
         ZipOutputStream(baos).use { zos ->
             IntStream.range(0, batchSize).forEach { i: Int ->
                 val label = generateUniqueCode()
-                val randomText = "https://tips.izinga.co.za?linkCode=%s".formatted(label)
+                val randomText = "https://tips.izinga.co.za/tip?linkCode=%s".formatted(label)
                 val qrCodeImage = qrCodeService!!.generateQRCodeImage(randomText, label, 450, 450)
                 val entry = ZipEntry("QRCode_" + (i + 1) + ".png")
                 entry.size = qrCodeImage!!.size.toLong()
