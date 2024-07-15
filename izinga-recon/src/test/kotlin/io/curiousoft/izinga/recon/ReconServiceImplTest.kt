@@ -34,7 +34,7 @@ class ReconServiceTest {
     @Before
     fun setUp() {
         sut = ReconServiceImpl(orderRepo = orderRepo, payoutBundleRepo = payoutBundleRepo, storeRepo = storeRepo,
-            messengerRepo = messengerRepo, payoutRepo = payoutRepo, tipsService = tipService, applicationEventPublisher = applicationEventPublisher)
+            userProfileRepo = messengerRepo, payoutRepo = payoutRepo, tipsService = tipService, applicationEventPublisher = applicationEventPublisher)
     }
 
     @Test

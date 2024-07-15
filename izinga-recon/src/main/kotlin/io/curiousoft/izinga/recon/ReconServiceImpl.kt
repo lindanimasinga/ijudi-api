@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.recon
 
 import io.curiousoft.izinga.commons.model.OrderStage
+import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.order.OrderRepository
 import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
 import io.curiousoft.izinga.commons.repo.StoreRepository
@@ -19,7 +20,7 @@ class ReconServiceImpl(
     private val orderRepo: OrderRepository,
     private val payoutBundleRepo: PayoutBundleRepo,
     private val storeRepo: StoreRepository,
-    private val messengerRepo: UserProfileRepo,
+    private val userProfileRepo: UserProfileRepo,
     private val payoutRepo: PayoutRepository,
     private val tipsService: TipsService,
     private val applicationEventPublisher: ApplicationEventPublisher
@@ -28,10 +29,11 @@ class ReconServiceImpl(
     override fun generateNextPayoutsToShop(): PayoutBundle? {
         return orderRepo.findByShopPaidAndStage(false, OrderStage.STAGE_7_ALL_PAID)
             ?.groupBy { it.shopId }
-            ?.map { map ->
-                storeRepo.findByIdOrNull(map.key)?.let {
+            ?.map { map ->  storeRepo.findByIdOrNull(map.key)
+                ?.takeIf { it.hasPaymentAgreement }
+                ?.let {
                     ShopPayout(
-                        toId = map.key,
+                        toId = it.id!!,
                         toName = it.name!!,
                         toBankName = it.bank?.name!!,
                         toAccountNumber = it.bank?.accountId?.replace("+27", "0")!!,
@@ -42,11 +44,12 @@ class ReconServiceImpl(
                         fromReference = "Payment to ${it.name}",
                         emailAddress = it.emailAddress,
                         emailNotify = "",
-                        emailSubject = "iZinga pay ${map.value.last().id}"
-                    )
+                        emailSubject = "iZinga pay ${map.value.last().id}")
                 }
             }
-            ?.filterNotNull()?.toList()?.let {
+            ?.filterNotNull()
+            ?.toList()
+            ?.let {
                 val bundle =
                     payoutBundleRepo.findOneByTypeAndExecuted(PayoutType.SHOP)?.apply { payouts = it } ?: PayoutBundle(
                         payouts = it,
@@ -64,7 +67,7 @@ class ReconServiceImpl(
             ?.filter { it.shippingData?.messengerId?.isNotEmpty() ?: false }
             ?.groupBy { it.shippingData?.messengerId }
             ?.map { map ->
-                messengerRepo.findByIdOrNull(map.key)?.let { messng ->
+                userProfileRepo.findByIdOrNull(map.key)?.let { messng ->
                     bundle?.payouts?.firstOrNull { it.toId == messng.id }?.also { payout ->
                         payout.emailSent = payout.emailSent && payout.orders.size ==  map.value.toMutableSet().size
                         payout.orders = map.value.toMutableSet()
@@ -103,7 +106,8 @@ class ReconServiceImpl(
     }
 
     override fun updatePayoutStatus(bundleResponse: PayoutBundleResults): PayoutBundle? {
-        return payoutBundleRepo.findByIdOrNull(bundleResponse.bundleId)?.also { payoutBundle ->
+        return payoutBundleRepo.findByIdOrNull(bundleResponse.bundleId)
+            ?.also { payoutBundle ->
             val successfulPayouts = bundleResponse.payoutItemResults?.map { payResults ->
                 payoutBundle.payouts.firstOrNull { payResults.toId == it.toId }?.apply { paid = payResults.paid }
             }?.filter { it?.paid ?: false }

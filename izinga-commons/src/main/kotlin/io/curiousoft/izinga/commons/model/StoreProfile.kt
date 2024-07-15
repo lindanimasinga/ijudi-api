@@ -25,9 +25,9 @@ class StoreProfile(
 ) : Profile(name, address, imageUrl, mobileNumber, ProfileRoles.STORE), GeoPoint {
     @Indexed(unique = true)
     var regNumber: String? = null
-
     var stockList: HashSet<Stock> = HashSet()
     var hasVat = false
+    var hasPaymentAgreement = false
     var featured = false
     var featuredExpiry: Date? = null
     var storeMessenger: HashSet<Messager>? = HashSet()
