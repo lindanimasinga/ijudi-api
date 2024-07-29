@@ -26,7 +26,7 @@ public record StoreOrderEventHandler(PushNotificationService pushNotificationSer
         var store = event.getReceivingStore();
         var order = event.getOrder();
         List<Device> shopDevices = deviceService.findByUserId(store.getOwnerId());
-        if (shopDevices.size() > 0) {
+        if (!shopDevices.isEmpty()) {
             pushNotificationService.notifyStoreOrderPlaced(store.getName(), shopDevices, order);
         } else {
             adminOnlyNotificationService.notifyShopOrderPlaced(store, order, userProfileService.find(order.getCustomerId()));

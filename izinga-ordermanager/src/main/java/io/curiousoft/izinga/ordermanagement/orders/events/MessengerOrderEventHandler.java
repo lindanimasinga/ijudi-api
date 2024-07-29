@@ -38,6 +38,10 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
         var order = event.getOrder();
         var store = event.getReceivingStore();
 
+        if(event.getMessenger() == null) {
+            return;
+        }
+
         boolean isDelivery = order.getShippingData() != null
                 && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
                 && store.getStoreType() != StoreType.TIPS && store.getStoreType() != StoreType.CAR_WASH;
