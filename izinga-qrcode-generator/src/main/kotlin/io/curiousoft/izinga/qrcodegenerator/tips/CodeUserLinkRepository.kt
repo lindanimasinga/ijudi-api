@@ -1,4 +1,4 @@
-package io.curiousoft.izinga.qrcodegenerator
+package io.curiousoft.izinga.qrcodegenerator.tips
 
 import org.springframework.data.mongodb.repository.MongoRepository
 

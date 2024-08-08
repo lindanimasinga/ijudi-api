@@ -1,25 +1,14 @@
-package io.curiousoft.izinga.qrcodegenerator
+package io.curiousoft.izinga.qrcodegenerator.tips
 
-import org.springframework.web.bind.annotation.RestController
 import org.springframework.beans.factory.annotation.Autowired
-import io.curiousoft.izinga.qrcodegenerator.QRCodeService
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.RequestParam
-import org.springframework.http.ResponseEntity
-import org.springframework.core.io.InputStreamResource
-import java.util.zip.ZipOutputStream
 import java.util.stream.IntStream
-import java.util.function.IntConsumer
-import java.io.ByteArrayInputStream
-import java.lang.RuntimeException
 import java.lang.StringBuilder
 import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.EncodeHintType
-import com.google.zxing.common.BitMatrix
 import com.google.zxing.BarcodeFormat
 import java.awt.image.BufferedImage
 import com.google.zxing.client.j2se.MatrixToImageWriter
-import io.curiousoft.izinga.qrcodegenerator.controller.LinkCodeUserRequest
+import io.curiousoft.izinga.qrcodegenerator.tips.controller.LinkCodeUserRequest
 import org.springframework.stereotype.Service
 import java.awt.*
 import java.io.ByteArrayOutputStream
@@ -31,6 +20,7 @@ import java.util.Map
 
 @Service
 class QRCodeService(@Autowired val linkCodeUserRepo: LinkCodeUserRepository) {
+
     @Throws(Exception::class)
     fun generateQRCodeImage(text: String?, label: String, width: Int, height: Int): ByteArray {
         val qrCodeWriter = QRCodeWriter()
@@ -101,6 +91,6 @@ class QRCodeService(@Autowired val linkCodeUserRepo: LinkCodeUserRepository) {
 
     fun getLinkedUser(linkCode: String): LinkCodeUser? = linkCodeUserRepo.findByLinkCode(linkCode)
 
-    fun linkUser(linkRequest: LinkCodeUserRequest): LinkCodeUser  = linkCodeUserRepo.save(linkRequest.let { LinkCodeUser(it.userId, it.linkCode) })
+    fun linkUser(linkRequest: LinkCodeUserRequest): LinkCodeUser = linkCodeUserRepo.save(linkRequest.let { LinkCodeUser(it.userId, it.linkCode) })
 
 }

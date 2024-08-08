@@ -30,4 +30,5 @@ interface OrderRepository : MongoRepository<Order?, String?> {
     fun findByMessengerPaidAndStage(paid: Boolean, stage7AllPaid: @NotNull OrderStage?): List<Order>?
     fun findByIdIn(orderIds: List<String>): List<Order>
     fun findByCustomerIdAndShippingDataMessengerIdAndStageIn(customerId: String, messengerId: String, stages: Array<OrderStage>): List<Order>?
+    fun findByCustomerIdAndStage(id: String, stage7AllPaid: OrderStage): List<Order>?
 }

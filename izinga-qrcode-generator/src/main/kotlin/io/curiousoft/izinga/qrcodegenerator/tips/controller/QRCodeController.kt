@@ -1,9 +1,9 @@
-package io.curiousoft.izinga.qrcodegenerator.controller
+package io.curiousoft.izinga.qrcodegenerator.tips.controller
 
-import io.curiousoft.izinga.qrcodegenerator.LinkCodeUser
+import io.curiousoft.izinga.qrcodegenerator.tips.LinkCodeUser
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.beans.factory.annotation.Autowired
-import io.curiousoft.izinga.qrcodegenerator.QRCodeService
+import io.curiousoft.izinga.qrcodegenerator.tips.QRCodeService
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.http.ResponseEntity
@@ -11,7 +11,6 @@ import org.springframework.core.io.InputStreamResource
 import java.util.zip.ZipOutputStream
 import java.util.stream.IntStream
 import java.io.ByteArrayInputStream
-import java.lang.RuntimeException
 import java.lang.StringBuilder
 import java.util.Locale
 import org.springframework.http.HttpHeaders
@@ -21,7 +20,6 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import java.io.ByteArrayOutputStream
-import java.lang.Exception
 import java.security.SecureRandom
 import java.util.zip.ZipEntry
 
@@ -35,8 +33,8 @@ class QRCodeController(@Autowired private val qrCodeService: QRCodeService) {
         ZipOutputStream(baos).use { zos ->
             IntStream.range(0, batchSize).forEach { i: Int ->
                 val label = generateUniqueCode()
-                val randomText = "https://tips.izinga.co.za/tip?linkCode=%s".formatted(label)
-                val qrCodeImage = qrCodeService!!.generateQRCodeImage(randomText, label, 450, 450)
+                val randomText = "https://tips.izinga.co.za/tip?linkCode=${label}"
+                val qrCodeImage = qrCodeService.generateQRCodeImage(randomText, label, 450, 450)
                 val entry = ZipEntry("QRCode_" + (i + 1) + ".png")
                 entry.size = qrCodeImage!!.size.toLong()
                 zos.putNextEntry(entry)
