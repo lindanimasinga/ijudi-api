@@ -4,4 +4,4 @@ import org.springframework.data.mongodb.core.mapping.Document
 import java.time.LocalDateTime
 
 @Document
-data class RedeemedCode(val code: String, val expiryDate: LocalDateTime, val userId: Int)
+data class RedeemedCode(val code: String, val date: LocalDateTime, val userId: String)

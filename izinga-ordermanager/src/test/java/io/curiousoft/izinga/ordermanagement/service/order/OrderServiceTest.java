@@ -77,7 +77,9 @@ public class OrderServiceTest {
                 deviceRepo,
                 pushNotificationService,
                 smsNotifcation, emailNotificationService,
-                applicationEventPublisher);
+                null,
+                applicationEventPublisher
+                );
     }
 
     public static StoreProfile createStoreProfile(StoreType food) {

@@ -3,12 +3,13 @@ package io.curiousoft.izinga.qrcodegenerator.promocodes
 import dev.forkhandles.result4k.onFailure
 import dev.forkhandles.result4k.valueOrNull
 import io.curiousoft.izinga.qrcodegenerator.promocodes.model.PromoCode
+import io.curiousoft.izinga.qrcodegenerator.promocodes.model.RedeemedCode
 import io.curiousoft.izinga.qrcodegenerator.promocodes.model.UserPromoDetails
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
-@RequestMapping("/api/promocodes")
+@RequestMapping("/promocodes")
 class PromoCodeController(val promoCodeService: PromoCodeService) {
 
     @PostMapping
@@ -18,12 +19,12 @@ class PromoCodeController(val promoCodeService: PromoCodeService) {
     }
 
     @GetMapping
-    fun createPromoCodes(): ResponseEntity<List<PromoCode>> {
+    fun getPromoCodes(): ResponseEntity<List<PromoCode>> {
         val promoCodes = promoCodeService.getAllPromoCodes()
         return ResponseEntity.ok(promoCodes)
     }
 
-    @GetMapping("/for-user")
+    @GetMapping("/forUser")
     fun verifyUser(@RequestParam userId: String, @RequestParam promoCode: String, @RequestParam orderId: String): ResponseEntity<UserPromoDetails> {
         val userPromoCodeResults = promoCodeService.getPromoDetailsForUser(userId, promoCode, orderId)
         userPromoCodeResults.onFailure {
@@ -31,6 +32,16 @@ class PromoCodeController(val promoCodeService: PromoCodeService) {
         }
         return userPromoCodeResults.valueOrNull().let { ResponseEntity.ok(it) }
 
+    }
+
+    @PostMapping("/redeem")
+    fun redeem(@RequestBody userPromoDetails: UserPromoDetails): ResponseEntity<RedeemedCode> {
+        verifyUser(userPromoDetails.userId, userPromoDetails.promo, userPromoDetails.orderId)
+        val userPromoCodeResults = promoCodeService.redeem(userPromoDetails)
+        userPromoCodeResults.onFailure {
+            throw it.reason
+        }
+        return userPromoCodeResults.valueOrNull().let { ResponseEntity.ok(it) }
     }
 
     fun handleError(exception: Exception): ResponseEntity<Exception> {

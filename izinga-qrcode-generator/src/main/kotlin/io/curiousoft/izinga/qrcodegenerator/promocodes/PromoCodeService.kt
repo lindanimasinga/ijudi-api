@@ -10,6 +10,7 @@ import io.curiousoft.izinga.commons.order.OrderRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.qrcodegenerator.promocodes.model.PromoCode
 import io.curiousoft.izinga.qrcodegenerator.promocodes.model.PromoType
+import io.curiousoft.izinga.qrcodegenerator.promocodes.model.RedeemedCode
 import io.curiousoft.izinga.qrcodegenerator.promocodes.model.UserPromoDetails
 import io.curiousoft.izinga.qrcodegenerator.promocodes.repo.PromoCodeRepository
 import io.curiousoft.izinga.qrcodegenerator.promocodes.repo.RedeemedCodeRepository
@@ -68,7 +69,8 @@ class PromoCodeService(val promoCodeRepository: PromoCodeRepository,
                 promo = promoCode.code,
                 verified = true,
                 expiry = promoCode.expiryDate,
-                amount = (promoCode.percentage * order.totalAmount * -1).toBigDecimal()
+                amount = (promoCode.percentage * order.totalAmount * -1).toBigDecimal(),
+                orderId = order.id!!
             )
         }
     }
@@ -80,7 +82,8 @@ class PromoCodeService(val promoCodeRepository: PromoCodeRepository,
                 promo = promoCode.code,
                 verified = true,
                 expiry = promoCode.expiryDate,
-                amount = (promoCode.percentage * order.totalAmount).toBigDecimal()
+                amount = (promoCode.percentage * order.totalAmount).toBigDecimal(),
+                orderId = order.id!!
             )
         }
     }
@@ -96,12 +99,22 @@ class PromoCodeService(val promoCodeRepository: PromoCodeRepository,
                 promo = promoCode.code,
                 verified = true,
                 expiry = promoCode.expiryDate,
-                amount = (promoCode.percentage * order.totalAmount * -1).toBigDecimal()
+                amount = (promoCode.percentage * order.totalAmount * -1).toBigDecimal(),
+                orderId = order.id!!
             )
         }
     }
 
     fun getAllPromoCodes(): List<PromoCode> {
         return promoCodeRepository.findByExpiryDateAfter(LocalDateTime.now())
+    }
+
+    fun redeem(userPromoDetails: UserPromoDetails): Result<RedeemedCode, Exception> {
+        return resultFrom {
+            redeemedCodeRepository.save(RedeemedCode(
+                code = userPromoDetails.promo,
+                userId = userPromoDetails.userId,
+                date = java.time.LocalDateTime.now()))
+        }
     }
 }

@@ -7,6 +7,7 @@ import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
+import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
 import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
 import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
@@ -43,15 +44,12 @@ public class OrderServiceImpl implements OrderService {
     private final PaymentService paymentService;
     private final DeviceRepository deviceRepo;
     private final PushNotificationService pushNotificationService;
-    private final AdminOnlyNotificationService smsNotificationService;
-    private final EmailNotificationService emailNotificationService;
     private final double starndardDeliveryFee;
     private final double serviceFeePerc;
-    private final long cleanUpMinutes;
-    private final List<String> adminCellNumbers;
     private final String googleMapsApiKey;
     private final double starndardDeliveryKm;
     private final double ratePerKm;
+    private final PromoCodeClient promoCodeClient;
     private final ApplicationEventPublisher applicationEventPublisher;
 
     @Autowired
@@ -68,22 +66,21 @@ public class OrderServiceImpl implements OrderService {
                             DeviceRepository deviceRepo,
                             PushNotificationService pushNotificationService,
                             AdminOnlyNotificationService smsNotifcationService,
-                            EmailNotificationService emailNotificationService, ApplicationEventPublisher applicationEventPublisher) {
+                            EmailNotificationService emailNotificationService,
+                            PromoCodeClient promoCodeClient,
+                            ApplicationEventPublisher applicationEventPublisher) {
         this.starndardDeliveryFee = starndardDeliveryFee;
         this.starndardDeliveryKm = starndardDeliveryKm;
         this.ratePerKm = ratePerKm;
         this.serviceFeePerc = serviceFeePerc;
-        this.cleanUpMinutes = cleanUpMinutes;
-        this.adminCellNumbers = adminCellNumbers;
         this.orderRepo = orderRepository;
         this.storeRepository = storeRepository;
         this.userProfileRepo = userProfileRepo;
         this.paymentService = paymentService;
         this.pushNotificationService = pushNotificationService;
-        this.smsNotificationService = smsNotifcationService;
         this.deviceRepo = deviceRepo;
         this.googleMapsApiKey = googleMapsApiKey;
-        this.emailNotificationService = emailNotificationService;
+        this.promoCodeClient = promoCodeClient;
         this.applicationEventPublisher = applicationEventPublisher;
         ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
         validator = factory.getValidator();
@@ -339,6 +336,25 @@ public class OrderServiceImpl implements OrderService {
 
         }
         return orderRepo.save(order);
+    }
+
+    @Override
+    public Order applyPromoCode(String promoCode, Order order) throws Exception {
+        var promoData = promoCodeClient.findForUser(order.getId(), order.getCustomerId(), promoCode);
+        if (!promoData.verified()) {
+            throw new Exception("Promo code not verified.");
+        }
+        return orderRepo.findById(order.getId())
+                .map(ord -> {
+                    BasketItem discount = new BasketItem(promoData.promo(),
+                            1,
+                            promoData.amount(),
+                            0);
+                    ord.getBasket().getItems().add(discount);
+                    orderRepo.save(ord);
+                    promoCodeClient.redeemed(promoData);
+                    return ord;
+                }).orElseThrow();
     }
 
     @Override

@@ -75,6 +75,9 @@ spring:
                     izinga-order-manager:
                         url: ./
                         connectTimeout: 20000
+                    promo-code-service:
+                        url: ./
+                        connectTimeout: 20000
                     yoco-api:
                         loggerLevel: full
                         connectTimeout: 20000
@@ -121,3 +124,6 @@ zoomconnectsms:
         endpoint: https://www.zoomconnect.com/app/api/rest/v1/sms/send
         key: c0217d42-dd53-4d6b-811c-a79b584e5177
     enable: true
+promocodes:
+    verifier:
+        url: http://localhost/

@@ -14,6 +14,7 @@ import javax.validation.Valid;
 import java.util.List;
 
 import static io.curiousoft.izinga.commons.model.PaymentType.PAYFAST;
+import static org.springframework.util.StringUtils.isEmpty;
 
 @RestController
 @RequestMapping({"/order", "//order"})
@@ -45,6 +46,13 @@ public class OrderController {
         return !order.getId().equals(id)? ResponseEntity.badRequest().build() : ResponseEntity.ok(orderService.finishOder(order));
     }
 
+    @PatchMapping(value = "/{orderId}/promocode/{promocode}")
+    public ResponseEntity<Order> applyPromoCode(@PathVariable String orderId, @PathVariable String promocode) throws Exception {
+        var order = orderService.findOrder(orderId);
+        order = orderService.applyPromoCode(promocode, order);
+        return ResponseEntity.ok(order);
+    }
+
     @GetMapping(value = "/{orderId}/nextstage", produces = "application/json")
     public ResponseEntity<Order> progressNextStage(@PathVariable String orderId) throws Exception {
         return ResponseEntity.ok(orderService.progressNextStage(orderId));
@@ -66,10 +74,10 @@ public class OrderController {
                                                     @RequestParam(required = false) String phone,
                                                     @RequestParam(required = false) String messengerId,
                                                     @RequestParam(required = false) String storeId) throws Exception {
-        List<Order> order = !StringUtils.isEmpty(userId) ? orderService.findOrderByUserId(userId) :
-                !StringUtils.isEmpty(phone) ? orderService.findOrderByPhone(phone) :
-                !StringUtils.isEmpty(storeId) ? orderService.findOrderByStoreId(storeId) :
-                !StringUtils.isEmpty(messengerId) ? orderService.findOrderByMessengerId(messengerId) :
+        List<Order> order = !isEmpty(userId) ? orderService.findOrderByUserId(userId) :
+                !isEmpty(phone) ? orderService.findOrderByPhone(phone) :
+                !isEmpty(storeId) ? orderService.findOrderByStoreId(storeId) :
+                !isEmpty(messengerId) ? orderService.findOrderByMessengerId(messengerId) :
                         orderService.findAll();
         return order != null ? ResponseEntity.ok(order) : ResponseEntity.notFound().build();
     }
