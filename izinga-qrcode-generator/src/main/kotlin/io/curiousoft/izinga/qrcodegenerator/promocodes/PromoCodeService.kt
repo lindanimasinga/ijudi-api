@@ -25,6 +25,7 @@ class PromoCodeService(val promoCodeRepository: PromoCodeRepository,
                        val orderRepository: OrderRepository) {
 
     fun createPromoCodes(promoCodes: List<PromoCode>): List<PromoCode> {
+        promoCodes.map { it.code = it.code.uppercase() }
         return promoCodeRepository.saveAll(promoCodes)
     }
 

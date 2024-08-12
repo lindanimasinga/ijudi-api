@@ -26,7 +26,7 @@ class PromoCodeController(val promoCodeService: PromoCodeService) {
 
     @GetMapping("/forUser")
     fun verifyUser(@RequestParam userId: String, @RequestParam promoCode: String, @RequestParam orderId: String): ResponseEntity<UserPromoDetails> {
-        val userPromoCodeResults = promoCodeService.getPromoDetailsForUser(userId, promoCode, orderId)
+        val userPromoCodeResults = promoCodeService.getPromoDetailsForUser(userId, promoCode.uppercase(), orderId)
         userPromoCodeResults.onFailure {
             throw it.reason
         }
@@ -36,7 +36,7 @@ class PromoCodeController(val promoCodeService: PromoCodeService) {
 
     @PostMapping("/redeem")
     fun redeem(@RequestBody userPromoDetails: UserPromoDetails): ResponseEntity<RedeemedCode> {
-        val promoDetails = verifyUser(userPromoDetails.userId, userPromoDetails.promo, userPromoDetails.orderId)
+        val promoDetails = verifyUser(userPromoDetails.userId, userPromoDetails.promo.uppercase(), userPromoDetails.orderId)
         val userPromoCodeResults = promoCodeService.redeem(promoDetails.body!!)
         userPromoCodeResults.onFailure {
             throw it.reason
