@@ -213,6 +213,17 @@ public class OrderServiceImpl implements OrderService {
             persistedOrder.setStage(OrderStage.STAGE_7_ALL_PAID);
         }
 
+        var promoCode = order.getTag().get("promoCode");
+        if(promoCode != null) {
+            PromoCodeClient.UserPromoDetails promoDetails = new PromoCodeClient.UserPromoDetails(order.getCustomerId(),
+                    promoCode,
+                    true,
+                    0.00,
+                    null,
+                    order.getId());
+            promoCodeClient.redeemed(promoDetails);
+        }
+
         //decrease stock available
         Optional<StoreProfile> optional = storeRepository.findById(persistedOrder.getShopId());
         StoreProfile store = optional.get();
@@ -351,9 +362,8 @@ public class OrderServiceImpl implements OrderService {
                             promoData.amount(),
                             0);
                     ord.getBasket().getItems().add(discount);
-                    orderRepo.save(ord);
-                    promoCodeClient.redeemed(promoData);
-                    return ord;
+                    ord.getTag().put("promoCode", promoCode);
+                    return orderRepo.save(ord);
                 }).orElseThrow();
     }
 

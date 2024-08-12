@@ -36,8 +36,8 @@ class PromoCodeController(val promoCodeService: PromoCodeService) {
 
     @PostMapping("/redeem")
     fun redeem(@RequestBody userPromoDetails: UserPromoDetails): ResponseEntity<RedeemedCode> {
-        verifyUser(userPromoDetails.userId, userPromoDetails.promo, userPromoDetails.orderId)
-        val userPromoCodeResults = promoCodeService.redeem(userPromoDetails)
+        val promoDetails = verifyUser(userPromoDetails.userId, userPromoDetails.promo, userPromoDetails.orderId)
+        val userPromoCodeResults = promoCodeService.redeem(promoDetails.body!!)
         userPromoCodeResults.onFailure {
             throw it.reason
         }
