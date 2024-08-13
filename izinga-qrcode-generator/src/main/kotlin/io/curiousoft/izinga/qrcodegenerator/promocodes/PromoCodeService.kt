@@ -77,13 +77,22 @@ class PromoCodeService(val promoCodeRepository: PromoCodeRepository,
     }
 
     private fun userPromoForTips(user: UserProfile, promoCode: PromoCode, order: Order): Result<UserPromoDetails, Exception> {
+        val tipShopId = "adace792-5b97-4708-b1d3-ff8448854b30"
         order.basket.items.firstOrNull { it.name.lowercase() == "tip" } ?: return Failure(Exception("error.orderNotEligible"))
+
+        val orderCount = orderRepository.findByCustomerIdAndModifiedDateAfter(
+            order.customerId!!,
+            LocalDateTime.now().toLocalDate().toDate()
+        ).count { it.shopId == tipShopId }
+
+        if (orderCount < promoCode.minimumOrderRequired) return Failure(Exception("error.previousOrderMustMeetRequirements"))
+
         return resultFrom {
             UserPromoDetails(userId = user.id!!,
                 promo = promoCode.code,
                 verified = true,
                 expiry = promoCode.expiryDate,
-                amount = (promoCode.percentage * order.totalAmount).toBigDecimal(),
+                amount = promoCode.amount,
                 orderId = order.id!!
             )
         }
@@ -106,8 +115,10 @@ class PromoCodeService(val promoCodeRepository: PromoCodeRepository,
         }
     }
 
-    fun getAllPromoCodes(): List<PromoCode> {
-        return promoCodeRepository.findByExpiryDateAfter(LocalDateTime.now())
+    fun getAllPromoCodes(type: PromoType?): List<PromoCode> {
+        return type?.let {
+            promoCodeRepository.findByExpiryDateAfterAndType(LocalDateTime.now(), it)
+        } ?: promoCodeRepository.findByExpiryDateAfter(LocalDateTime.now())
     }
 
     fun redeem(userPromoDetails: UserPromoDetails): Result<RedeemedCode, Exception> {

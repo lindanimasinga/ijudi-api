@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
 
 @FeignClient(value = "promo-code-service", url = "${promocodes.verifier.url}")
 public interface PromoCodeClient {
@@ -17,10 +19,16 @@ public interface PromoCodeClient {
     @PostMapping(value = "/promocodes/redeem", consumes = "application/json", produces = "application/json")
     Redeemed redeemed(@RequestBody UserPromoDetails userPromoDetails);
 
+    @GetMapping(value = "/promocodes", consumes = "application/json", produces = "application/json")
+    List<PromoCode> getPromoCodes(@RequestParam String type) throws Exception;
+
     record UserPromoDetails(String userId, String promo, Boolean verified, Double amount, LocalDateTime expiry, String orderId){
     }
 
     record Redeemed(String code, LocalDateTime date, String userId){
+    }
+
+    record PromoCode(String code, LocalDateTime expiry, String userId, String type, Double amount){
     }
 
 }

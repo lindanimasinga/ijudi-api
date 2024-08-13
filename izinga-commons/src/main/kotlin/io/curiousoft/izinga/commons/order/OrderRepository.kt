@@ -31,4 +31,5 @@ interface OrderRepository : MongoRepository<Order?, String?> {
     fun findByIdIn(orderIds: List<String>): List<Order>
     fun findByCustomerIdAndShippingDataMessengerIdAndStageIn(customerId: String, messengerId: String, stages: Array<OrderStage>): List<Order>?
     fun findByCustomerIdAndStage(id: String, stage7AllPaid: OrderStage): List<Order>?
+    fun findByCustomerIdAndModifiedDateAfter(customerId: String, toDate: Date): List<Order>
 }
