@@ -58,6 +58,7 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
             //if user qualified for incentive, create a new order with incentive amount.
             if (promoCode.isPresent()) {
                 createAndFinishPromoOrder(order, promoCode.get());
+                promoCodeClient.redeemed(promoCode.get());
             }
 
             //get payout balance send event to update payout
@@ -94,6 +95,8 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
         BeanUtils.copyProperties(order, incentiveOrder);
         Basket basket = new Basket();
         basket.setItems(List.of(new BasketItem(promoCode.promo(), 1, promoCode.amount(), 0)));
+        incentiveOrder.setId(null);
+        incentiveOrder.setStage(OrderStage.STAGE_7_ALL_PAID);
         incentiveOrder.setBasket(basket);
         incentiveOrder.setOrderType(OrderType.INSTORE);
         incentiveOrder.setServiceFee(0.00);
