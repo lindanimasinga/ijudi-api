@@ -101,6 +101,7 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
         incentiveOrder.setOrderType(OrderType.INSTORE);
         incentiveOrder.setServiceFee(0.00);
         incentiveOrder.getShippingData().setFee(0.00);
+        incentiveOrder.setTip(promoCode.amount());
         orderRepository.save(incentiveOrder);
     }
 
