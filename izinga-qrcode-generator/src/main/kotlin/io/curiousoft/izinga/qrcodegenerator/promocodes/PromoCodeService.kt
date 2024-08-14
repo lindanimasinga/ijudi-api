@@ -70,7 +70,7 @@ class PromoCodeService(val promoCodeRepository: PromoCodeRepository,
                 promo = promoCode.code,
                 verified = true,
                 expiry = promoCode.expiryDate,
-                amount = (promoCode.percentage * order.totalAmount * -1).toBigDecimal(),
+                amount = (promoCode.amount ?: promoCode.percentage?.let { (it * order.totalAmount).toBigDecimal() } ?: 0.toBigDecimal()) * (-1).toBigDecimal(),
                 orderId = order.id!!
             )
         }
@@ -92,7 +92,7 @@ class PromoCodeService(val promoCodeRepository: PromoCodeRepository,
                 promo = promoCode.code,
                 verified = true,
                 expiry = promoCode.expiryDate,
-                amount = promoCode.amount,
+                amount = promoCode.amount ?: 0.toBigDecimal(),
                 orderId = order.id!!
             )
         }
@@ -109,7 +109,7 @@ class PromoCodeService(val promoCodeRepository: PromoCodeRepository,
                 promo = promoCode.code,
                 verified = true,
                 expiry = promoCode.expiryDate,
-                amount = (promoCode.percentage * order.totalAmount * -1).toBigDecimal(),
+                amount = (promoCode.amount ?: promoCode.percentage?.let { (it * order.totalAmount).toBigDecimal() } ?: 0.toBigDecimal()) * (-1).toBigDecimal(),
                 orderId = order.id!!
             )
         }

@@ -9,12 +9,12 @@ import java.time.LocalDateTime
 data class PromoCode(
     @Id var code: String,
     val expiryDate: LocalDateTime,
-    val percentage: Double,
+    val percentage: Double?,
     val type: PromoType,
     val maxRedemption: Int,
     val storeId: String? = null,
     val minimumOrderRequired: Int,
-    val amount: BigDecimal
+    val amount: BigDecimal?
 )
 
 enum class PromoType {
