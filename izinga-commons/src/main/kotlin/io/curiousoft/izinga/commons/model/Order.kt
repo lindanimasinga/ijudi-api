@@ -38,9 +38,7 @@ class Order : BaseModel() {
     var minimumDepositAllowedPerc = 0.0
     val totalAmount: Double
         get() = BigDecimal.valueOf(
-            serviceFee + basket.items.stream()
-                .mapToDouble { obj: BasketItem -> obj.totalPrice }
-                .sum() + (!freeDelivery && shippingData != null).isTrue({shippingData?.fee!!}) { 0.00 }
+            serviceFee + basket.totalPrice + (!freeDelivery && shippingData != null).isTrue({shippingData?.fee!!}) { 0.00 }
         )
         .setScale(2, RoundingMode.HALF_EVEN)
         .toDouble()

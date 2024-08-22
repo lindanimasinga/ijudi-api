@@ -13,6 +13,10 @@ class BasketItem(@JsonProperty("name") var name: String,
     val totalPrice: Double
         get() = price * quantity
 
+    val discountedPrice: Double
+    get() = -1 * totalPrice * discountPerc
+
+
     override fun equals(o: Any?): Boolean {
         if (this === o) return true
         if (o == null || javaClass != o.javaClass) return false

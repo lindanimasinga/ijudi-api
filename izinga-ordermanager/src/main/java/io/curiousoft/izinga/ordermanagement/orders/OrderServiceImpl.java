@@ -147,6 +147,13 @@ public class OrderServiceImpl implements OrderService {
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setMinimumDepositAllowedPerc(storeOptional.get().getMinimumDepositAllowedPerc());
 
+        //add a store discount
+        var basket = order.getBasket();
+        if (basket.getTotalDiscount() != 0) {
+            BasketItem discount = new BasketItem("Store Discount", 1, basket.getTotalDiscount(), 0);
+            basket.getItems().add(discount);
+        }
+
         double deliveryFee = 0;
         if (order.getOrderType() == OrderType.ONLINE) {
             //if there are orders in progress going to the same location for the same customer and same messenger then add a discount
