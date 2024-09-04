@@ -154,6 +154,8 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
     }
 
     public StoreProfile findOneByIdOrShortName(String id, String shortname) throws Exception {
-        return profileRepo.findOneByIdOrShortName(id, shortname).orElseThrow(() -> new Exception("Shop Profile not found"));
+        var store = profileRepo.findOneByIdOrShortName(id, shortname).orElseThrow(() -> new Exception("Shop Profile not found"));
+        store.setMarkUp(markupPercentage);
+        return store;
     }
 }
