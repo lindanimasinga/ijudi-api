@@ -199,7 +199,7 @@ public class OrderServiceImpl implements OrderService {
     public Order finishOder(Order order) throws Exception {
         validate(order);
         Order persistedOrder = orderRepo.findById(order.getId())
-                .orElseThrow(() -> new Exception("Order with id " + order.getId() + " not found."));
+                .orElseThrow(() -> new Exception("Order with id %s not found.".formatted(order.getId())));
 
         if(order.getStage() != OrderStage.STAGE_0_CUSTOMER_NOT_PAID) {
             return persistedOrder;
@@ -237,23 +237,22 @@ public class OrderServiceImpl implements OrderService {
         Set<Stock> stock = store.getStockList();
         persistedOrder.getBasket()
                 .getItems()
-                .forEach(item -> {
-                    stock.stream()
-                            .filter(sto -> sto.getName().equals(item.getName()))
-                            .findFirst()
-                            .ifPresent(stockItem -> {
-                                stockItem.setQuantity(stockItem.getQuantity() - item.getQuantity());
-                                if(store.getStoreWebsiteUrl() != null) {
-                                    String fullUrl = (store.getStoreWebsiteUrl() + "/" + stockItem.getExternalUrlPath())
-                                            .replaceAll("(/){2,}", "/").replaceAll(":/", "://");
-                                    item.setExternalUrl(fullUrl);
-                                }
-                            });
-                });
+                .forEach(item -> stock.stream()
+                        .filter(sto -> sto.getName().equals(item.getName()))
+                        .findFirst()
+                        .ifPresent(stockItem -> {
+                            stockItem.setQuantity(stockItem.getQuantity() - item.getQuantity());
+                            if(store.getStoreWebsiteUrl() != null) {
+                                String fullUrl = (store.getStoreWebsiteUrl() + "/" + stockItem.getExternalUrlPath())
+                                        .replaceAll("(/){2,}", "/")
+                                        .replaceAll(":/", "://");
+                                item.setExternalUrl(fullUrl);
+                            }
+                        }));
         store.setServicesCompleted(store.getServicesCompleted() + 1);
         storeRepository.save(store);
-        LOG.info("New order placed. Order No. " + order.getId() + ", Basket Amount. R"+order.getBasketAmount());
-        LOG.info("New order placed. Order No. " + order.getId() + ", Delivery Fee. R"+order.getShippingData().getFee());
+        LOG.info("New order placed. Order No. {}, Basket Amount. R{}", order.getId(), order.getBasketAmount());
+        LOG.info("New order placed. Order No. {}, Delivery Fee. R{}", order.getId(), order.getShippingData().getFee());
         NewOrderEvent newOrderEvent = new NewOrderEvent(this, order, persistedOrder.getShippingData().getMessengerId(), store);
         var orderCompleted = orderRepo.save(persistedOrder);
         applicationEventPublisher.publishEvent(newOrderEvent);

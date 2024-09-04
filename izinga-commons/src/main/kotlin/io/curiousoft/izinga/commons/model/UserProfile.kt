@@ -18,6 +18,6 @@ class UserProfile(
     var idNumber: String? = null
 
     enum class SignUpReason {
-        DELIVERY_DRIVER, SELL, BUY
+        DELIVERY_DRIVER, SELL, BUY, LICENSING
     }
 }

@@ -1,5 +1,5 @@
 package io.curiousoft.izinga.commons.model
 
 enum class StoreType {
-    FOOD, CLOTHING, SALON, CAR_WASH, MOVERS, TIPS
+    FOOD, CLOTHING, SALON, CAR_WASH, MOVERS, TIPS, LICENSING
 }
