@@ -15,6 +15,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -43,6 +44,8 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
             return;
         }
 
+        var messenger = userProfileService.find(event.getMessenger());
+
         boolean isDelivery = order.getShippingData() != null
                 && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
                 && store.getStoreType() != StoreType.TIPS && store.getStoreType() != StoreType.CAR_WASH;
@@ -51,6 +54,10 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
         if (isDelivery) {
             List<Device> messengerDevices = deviceService.findByUserId(order.getShippingData().getMessengerId());
             pushNotificationService.notifyMessengerOrderPlaced(messengerDevices, order, store);
+
+            if (StringUtils.hasText(messenger.getEmailAddress())) {
+                emailNotificationService.notifyShops(order, List.of(messenger.getEmailAddress()));
+            }
         }
 
         if (store.getStoreType() == StoreType.TIPS) {
