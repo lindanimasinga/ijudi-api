@@ -29,17 +29,16 @@ import kotlin.collections.set
 @Service
 class GooglePassGenerator : PassGenerator<String> {
 
-    private var service: Walletobjects
-    private var credentials: GoogleCredentials
-
-    private var googleConfig: GoogleConfig
+    private lateinit var service: Walletobjects
+    private lateinit var credentials: GoogleCredentials
+    private lateinit var googleConfig: GoogleConfig
 
     @Autowired
     constructor(googleConfig: GoogleConfig) {
         this.googleConfig = googleConfig
         val walletKeyStream = ByteArrayInputStream(googleConfig.configAsJson().toByteArray())
         credentials = GoogleCredentials.fromStream(walletKeyStream)
-            .createScoped(List.of(WalletobjectsScopes.WALLET_OBJECT_ISSUER))
+                .createScoped(List.of(WalletobjectsScopes.WALLET_OBJECT_ISSUER))
         credentials.refresh()
         val httpTransport: HttpTransport = GoogleNetHttpTransport.newTrustedTransport()
 

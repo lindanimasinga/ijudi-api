@@ -162,7 +162,7 @@ public class SchedulerService {
     }
 
     @Scheduled(cron = "* 12 7,10 * * *")// 10 minutes
-    public void publishMenuOfTheDay() throws IOException {
+    public void publishMenuOfTheDay() throws IOException, InterruptedException {
         Application.main(new String[]{});
     }
 }

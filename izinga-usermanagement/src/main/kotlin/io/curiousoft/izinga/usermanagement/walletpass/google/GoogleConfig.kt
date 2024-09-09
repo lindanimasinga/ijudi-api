@@ -34,4 +34,5 @@ data class GoogleConfig(
     fun configAsJson() : String = ObjectMapper()
         .apply { propertyNamingStrategy = PropertyNamingStrategies.SNAKE_CASE }
         .writeValueAsString(this)
+        .replace("\\\\n", "\\n");
 }

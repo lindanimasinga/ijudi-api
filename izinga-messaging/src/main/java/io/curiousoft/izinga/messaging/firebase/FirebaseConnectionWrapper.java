@@ -13,54 +13,57 @@ public class FirebaseConnectionWrapper {
 
     private static Logger LOGGER = LoggerFactory.getLogger(FirebaseConnectionWrapper.class);
 
-    private String apiKey;
+    private String token;
+    private String projectId;
     private GoogleServices.FirebaseInstanceIdHttpService firebaseHttpService;
     private GoogleServices.FirebaseMessageService firebaseMessagingHttpService;
 
-    public FirebaseConnectionWrapper() {
+    private FirebaseConnectionWrapper() {
         firebaseHttpService = GoogleServices.getInstanceIdService();
         firebaseMessagingHttpService = GoogleServices.getMessagingService();
     }
 
-    public FirebaseConnectionWrapper(String apiKey) {
+    public FirebaseConnectionWrapper(String token, String projectId) {
         this();
-        this.apiKey = "key=" + apiKey;
+        this.token = "Bearer %s".formatted(token);
+        this.projectId = projectId;
     }
 
-    public FirebaseConnectionWrapper(String apiKey, GoogleServices.FirebaseInstanceIdHttpService firebaseHttpService,
-            GoogleServices.FirebaseMessageService firebaseMessageService) {
+    public FirebaseConnectionWrapper(String token, String projectId, GoogleServices.FirebaseInstanceIdHttpService firebaseHttpService,
+                                     GoogleServices.FirebaseMessageService firebaseMessageService) {
         this.firebaseHttpService = firebaseHttpService;
         this.firebaseMessagingHttpService = firebaseMessageService;
-        this.apiKey = "key=" + apiKey;
+        this.token = "Bearer %s".formatted(token);
+        this.projectId = projectId;
     }
 
     public Map sendMessage(FCMMessage fcmMessage) throws Exception {
-        Call<Map> requestCall = firebaseMessagingHttpService.sendMessage(apiKey, fcmMessage);
+        Call<Map> requestCall = firebaseMessagingHttpService.sendMessage(token, projectId, fcmMessage);
         Map response = processRequest(requestCall);
-        LOGGER.info("Message sent to " + fcmMessage.getTo());
-        LOGGER.info("Message data " + fcmMessage.getData());
+        LOGGER.info("Message sent to {}", fcmMessage.getTo());
+        LOGGER.info("Message data {}", fcmMessage.getData());
         return response;
     }
 
     public String createTopic(String topicName, String deviceToken) throws Exception {
-        Call<Map> requestCall = firebaseHttpService.createTopic(apiKey, deviceToken, topicName);
+        Call<Map> requestCall = firebaseHttpService.createTopic(token, deviceToken, topicName);
         processRequest(requestCall);
         return topicName;
     }
 
     public <T> T processRequest(Call<T> requestCall) throws Exception {
-        LOGGER.info("FCM Request " + requestCall.request().toString());
+        LOGGER.info("FCM Request {}", requestCall.request().toString());
         Response<T> response = requestCall.execute();
         if (!response.isSuccessful()) {
-            LOGGER.error("FCM response code: " + response.code() + " Body " + response.errorBody().string());
+            LOGGER.error("FCM response code: {} Body {}", response.code(), response.errorBody().string());
             throw new Exception(response.errorBody().string());
         }
-        LOGGER.info("FCM Response success! code: " + response.code() + " body: " + response.body());
+        LOGGER.info("FCM Response success! code: {} body: {}",  response.code(), response.body());
         return response.body();
     }
 
     public void subscribeTopic(String topicName, String deviceToken) throws Exception {
-        Call<Map> requestCall = firebaseHttpService.subscribeTopic(apiKey, deviceToken, topicName);
+        Call<Map> requestCall = firebaseHttpService.subscribeTopic(token, deviceToken, topicName);
         processRequest(requestCall);
     }
 
@@ -78,16 +81,16 @@ public class FirebaseConnectionWrapper {
 
     public void unSubscribe(String name, String deviceToken) throws Exception {
         FCMUnSubscribeMessage message = new FCMUnSubscribeMessage(name, Collections.singletonList(deviceToken));
-        Call<Map> requestCall = firebaseHttpService.unSubscribeTopic(apiKey, message);
+        Call<Map> requestCall = firebaseHttpService.unSubscribeTopic(token, message);
         processRequest(requestCall);
     }
 
-    public String getApiKey() {
-        return apiKey;
+    public String getToken() {
+        return token;
     }
 
-    public void setApiKey(String apiKey) {
-        this.apiKey = apiKey;
+    public void setToken(String token) {
+        this.token = token;
     }
 
     public GoogleServices.FirebaseInstanceIdHttpService getFirebaseHttpService() {
