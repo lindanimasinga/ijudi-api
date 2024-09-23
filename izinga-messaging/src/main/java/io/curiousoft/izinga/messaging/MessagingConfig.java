@@ -25,9 +25,7 @@ public class MessagingConfig {
         var firebaseKeyStream = new ByteArrayInputStream(firebaseAuthConfig.configAsJson().getBytes());
         var credentials = GoogleCredentials.fromStream(firebaseKeyStream)
                 .createScoped(List.of(MESSAGING_SCOPE));
-        credentials.refresh();
-        var authToken = credentials.getAccessToken().getTokenValue();
-        return new FirebaseConnectionWrapper(authToken, firebaseAuthConfig.projectId());
+        return new FirebaseConnectionWrapper(credentials, firebaseAuthConfig.projectId());
     }
 
     @Bean

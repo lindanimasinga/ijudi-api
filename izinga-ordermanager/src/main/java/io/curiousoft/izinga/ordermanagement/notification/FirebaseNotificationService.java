@@ -103,14 +103,10 @@ public class FirebaseNotificationService implements PushNotificationService {
     }
 
     private FCMMessage getFcmMessage(String destination, PushMessage message) {
-        Map data = new HashMap<>();
-        data.put("messageType", message.getPushMessageType());
-        data.put("messageContent", message.getPushContent());
-
         FCMNotification notification = new FCMNotification(message.getPushHeading().getBody(),
                 message.getPushHeading().getTitle(),
                 null);
-        return new FCMMessage(destination, notification, data);
+        return new FCMMessage(destination, notification);
     }
 
     @Override
