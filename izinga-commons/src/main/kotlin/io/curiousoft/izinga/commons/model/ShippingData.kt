@@ -8,6 +8,9 @@ import javax.validation.constraints.NotNull
 class ShippingData {
     var id: String? = null
     var fromAddress: @NotBlank(message = "shipping address not valid") String? = null
+    var fromBuildingType: BuildingType? = null
+    var fromUnitNumber: String? = null
+    var fromBuildingName: String? = null
     var toAddress: @NotBlank(message = "Shipping address not valid") String? = null
     var buildingType: BuildingType? = null
     var unitNumber: String? = null

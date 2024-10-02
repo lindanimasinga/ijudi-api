@@ -55,6 +55,8 @@ public class SchedulerServiceTest {
     private OrderRepository orderRepository;
     @Mock
     private AdminOnlyNotificationService adminOnlyNotificationService;
+    @Mock
+    private UserProfileRepo userRepo;
 
     //system under test
     private SchedulerService sut;
@@ -62,6 +64,7 @@ public class SchedulerServiceTest {
     @Spy
     List<String> phoneNumbers = Lists.list("08128155660", "0812815707");
     int cleaupMinutes = 5;
+
 
     @Before
     public void setUp() throws Exception {
@@ -73,7 +76,8 @@ public class SchedulerServiceTest {
                 adminOnlyNotificationService,
                 emailNotificationService,
                 promotionService,
-                cleaupMinutes
+                cleaupMinutes,
+                userRepo
         );
     }
 

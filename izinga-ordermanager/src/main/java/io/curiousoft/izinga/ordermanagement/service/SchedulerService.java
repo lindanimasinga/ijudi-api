@@ -5,6 +5,7 @@ import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
+import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
 import org.slf4j.Logger;
@@ -15,9 +16,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static java.lang.String.format;
@@ -28,20 +31,21 @@ public class SchedulerService {
     private static final Logger LOG = LoggerFactory.getLogger(SchedulerService.class);
     private final long cleanUpMinutes;
 
-    private OrderRepository orderRepo;
-    private StoreRepository storeRepository;
-    private DeviceRepository deviceRepo;
-    private PushNotificationService pushNotificationService;
-    private AdminOnlyNotificationService smsNotificationService;
-    private EmailNotificationService emailNotificationService;
-    private PromotionService promotionService;
+    private final OrderRepository orderRepo;
+    private final StoreRepository storeRepository;
+    private final DeviceRepository deviceRepo;
+    private final PushNotificationService pushNotificationService;
+    private final AdminOnlyNotificationService smsNotificationService;
+    private final EmailNotificationService emailNotificationService;
+    private final PromotionService promotionService;
+    private final UserProfileRepo userProfileRepo;
 
     public SchedulerService(OrderRepository orderRepo, StoreRepository storeRepository,
                             DeviceRepository deviceRepo, PushNotificationService pushNotificationService,
                             AdminOnlyNotificationService smsNotifcationService,
                             EmailNotificationService emailNotificationService,
                             PromotionService promotionService,
-                            @Value("${order.cleanup.unpaid.minutes}") long cleanUpMinutes) {
+                            @Value("${order.cleanup.unpaid.minutes}") long cleanUpMinutes, UserProfileRepo userProfileRepo) {
         this.orderRepo = orderRepo;
         this.storeRepository = storeRepository;
         this.deviceRepo = deviceRepo;
@@ -50,6 +54,7 @@ public class SchedulerService {
         this.emailNotificationService = emailNotificationService;
         this.cleanUpMinutes = cleanUpMinutes;
         this.promotionService = promotionService;
+        this.userProfileRepo = userProfileRepo;
     }
 
     @Scheduled(fixedDelay = 150000, initialDelay = 150000)// 10 minutes
@@ -159,6 +164,26 @@ public class SchedulerService {
                         LOG.info(format("promotion \"%s\" sent out as push notification", pushMessage.getPushHeading().getTitle()));
                     }
                 });
+    }
+
+    public void notifyInactiveUsersForLast45Days() {
+        LocalDate ninetyDaysAgo = LocalDate.now().minusDays(90);
+        var orderesLast90Days = orderRepo.findAllByCreatedDateAfter(ninetyDaysAgo);
+        var customerIdLast90Days = orderesLast90Days
+                .stream()
+                .map(Order::getCustomerId)
+                .collect(Collectors.toSet());
+
+        // Find the customers who have placed an order in the last 45 days
+        Date fortyFiveDaysAgo = Date.from(LocalDateTime.now().minusDays(45).atZone(ZoneId.systemDefault()).toInstant());
+        Set<String> customersInLast45Days = orderesLast90Days.stream()
+                .filter(order -> order.getCreatedDate().after(fortyFiveDaysAgo))
+                .map(Order::getCustomerId)
+                .collect(Collectors.toSet());
+
+        customerIdLast90Days.removeAll(customersInLast45Days);
+        var inactiveCustomers45Days = customerIdLast90Days;
+        userProfileRepo.findByIdIn(inactiveCustomers45Days);
     }
 
     @Scheduled(cron = "* 12 7,10 * * *")// 10 minutes

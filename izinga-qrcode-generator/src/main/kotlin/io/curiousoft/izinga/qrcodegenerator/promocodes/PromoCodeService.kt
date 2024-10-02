@@ -71,8 +71,7 @@ class PromoCodeService(val promoCodeRepository: PromoCodeRepository,
                 verified = true,
                 expiry = promoCode.expiryDate,
                 amount = (promoCode.amount ?: promoCode.percentage?.let { (it * order.totalAmount).toBigDecimal() } ?: 0.toBigDecimal()) * (-1).toBigDecimal(),
-                orderId = order.id!!
-            )
+                orderId = order.id!!)
         }
     }
 

@@ -49,7 +49,7 @@ fun calculateMarkupPrice(storePrice: Double, markPercentage: Double): Double {
 fun calculateDrivingDirectionKM(apiKey: String?, order: Order, store: StoreProfile): Double {
     val googleMapsInstance = GoogleMaps.instance
     // from lat long
-    val fromLatLong = if (store.storeType == StoreType.MOVERS)
+    val fromLatLong = if (!store.deliversFromFixedAddress)
         googleMapsInstance.geocodeAddress(apiKey, order.shippingData?.fromAddress, 100.0).execute().body()
             .let { it.results[0].geometry.location }
             .let { it.lat.toString() + "," + it.lng }

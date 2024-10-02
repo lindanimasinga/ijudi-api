@@ -42,6 +42,7 @@ class StoreProfile(
     var standardDeliveryKm = 0.0
     var ratePerKm = 0.0
     var franchiseName: String? = null
+    var deliversFromFixedAddress = true;
 
     init {
         super.bank = bank

@@ -4,6 +4,7 @@ import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.commons.model.OrderStage
 import io.curiousoft.izinga.commons.model.ShippingData
 import org.springframework.data.mongodb.repository.MongoRepository
+import java.time.LocalDate
 import java.util.*
 import javax.validation.constraints.NotNull
 
@@ -32,4 +33,5 @@ interface OrderRepository : MongoRepository<Order?, String?> {
     fun findByCustomerIdAndShippingDataMessengerIdAndStageIn(customerId: String, messengerId: String, stages: Array<OrderStage>): List<Order>?
     fun findByCustomerIdAndStage(id: String, stage7AllPaid: OrderStage): List<Order>?
     fun findByCustomerIdAndModifiedDateAfter(customerId: String, toDate: Date): List<Order>
+    fun findAllByCreatedDateAfter(ninetyDaysAgo: LocalDate): List<Order>
 }

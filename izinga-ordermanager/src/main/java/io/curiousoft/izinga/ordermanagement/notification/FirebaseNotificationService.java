@@ -2,11 +2,11 @@ package io.curiousoft.izinga.ordermanagement.notification;
 
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import io.curiousoft.izinga.messaging.firebase.FCMMessage;
 import io.curiousoft.izinga.messaging.firebase.FCMNotification;
 import io.curiousoft.izinga.messaging.firebase.FirebaseConnectionWrapper;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;

@@ -2,7 +2,6 @@ package io.curiousoft.izinga.commons.repo
 
 import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.UserProfile
-import java.util.*
 
 interface UserProfileRepo : ProfileRepo<UserProfile> {
     fun findByMobileNumber(phone: String): UserProfile?
@@ -13,4 +12,6 @@ interface UserProfileRepo : ProfileRepo<UserProfile> {
         longMin: Double,
         longMax: Double
     ): List<UserProfile>?
+
+    fun findByIdIn(inactiveCustomers45Days: MutableSet<String>): MutableList<UserProfile>
 }
