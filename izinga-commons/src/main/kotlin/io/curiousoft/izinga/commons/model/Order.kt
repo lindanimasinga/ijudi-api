@@ -3,8 +3,10 @@ package io.curiousoft.izinga.commons.model
 import io.curiousoft.izinga.commons.validator.ValidDeliveryInfo
 import io.curiousoft.izinga.commons.validator.ValidOrderType
 import org.springframework.data.mongodb.core.mapping.Document
+import java.lang.StringBuilder
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.security.SecureRandom
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.*
@@ -62,4 +64,13 @@ class Order : BaseModel() {
 }
 
 fun <R> Boolean.isTrue(isTrue: () -> R, isFalse : () -> R): R = if (this) isTrue.invoke() else isFalse.invoke()
-fun generateId() = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC).toString() + ""
+
+fun generateId(): String {
+    val random = SecureRandom()
+    val characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    val sb = StringBuilder()
+    while (sb.length < 5) {
+        sb.append(characters[random.nextInt(characters.length)])
+    }
+    return sb.substring(0, 5).uppercase(Locale.getDefault())
+}
