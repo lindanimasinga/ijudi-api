@@ -28,13 +28,13 @@ class QRCodeController(@Autowired private val qrCodeService: QRCodeService) {
     private val random = SecureRandom()
 
     @GetMapping("/generateQRCodes")
-    fun generateQRCodes(@RequestParam batchSize: Int): ResponseEntity<InputStreamResource> {
+    fun generateQRCodes(@RequestParam batchSize: Int, @RequestParam(required = false) heading: String?, @RequestParam(required = false) izingaLogo: Boolean? = true): ResponseEntity<InputStreamResource> {
         val baos = ByteArrayOutputStream()
         ZipOutputStream(baos).use { zos ->
             IntStream.range(0, batchSize).forEach { i: Int ->
                 val label = generateUniqueCode()
-                val randomText = "https://tips.izinga.co.za/tip?linkCode=${label}"
-                val qrCodeImage = qrCodeService.generateQRCodeImage(randomText, label, 450, 450)
+                val uniqueUrl = "https://tips.izinga.co.za/tip?linkCode=${label}"
+                val qrCodeImage = qrCodeService.generateQRCodeImage(heading, uniqueUrl, label, 450, 450)
                 val entry = ZipEntry("QRCode_" + (i + 1) + ".png")
                 entry.size = qrCodeImage!!.size.toLong()
                 zos.putNextEntry(entry)

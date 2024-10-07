@@ -22,16 +22,16 @@ import java.util.Map
 class QRCodeService(@Autowired val linkCodeUserRepo: LinkCodeUserRepository) {
 
     @Throws(Exception::class)
-    fun generateQRCodeImage(text: String?, label: String, width: Int, height: Int): ByteArray {
+    fun generateQRCodeImage(heading: String?, text: String?, label: String, width: Int, height: Int): ByteArray {
         val qrCodeWriter = QRCodeWriter()
         val hints = Map.of(EncodeHintType.CHARACTER_SET, "UTF-8")
         val bitMatrix = qrCodeWriter.encode(text, BarcodeFormat.QR_CODE, width, height, hints)
         val qrImage = MatrixToImageWriter.toBufferedImage(bitMatrix)
-        return addTemplateToQRCode(qrImage, label)
+        return addTemplateToQRCode(qrImage, label, heading)
     }
 
     @Throws(IOException::class)
-    private fun addTemplateToQRCode(qrImage: BufferedImage, label: String): ByteArray {
+    private fun addTemplateToQRCode(qrImage: BufferedImage, label: String, heading: String?): ByteArray {
         // Bank card dimensions in pixels at 300 DPI
         val cardWidth = 638
         val cardHeight = 1011
@@ -61,7 +61,7 @@ class QRCodeService(@Autowired val linkCodeUserRepo: LinkCodeUserRepository) {
         graphics.color = Color.WHITE
         graphics.font = Font("Arial", Font.PLAIN, 52)
         val metrics = graphics.fontMetrics
-        val scanToTipText = "SCAN TO TIP"
+        val scanToTipText = heading ?: "SCAN TO TIP"
         val scanToTipTextX = (cardWidth - metrics.stringWidth(scanToTipText)) / 2
         val scanToTipTextY = spacing + logoHeight + 2 * spacing
         graphics.drawString(scanToTipText, scanToTipTextX, scanToTipTextY)
