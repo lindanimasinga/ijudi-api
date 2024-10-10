@@ -380,9 +380,14 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public List<Order> findOrderByPhone(String phone) throws Exception {
-        UserProfile user = Optional.of(userProfileRepo.findByMobileNumber(phone))
-                .orElseThrow(() -> new Exception("User not found"));
-        return orderRepo.findByCustomerId(user.getId()).orElse(new ArrayList<>());
+        String last9Digits = phone.substring(phone.length() - 9);
+        for(String code : List.of("0", "+27", "27")) {
+            Optional<UserProfile> user = Optional.ofNullable(userProfileRepo.findByMobileNumber("%s%s".formatted(code, last9Digits)));
+            if (user.isPresent()) {
+                return orderRepo.findByCustomerId(user.get().getId()).orElse(new ArrayList<>());
+            }
+        }
+        throw new Exception("User not found");
     }
 
     @Override

@@ -1,15 +1,18 @@
 package io.curiousoft.izinga.usermanagement.users
 
+import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import org.springframework.stereotype.Service
+import java.util.*
 
 @Service
 class UserProfileService(userProfileRepo: UserProfileRepo) : ProfileServiceImpl<UserProfileRepo, UserProfile>(userProfileRepo) {
     
     fun findUserByPhone(phone: String): UserProfile? {
-        return profileRepo.findByMobileNumber(phone)
+        val last9Digits = phone.substring(phone.length - 9)
+        return listOf("0", "+27", "27").firstNotNullOf { profileRepo.findByMobileNumber("$it$last9Digits") }
     }
 
     fun findByLocation(role: ProfileRoles, latitude: Double, longitude: Double, range: Double): List<UserProfile>? {
