@@ -30,7 +30,7 @@ class StoreProfile(
     var hasPaymentAgreement = false
     var featured = false
     var featuredExpiry: Date? = null
-    var storeMessenger: HashSet<Messager>? = HashSet()
+    var storeMessenger: HashSet<StoreMessenger>? = HashSet()
     var storeWebsiteUrl: String? = null
     var izingaTakesCommission = false
     var scheduledDeliveryAllowed = false

@@ -3,7 +3,7 @@ package io.curiousoft.izinga.commons.model
 import javax.validation.constraints.DecimalMin
 import javax.validation.constraints.NotEmpty
 
-class Messager(
+class StoreMessenger(
     var name: @NotEmpty(message = "Messenger name not valid") String?,
     var standardDeliveryPrice: @DecimalMin(
         value = "0.001",
