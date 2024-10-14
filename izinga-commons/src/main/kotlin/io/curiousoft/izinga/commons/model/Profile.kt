@@ -32,6 +32,7 @@ open class Profile(
     var bank: Bank? = null
     var latitude = 0.0
     var longitude = 0.0
+    var documents: Set<DocumentAttachment>? = null
     var availabilityStatus: ProfileAvailabilityStatus = ProfileAvailabilityStatus.ONLINE
 }
 

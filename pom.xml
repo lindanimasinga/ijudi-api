@@ -11,6 +11,7 @@
         <module>izinga-yoco-pay</module>
         <module>store-menu-to-izinga-menu</module>
         <module>izinga-qrcode-generator</module>
+        <module>izinga-documentmanagement</module>
     </modules>
 
     <parent>

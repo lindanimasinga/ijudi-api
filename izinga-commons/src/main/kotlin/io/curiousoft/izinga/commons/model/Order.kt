@@ -38,6 +38,7 @@ class Order : BaseModel() {
     var smsSentToAdmin = false
     var freeDelivery = false
     var minimumDepositAllowedPerc = 0.0
+    var documents: Set<DocumentAttachment>? = null
     val totalAmount: Double
         get() = BigDecimal.valueOf(
             serviceFee + basket.totalPrice + (!freeDelivery && shippingData != null).isTrue({shippingData?.fee!!}) { 0.00 }

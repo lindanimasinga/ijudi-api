@@ -55,6 +55,12 @@
             <scope>runtime</scope>
         </dependency>
         <dependency>
+            <groupId>io.curiousoft.izinga</groupId>
+            <artifactId>izinga-documentmanagement</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
             <groupId>io.curiousoft.storemenu</groupId>
             <artifactId>store-menu-to-izinga-menu</artifactId>
             <version>1.0.3</version>

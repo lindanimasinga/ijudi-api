@@ -25,33 +25,38 @@ import java.util.TimeZone;
 		"io.curiousoft.izinga.messaging",
 		"io.curiousoft.izinga.yocopay",
 		"io.curiousoft.izinga.usermanagement",
-		"io.curiousoft.izinga.qrcodegenerator"})
+		"io.curiousoft.izinga.qrcodegenerator",
+		"io.curiousoft.izinga.documentmanagement"})
 @EntityScan({"io.curiousoft.izinga.ordermanagement",
 		"io.curiousoft.izinga.commons",
 		"io.curiousoft.izinga.recon",
 		"io.curiousoft.izinga.messaging",
 		"io.curiousoft.izinga.yocopay",
 		"io.curiousoft.izinga.usermanagement",
-		"io.curiousoft.izinga.qrcodegenerator"})
+		"io.curiousoft.izinga.qrcodegenerator",
+		"io.curiousoft.izinga.documentmanagement"})
 @EnableMongoRepositories({"io.curiousoft.izinga.ordermanagement",
 		"io.curiousoft.izinga.commons",
 		"io.curiousoft.izinga.recon",
 		"io.curiousoft.izinga.messaging",
 		"io.curiousoft.izinga.yocopay",
 		"io.curiousoft.izinga.usermanagement",
-		"io.curiousoft.izinga.qrcodegenerator"})
+		"io.curiousoft.izinga.qrcodegenerator",
+		"io.curiousoft.izinga.documentmanagement"})
 @ConfigurationPropertiesScan({"io.curiousoft.izinga.ordermanagement",
 		"io.curiousoft.izinga.yocopay",
 		"io.curiousoft.izinga.messaging",
 		"io.curiousoft.izinga.usermanagement",
-		"io.curiousoft.izinga.qrcodegenerator"})
+		"io.curiousoft.izinga.qrcodegenerator",
+		"io.curiousoft.izinga.documentmanagement"})
 @EnableFeignClients({"io.curiousoft.izinga.ordermanagement",
 		"io.curiousoft.izinga.commons",
 		"io.curiousoft.izinga.recon",
 		"io.curiousoft.izinga.messaging",
 		"io.curiousoft.izinga.yocopay",
 		"io.curiousoft.izinga.usermanagement",
-		"io.curiousoft.izinga.qrcodegenerator"})
+		"io.curiousoft.izinga.qrcodegenerator",
+		"io.curiousoft.izinga.documentmanagement"})
 public class IjudiApplication {
 
 	static Optional<ApplicationContext> app = Optional.empty();
