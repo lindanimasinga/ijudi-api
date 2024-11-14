@@ -26,7 +26,7 @@ import java.util.stream.IntStream;
 import static java.lang.String.format;
 
 @Service
-public class SchedulerService {
+    public class SchedulerService {
 
     private static final Logger LOG = LoggerFactory.getLogger(SchedulerService.class);
     private final long cleanUpMinutes;
@@ -186,7 +186,7 @@ public class SchedulerService {
         userProfileRepo.findByIdIn(inactiveCustomers45Days);
     }
 
-    @Scheduled(cron = "* 12 7,10 * * *")// 10 minutes
+    @Scheduled(cron = "* 12 5,8,10 * * *")// 10 minutes
     public void publishMenuOfTheDay() throws IOException, InterruptedException {
         Application.main(new String[]{});
     }
