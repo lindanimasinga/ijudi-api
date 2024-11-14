@@ -95,7 +95,13 @@ public class StoreControler {
                                 : storeService.findNearbyStores(latitude, longitude, storeType, range, size);
         var storeNames = stores
                 .stream()
-                .map(store -> new StoreNamesMap(store.getName(), store.getId(), store.getFranchiseName(), store.getLatitude(), store.getLatitude()))
+                .map(store -> new StoreNamesMap(store.getName(),
+                        store.getId(),
+                        store.getFranchiseName(),
+                        store.getLatitude(),
+                        store.getLatitude(),
+                        store.getImageUrl(),
+                        store.getDescription()))
                 .toList();
         return ResponseEntity.ok(storeNames);
     }
