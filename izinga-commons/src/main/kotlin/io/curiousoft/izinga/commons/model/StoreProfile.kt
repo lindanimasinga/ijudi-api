@@ -42,7 +42,7 @@ class StoreProfile(
     var standardDeliveryKm = 0.0
     var ratePerKm = 0.0
     var franchiseName: String? = null
-    var deliversFromFixedAddress: Boolean? = null;
+    var deliversFromMultipleAddresses: Boolean? = null;
 
     init {
         super.bank = bank

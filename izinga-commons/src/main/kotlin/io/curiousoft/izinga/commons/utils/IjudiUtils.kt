@@ -5,7 +5,6 @@ import io.curiousoft.izinga.messaging.domain.directions.Route
 import io.curiousoft.izinga.messaging.firebase.GoogleServices.GoogleMaps
 import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.commons.model.StoreProfile
-import io.curiousoft.izinga.commons.model.StoreType
 import org.hibernate.validator.internal.constraintvalidators.hv.LuhnCheckValidator
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -49,7 +48,7 @@ fun calculateMarkupPrice(storePrice: Double, markPercentage: Double): Double {
 fun calculateDrivingDirectionKM(apiKey: String?, order: Order, store: StoreProfile): Double {
     val googleMapsInstance = GoogleMaps.instance
     // from lat long
-    val fromLatLong = if (store.deliversFromFixedAddress?.let { !it } == true)
+    val fromLatLong = if (store.deliversFromMultipleAddresses == true)
         googleMapsInstance.geocodeAddress(apiKey, order.shippingData?.fromAddress, 100.0).execute().body()
             .let { it.results[0].geometry.location }
             .let { it.lat.toString() + "," + it.lng }
