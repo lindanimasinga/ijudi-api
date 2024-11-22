@@ -2,6 +2,7 @@ package io.curiousoft.izinga.ordermanagement.service;
 
 import co.za.izinga.menuupdater.Application;
 import io.curiousoft.izinga.commons.model.*;
+import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
@@ -11,6 +12,7 @@ import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -39,13 +41,15 @@ import static java.lang.String.format;
     private final EmailNotificationService emailNotificationService;
     private final PromotionService promotionService;
     private final UserProfileRepo userProfileRepo;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     public SchedulerService(OrderRepository orderRepo, StoreRepository storeRepository,
                             DeviceRepository deviceRepo, PushNotificationService pushNotificationService,
                             AdminOnlyNotificationService smsNotifcationService,
                             EmailNotificationService emailNotificationService,
                             PromotionService promotionService,
-                            @Value("${order.cleanup.unpaid.minutes}") long cleanUpMinutes, UserProfileRepo userProfileRepo) {
+                            @Value("${order.cleanup.unpaid.minutes}") long cleanUpMinutes, UserProfileRepo userProfileRepo,
+                            ApplicationEventPublisher applicationEventPublisher) {
         this.orderRepo = orderRepo;
         this.storeRepository = storeRepository;
         this.deviceRepo = deviceRepo;
@@ -55,9 +59,10 @@ import static java.lang.String.format;
         this.cleanUpMinutes = cleanUpMinutes;
         this.promotionService = promotionService;
         this.userProfileRepo = userProfileRepo;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
-    @Scheduled(fixedDelay = 150000, initialDelay = 150000)// 10 minutes
+    @Scheduled(fixedDelay = 600000, initialDelay = 10000)// 10 minutes
     public void checkUnconfirmedOrders() {
         List<Order> orders = orderRepo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         LOG.info("Found %s unconfirmed orders..".formatted(orders.size()));
@@ -97,6 +102,31 @@ import static java.lang.String.format;
                 } catch (Exception e) {
                     LOG.error("Failed to send sms. ", e);
                 }
+            }
+        });
+    }
+
+    @Scheduled(fixedDelay = 600000, initialDelay = 20000)// 10 minutes
+    public void checkScheduledOrders() {
+        List<Order> orders = orderRepo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM)
+                .stream()
+                .filter(order -> ShippingData.ShippingType.SCHEDULED_DELIVERY == order.getShippingData().getType())
+                .toList();
+        LOG.info("Found %s unconfirmed scheduled orders..".formatted(orders.size()));
+        orders.forEach(order -> {
+            Date checkDate = Date.from(LocalDateTime.now()
+                    .plusMinutes(60)
+                    .atZone(ZoneId.systemDefault())
+                    .toInstant());
+
+            //notify by sms
+            boolean sendNewOrderNotification = order.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY
+                    && order.getShippingData().getPickUpTime().before(checkDate);
+
+            if (sendNewOrderNotification) {
+                var store = storeRepository.findById(order.getShopId());
+                NewOrderEvent newOrderEvent = new NewOrderEvent(this, order, order.getShippingData().getMessengerId(), store.get());
+                applicationEventPublisher.publishEvent(newOrderEvent);
             }
         });
     }
