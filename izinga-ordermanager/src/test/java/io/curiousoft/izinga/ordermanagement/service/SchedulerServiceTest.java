@@ -20,6 +20,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -57,6 +58,8 @@ public class SchedulerServiceTest {
     private AdminOnlyNotificationService adminOnlyNotificationService;
     @Mock
     private UserProfileRepo userRepo;
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
 
     //system under test
     private SchedulerService sut;
@@ -77,7 +80,8 @@ public class SchedulerServiceTest {
                 emailNotificationService,
                 promotionService,
                 cleaupMinutes,
-                userRepo
+                userRepo,
+                applicationEventPublisher
         );
     }
 
