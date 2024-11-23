@@ -1,6 +1,8 @@
 package io.curiousoft.izinga.ordermanagement.orders;
 
 import io.curiousoft.izinga.commons.model.*;
+import io.curiousoft.izinga.commons.order.events.OrderEvent;
+import io.curiousoft.izinga.commons.order.events.ScheduledOrderEvent;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
@@ -253,9 +255,14 @@ public class OrderServiceImpl implements OrderService {
         storeRepository.save(store);
         LOG.info("New order placed. Order No. {}, Basket Amount. R{}", order.getId(), order.getBasketAmount());
         LOG.info("New order placed. Order No. {}, Delivery Fee. R{}", order.getId(), order.getShippingData().getFee());
-        NewOrderEvent newOrderEvent = new NewOrderEvent(this, order, persistedOrder.getShippingData().getMessengerId(), store);
         var orderCompleted = orderRepo.save(persistedOrder);
+
+        //send order event
+        OrderEvent newOrderEvent = order.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY ?
+                new ScheduledOrderEvent(this, order, persistedOrder.getShippingData().getMessengerId(), store)
+        : new NewOrderEvent(this, order, persistedOrder.getShippingData().getMessengerId(), store);
         applicationEventPublisher.publishEvent(newOrderEvent);
+
         return orderCompleted;
     }
 
@@ -286,71 +293,6 @@ public class OrderServiceImpl implements OrderService {
                 OrderStage collectionStage = onlineCollectionStages.get(index + 1);
                 order.setStage(collectionStage);
                 break;
-        }
-
-        final String order_status_updated = "Order Status Updated";
-        switch (order.getStage()) {
-            case STAGE_2_STORE_PROCESSING:
-                //notify only customer
-                deviceRepo.findByUserId(order.getCustomerId()).forEach(device -> {
-                    PushHeading title = new PushHeading("The store has started processing your order " + order.getId(),
-                            order_status_updated, null);
-                    PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
-                    try {
-                        pushNotificationService.sendNotification(device, message);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                });
-                break;
-            case STAGE_3_READY_FOR_COLLECTION:
-                StoreProfile shop = storeRepository.findById(order.getShopId()).get();
-                List<Device> devices = order.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY ?
-                        deviceRepo.findByUserId(order.getCustomerId()) :
-                        deviceRepo.findByUserId(order.getShippingData().getMessengerId());
-
-                devices.forEach(device -> {
-                    PushHeading title = new PushHeading("Food is ready for Collection at " + shop.getName(),
-                            order_status_updated, null);
-                    PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
-                    try {
-                        pushNotificationService.sendNotification(device, message);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                });
-
-                break;
-            case STAGE_4_ON_THE_ROAD:
-                deviceRepo.findByUserId(order.getCustomerId()).forEach(device -> {
-                    PushHeading title = new PushHeading("The driver is on the way",
-                            order_status_updated, null);
-                    PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
-                    try {
-                        pushNotificationService.sendNotification(device, message);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                });
-
-                break;
-            case STAGE_5_ARRIVED:
-                deviceRepo.findByUserId(order.getCustomerId()).forEach(device -> {
-                    PushHeading title = new PushHeading("The driver has arrived",
-                            order_status_updated, null);
-                    PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
-                    try {
-                        pushNotificationService.sendNotification(device, message);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                });
-
-                break;
-            case STAGE_6_WITH_CUSTOMER:
-                order.setStage(OrderStage.STAGE_7_ALL_PAID);
-                break;
-
         }
         return orderRepo.save(order);
     }
