@@ -7,13 +7,13 @@ import com.google.gson.GsonBuilder;
 import io.curiousoft.izinga.messaging.firebase.FCMMessage;
 import io.curiousoft.izinga.messaging.firebase.FCMNotification;
 import io.curiousoft.izinga.messaging.firebase.FirebaseConnectionWrapper;
+import io.curiousoft.izinga.messaging.firebase.WebPush;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -63,7 +63,8 @@ public class FirebaseNotificationService implements PushNotificationService {
         devices.forEach(device -> {
             PushHeading title = new PushHeading(
                     "New order placed at "+ storeName +". Please confirm the order.",
-                    "New Order Received", null);
+                    "New Order Received", null,
+                    String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
             PushMessage message = new PushMessage(PushMessageType.NEW_ORDER, title, order);
             try {
                 sendNotification(device, message);
@@ -106,7 +107,8 @@ public class FirebaseNotificationService implements PushNotificationService {
         FCMNotification notification = new FCMNotification(message.getPushHeading().getBody(),
                 message.getPushHeading().getTitle(),
                 null);
-        return new FCMMessage(destination, notification);
+        WebPush webPush = new WebPush(new WebPush.FcmOptions(message.getPushHeading().getLink()));
+        return new FCMMessage(destination, notification, webPush);
     }
 
     @Override
@@ -142,8 +144,11 @@ public class FirebaseNotificationService implements PushNotificationService {
                                            Order order,
                                            StoreProfile shop) {
         messengerDevices.forEach(device -> {
-            PushHeading title = new PushHeading("An order is placed at " +shop.getName() + " shop. We will notify you when the order is ready for collection. :)",
-                    PushMessageType.NEW_ORDER.toString(), null);
+            PushHeading title = new PushHeading(
+                    "An order is placed at %s shop. We will notify you when the order is ready for collection. :)".formatted(shop.getName()),
+                    PushMessageType.NEW_ORDER.toString(),
+                    null,
+                    String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
             Order tempOrder = new Order();
             PushMessage message = new PushMessage(PushMessageType.NEW_ORDER, title, tempOrder);
             try {

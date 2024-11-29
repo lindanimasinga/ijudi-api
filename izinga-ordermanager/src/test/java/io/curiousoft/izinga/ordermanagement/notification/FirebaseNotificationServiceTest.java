@@ -37,11 +37,11 @@ public class FirebaseNotificationServiceTest {
         //given
         Device device = new Device("testToken");
         String content = "hello world";
-        PushHeading heading = new PushHeading("hello", "greetings", null);
+        PushHeading heading = new PushHeading("hello", "greetings", null, null);
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER, heading, content);
 
         FCMNotification notification = new FCMNotification(heading.getBody(), heading.getTitle(), null);
-        FCMMessage fcmMessage = new FCMMessage(device.getToken(), notification);
+        FCMMessage fcmMessage = new FCMMessage(device.getToken(), notification, null);
 
         //when
         firebaseNotificationService.sendNotification(device, message);
@@ -174,11 +174,11 @@ public class FirebaseNotificationServiceTest {
         String content = "hello world";
         String topicName = "topic";
 
-        PushHeading heading = new PushHeading("hello", "greetings", null);
+        PushHeading heading = new PushHeading("hello", "greetings", null, null);
         PushMessage message = new PushMessage(PushMessageType.MARKETING, heading, content);
 
         FCMNotification notification = new FCMNotification(heading.getBody(), heading.getTitle(), null);
-        FCMMessage fcmMessage = new FCMMessage("/topics/"+topicName, notification);
+        FCMMessage fcmMessage = new FCMMessage("/topics/"+topicName, notification, null);
 
         //when
         firebaseNotificationService.publishTopic(topicName, message);
