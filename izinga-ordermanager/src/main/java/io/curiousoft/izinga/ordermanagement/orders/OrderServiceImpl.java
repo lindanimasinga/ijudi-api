@@ -363,8 +363,10 @@ public class OrderServiceImpl implements OrderService {
         order.setStage(OrderStage.CANCELLED);
         order = orderRepo.save(order);
         List<Device> customerDevices = deviceRepo.findByUserId(order.getCustomerId());
-        PushHeading pushMessage = new PushHeading("Your order has been cancelled. Payment has been reversed to your account.",
-                "Your order has been cancelled.", null);
+        PushHeading pushMessage = new PushHeading(
+                "Your order has been cancelled. Payment has been reversed to your account.",
+                "Your order has been cancelled.", null,
+                String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, pushMessage, order);
         customerDevices.forEach(device -> {
             try {

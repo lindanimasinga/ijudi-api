@@ -1572,8 +1572,10 @@ public class OrderServiceTest {
         order.setShopId(shopId);
         order.setDescription("desc");
         Device device = new Device("token");
-        PushHeading title = new PushHeading("The store has started processing your order " + order.getId(),
-                "Order Status Updated", null);
+        PushHeading title = new PushHeading(
+                "The store has started processing your order " + order.getId(),
+                "Order Status Updated", null,
+                String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
@@ -1612,8 +1614,10 @@ public class OrderServiceTest {
         order.setShopId(shopId);
         order.setDescription("desc");
         Device device = new Device("token");
-        PushHeading title = new PushHeading("Food is ready for Collection at " + shop.getName(),
-                "Order Status Updated", null);
+        PushHeading title = new PushHeading(
+                "Food is ready for Collection at %s".formatted(shop.getName()),
+                "Order Status Updated", null,
+                String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
@@ -1657,7 +1661,8 @@ public class OrderServiceTest {
         order.setDescription("desc");
         Device device = new Device("token");
         PushHeading title = new PushHeading("The driver is on the way",
-                "Order Status Updated", null);
+                "Order Status Updated", null,
+                String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
@@ -1699,7 +1704,8 @@ public class OrderServiceTest {
         order.setDescription("desc");
         Device device = new Device("token");
         PushHeading title = new PushHeading("The driver has arrived",
-                "Order Status Updated", null);
+                "Order Status Updated", null,
+                String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
@@ -1823,7 +1829,8 @@ public class OrderServiceTest {
         order.setDescription("desc");
         Device device = new Device("token");
         PushHeading title = new PushHeading("Food is ready for Collection at " + storeProfile.getName(),
-                "Order Status Updated", null);
+                "Order Status Updated", null,
+                String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
@@ -1867,7 +1874,8 @@ public class OrderServiceTest {
         order.setDescription("desc");
         Device device = new Device("token");
         PushHeading title = new PushHeading("Food is ready for Collection at " + storeProfile.getName(),
-                "Order Status Updated", null);
+                "Order Status Updated", null,
+                String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
 
         //when
@@ -1904,7 +1912,8 @@ public class OrderServiceTest {
         order.setDescription("desc");
         Device device = new Device("token");
         PushHeading title = new PushHeading("The store has started processing your order " + order.getId(),
-                "Order Status Updated", null);
+                "Order Status Updated", null,
+                String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
@@ -2108,7 +2117,8 @@ public class OrderServiceTest {
         verify(repo).findById(order.getId());
         verify(paymentService).reversePayment(order);
         PushHeading title = new PushHeading("Your order has been cancelled. Payment has been reversed to your account.",
-                "Your order has been cancelled.", null);
+                "Your order has been cancelled.", null,
+                String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
         verify(pushNotificationService, times(2)).sendNotification(any(), eq(message));
         assertEquals(OrderStage.CANCELLED, cancelledOrder.getStage());
