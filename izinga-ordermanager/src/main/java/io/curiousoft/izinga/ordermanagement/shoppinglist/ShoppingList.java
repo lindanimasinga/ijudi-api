@@ -3,16 +3,20 @@ package io.curiousoft.izinga.ordermanagement.shoppinglist;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.annotation.Id;
 
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
 @Getter
 @Setter
 @Slf4j
 public class ShoppingList {
 
+    @Id
+    private String id = UUID.randomUUID().toString();
     private List<ShoppingItem> items = new ArrayList<>();
     private Schedule schedule;
     private Date startDate, endDate;

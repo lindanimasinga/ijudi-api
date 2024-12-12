@@ -20,7 +20,7 @@ public class ShoppingListService {
         return shoppingListRepository.save(shoppingList);
     }
 
-    public ShoppingList updateShoppingList(Long id, ShoppingList updatedList) {
+    public ShoppingList updateShoppingList(String id, ShoppingList updatedList) {
         return shoppingListRepository.findById(id).map(item -> {
             item.setSchedule(updatedList.getSchedule());
             item.setStartDate(updatedList.getStartDate());
@@ -30,14 +30,14 @@ public class ShoppingListService {
         }).orElseThrow(() -> new ResourceNotFoundException("Shopping List not found with id %d".formatted(id)));
     }
 
-    public ShoppingList addItemToShoppingList(Long id, ShoppingItem item) {
+    public ShoppingList addItemToShoppingList(String id, ShoppingItem item) {
         return shoppingListRepository.findById(id).map(list -> {
             list.getItems().add(item);
             return shoppingListRepository.save(list);
         }).orElseThrow(() -> new ResourceNotFoundException("Shopping List not found with id " + id));
     }
 
-    public ShoppingList removeItemFromShoppingList(Long id, String itemName) {
+    public ShoppingList removeItemFromShoppingList(String id, String itemName) {
         return shoppingListRepository.findById(id).map(list -> {
             list.getItems().removeIf(item -> item.getName().equalsIgnoreCase(itemName));
             return shoppingListRepository.save(list);
@@ -48,12 +48,12 @@ public class ShoppingListService {
         return shoppingListRepository.findByUserIds(userId);
     }
 
-    public ShoppingList getShoppingListById(Long id) {
+    public ShoppingList getShoppingListById(String id) {
         return shoppingListRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Shopping List not found with id " + id));
     }
 
-    public void deleteShoppingList(Long id) {
+    public void deleteShoppingList(String id) {
         shoppingListRepository.deleteById(id);
     }
 }
