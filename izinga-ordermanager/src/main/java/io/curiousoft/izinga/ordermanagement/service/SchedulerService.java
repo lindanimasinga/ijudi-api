@@ -216,8 +216,8 @@ import static java.lang.String.format;
         userProfileRepo.findByIdIn(inactiveCustomers45Days);
     }
 
-    @Scheduled(cron = "* 12 5,8,10 * * *")// 10 minutes
+    @Scheduled(fixedDelay = 10000000L , initialDelay = 5000)// 10 minutes
     public void publishMenuOfTheDay() throws IOException, InterruptedException {
-        Application.main(new String[]{});
+       // Application.main(new String[]{});
     }
 }

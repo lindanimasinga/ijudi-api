@@ -2,6 +2,7 @@ package io.curiousoft.izinga.ordermanagement.orders;
 
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.order.events.OrderEvent;
+import io.curiousoft.izinga.commons.order.events.OrderUpdatedEvent;
 import io.curiousoft.izinga.commons.order.events.ScheduledOrderEvent;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.order.OrderRepository;
@@ -277,11 +278,6 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new Exception("Order with id " + orderId + " not found."));
         int index = onlineDeliveryStages.indexOf(order.getStage());
 
-        if (order.getOrderType() == INSTORE || order.getStage() == OrderStage.STAGE_0_CUSTOMER_NOT_PAID
-                || order.getStage() == OrderStage.STAGE_7_ALL_PAID) {
-            return order;
-        }
-
         if(order.getStage() == OrderStage.CANCELLED) throw new Exception("Order with id " + orderId + " has been cancelled");
 
         switch (order.getShippingData().getType()) {
@@ -294,6 +290,9 @@ public class OrderServiceImpl implements OrderService {
                 order.setStage(collectionStage);
                 break;
         }
+        var store = storeRepository.findById(order.getShopId()).get();
+        OrderUpdatedEvent orderUpdatedEvent = new OrderUpdatedEvent(this, order, order.getShippingData().getMessengerId(), store);
+        applicationEventPublisher.publishEvent(orderUpdatedEvent);
         return orderRepo.save(order);
     }
 

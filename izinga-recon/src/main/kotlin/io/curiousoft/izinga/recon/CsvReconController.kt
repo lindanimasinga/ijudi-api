@@ -1,12 +1,8 @@
 package io.curiousoft.izinga.recon
 
-import io.curiousoft.izinga.recon.payout.PayoutType
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
-import java.time.LocalDate
-import java.time.OffsetDateTime
 import javax.servlet.http.HttpServletResponse
 
 @RestController
@@ -19,14 +15,12 @@ class CsvReconController(val reconService: ReconService) {
             contentType = "application/csv"
             addHeader("Content-Disposition", "attachment; filename=\"shop-payout-bundle.csv\"")
         }
-        reconService.generateNextPayoutsToShop()?.let {
-            payoutBundleToCsv(response.writer, it)
-        }
+        payoutBundleToCsv(response.writer, reconService.getCurrentPayoutBundleForShops())
     }
 
     @GetMapping(value = ["/messenger-payout-bundle"], produces = ["application/csv"])
     fun messengerPayoutBundle(response: HttpServletResponse) {
-        reconService.generateNextPayoutsToMessenger()?.let {
+        reconService.getCurrentPayoutBundleForMessenger().let {
             response.contentType = "application/csv"
             val fileName = "messenger-payout-bundle-${it.createdDate}.csv"
             response.addHeader("Content-Disposition", "attachment; filename=\"${fileName}\"")

@@ -2,6 +2,8 @@ package io.curiousoft.izinga.ordermanagement.orders.events;
 
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.order.OrderRepository;
+import io.curiousoft.izinga.commons.order.events.OrderCancelledEvent;
+import io.curiousoft.izinga.commons.order.events.OrderUpdatedEvent;
 import io.curiousoft.izinga.commons.payout.events.PayoutBalanceUpdatedEvent;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
@@ -45,7 +47,6 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
         }
 
         var messenger = userProfileService.find(event.getMessenger());
-
         boolean isDelivery = order.getShippingData() != null
                 && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
                 && store.getStoreType() != StoreType.TIPS && store.getStoreType() != StoreType.CAR_WASH;
@@ -69,11 +70,7 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
             }
 
             //get payout balance send event to update payout
-            Optional.ofNullable(reconService.generateNextPayoutsToMessenger())
-                    .stream()
-                    .flatMap(pay -> pay.getPayouts().stream())
-                    .filter(pay -> Objects.equals(pay.getToId(), order.getShippingData().getMessengerId()))
-                    .findFirst()
+            Optional.ofNullable(reconService.generatePayoutForMessengerAndOrder(order))
                     .ifPresent( payout -> {
                         var payoutTotal = payout.getTotal().setScale(2, RoundingMode.HALF_UP);
 
@@ -122,11 +119,23 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
         }
     }
 
+    @EventListener
     @Override
-    public void handleOrderUpdatedEvent(NewOrderEvent newOrderEvent) {
+    public void handleOrderUpdatedEvent(OrderUpdatedEvent event) {
+        var order = event.getOrder();
+        var store = event.getReceivingStore();
+
+        if(event.getMessenger() == null) {
+            return;
+        }
+
+        if (order.getStage() == OrderStage.STAGE_7_ALL_PAID) {
+            reconService.generatePayoutForMessengerAndOrder(order);
+        }
     }
 
     @Override
-    public void handleOrderCancelledEvent(NewOrderEvent newOrderEvent) {
+    public void handleOrderCancelledEvent(OrderCancelledEvent newOrderEvent) {
+
     }
 }

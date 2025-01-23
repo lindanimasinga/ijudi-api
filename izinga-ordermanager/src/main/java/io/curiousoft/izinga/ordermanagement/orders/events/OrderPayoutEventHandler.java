@@ -20,31 +20,30 @@ public record OrderPayoutEventHandler(OrderRepository orderRepository,
 
     @EventListener
     public void handleNewOrderEvent(OrderPayoutEvent event) {
-        orderRepository.findById(event.getOrderId()).ifPresent(order -> {
-            order.setShopPaid(event.isStorePaid());
-            order.setMessengerPaid(event.isMessengerPaid());
-            orderRepository.save(order);
+        orderRepository.findById(event.getOrderId())
+                .ifPresent(order -> {
+                    order.setShopPaid(event.isStorePaid());
+                    order.setMessengerPaid(event.isMessengerPaid());
+                    orderRepository.save(order);
 
-            //get payout balance send event to update payout
-            Optional.ofNullable(reconService.generateNextPayoutsToMessenger())
-                    .stream()
-                    .flatMap(pay -> pay.getPayouts().stream())
-                    .filter(pay -> Objects.equals(pay.getToId(), order.getShippingData().getMessengerId()))
-                    .findFirst()
-                    .ifPresent(payout -> {
-                        var payoutTotal = payout.getTotal().setScale(2, RoundingMode.HALF_UP);
-                        var balanceEventAndroid = new PayoutBalanceUpdatedEvent(order.getShippingData().getMessengerId(),
-                                payoutTotal,
-                                DeviceType.ANDROID,
-                                this);
-                        eventPublisher.publishEvent(balanceEventAndroid);
-                        var balanceEventIOS = new PayoutBalanceUpdatedEvent(order.getShippingData().getMessengerId(),
-                                payoutTotal,
-                                DeviceType.APPLE,
-                                this);
-                        eventPublisher.publishEvent(balanceEventIOS);
-                    });
-        });
+                    //get payout balance send event to update payout
+                    reconService.getCurrentPayoutBundleForMessenger().getPayouts().stream()
+                            .filter(payout -> payout.getToId().equals(order.getId()))
+                            .findFirst()
+                            .ifPresent(payout -> {
+                                var payoutTotal = payout.getTotal().setScale(2, RoundingMode.HALF_UP);
+                                var balanceEventAndroid = new PayoutBalanceUpdatedEvent(order.getShippingData().getMessengerId(),
+                                        payoutTotal,
+                                        DeviceType.ANDROID,
+                                        this);
+                                eventPublisher.publishEvent(balanceEventAndroid);
+                                var balanceEventIOS = new PayoutBalanceUpdatedEvent(order.getShippingData().getMessengerId(),
+                                        payoutTotal,
+                                        DeviceType.APPLE,
+                                        this);
+                                eventPublisher.publishEvent(balanceEventIOS);
+                            });
+                });
     }
 
 }

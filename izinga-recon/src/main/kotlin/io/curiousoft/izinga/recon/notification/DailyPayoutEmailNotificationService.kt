@@ -24,22 +24,19 @@ class DailyPayoutEmailNotificationService(
 
     @Scheduled(cron = "0 0 17 1/1 * ?") // every day at 7pm
     fun notifyDailyPayouts() {
-        val shopPayouts = reconService.generateNextPayoutsToShop()
-        val messagerPayouts = reconService.generateNextPayoutsToMessenger()
+        val shopPayouts = reconService.getCurrentPayoutBundleForShops()
+        val messagerPayouts = reconService.getCurrentPayoutBundleForMessenger()
 
-        shopPayouts?.payouts
-            ?.filter { !it.emailSent }
-            ?.map {
-                    sendPayoutEmail(it)
-            }
+        shopPayouts.payouts
+            .filter { !it.emailSent }
+            .map { sendPayoutEmail(it) }
 
-        messagerPayouts?.payouts
-            ?.filter { !it.emailSent }
-            ?.map {
-                sendPayoutEmail(it)
-            }
-        shopPayouts?.let { reconService.updateBundle(it) }
-        messagerPayouts?.let { reconService.updateBundle(it) }
+        messagerPayouts.payouts
+            .filter { !it.emailSent }
+            .map { sendPayoutEmail(it) }
+
+        reconService.updateBundle(shopPayouts)
+        reconService.updateBundle(messagerPayouts)
     }
 
     private fun sendPayoutEmail(it: Payout) {

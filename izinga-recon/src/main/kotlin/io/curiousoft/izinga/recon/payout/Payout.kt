@@ -22,6 +22,7 @@ abstract class Payout(
     var emailSubject: String?,
     var orders: MutableSet<Order>,
     var tips: MutableSet<Tip>? = null,
+    var payoutStage: PayoutStage
 ): BaseModel() {
     abstract var paid: Boolean
     abstract val total: BigDecimal
@@ -42,11 +43,14 @@ class MessengerPayout(
     emailAddress: String?,
     bundleId: String? = null,
     emailSubject: String?,
-    tips: MutableSet<Tip>? = null
+    tips: MutableSet<Tip>? = null,
+    payoutStage: PayoutStage = PayoutStage.PENDING
 ) : Payout(
     toId = toId, toName = toName, toType = toType, toBankName = toBankName, toAccountNumber = toAccountNumber,
     toBranchCode = toBranchCode, fromReference = fromReference, toReference = toReference, emailNotify = emailNotify,
-    emailAddress = emailAddress, emailSubject = emailSubject, orders = orders, bundleId = bundleId, tips = tips) {
+    emailAddress = emailAddress, emailSubject = emailSubject, orders = orders, bundleId = bundleId, tips = tips,
+    payoutStage = payoutStage
+) {
     override var paid: Boolean = false
     var isPermEmployed: Boolean = false
 
@@ -68,11 +72,17 @@ class ShopPayout(
     emailAddress: String?,
     emailSubject: String?,
     bundleId: String? = null,
+    payoutStage: PayoutStage = PayoutStage.PENDING
 ) : Payout(
     toId = toId, toName = toName, toType = toType, toBankName = toBankName, toAccountNumber = toAccountNumber,
     toBranchCode = toBranchCode, fromReference = fromReference, toReference = toReference,
-    emailNotify = emailNotify, emailAddress = emailAddress, emailSubject = emailSubject, orders = orders, bundleId = bundleId) {
+    emailNotify = emailNotify, emailAddress = emailAddress, emailSubject = emailSubject, orders = orders, bundleId = bundleId,
+    payoutStage = payoutStage) {
 
     override val total: BigDecimal get() = orders.sumOf { it.basketAmount }.toBigDecimal()
     override var paid: Boolean = false
+}
+
+enum class PayoutStage {
+    PENDING, PROCESSING, COMPLETED
 }

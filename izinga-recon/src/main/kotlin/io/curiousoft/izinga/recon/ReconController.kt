@@ -12,13 +12,13 @@ import java.util.*
 class ReconController(val reconService: ReconService) {
 
     @GetMapping("/shopPayoutBundle")
-    fun shopPayoutBundle() = reconService.generateNextPayoutsToShop()
+    fun shopPayoutBundle() = reconService.getCurrentPayoutBundleForShops()
 
     @PatchMapping("/shopPayoutBundle")
     fun shopPayoutBundle(@RequestBody payoutResults: PayoutBundleResults) = reconService.updatePayoutStatus(payoutResults)
 
     @GetMapping("/messengerPayoutBundle")
-    fun messengerPayoutBundle() = reconService.generateNextPayoutsToMessenger()
+    fun messengerPayoutBundle() = reconService.getCurrentPayoutBundleForMessenger()
 
     @PatchMapping("/messengerPayoutBundle")
     fun messengerPayoutBundle(@RequestBody payoutResults: PayoutBundleResults) = reconService.updatePayoutStatus(payoutResults)
