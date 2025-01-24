@@ -12,7 +12,8 @@ class UserProfileService(userProfileRepo: UserProfileRepo) : ProfileServiceImpl<
     
     fun findUserByPhone(phone: String): UserProfile? {
         val last9Digits = phone.substring(phone.length - 9)
-        return listOf("0", "+27", "27").firstNotNullOf { profileRepo.findByMobileNumber("$it$last9Digits") }
+        return listOf("0", "+27", "27")
+            .firstNotNullOfOrNull { profileRepo.findByMobileNumber("$it$last9Digits") }
     }
 
     fun findByLocation(role: ProfileRoles, latitude: Double, longitude: Double, range: Double): List<UserProfile>? {
