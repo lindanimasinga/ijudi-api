@@ -1,15 +1,12 @@
 package io.curiousoft.izinga.recon
 
 import io.curiousoft.izinga.commons.model.*
-import io.curiousoft.izinga.commons.order.OrderRepository
 import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.payout.*
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
-import io.curiousoft.izinga.recon.payout.repo.PayoutBundleRepo
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
-import io.curiousoft.izinga.recon.tips.TipsService
 import io.mockk.*
 import org.junit.Assert.*
 import org.junit.Before
@@ -24,25 +21,18 @@ import java.util.*
 class ReconServiceTest {
 
     lateinit var sut: ReconServiceImpl
-    private val orderRepo = mockk<OrderRepository>()
-    private val payoutBundleRepo = mockk<PayoutBundleRepo>()
     private val storeRepo = mockk<StoreRepository>()
     private val messengerRepo = mockk<UserProfileRepo>()
     private val shopPayoutRepository = mockk<ShopPayoutRepository>()
     private val messengerPayoutRepository = mockk<MessengerPayoutRepository>()
-    private val tipService = mockk<TipsService>()
     private val applicationEventPublisher = mockk<ApplicationEventPublisher>()
-
 
     @Before
     fun setUp() {
         sut = ReconServiceImpl(
-            orderRepo = orderRepo,
-            payoutBundleRepo = payoutBundleRepo,
             storeRepo = storeRepo,
             userProfileRepo = messengerRepo,
             shopPayoutRepo = shopPayoutRepository,
-            tipsService = tipService,
             messengerPayoutRepository = messengerPayoutRepository,
             applicationEventPublisher = applicationEventPublisher)
     }
@@ -125,13 +115,12 @@ class ReconServiceTest {
             emailSubject = "email",
         )
 
-        every { shopPayoutRepository.findByPaid() } returns listOf(payout1,payout2,payout3)
+        every { shopPayoutRepository.findByPayoutStage() } returns listOf(payout1,payout2,payout3)
 
         //when
         val paybundle = sut.getCurrentPayoutBundleForShops()
 
         //then
-        assertFalse(paybundle.executed)
         assertEquals(3, paybundle.payouts.size)
         assertEquals(3, paybundle.numberOfPayouts)
         assertEquals(700.0.toBigDecimal(), paybundle.payoutTotalAmount)
@@ -206,17 +195,104 @@ class ReconServiceTest {
 
         every { messengerPayoutRepository.findByPayoutStage() } returns listOf(shopPayout1,payout2,payout3)
 
-        every { payoutBundleRepo.save(any()) } returnsArgument 0
+        every { messengerPayoutRepository.save(any()) } returnsArgument 0
+        every { shopPayoutRepository.save(any()) } returnsArgument 0
 
         //when
         val paybundle = sut.getCurrentPayoutBundleForMessenger()
 
         //then
-        assertFalse(paybundle.executed)
         assertEquals(3, paybundle.payouts.size)
         assertEquals(PayoutType.MESSENGER, paybundle.type)
         assertEquals(3, paybundle.numberOfPayouts)
         assertEquals(105.75.toBigDecimal(), paybundle.payoutTotalAmount)
+    }
+
+    @Test
+    fun `get next payout for messengers mark as processing`() {
+        //given 3 orders not paid to messengers
+        val messenger1 = "messenger1-id"
+        val messenger2 = "messenger2-id"
+        val messenger3 = "messenger3-id"
+
+        val messenger1Name = "messenger1name"
+        val messenger2Name = "messenger2name"
+        val messenger3Name = "messenger3name"
+
+        val shop1Orders: MutableSet<Order> = mutableSetOf(
+            Order().also {
+                it.description = "order1"
+                it.messengerPaid = false
+                it.shippingData = ShippingData().apply { messengerId = messenger1; fee = 30.0 }
+            }
+        )
+        val shop2Orders: MutableSet<Order> = mutableSetOf(
+            Order().also {
+                it.description = "order2"
+                it.messengerPaid = false
+                it.shippingData = ShippingData().apply { messengerId = messenger2; fee = 40.0 }
+            }
+        )
+        val shop3Orders: MutableSet<Order> = mutableSetOf(
+            Order().also {
+                it.description = "order3"
+                it.messengerPaid = false
+                it.shippingData = ShippingData().apply { messengerId = messenger3; fee = 35.75 }
+            }
+        )
+
+        val shopPayout1 = MessengerPayout(
+            toId = messenger1, toName = messenger1Name, toBankName = "Ewallet", toType = BankAccType.CHEQUE,
+            toAccountNumber = "messenger1",
+            toBranchCode = "codeBranch",
+            fromReference = "fromRef",
+            toReference = "toRef",
+            emailNotify = "email",
+            orders = shop1Orders,
+            emailAddress = "email",
+            emailSubject = "email"
+        )
+        val payout2 = MessengerPayout(
+            toId = messenger2, toName = messenger2Name, toBankName = "FNB", toType = BankAccType.CHEQUE,
+            toAccountNumber = "messenger2",
+            toBranchCode = "codeBranch",
+            fromReference = "fromRef",
+            toReference = "toRef",
+            emailNotify = "email",
+            orders = shop2Orders,
+            emailAddress = "email",
+            emailSubject = "email"
+        )
+        val payout3 = MessengerPayout(
+            toId = messenger3, toName = messenger3Name, toBankName = "ABSA", toType = BankAccType.CHEQUE,
+            toAccountNumber = "messenger3",
+            toBranchCode = "codeBranch",
+            fromReference = "fromRef",
+            toReference = "toRef",
+            emailNotify = "email",
+            orders = shop3Orders,
+            emailAddress = "email",
+            emailSubject = "email"
+        )
+
+        every { messengerPayoutRepository.findByPayoutStage() } returns listOf(shopPayout1,payout2,payout3)
+
+        every { messengerPayoutRepository.save(any()) } returnsArgument 0
+        every { shopPayoutRepository.save(any()) } returnsArgument 0
+
+        //mark payout as processing
+        var paybundle = sut.getCurrentPayoutBundleForMessenger()
+        paybundle.payouts.forEach { it.payoutStage = PayoutStage.PROCESSING }
+        sut.updateBundle(paybundle)
+
+        //when
+        paybundle = sut.getCurrentPayoutBundleForMessenger()
+
+        //then
+        assertEquals(0, paybundle.payouts.size)
+        assertEquals(PayoutType.MESSENGER, paybundle.type)
+        assertEquals(0, paybundle.numberOfPayouts)
+        assertEquals(0.00.toBigDecimal(), paybundle.payoutTotalAmount)
     }
 
     @Test
@@ -254,7 +330,7 @@ class ReconServiceTest {
             bundleId = "12344554" ,
             payoutItemResults = (0..100).map {
                 PayoutItemResults(
-                    payoutType = PayoutType.MESSENGER,
+                    type = PayoutType.MESSENGER,
                     paid = Random().nextBoolean(),
                     toId = "Messenger $it",
                     message = "Failed or passed due to system settings"
@@ -340,7 +416,7 @@ class ReconServiceTest {
             bundleId = "12344554" ,
             payoutItemResults = (0..100).map {
                 PayoutItemResults(
-                    payoutType = PayoutType.SHOP,
+                    type = PayoutType.SHOP,
                     paid = Random().nextBoolean(),
                     toId = "shop $it",
                     message = "Failed or passed due to system settings"

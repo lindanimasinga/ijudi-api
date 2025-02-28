@@ -1,7 +1,6 @@
 package io.curiousoft.izinga.recon
 
 import io.curiousoft.izinga.recon.payout.Payout
-import io.curiousoft.izinga.recon.payout.PayoutBundle
 import io.curiousoft.izinga.recon.payout.PayoutBundleResults
 import io.curiousoft.izinga.recon.payout.PayoutType
 import org.springframework.web.bind.annotation.*
@@ -24,8 +23,8 @@ class ReconController(val reconService: ReconService) {
     fun messengerPayoutBundle(@RequestBody payoutResults: PayoutBundleResults) = reconService.updatePayoutStatus(payoutResults)
 
     @GetMapping("/payoutBundle")
-    fun getAllPayoutBundles(@RequestParam payoutType: PayoutType, @RequestParam from: Date,
-                      @RequestParam toDate: Date): List<PayoutBundle> = reconService.getAllPayoutBundles(payoutType, from, toDate)
+    fun getAllPayoutBundles(@RequestParam payoutType: PayoutType, @RequestParam fromDate: Date,
+                            @RequestParam toDate: Date): List<Payout> = reconService.getAllPayoutBundles(payoutType, fromDate, toDate)
 
     @GetMapping("/payout")
     fun getAllPayouts(@RequestParam payoutType: PayoutType, @RequestParam fromDate: Date,

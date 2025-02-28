@@ -2,15 +2,12 @@ package io.curiousoft.izinga.recon
 
 import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.commons.model.OrderStage
-import io.curiousoft.izinga.commons.order.OrderRepository
 import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.payout.*
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
-import io.curiousoft.izinga.recon.payout.repo.PayoutBundleRepo
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
-import io.curiousoft.izinga.recon.tips.TipsService
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
@@ -18,13 +15,10 @@ import java.util.*
 
 @Service
 class ReconServiceImpl(
-    private val orderRepo: OrderRepository,
-    private val payoutBundleRepo: PayoutBundleRepo,
     private val storeRepo: StoreRepository,
     private val userProfileRepo: UserProfileRepo,
     private val shopPayoutRepo: ShopPayoutRepository,
     private val messengerPayoutRepository: MessengerPayoutRepository,
-    private val tipsService: TipsService,
     private val applicationEventPublisher: ApplicationEventPublisher
 ) : ReconService {
 
@@ -94,16 +88,21 @@ class ReconServiceImpl(
 
     override fun updatePayoutStatus(bundleResponse: PayoutBundleResults) {
         bundleResponse.payoutItemResults
-            .filter { it.payoutType == PayoutType.SHOP }
+            .filter { it.type == PayoutType.SHOP }
             .mapNotNull {
                 shopPayoutRepo.findByToIdAndPayoutStage(it.toId, PayoutStage.PROCESSING)
                     ?.let { payout ->
                         payout.paid = it.paid
+                        payout.bundleId = bundleResponse.bundleId
                         shopPayoutRepo.save(payout)
                         payout
                     }
             }
             .filter { it.paid }
+            .onEach {
+                it.payoutStage = PayoutStage.COMPLETED
+                shopPayoutRepo.save(it)
+            }
             .flatMap { it.orders }
             .forEach {
                 val payoutEvent = OrderPayoutEvent(
@@ -115,7 +114,7 @@ class ReconServiceImpl(
             }
 
         bundleResponse.payoutItemResults
-            .filter { it.payoutType == PayoutType.MESSENGER }
+            .filter { it.type == PayoutType.MESSENGER }
             .mapNotNull {
                 messengerPayoutRepository.findByToIdAndPayoutStage(it.toId, PayoutStage.PROCESSING)
                     ?.let { payout ->
@@ -125,6 +124,10 @@ class ReconServiceImpl(
                     }
             }
             .filter { it.paid }
+            .onEach {
+                it.payoutStage = PayoutStage.COMPLETED
+                messengerPayoutRepository.save(it)
+            }
             .flatMap { it.orders }
             .forEach {
                 val event  = OrderPayoutEvent(
@@ -135,8 +138,14 @@ class ReconServiceImpl(
             }
     }
 
-    override fun updateBundle(bundle: PayoutBundle) : PayoutBundle {
-        return payoutBundleRepo.save(bundle)
+    override fun updateBundle(bundle: PayoutBundle) {
+        return bundle.payouts.groupBy { it.javaClass.name }
+            .forEach( {
+                when (it.key) {
+                    ShopPayout::class.qualifiedName -> shopPayoutRepo.saveAll(it.value as List<ShopPayout>)
+                    MessengerPayout::class.qualifiedName -> messengerPayoutRepository.saveAll(it.value as List<MessengerPayout>)
+                }
+        })
     }
 
     override fun getAllPayouts(payoutType: PayoutType, fromDate: Date, toDate: Date, toId: String): List<Payout> {
@@ -146,24 +155,26 @@ class ReconServiceImpl(
         }
     }
 
-    override fun getAllPayoutBundles(payoutType: PayoutType, fromDate: Date, toDate: Date): List<PayoutBundle> {
-        return payoutBundleRepo.findByCreatedDateBetweenAndType(fromDate, toDate, payoutType)
+    override fun getAllPayoutBundles(payoutType: PayoutType, fromDate: Date, toDate: Date): List<Payout> {
+        return when (payoutType) {
+            PayoutType.SHOP -> shopPayoutRepo.findByCreatedDateBetween(fromDate, toDate)
+            PayoutType.MESSENGER -> messengerPayoutRepository.findByCreatedDateBetween(fromDate, toDate)
+        }
     }
 
     override fun getCurrentPayoutBundleForShops(): PayoutBundle {
         return PayoutBundle(payouts = shopPayoutRepo.findByPayoutStage(),
             type = PayoutType.SHOP,
-            executed = false,
             createdBy = "izinga-system")
     }
 
     override fun getCurrentPayoutBundleForMessenger(): PayoutBundle {
         return PayoutBundle(payouts = messengerPayoutRepository.findByPayoutStage(),
             type = PayoutType.MESSENGER,
-            executed = false,
             createdBy = "izinga-system")
     }
 
-    override fun findPayout(bundleId: String, payoutId: String): Payout? = null
-        //payoutRepo.findByIdOrNull(bundleId)?.let { it.payouts.firstOrNull { a -> a.toId == payoutId } }
+    override fun findPayout(bundleId: String, payoutId: String): Payout? = shopPayoutRepo.findByIdOrNull(payoutId)
+        ?: messengerPayoutRepository.findByIdOrNull(payoutId)
+
 }

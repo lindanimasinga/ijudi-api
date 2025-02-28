@@ -12,7 +12,7 @@ interface ReconService {
 
     fun updatePayoutStatus(bundleResponse: PayoutBundleResults)
 
-    fun getAllPayoutBundles(payoutType: PayoutType, from: Date, toDate: Date): List<PayoutBundle>
+    fun getAllPayoutBundles(payoutType: PayoutType, from: Date, toDate: Date): List<Payout>
 
     fun getCurrentPayoutBundleForShops(): PayoutBundle
 
@@ -21,5 +21,5 @@ interface ReconService {
     fun getAllPayouts(payoutType: PayoutType, from: Date, toDate: Date, toId: String): List<Payout>
 
     fun findPayout(bundleId: String, payoutId: String): Payout?
-    fun updateBundle(bundle: PayoutBundle): PayoutBundle
+    fun updateBundle(bundle: PayoutBundle)
 }
