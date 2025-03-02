@@ -4,7 +4,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import io.curiousoft.izinga.commons.model.BankAccType
 import io.curiousoft.izinga.commons.model.BaseModel
 import io.curiousoft.izinga.commons.model.Order
+import java.lang.StringBuilder
 import java.math.BigDecimal
+import java.security.SecureRandom
+import java.util.*
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 abstract class Payout(
@@ -22,8 +25,7 @@ abstract class Payout(
     var emailSubject: String?,
     var orders: MutableSet<Order>,
     var tips: MutableSet<Tip>? = null,
-    var payoutStage: PayoutStage
-): BaseModel() {
+    var payoutStage: PayoutStage): BaseModel(id = generateId()) {
     abstract var paid: Boolean
     abstract val total: BigDecimal
     var emailSent = false;
@@ -85,4 +87,14 @@ class ShopPayout(
 
 enum class PayoutStage {
     PENDING, PROCESSING, COMPLETED
+}
+
+fun generateId(): String {
+    val random = SecureRandom()
+    val characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    val sb = StringBuilder()
+    while (sb.length < 5) {
+        sb.append(characters[random.nextInt(characters.length)])
+    }
+    return sb.substring(0, 5).uppercase(Locale.getDefault())
 }

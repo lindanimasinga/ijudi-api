@@ -1,7 +1,5 @@
 package io.curiousoft.izinga.recon.payout.repo
 
-import io.curiousoft.izinga.recon.payout.Payout
-import io.curiousoft.izinga.recon.payout.PayoutBundle
 import io.curiousoft.izinga.recon.payout.PayoutStage
 import io.curiousoft.izinga.recon.payout.ShopPayout
 import org.springframework.data.mongodb.repository.MongoRepository
@@ -14,4 +12,6 @@ interface ShopPayoutRepository : MongoRepository<ShopPayout, String> {
     fun findByPayoutStage(payoutStage: PayoutStage = PayoutStage.PENDING): List<ShopPayout>
     fun findByCreatedDateBetweenAndToId(fromDate: Date, toDate: Date, toId: String): List<ShopPayout>
     fun findByCreatedDateBetween(fromDate: Date, toDate: Date): List<ShopPayout>
+    fun findByModifiedDateBetweenAndToId(fromDate: Date, toDate: Date, toId: String): List<ShopPayout>
+    fun findByModifiedDateBetween(fromDate: Date, toDate: Date): List<ShopPayout>
 }

@@ -150,15 +150,15 @@ class ReconServiceImpl(
 
     override fun getAllPayouts(payoutType: PayoutType, fromDate: Date, toDate: Date, toId: String): List<Payout> {
         return when (payoutType) {
-            PayoutType.SHOP -> shopPayoutRepo.findByCreatedDateBetweenAndToId(fromDate, toDate, toId)
-            PayoutType.MESSENGER -> messengerPayoutRepository.findByCreatedDateBetweenAndToId(fromDate, toDate, toId)
+            PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetweenAndToId(fromDate, toDate, toId)
+            PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateAndToId(fromDate, toDate, toId)
         }
     }
 
     override fun getAllPayoutBundles(payoutType: PayoutType, fromDate: Date, toDate: Date): List<Payout> {
         return when (payoutType) {
-            PayoutType.SHOP -> shopPayoutRepo.findByCreatedDateBetween(fromDate, toDate)
-            PayoutType.MESSENGER -> messengerPayoutRepository.findByCreatedDateBetween(fromDate, toDate)
+            PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetween(fromDate, toDate)
+            PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateBetween(fromDate, toDate)
         }
     }
 
