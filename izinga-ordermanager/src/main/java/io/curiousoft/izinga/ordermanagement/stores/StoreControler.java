@@ -127,7 +127,8 @@ public class StoreControler {
                         store.getLatitude(),
                         store.getLatitude(),
                         store.getImageUrl(),
-                        store.getDescription()))
+                        store.getDescription(),
+                        store.isStoreOffline()))
                 .toList();
         return ResponseEntity.ok(storeNames);
     }
