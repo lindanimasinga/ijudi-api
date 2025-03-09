@@ -218,6 +218,6 @@ import static java.lang.String.format;
 
     @Scheduled(fixedDelay = 10000000L , initialDelay = 5000)// 10 minutes
     public void publishMenuOfTheDay() throws IOException, InterruptedException {
-       // Application.main(new String[]{});
+       Application.main(new String[]{});
     }
 }
