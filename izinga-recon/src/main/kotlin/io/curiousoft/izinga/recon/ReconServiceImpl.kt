@@ -49,6 +49,7 @@ class ReconServiceImpl(
         )
 
         payout.orders.add(order)
+        payout.emailSent = false
         return shopPayoutRepo.save(payout)
     }
 
@@ -83,6 +84,7 @@ class ReconServiceImpl(
         }
 
         payout.orders.add(order)
+        payout.emailSent = false
         return messengerPayoutRepository.save(payout)
     }
 
@@ -148,17 +150,17 @@ class ReconServiceImpl(
         })
     }
 
-    override fun getAllPayouts(payoutType: PayoutType, fromDate: Date, toDate: Date, toId: String): List<Payout> {
+    override fun getAllPayouts(payoutType: PayoutType, from: Date, toDate: Date, toId: String): List<Payout> {
         return when (payoutType) {
-            PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetweenAndToId(fromDate, toDate, toId)
-            PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateAndToId(fromDate, toDate, toId)
+            PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetweenAndToId(from, toDate, toId)
+            PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateAndToId(from, toDate, toId)
         }
     }
 
-    override fun getAllPayoutBundles(payoutType: PayoutType, fromDate: Date, toDate: Date): List<Payout> {
+    override fun getAllPayoutBundles(payoutType: PayoutType, from: Date, toDate: Date): List<Payout> {
         return when (payoutType) {
-            PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetween(fromDate, toDate)
-            PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateBetween(fromDate, toDate)
+            PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetween(from, toDate)
+            PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateBetween(from, toDate)
         }
     }
 
