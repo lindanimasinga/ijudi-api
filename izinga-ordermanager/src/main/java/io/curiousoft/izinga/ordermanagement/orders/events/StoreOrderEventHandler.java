@@ -49,10 +49,6 @@ public record StoreOrderEventHandler(PushNotificationService pushNotificationSer
         var order = event.getOrder();
         var store = event.getReceivingStore();
 
-        if(event.getMessenger() == null) {
-            return;
-        }
-
         if (order.getStage() == OrderStage.STAGE_7_ALL_PAID) {
             reconService.generatePayoutForShopAndOrder(order);
         }
