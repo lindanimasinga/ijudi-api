@@ -41,12 +41,12 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
     public void handleNewOrderEvent(NewOrderEvent event) throws Exception {
         var order = event.getOrder();
         var store = event.getReceivingStore();
+        var messenger = userProfileService.find(event.getMessenger());
 
-        if(event.getMessenger() == null) {
+        if(messenger == null) {
             return;
         }
 
-        var messenger = userProfileService.find(event.getMessenger());
         boolean isDelivery = order.getShippingData() != null
                 && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
                 && store.getStoreType() != StoreType.TIPS && store.getStoreType() != StoreType.CAR_WASH;
