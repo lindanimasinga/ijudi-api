@@ -11,12 +11,14 @@ import io.curiousoft.izinga.ordermanagement.service.DeviceService;
 import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
 import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
 
+@Slf4j
 @Service
 public record StoreOrderEventHandler(PushNotificationService pushNotificationService,
                                      AdminOnlyNotificationService adminOnlyNotificationService,
@@ -48,7 +50,7 @@ public record StoreOrderEventHandler(PushNotificationService pushNotificationSer
     public void handleOrderUpdatedEvent(OrderUpdatedEvent event) {
         var order = event.getOrder();
         var store = event.getReceivingStore();
-
+        log.info("Received order udpated event {} for order {}", event.getOrder().getStage(), event.getOrder().getId());
         if (order.getStage() == OrderStage.STAGE_7_ALL_PAID) {
             reconService.generatePayoutForShopAndOrder(order);
         }

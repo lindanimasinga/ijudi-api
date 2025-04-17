@@ -9,6 +9,10 @@ import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
+import io.curiousoft.izinga.recon.ReconService;
+import io.curiousoft.izinga.recon.payout.PayoutStage;
+import io.curiousoft.izinga.recon.payout.PayoutType;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,6 +31,7 @@ import java.util.stream.IntStream;
 
 import static java.lang.String.format;
 
+@Slf4j
 @Service
     public class SchedulerService {
 
@@ -42,6 +47,7 @@ import static java.lang.String.format;
     private final PromotionService promotionService;
     private final UserProfileRepo userProfileRepo;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final ReconService reconService;
 
     public SchedulerService(OrderRepository orderRepo, StoreRepository storeRepository,
                             DeviceRepository deviceRepo, PushNotificationService pushNotificationService,
@@ -49,7 +55,7 @@ import static java.lang.String.format;
                             EmailNotificationService emailNotificationService,
                             PromotionService promotionService,
                             @Value("${order.cleanup.unpaid.minutes}") long cleanUpMinutes, UserProfileRepo userProfileRepo,
-                            ApplicationEventPublisher applicationEventPublisher) {
+                            ApplicationEventPublisher applicationEventPublisher, ReconService reconService) {
         this.orderRepo = orderRepo;
         this.storeRepository = storeRepository;
         this.deviceRepo = deviceRepo;
@@ -60,9 +66,10 @@ import static java.lang.String.format;
         this.promotionService = promotionService;
         this.userProfileRepo = userProfileRepo;
         this.applicationEventPublisher = applicationEventPublisher;
+        this.reconService = reconService;
     }
 
-    @Scheduled(fixedDelay = 600000, initialDelay = 10000)// 10 minutes
+//    @Scheduled(fixedDelay = 600000, initialDelay = 10000)// 10 minutes
     public void checkUnconfirmedOrders() {
         List<Order> orders = orderRepo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         LOG.info("Found %s unconfirmed orders..".formatted(orders.size()));
@@ -106,7 +113,7 @@ import static java.lang.String.format;
         });
     }
 
-    @Scheduled(fixedDelay = 600000, initialDelay = 20000)// 10 minutes
+//    @Scheduled(fixedDelay = 600000, initialDelay = 20000)// 10 minutes
     public void checkScheduledOrders() {
         List<Order> orders = orderRepo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM)
                 .stream()
@@ -131,7 +138,7 @@ import static java.lang.String.format;
         });
     }
 
-    @Scheduled(fixedDelay = 900000, initialDelay = 900000) // 15 minutes
+  //  @Scheduled(fixedDelay = 900000, initialDelay = 900000) // 15 minutes
     public void cleanUnpaidOrders() {
         Date pastDate = Date.from(LocalDateTime.now()
                 .minusMinutes(cleanUpMinutes)
@@ -141,7 +148,7 @@ import static java.lang.String.format;
         orderRepo.deleteByShopPaidAndStageAndModifiedDateBefore(false, OrderStage.STAGE_0_CUSTOMER_NOT_PAID, pastDate);
     }
 
-    @Scheduled(fixedDelay = 900000, initialDelay = 420000) // 7 minutes
+ //   @Scheduled(fixedDelay = 900000, initialDelay = 420000) // 7 minutes
     public void notifyUnpaidOrders() {
         Date pastDate = Date.from(LocalDateTime.now()
                 .minusMinutes(7)
@@ -158,7 +165,52 @@ import static java.lang.String.format;
         LOG.info("Sms sent to admin");
     }
 
-    @Scheduled(cron = "* 15 7,10 * * *")// 10 minutes
+    @Scheduled(fixedDelay = 3600000, initialDelay = 480000) // 7 minutes
+    public void updateMissingPayouts() {
+        Date fromDate = Date.from(LocalDateTime.now()
+                .minusHours(720)
+                .atZone(ZoneId.systemDefault())
+                .toInstant());
+        Date toDate = Date.from(LocalDateTime.now()
+                .atZone(ZoneId.systemDefault())
+                .toInstant());
+        List<Order> unpaidOrders = orderRepo.findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(false,
+                OrderStage.STAGE_7_ALL_PAID, false, fromDate);
+
+        unpaidOrders.stream()
+                .filter(it -> !it.getPayoutCreated())
+                .forEach(order -> {
+                    var payoutCreatedForShop = reconService.getAllPayouts(PayoutType.SHOP,
+                                    fromDate,
+                                    toDate,
+                                    order.getShopId())
+                            .stream()
+                            .filter(it -> it.getToId().equals(order.getShopId()))
+                            .filter(it -> it.getPayoutStage() == PayoutStage.PENDING)
+                            .count() > 0;
+                    var payoutCreatedForMessenger = order.getShippingData().getMessengerId() != null && reconService.getAllPayouts(PayoutType.MESSENGER,
+                                    fromDate,
+                                    toDate,
+                                    order.getShippingData().getMessengerId())
+                            .stream()
+                            .filter(it -> it.getToId().equals(order.getShopId()))
+                            .filter(it -> it.getPayoutStage() == PayoutStage.PENDING)
+                            .count() > 0;
+                    if (!payoutCreatedForShop) {
+                        reconService.generatePayoutForShopAndOrder(order);
+                        log.info("generated missing shop payout for order {}", order.getId());
+                    }
+                    if (!payoutCreatedForMessenger) {
+                        reconService.generatePayoutForMessengerAndOrder(order);
+                        log.info("generated missing messenger payout for order {}", order.getId());
+                    }
+
+                    order.setPayoutCreated(true);
+                    orderRepo.save(order);
+                });
+    }
+
+ //   @Scheduled(cron = "* 15 7,10 * * *")// 10 minutes
     public void publishPromosOfTheDay() {
         LOG.info("Finding today's promotions ...");
         var activeUserUserId = orderRepo.findAll()
@@ -216,7 +268,7 @@ import static java.lang.String.format;
         userProfileRepo.findByIdIn(inactiveCustomers45Days);
     }
 
-    @Scheduled(fixedDelay = 10000000L , initialDelay = 5000)// 10 minutes
+  //  @Scheduled(fixedDelay = 10000000L , initialDelay = 5000)// 10 minutes
     public void publishMenuOfTheDay() throws IOException, InterruptedException {
        Application.main(new String[]{});
     }

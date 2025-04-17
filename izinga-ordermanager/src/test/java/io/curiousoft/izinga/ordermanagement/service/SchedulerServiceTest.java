@@ -10,6 +10,7 @@ import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
+import io.curiousoft.izinga.recon.ReconService;
 import org.assertj.core.util.Lists;
 import org.junit.Assert;
 import org.junit.Before;
@@ -60,6 +61,8 @@ public class SchedulerServiceTest {
     private UserProfileRepo userRepo;
     @Mock
     private ApplicationEventPublisher applicationEventPublisher;
+    @Mock
+    private ReconService reconService;
 
     //system under test
     private SchedulerService sut;
@@ -81,7 +84,8 @@ public class SchedulerServiceTest {
                 promotionService,
                 cleaupMinutes,
                 userRepo,
-                applicationEventPublisher
+                applicationEventPublisher,
+                reconService
         );
     }
 

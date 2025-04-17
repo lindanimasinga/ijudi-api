@@ -5,6 +5,7 @@ import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent;
 import io.curiousoft.izinga.commons.payout.events.PayoutBalanceUpdatedEvent;
 import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.commons.model.DeviceType;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,7 @@ import java.math.RoundingMode;
 import java.util.Objects;
 import java.util.Optional;
 
+@Slf4j
 @Service
 public record OrderPayoutEventHandler(OrderRepository orderRepository,
                                       ApplicationEventPublisher eventPublisher,
@@ -20,6 +22,7 @@ public record OrderPayoutEventHandler(OrderRepository orderRepository,
 
     @EventListener
     public void handleNewOrderEvent(OrderPayoutEvent event) {
+        log.info("Received payout for order {}", event.getOrderId());
         orderRepository.findById(event.getOrderId())
                 .ifPresent(order -> {
                     order.setShopPaid(event.isStorePaid());

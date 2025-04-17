@@ -280,16 +280,8 @@ public class OrderServiceImpl implements OrderService {
 
         if(order.getStage() == OrderStage.CANCELLED) throw new Exception("Order with id " + orderId + " has been cancelled");
 
-        switch (order.getShippingData().getType()) {
-            case DELIVERY:
-                OrderStage stage = onlineDeliveryStages.get(index + 1);
-                order.setStage(stage);
-                break;
-            case SCHEDULED_DELIVERY:
-                OrderStage collectionStage = onlineCollectionStages.get(index + 1);
-                order.setStage(collectionStage);
-                break;
-        }
+        OrderStage stage = onlineDeliveryStages.get(index + 1);
+        order.setStage(stage);
         var store = storeRepository.findById(order.getShopId()).get();
         OrderUpdatedEvent orderUpdatedEvent = new OrderUpdatedEvent(this, order, order.getShippingData().getMessengerId(), store);
         applicationEventPublisher.publishEvent(orderUpdatedEvent);

@@ -28,10 +28,12 @@ interface OrderRepository : MongoRepository<Order?, String?> {
     ): List<Order?>?
 
     fun findByShopPaidAndStage(paid: Boolean, stage7AllPaid: @NotNull OrderStage?): List<Order>?
+    fun findByShopPaidAndStageAndPayoutCreated(paid: Boolean, stage7AllPaid: @NotNull OrderStage, payoutCreated: Boolean): List<Order>?
     fun findByMessengerPaidAndStage(paid: Boolean, stage7AllPaid: @NotNull OrderStage?): List<Order>?
     fun findByIdIn(orderIds: List<String>): List<Order>
     fun findByCustomerIdAndShippingDataMessengerIdAndStageIn(customerId: String, messengerId: String, stages: Array<OrderStage>): List<Order>?
     fun findByCustomerIdAndStage(id: String, stage7AllPaid: OrderStage): List<Order>?
     fun findByCustomerIdAndModifiedDateAfter(customerId: String, toDate: Date): List<Order>
     fun findAllByCreatedDateAfter(ninetyDaysAgo: LocalDate): List<Order>
+    fun findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(paid: Boolean, stage7AllPaid: @NotNull OrderStage, payoutCreated: Boolean, date: Date): List<Order>
 }

@@ -10,6 +10,7 @@ import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Service
 import java.util.*
 
@@ -22,6 +23,7 @@ class ReconServiceImpl(
     private val applicationEventPublisher: ApplicationEventPublisher
 ) : ReconService {
 
+    @Async
     override fun generatePayoutForShopAndOrder(order: Order): ShopPayout? {
         if (order.stage != OrderStage.STAGE_7_ALL_PAID) {
             return null
@@ -53,6 +55,7 @@ class ReconServiceImpl(
         return shopPayoutRepo.save(payout)
     }
 
+    @Async
     override fun generatePayoutForMessengerAndOrder(order: Order): MessengerPayout? {
         if (order.stage != OrderStage.STAGE_7_ALL_PAID) {
             return null
