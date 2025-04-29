@@ -16,6 +16,7 @@ import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -36,6 +37,7 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
                                          PromoCodeClient promoCodeClient,
                                          OrderRepository orderRepository) implements OrderEventHandler {
 
+    @Async
     @EventListener
     @Override
     public void handleNewOrderEvent(NewOrderEvent event) throws Exception {
@@ -119,6 +121,7 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
         }
     }
 
+    @Async
     @EventListener
     @Override
     public void handleOrderUpdatedEvent(OrderUpdatedEvent event) {

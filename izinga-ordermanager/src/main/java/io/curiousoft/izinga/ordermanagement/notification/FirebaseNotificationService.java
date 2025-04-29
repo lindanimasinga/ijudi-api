@@ -145,7 +145,8 @@ public class FirebaseNotificationService implements PushNotificationService {
                                            StoreProfile shop) {
         messengerDevices.forEach(device -> {
             PushHeading title = new PushHeading(
-                    "An order is placed at %s shop. We will notify you when the order is ready for collection. :)".formatted(shop.getName()),
+                    "An order is placed at %s shop. We will notify you when the order is ready for collection. :)"
+                            .formatted(shop.getName()),
                     PushMessageType.NEW_ORDER.toString(),
                     null,
                     String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));

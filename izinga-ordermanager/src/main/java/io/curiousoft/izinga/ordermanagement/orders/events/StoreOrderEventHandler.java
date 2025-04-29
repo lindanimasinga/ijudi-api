@@ -13,6 +13,7 @@ import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -27,6 +28,7 @@ public record StoreOrderEventHandler(PushNotificationService pushNotificationSer
                                      UserProfileService userProfileService,
                                      ReconService reconService) implements OrderEventHandler {
 
+    @Async
     @Override
     @EventListener
     public void handleNewOrderEvent(NewOrderEvent event) throws Exception {
@@ -45,6 +47,7 @@ public record StoreOrderEventHandler(PushNotificationService pushNotificationSer
         }
     }
 
+    @Async
     @EventListener
     @Override
     public void handleOrderUpdatedEvent(OrderUpdatedEvent event) {

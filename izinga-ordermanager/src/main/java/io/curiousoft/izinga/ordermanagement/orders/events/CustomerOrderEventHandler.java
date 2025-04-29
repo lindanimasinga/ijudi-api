@@ -10,6 +10,7 @@ import io.curiousoft.izinga.ordermanagement.service.DeviceService;
 import io.curiousoft.izinga.ordermanagement.service.zoomsms.ZoomSmsNotificationService;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,15 +22,16 @@ public record CustomerOrderEventHandler(PushNotificationService pushNotification
                                         DeviceService deviceService,
                                         UserProfileService userProfileService) implements OrderEventHandler {
 
+    @Async
     @EventListener
     @Override
     public void handleNewOrderEvent(NewOrderEvent newOrderEvent) {
         var store = newOrderEvent.getReceivingStore();
         var order = newOrderEvent.getOrder();
         var customer = userProfileService.find(order.getCustomerId());
-        List<Device> shopDevices = deviceService.findByUserId(customer.getId());
-        if (!shopDevices.isEmpty()) {
-            pushNotificationService.notifyStoreOrderPlaced(store.getName(), shopDevices, order);
+        List<Device> customerDevices = deviceService.findByUserId(customer.getId());
+        if (!customerDevices.isEmpty()) {
+            pushNotificationService.notifyStoreOrderPlaced(store.getName(), customerDevices, order);
         } else {
             zoomSmsNotificationService.notifyShopOrderPlaced(store, order, customer);
         }
