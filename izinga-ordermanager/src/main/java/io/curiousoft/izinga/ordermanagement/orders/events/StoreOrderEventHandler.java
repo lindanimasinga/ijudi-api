@@ -34,17 +34,29 @@ public record StoreOrderEventHandler(PushNotificationService pushNotificationSer
     public void handleNewOrderEvent(NewOrderEvent event) throws Exception {
         var store = event.getReceivingStore();
         var order = event.getOrder();
-
         List<Device> shopDevices = deviceService.findByUserId(store.getOwnerId());
         if (!shopDevices.isEmpty()) {
             pushNotificationService.notifyStoreOrderPlaced(store.getName(), shopDevices, order);
-        } else {
-            adminOnlyNotificationService.notifyShopOrderPlaced(store, order, userProfileService.find(order.getCustomerId()));
         }
+    }
 
+    @Async
+    @EventListener
+    @Override
+    public void handleNewOrderEventToEmail(NewOrderEvent event) throws Exception {
+        var store = event.getReceivingStore();
+        var order = event.getOrder();
         if (StringUtils.hasText(store.getEmailAddress())) {
             emailNotificationService.notifyShops(order, List.of(store.getEmailAddress()));
         }
+    }
+
+    @Async
+    @EventListener
+    public void handleNewOrderEventToWhatsapp(NewOrderEvent event) throws Exception {
+        var store = event.getReceivingStore();
+        var order = event.getOrder();
+        adminOnlyNotificationService.notifyShopOrderPlaced(order, store);
     }
 
     @Async

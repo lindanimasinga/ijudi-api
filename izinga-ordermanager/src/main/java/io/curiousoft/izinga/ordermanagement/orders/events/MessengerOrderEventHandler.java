@@ -43,9 +43,10 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
     public void handleNewOrderEvent(NewOrderEvent event) throws Exception {
         var order = event.getOrder();
         var store = event.getReceivingStore();
-        var messenger = userProfileService.find(event.getMessenger());
+        var messenger = Optional.ofNullable(event.getMessenger())
+                .map(userProfileService::find);
 
-        if(messenger == null) {
+        if(messenger.isEmpty()) {
             return;
         }
 
@@ -58,8 +59,8 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
             List<Device> messengerDevices = deviceService.findByUserId(order.getShippingData().getMessengerId());
             pushNotificationService.notifyMessengerOrderPlaced(messengerDevices, order, store);
 
-            if (StringUtils.hasText(messenger.getEmailAddress())) {
-                emailNotificationService.notifyShops(order, List.of(messenger.getEmailAddress()));
+            if (StringUtils.hasText(messenger.get().getEmailAddress())) {
+                emailNotificationService.notifyShops(order, List.of(messenger.get().getEmailAddress()));
             }
         }
 
@@ -93,6 +94,36 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
                                 this);
                         eventPublisher.publishEvent(balanceEventIOS);
                     });
+        }
+    }
+
+    @Async
+    @EventListener
+    @Override
+    public void handleNewOrderEventToEmail(NewOrderEvent event) throws Exception {
+
+    }
+
+    @Async
+    @EventListener
+    @Override
+    public void handleNewOrderEventToWhatsapp(NewOrderEvent event) throws Exception {
+        var order = event.getOrder();
+        var store = event.getReceivingStore();
+        var messenger = Optional.ofNullable(event.getMessenger())
+                .map(userProfileService::find);
+
+        if(messenger.isEmpty()) {
+            return;
+        }
+
+        boolean isDelivery = order.getShippingData() != null
+                && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
+                && store.getStoreType() != StoreType.TIPS && store.getStoreType() != StoreType.CAR_WASH;
+
+        // notify messenger
+        if (isDelivery) {
+            smsNotificationService.notifyOrderPlaced(order, messenger.get());
         }
     }
 

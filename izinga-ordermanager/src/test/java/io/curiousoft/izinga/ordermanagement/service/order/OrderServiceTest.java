@@ -1253,7 +1253,7 @@ public class OrderServiceTest {
         verify(storeRepo).save(shop);
         verify(pushNotificationService, times(0)).notifyStoreOrderPlaced("ShopName", storeDevices, order);
         verify(pushNotificationService, times(0)).notifyStoreOrderPlaced("ShopName", storeDevices, order);
-        verify(smsNotifcation).notifyOrderPlaced(shop, order, customer);
+        verify(smsNotifcation).notifyOrderPlaced(order, customer);
         verify(pushNotificationService).notifyMessengerOrderPlaced(messengerDevices, order, shop);
         verify(deviceRepo).findByUserId(shop.getOwnerId());
     }

@@ -3,6 +3,8 @@ package io.curiousoft.izinga.messaging;
 import com.google.auth.oauth2.GoogleCredentials;
 import io.curiousoft.izinga.messaging.firebase.FirebaseConnectionWrapper;
 import io.curiousoft.izinga.messaging.firebase.FirebaseAuthConfig;
+import io.curiousoft.izinga.messaging.whatsapp.WhatsAppFactory;
+import io.curiousoft.izinga.messaging.whatsapp.WhatsAppService;
 import io.curiousoft.izinga.messaging.zoomconnectsms.ZoomSMSFactory;
 import io.curiousoft.izinga.messaging.zoomconnectsms.ZoomSMSService;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,5 +34,10 @@ public class MessagingConfig {
     public ZoomSMSService createSmsService(@Value("${zoomconnectsms.api.email}") String email,
                                            @Value("${zoomconnectsms.api.key}") String token) {
         return ZoomSMSFactory.createZoomSMSService(email, token);
+    }
+
+    @Bean
+    public WhatsAppService createWhatsappService(@Value("${whatsapp.cloud.api.key}") String token) {
+        return WhatsAppFactory.createWhatsappService(token);
     }
 }

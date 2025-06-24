@@ -7,34 +7,49 @@ import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationServic
 import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.DeviceService;
-import io.curiousoft.izinga.ordermanagement.service.zoomsms.ZoomSmsNotificationService;
+import io.curiousoft.izinga.ordermanagement.service.whatsapp.WhatsappNotificationService;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.util.List;
 
 @Service
 public record CustomerOrderEventHandler(PushNotificationService pushNotificationService,
                                         EmailNotificationService emailNotificationService,
-                                        ZoomSmsNotificationService zoomSmsNotificationService,
+                                        WhatsappNotificationService whatsappNotificationService,
                                         DeviceService deviceService,
                                         UserProfileService userProfileService) implements OrderEventHandler {
 
     @Async
     @EventListener
     @Override
-    public void handleNewOrderEvent(NewOrderEvent newOrderEvent) {
+    public void handleNewOrderEvent(NewOrderEvent newOrderEvent) throws IOException {
         var store = newOrderEvent.getReceivingStore();
         var order = newOrderEvent.getOrder();
         var customer = userProfileService.find(order.getCustomerId());
         List<Device> customerDevices = deviceService.findByUserId(customer.getId());
         if (!customerDevices.isEmpty()) {
             pushNotificationService.notifyStoreOrderPlaced(store.getName(), customerDevices, order);
-        } else {
-            zoomSmsNotificationService.notifyShopOrderPlaced(store, order, customer);
         }
+    }
+
+    @Async
+    @EventListener
+    @Override
+    public void handleNewOrderEventToEmail(NewOrderEvent event) throws Exception {
+
+    }
+
+    @Async
+    @EventListener
+    @Override
+    public void handleNewOrderEventToWhatsapp(NewOrderEvent event) throws Exception {
+        var order = event.getOrder();
+        var customer = userProfileService.find(order.getCustomerId());
+        whatsappNotificationService.notifyOrderPlaced(order, customer);
     }
 
     @Override
@@ -76,7 +91,7 @@ public record CustomerOrderEventHandler(PushNotificationService pushNotification
         if (!customerDevices.isEmpty()) {
             pushNotificationService.sendNotifications(customerDevices, message);
         } else {
-            //zoomSmsNotificationService.sendMessage(store, order, customer);
+            //whatsappNotificationService.sendMessage(store, order, customer);
         }
     }
 

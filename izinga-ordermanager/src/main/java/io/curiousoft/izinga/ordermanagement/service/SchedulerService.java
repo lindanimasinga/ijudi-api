@@ -69,7 +69,7 @@ import static java.lang.String.format;
         this.reconService = reconService;
     }
 
-//    @Scheduled(fixedDelay = 600000, initialDelay = 10000)// 10 minutes
+    @Scheduled(fixedDelay = 600000, initialDelay = 10000)// 10 minutes
     public void checkUnconfirmedOrders() {
         List<Order> orders = orderRepo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         LOG.info("Found %s unconfirmed orders..".formatted(orders.size()));
@@ -113,7 +113,7 @@ import static java.lang.String.format;
         });
     }
 
-//    @Scheduled(fixedDelay = 600000, initialDelay = 20000)// 10 minutes
+    @Scheduled(fixedDelay = 600000, initialDelay = 20000)// 10 minutes
     public void checkScheduledOrders() {
         List<Order> orders = orderRepo.findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM)
                 .stream()
@@ -138,7 +138,7 @@ import static java.lang.String.format;
         });
     }
 
-  //  @Scheduled(fixedDelay = 900000, initialDelay = 900000) // 15 minutes
+    @Scheduled(fixedDelay = 900000, initialDelay = 900000) // 15 minutes
     public void cleanUnpaidOrders() {
         Date pastDate = Date.from(LocalDateTime.now()
                 .minusMinutes(cleanUpMinutes)
@@ -148,7 +148,7 @@ import static java.lang.String.format;
         orderRepo.deleteByShopPaidAndStageAndModifiedDateBefore(false, OrderStage.STAGE_0_CUSTOMER_NOT_PAID, pastDate);
     }
 
- //   @Scheduled(fixedDelay = 900000, initialDelay = 420000) // 7 minutes
+    @Scheduled(fixedDelay = 900000, initialDelay = 420000) // 7 minutes
     public void notifyUnpaidOrders() {
         Date pastDate = Date.from(LocalDateTime.now()
                 .minusMinutes(7)
@@ -210,7 +210,7 @@ import static java.lang.String.format;
                 });
     }
 
- //   @Scheduled(cron = "* 15 7,10 * * *")// 10 minutes
+    @Scheduled(cron = "* 15 7,10 * * *")// 10 minutes
     public void publishPromosOfTheDay() {
         LOG.info("Finding today's promotions ...");
         var activeUserUserId = orderRepo.findAll()
@@ -268,7 +268,7 @@ import static java.lang.String.format;
         userProfileRepo.findByIdIn(inactiveCustomers45Days);
     }
 
-  //  @Scheduled(fixedDelay = 10000000L , initialDelay = 5000)// 10 minutes
+    @Scheduled(fixedDelay = 10000000L , initialDelay = 5000)// 10 minutes
     public void publishMenuOfTheDay() throws IOException, InterruptedException {
        Application.main(new String[]{});
     }
