@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.ordermanagement.service;
 
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.model.Profile;
 import io.curiousoft.izinga.commons.model.StoreProfile;
@@ -15,4 +16,6 @@ public interface AdminOnlyNotificationService {
     void notifyOrderPlaced(Order persistedOrder, Profile userProfile) throws IOException;
 
     void notifyShopOrderPlaced(Order persistedOrder, StoreProfile userProfile) throws IOException;
+
+    void notifyMessengerOrderPlaced(Order order, UserProfile userProfile, StoreProfile shop) throws IOException;
 }

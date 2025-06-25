@@ -124,6 +124,7 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
         // notify messenger
         if (isDelivery) {
             smsNotificationService.notifyOrderPlaced(order, messenger.get());
+            smsNotificationService.notifyMessengerOrderPlaced(order, messenger.get(), store);
         }
     }
 
