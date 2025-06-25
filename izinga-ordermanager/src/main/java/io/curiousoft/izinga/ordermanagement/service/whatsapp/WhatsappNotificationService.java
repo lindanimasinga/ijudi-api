@@ -38,6 +38,16 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
 
     @Override
     public void notifyOrderPlaced(Order order, Profile userProfile) throws IOException {
+        notifyOrderPlaced(whatsappConfig.orderConfirmationCustomerTemplate(), order, userProfile);
+    }
+
+
+    @Override
+    public void notifyShopOrderPlaced(Order order, StoreProfile store) throws IOException {
+        notifyOrderPlaced(whatsappConfig.orderConfirmationShopTemplate(), order, store);
+    }
+
+    private void notifyOrderPlaced(String templateName, Order order, Profile userProfile) throws IOException {
         // BODY parameters
         WhatsappTemplateRequest.Parameter nameParam = new WhatsappTemplateRequest.Parameter();
         nameParam.setText(userProfile.getName());
@@ -60,11 +70,10 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
         buttonComponent.setType(WhatsappTemplateRequest.ComponentType.BUTTON);
         buttonComponent.setSub_type(WhatsappTemplateRequest.ButtonSubType.URL); // or QUICK_REPLY depending on your template
         buttonComponent.setIndex(0);
-        buttonComponent.setParameters(List.of(buttonParam));
 
         // Template
         WhatsappTemplateRequest.Template template = new WhatsappTemplateRequest.Template();
-        template.setName(whatsappConfig.orderConfirmationCustomerTemplate());
+        template.setName(templateName);
 
         WhatsappTemplateRequest.Language language = new WhatsappTemplateRequest.Language();
         language.setCode("en_US"); // adjust based on your template
@@ -80,14 +89,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                         : userProfile.getMobileNumber()
         );
         request.setTemplate(template);
-
         whatsAppService.sendMessage(whatsappConfig.phoneId(), request)
                 .execute();
-    }
-
-
-    @Override
-    public void notifyShopOrderPlaced(Order order, StoreProfile store) throws IOException {
-        notifyOrderPlaced(order, store);
     }
 }
