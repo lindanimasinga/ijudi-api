@@ -5,5 +5,7 @@ import org.springframework.boot.context.properties.ConstructorBinding;
 
 @ConstructorBinding
 @ConfigurationProperties(prefix = "whatsapp.cloud")
-public record WhatsappConfig(String phoneId, String orderConfirmationCustomerTemplate) {
+public record WhatsappConfig(String phoneId, String orderConfirmationCustomerTemplate,
+                             String orderConfirmationShopTemplate,
+                             String orderConfirmationMessengerTemplate) {
 }

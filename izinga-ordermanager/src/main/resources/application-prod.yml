@@ -91,3 +91,8 @@ zoomconnectsms:
 promocodes:
     verifier:
         url: http://api.izinga.co.za/
+whatsapp:
+    cloud:
+        orderConfirmationCustomerTemplate: order_confirmed
+        orderConfirmationShopTemplate: order_management_1
+        orderConfirmationMessengerTemplate: order_management_messenger
