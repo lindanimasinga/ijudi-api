@@ -44,7 +44,43 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
 
     @Override
     public void notifyShopOrderPlaced(Order order, StoreProfile store) throws IOException {
-        notifyOrderPlaced(whatsappConfig.orderConfirmationShopTemplate(), order, store);
+        // BODY parameters
+        WhatsappTemplateRequest.Parameter nameParam = new WhatsappTemplateRequest.Parameter();
+        nameParam.setText(store.getName());
+        nameParam.setType(WhatsappTemplateRequest.ParameterType.TEXT);
+
+        WhatsappTemplateRequest.Parameter orderNumberParam = new WhatsappTemplateRequest.Parameter();
+        orderNumberParam.setText("#" + order.getId());
+        orderNumberParam.setType(WhatsappTemplateRequest.ParameterType.TEXT);
+
+        WhatsappTemplateRequest.Component bodyComponent = new WhatsappTemplateRequest.Component();
+        bodyComponent.setType(WhatsappTemplateRequest.ComponentType.BODY);
+        bodyComponent.setParameters(List.of(nameParam, orderNumberParam));
+
+        // BUTTON parameter
+        WhatsappTemplateRequest.Parameter buttonParam = new WhatsappTemplateRequest.Parameter();
+        buttonParam.setText(order.getId().toUpperCase()); // or "#K9RW9" etc.
+        buttonParam.setType(WhatsappTemplateRequest.ParameterType.TEXT);
+
+        // Template
+        WhatsappTemplateRequest.Template template = new WhatsappTemplateRequest.Template();
+        template.setName(whatsappConfig.orderConfirmationShopTemplate());
+
+        WhatsappTemplateRequest.Language language = new WhatsappTemplateRequest.Language();
+        language.setCode("en_US"); // adjust based on your template
+        template.setLanguage(language);
+        template.setComponents(List.of(bodyComponent));
+
+        // Request
+        WhatsappTemplateRequest request = new WhatsappTemplateRequest();
+        request.setTo(
+                store.getMobileNumber().startsWith("0")
+                        ? store.getMobileNumber().replaceFirst("0", "27")
+                        : store.getMobileNumber()
+        );
+        request.setTemplate(template);
+        whatsAppService.sendMessage(whatsappConfig.phoneId(), request)
+                .execute();
     }
 
     private void notifyOrderPlaced(String templateName, Order order, Profile userProfile) throws IOException {
@@ -78,7 +114,6 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
         WhatsappTemplateRequest.Language language = new WhatsappTemplateRequest.Language();
         language.setCode("en_US"); // adjust based on your template
         template.setLanguage(language);
-
         template.setComponents(List.of(bodyComponent, buttonComponent));
 
         // Request
