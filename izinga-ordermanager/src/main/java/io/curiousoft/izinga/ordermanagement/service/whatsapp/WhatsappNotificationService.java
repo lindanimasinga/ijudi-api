@@ -1,25 +1,19 @@
 package io.curiousoft.izinga.ordermanagement.service.whatsapp;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.model.Profile;
 import io.curiousoft.izinga.commons.model.StoreProfile;
 import io.curiousoft.izinga.commons.model.UserProfile;
-import io.curiousoft.izinga.commons.utils.IjudiUtils;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsAppService;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsappTemplateRequest;
 import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.validation.constraints.NotNull;
 import java.io.IOException;
-import java.util.List;
-
-import static java.lang.String.format;
 
 @Service
 public class WhatsappNotificationService implements AdminOnlyNotificationService {
@@ -54,7 +48,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                   "language": { "code": "en_US" },
                   "components": [
                     {
-                      "type": "body",
+                      "type": "BODY",
                       "parameters": [
                         { "type": "text", "text": "#name" },
                         { "type": "text", "text": "#orderId" }
@@ -84,7 +78,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                   "language": { "code": "en_US" },
                   "components": [
                     {
-                      "type": "body",
+                      "type": "BODY",
                       "parameters": [
                         { "type": "text", "text": "#messenger" },
                         { "type": "text", "text": "#shop" },
@@ -116,14 +110,14 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                   "language": { "code": "en_US" },
                   "components": [
                     {
-                      "type": "body",
+                      "type": "BODY",
                       "parameters": [
                         { "type": "text", "text": "#name" },
                         { "type": "text", "text": "#orderId" }
                       ]
                     },
                     {
-                      "type": "button",
+                      "type": "BUTTON",
                       "sub_type": "url",
                       "index": "0",
                       "parameters": [
