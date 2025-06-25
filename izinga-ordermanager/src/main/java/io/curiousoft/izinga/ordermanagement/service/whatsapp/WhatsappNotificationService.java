@@ -40,7 +40,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
         // Request
         WhatsappTemplateRequest request = new WhatsappTemplateRequest();
         request.setTo(store.getMobileNumber().startsWith("0")
-                ? store.getMobileNumber().replaceFirst("0", "27")
+                ? store.getMobileNumber().replaceFirst("0", "+27")
                 : store.getMobileNumber());
         var requestStr = """
                 {
@@ -70,7 +70,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
         // Request
         WhatsappTemplateRequest request = new WhatsappTemplateRequest();
         request.setTo(userProfile.getMobileNumber().startsWith("0")
-                ? userProfile.getMobileNumber().replaceFirst("0", "27")
+                ? userProfile.getMobileNumber().replaceFirst("0", "+27")
                 : userProfile.getMobileNumber());
         var requestStr = """
                 {
@@ -102,7 +102,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
         // Request
         WhatsappTemplateRequest request = new WhatsappTemplateRequest();
         request.setTo(userProfile.getMobileNumber().startsWith("0")
-                        ? userProfile.getMobileNumber().replaceFirst("0", "27")
+                        ? userProfile.getMobileNumber().replaceFirst("0", "+27")
                         : userProfile.getMobileNumber());
         var requestStr = """
                 {
