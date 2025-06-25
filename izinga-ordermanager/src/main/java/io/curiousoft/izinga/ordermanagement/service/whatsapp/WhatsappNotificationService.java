@@ -50,8 +50,8 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                     {
                       "type": "BODY",
                       "parameters": [
-                        { "type": "text", "text": "#name" },
-                        { "type": "text", "text": "#orderId" }
+                        { "type": "TEXT", "text": "#name" },
+                        { "type": "TEXT", "text": "#orderId" }
                       ]
                     }
                   ]
@@ -80,9 +80,9 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                     {
                       "type": "BODY",
                       "parameters": [
-                        { "type": "text", "text": "#messenger" },
-                        { "type": "text", "text": "#shop" },
-                        { "type": "text", "text": "#orderId" }
+                        { "type": "TEXT", "text": "#messenger" },
+                        { "type": "TEXT", "text": "#shop" },
+                        { "type": "TEXT", "text": "#orderId" }
                       ]
                     }
                   ]
@@ -112,16 +112,16 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                     {
                       "type": "BODY",
                       "parameters": [
-                        { "type": "text", "text": "#name" },
-                        { "type": "text", "text": "#orderId" }
+                        { "type": "TEXT", "text": "#name" },
+                        { "type": "TEXT", "text": "#orderId" }
                       ]
                     },
                     {
                       "type": "BUTTON",
-                      "sub_type": "url",
+                      "sub_type": "URL",
                       "index": "0",
                       "parameters": [
-                        { "type": "text", "text": "#orderId" }
+                        { "type": "TEXT", "text": "#orderId" }
                       ]
                     }
                   ]
