@@ -36,7 +36,7 @@ abstract class ProfileServiceImpl<E : ProfileRepo<U>, U : Profile>(protected val
         profileRepo.deleteById(id)
     }
 
-    override fun find(profileId: String): U {
+    override fun find(profileId: String): U? {
         return profileRepo.findById(profileId).orElse(null)
     }
 

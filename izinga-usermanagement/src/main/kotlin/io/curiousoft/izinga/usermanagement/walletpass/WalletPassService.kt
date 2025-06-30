@@ -22,10 +22,11 @@ class WalletPassService(private val applePassGenerator: ApplePassGenerator, priv
 
     @EventListener
     fun updateBalance(payoutBalanceUpdatedEvent: PayoutBalanceUpdatedEvent): Any? {
-        val user = userProfileService.find(payoutBalanceUpdatedEvent.userId)
-        return when (payoutBalanceUpdatedEvent.deviceType) {
-            DeviceType.APPLE -> applePassGenerator.updateBalance(user, payoutBalanceUpdatedEvent.balance)
-            DeviceType.ANDROID -> googlePassGenerator.updateBalance(user, payoutBalanceUpdatedEvent.balance)
+        return userProfileService.find(payoutBalanceUpdatedEvent.userId)?.let {
+            return when (payoutBalanceUpdatedEvent.deviceType) {
+                DeviceType.APPLE -> applePassGenerator.updateBalance(it, payoutBalanceUpdatedEvent.balance)
+                DeviceType.ANDROID -> googlePassGenerator.updateBalance(it, payoutBalanceUpdatedEvent.balance)
+            }
         }
     }
 }
