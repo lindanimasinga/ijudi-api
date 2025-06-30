@@ -13,6 +13,7 @@ import io.curiousoft.izinga.ordermanagement.service.DeviceService;
 import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
 import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+@Slf4j
 @Service
 public record MessengerOrderEventHandler(PushNotificationService pushNotificationService,
                                          AdminOnlyNotificationService smsNotificationService,
@@ -65,11 +67,13 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
         }
 
         if (store.getStoreType() == StoreType.TIPS) {
+            log.info("Processing tip event for {}", order.getShippingData().getMessengerId());
             var promoCode = qualifiesForPromotion(order);
             //if user qualified for incentive, create a new order with incentive amount.
             if (promoCode.isPresent()) {
                 createAndFinishPromoOrder(order, promoCode.get());
                 promoCodeClient.redeemed(promoCode.get());
+                log.info("Redeemed code {} for user {}", promoCode.get(), order.getShippingData().getMessengerId());
             }
 
             //get payout balance send event to update payout
@@ -80,8 +84,10 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
                 var tip = BigDecimal.valueOf(order.getTip()).setScale(2, RoundingMode.HALF_UP);
 
                 if (promoCode.isPresent()) {
+                    log.info("sending tip and reward confirmation message for {}", mobileNumber);
                     smsNotificationService.sendTipReceivedMessageWithReward(mobileNumber, tip, BigDecimal.valueOf(promoCode.get().amount()), payoutTotal);
                 } else {
+                    log.info("sending tip confirmation message for {}", mobileNumber);
                     smsNotificationService.sendTipReceivedMessage(mobileNumber, tip, payoutTotal);
                 }
 
@@ -94,6 +100,7 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
                         payoutTotal,
                         DeviceType.APPLE,
                         this);
+                log.info("Publishing balances to android and ios wallet for {}", mobileNumber);
                 eventPublisher.publishEvent(balanceEventIOS);
             }
         }

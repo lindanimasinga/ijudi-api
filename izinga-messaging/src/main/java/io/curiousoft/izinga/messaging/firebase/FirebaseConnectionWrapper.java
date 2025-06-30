@@ -56,15 +56,18 @@ public class FirebaseConnectionWrapper {
         return topicName;
     }
 
-    public <T> T processRequest(Call<T> requestCall) throws Exception {
+    private <T> T processRequest(Call<T> requestCall) throws Exception {
         LOGGER.info("FCM Request {}", requestCall.request().toString());
         Response<T> response = requestCall.execute();
-        if (!response.isSuccessful()) {
-            LOGGER.error("FCM response code: {} Body {}", response.code(), response.errorBody().string());
-            throw new Exception(response.errorBody().string());
+        if (response.isSuccessful()) {
+            LOGGER.info("FCM Response success! code: {} body: {}",  response.code(), response.body());
+            return response.body();
         }
-        LOGGER.info("FCM Response success! code: {} body: {}",  response.code(), response.body());
-        return response.body();
+        LOGGER.error("FCM response code: {} Body {}", response.code(), response.errorBody().string());
+        if (response.code() == 404) {
+            throw new FirebaseTokenNotFound(response.code());
+        }
+        throw new Exception(response.errorBody().string());
     }
 
     public void subscribeTopic(String topicName, String deviceToken) throws Exception {

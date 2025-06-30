@@ -4,10 +4,7 @@ import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import io.curiousoft.izinga.messaging.firebase.FCMMessage;
-import io.curiousoft.izinga.messaging.firebase.FCMNotification;
-import io.curiousoft.izinga.messaging.firebase.FirebaseConnectionWrapper;
-import io.curiousoft.izinga.messaging.firebase.WebPush;
+import io.curiousoft.izinga.messaging.firebase.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
@@ -38,7 +35,13 @@ public class FirebaseNotificationService implements PushNotificationService {
     public Map sendNotification(Device device, PushMessage message) throws Exception {
         FCMMessage fcmMessage = getFcmMessage(device.getToken(), message);
         LOGGER.debug(GSON.toJson(fcmMessage));
-        return firebaseConnectionWrapper.sendMessage(fcmMessage);
+        try {
+            return firebaseConnectionWrapper.sendMessage(fcmMessage);
+        } catch (FirebaseTokenNotFound ex) {
+            deviceRepository.delete(device);
+            LOGGER.info("Removed expired device " + device.getToken());
+            return null;
+        }
     }
 
     @Override
