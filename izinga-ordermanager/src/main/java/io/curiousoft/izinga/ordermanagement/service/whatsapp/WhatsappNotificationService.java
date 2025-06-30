@@ -142,11 +142,11 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                    "language": "en",
                    "components": [
                      {
-                       "type": "body",
+                       "type": "BODY",
                        "parameters": [
-                         { "type": "text", "text": "#tip" },
-                         { "type": "text", "text": "#reward" },
-                         { "type": "text", "text": "#balance" }
+                         { "type": "TEXT", "text": "#tip" },
+                         { "type": "TEXT", "text": "#reward" },
+                         { "type": "TEXT", "text": "#balance" }
                        ]
                      }
                    ]
