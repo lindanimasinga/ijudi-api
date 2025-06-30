@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 
 import javax.validation.constraints.NotNull;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Service
 public class WhatsappNotificationService implements AdminOnlyNotificationService {
@@ -91,6 +93,68 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 .replaceAll("#orderId", order.getId())
                 .replaceAll("#messenger", userProfile.getName())
                 .replaceAll("#shop", shop.getName());
+        var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
+        request.setTemplate(template);
+        whatsAppService.sendMessage(whatsappConfig.phoneId(), request)
+                .execute();
+    }
+
+    @Override
+    public void sendTipReceivedMessage(String mobileNumber, BigDecimal tip, BigDecimal payoutTotal) throws IOException {
+        // Request
+        WhatsappTemplateRequest request = new WhatsappTemplateRequest();
+        request.setTo(mobileNumber.startsWith("0")
+                ? mobileNumber.replaceFirst("0", "+27")
+                : mobileNumber);
+        var requestStr = """
+                {
+                  "name": "tip_message",
+                  "language": "en",
+                  "components": [
+                    {
+                      "type": "BODY",
+                      "parameters": [
+                        { "type": "TEXT", "text": "#tip" },
+                        { "type": "TEXT", "text": "#balance" }
+                      ]
+                    }
+                  ]
+                }
+                """
+                .replaceAll("#tip", tip.setScale(2, RoundingMode.HALF_EVEN).toString())
+                .replaceAll("#balance", payoutTotal.setScale(2, RoundingMode.HALF_EVEN).toString());
+        var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
+        request.setTemplate(template);
+        whatsAppService.sendMessage(whatsappConfig.phoneId(), request)
+                .execute();
+    }
+
+    @Override
+    public void sendTipReceivedMessageWithReward(String mobileNumber, BigDecimal tip, BigDecimal reward, BigDecimal payoutTotal) throws IOException {
+        // Request
+        WhatsappTemplateRequest request = new WhatsappTemplateRequest();
+        request.setTo(mobileNumber.startsWith("0")
+                ? mobileNumber.replaceFirst("0", "+27")
+                : mobileNumber);
+        var requestStr = """
+                {
+                   "name": "tip_with_reward_message",
+                   "language": "en",
+                   "components": [
+                     {
+                       "type": "body",
+                       "parameters": [
+                         { "type": "text", "text": "#tip" },
+                         { "type": "text", "text": "#reward" },
+                         { "type": "text", "text": "#balance" }
+                       ]
+                     }
+                   ]
+                 }
+                """
+                .replaceAll("#tip", tip.setScale(2, RoundingMode.HALF_EVEN).toString())
+                .replaceAll("#reward", payoutTotal.setScale(2, RoundingMode.HALF_EVEN).toString())
+                .replaceAll("#balance", payoutTotal.setScale(2, RoundingMode.HALF_EVEN).toString());
         var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
         request.setTemplate(template);
         whatsAppService.sendMessage(whatsappConfig.phoneId(), request)

@@ -73,27 +73,29 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
             }
 
             //get payout balance send event to update payout
-            Optional.ofNullable(reconService.generatePayoutForMessengerAndOrder(order))
-                    .ifPresent( payout -> {
-                        var payoutTotal = payout.getTotal().setScale(2, RoundingMode.HALF_UP);
+            io.curiousoft.izinga.recon.payout.MessengerPayout payout = reconService.generatePayoutForMessengerAndOrder(order);
+            if (payout != null) {
+                var payoutTotal = payout.getTotal().setScale(2, RoundingMode.HALF_UP);
+                var mobileNumber = userProfileService.find(order.getShippingData().getMessengerId()).getMobileNumber();
+                var tip = BigDecimal.valueOf(order.getTip()).setScale(2, RoundingMode.HALF_UP);
 
-                        var mobileNumber = userProfileService.find(order.getShippingData().getMessengerId()).getMobileNumber();
-                        var tip = BigDecimal.valueOf(order.getTip()).setScale(2, RoundingMode.HALF_UP);
-                        var tipReceivedMessage = promoCode.map(userPromoDetails -> String.format("Congratulations! You have received a tip of R%.2f and rewarded with an extra R%.2f, Your balance is R%.2f. Thank you for your service.%niZinga.", tip, userPromoDetails.amount(), payoutTotal))
-                                .orElseGet(() -> String.format("You have received a tip of R%s, Your balance is R%s. Thank you for your service.%niZinga.", tip, payoutTotal));
-                        smsNotificationService.sendMessage(mobileNumber, tipReceivedMessage);
+                if (promoCode.isPresent()) {
+                    smsNotificationService.sendTipReceivedMessageWithReward(mobileNumber, tip, BigDecimal.valueOf(promoCode.get().amount()), payoutTotal);
+                } else {
+                    smsNotificationService.sendTipReceivedMessage(mobileNumber, tip, payoutTotal);
+                }
 
-                        var balanceEventAndroid  = new PayoutBalanceUpdatedEvent(order.getShippingData().getMessengerId(),
-                                payoutTotal,
-                                DeviceType.ANDROID,
-                                this);
-                        eventPublisher.publishEvent(balanceEventAndroid);
-                        var balanceEventIOS  = new PayoutBalanceUpdatedEvent(order.getShippingData().getMessengerId(),
-                                payoutTotal,
-                                DeviceType.APPLE,
-                                this);
-                        eventPublisher.publishEvent(balanceEventIOS);
-                    });
+                var balanceEventAndroid = new PayoutBalanceUpdatedEvent(order.getShippingData().getMessengerId(),
+                        payoutTotal,
+                        DeviceType.ANDROID,
+                        this);
+                eventPublisher.publishEvent(balanceEventAndroid);
+                var balanceEventIOS = new PayoutBalanceUpdatedEvent(order.getShippingData().getMessengerId(),
+                        payoutTotal,
+                        DeviceType.APPLE,
+                        this);
+                eventPublisher.publishEvent(balanceEventIOS);
+            }
         }
     }
 
