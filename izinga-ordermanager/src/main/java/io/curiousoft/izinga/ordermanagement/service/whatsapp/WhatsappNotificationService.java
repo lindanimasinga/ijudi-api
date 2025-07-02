@@ -109,7 +109,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
         var requestStr = """
                 {
                   "name": "tip_message",
-                  "language": "en",
+                  "language": { "code": "en" },
                   "components": [
                     {
                       "type": "BODY",
@@ -139,7 +139,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
         var requestStr = """
                 {
                    "name": "tip_with_reward_message",
-                   "language": "en",
+                   "language": { "code": "en" },
                    "components": [
                      {
                        "type": "BODY",

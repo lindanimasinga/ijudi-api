@@ -60,7 +60,6 @@ class ReconServiceImpl(
         return shopPayoutRepo.save(payout)
     }
 
-    @Async
     override fun generatePayoutForMessengerAndOrder(order: Order): MessengerPayout? {
         val messng = userProfileRepo.findByIdOrNull(order.shippingData?.messengerId)
         if (messng?.isPermanentEmployed == true && order.tip?.let { it <= 0 } == true) {
