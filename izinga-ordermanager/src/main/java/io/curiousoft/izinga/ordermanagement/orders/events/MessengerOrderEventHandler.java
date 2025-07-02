@@ -43,12 +43,14 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
     @EventListener
     @Override
     public void handleNewOrderEvent(NewOrderEvent event) throws Exception {
+        log.info("Received new order {} event for messenger flow", event.getOrder().getId());
         var order = event.getOrder();
         var store = event.getReceivingStore();
         var messenger = Optional.ofNullable(event.getMessenger())
                 .map(userProfileService::find);
 
         if(messenger.isEmpty()) {
+            log.info("No messenger provided for order {}", order.getId());
             return;
         }
 
