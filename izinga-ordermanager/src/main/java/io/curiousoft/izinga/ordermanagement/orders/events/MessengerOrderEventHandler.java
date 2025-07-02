@@ -67,6 +67,37 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
                 emailNotificationService.notifyShops(order, List.of(messenger.get().getEmailAddress()));
             }
         }
+    }
+
+    @Async
+    @EventListener
+    @Override
+    public void handleNewOrderEventToEmail(NewOrderEvent event) throws Exception {
+
+    }
+
+    @Async
+    @EventListener
+    @Override
+    public void handleNewOrderEventToWhatsapp(NewOrderEvent event) throws Exception {
+        var order = event.getOrder();
+        var store = event.getReceivingStore();
+        var messenger = Optional.ofNullable(event.getMessenger())
+                .map(userProfileService::find);
+
+        if(messenger.isEmpty()) {
+            return;
+        }
+
+        boolean isDelivery = order.getShippingData() != null
+                && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
+                && store.getStoreType() != StoreType.TIPS && store.getStoreType() != StoreType.CAR_WASH;
+
+        // notify messenger
+        if (isDelivery) {
+            smsNotificationService.notifyOrderPlaced(order, messenger.get());
+            smsNotificationService.notifyMessengerOrderPlaced(order, messenger.get(), store);
+        }
 
         if (store.getStoreType() == StoreType.TIPS) {
             log.info("Processing tip event for {}", order.getShippingData().getMessengerId());
@@ -105,37 +136,6 @@ public record MessengerOrderEventHandler(PushNotificationService pushNotificatio
                 log.info("Publishing balances to android and ios wallet for {}", mobileNumber);
                 eventPublisher.publishEvent(balanceEventIOS);
             }
-        }
-    }
-
-    @Async
-    @EventListener
-    @Override
-    public void handleNewOrderEventToEmail(NewOrderEvent event) throws Exception {
-
-    }
-
-    @Async
-    @EventListener
-    @Override
-    public void handleNewOrderEventToWhatsapp(NewOrderEvent event) throws Exception {
-        var order = event.getOrder();
-        var store = event.getReceivingStore();
-        var messenger = Optional.ofNullable(event.getMessenger())
-                .map(userProfileService::find);
-
-        if(messenger.isEmpty()) {
-            return;
-        }
-
-        boolean isDelivery = order.getShippingData() != null
-                && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
-                && store.getStoreType() != StoreType.TIPS && store.getStoreType() != StoreType.CAR_WASH;
-
-        // notify messenger
-        if (isDelivery) {
-            smsNotificationService.notifyOrderPlaced(order, messenger.get());
-            smsNotificationService.notifyMessengerOrderPlaced(order, messenger.get(), store);
         }
     }
 

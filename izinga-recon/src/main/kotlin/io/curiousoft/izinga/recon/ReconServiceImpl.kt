@@ -8,6 +8,8 @@ import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.payout.*
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
+import lombok.extern.slf4j.Slf4j
+import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.scheduling.annotation.Async
@@ -23,15 +25,18 @@ class ReconServiceImpl(
     private val applicationEventPublisher: ApplicationEventPublisher
 ) : ReconService {
 
+    private val logger = LoggerFactory.getLogger(ReconServiceImpl::class.java)
+
     @Async
     override fun generatePayoutForShopAndOrder(order: Order): ShopPayout? {
         if (order.stage != OrderStage.STAGE_7_ALL_PAID) {
+            logger.info("no payout generated for order {} at stage STAGE_7_ALL_PAID", order.id)
             return null
         }
 
         val store = storeRepo.findByIdOrNull(order.shopId);
-
         if (store?.hasPaymentAgreement == false) {
+            logger.info("no payout created because store {} has no payout agreement", store.id);
             return null
         }
 
@@ -57,12 +62,7 @@ class ReconServiceImpl(
 
     @Async
     override fun generatePayoutForMessengerAndOrder(order: Order): MessengerPayout? {
-        if (order.stage != OrderStage.STAGE_7_ALL_PAID) {
-            return null
-        }
-
         val messng = userProfileRepo.findByIdOrNull(order.shippingData?.messengerId)
-
         if (messng?.isPermanentEmployed == true && order.tip?.let { it <= 0 } == true) {
             return null
         }
