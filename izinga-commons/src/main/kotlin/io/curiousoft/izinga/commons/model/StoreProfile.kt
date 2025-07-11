@@ -34,7 +34,7 @@ class StoreProfile(
     var storeWebsiteUrl: String? = null
     var izingaTakesCommission = false
     var scheduledDeliveryAllowed = false
-    var availability = AVAILABILITY.SPECIFIC_HOURS
+    var availability = AVAILABILITY.OFFLINE
     var freeDeliveryMinAmount = 0.0
     var markUpPrice = true
     var minimumDepositAllowedPerc = 1.0
