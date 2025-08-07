@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.ordermanagement.notification;
 
+import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingList;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import io.curiousoft.izinga.commons.model.Order;
@@ -102,5 +103,9 @@ public class EmailNotificationService {
         } catch (JsonProcessingException e) {
             e.printStackTrace();
         }
+    }
+
+    public void sendShoppingListRunNotification(UserProfile customer, ShoppingList shoppingList) {
+        // This method can be implemented to send a notification about the shopping list run
     }
 }

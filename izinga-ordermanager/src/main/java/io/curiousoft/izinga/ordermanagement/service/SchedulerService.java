@@ -9,6 +9,8 @@ import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
+import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingListRunEvent;
+import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingListService;
 import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.recon.payout.PayoutStage;
 import io.curiousoft.izinga.recon.payout.PayoutType;
@@ -48,6 +50,7 @@ import static java.lang.String.format;
     private final UserProfileRepo userProfileRepo;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final ReconService reconService;
+    private final ShoppingListService shoppingListService;
 
     public SchedulerService(OrderRepository orderRepo, StoreRepository storeRepository,
                             DeviceRepository deviceRepo, PushNotificationService pushNotificationService,
@@ -55,7 +58,7 @@ import static java.lang.String.format;
                             EmailNotificationService emailNotificationService,
                             PromotionService promotionService,
                             @Value("${order.cleanup.unpaid.minutes}") long cleanUpMinutes, UserProfileRepo userProfileRepo,
-                            ApplicationEventPublisher applicationEventPublisher, ReconService reconService) {
+                            ApplicationEventPublisher applicationEventPublisher, ReconService reconService, ShoppingListService shoppingListService) {
         this.orderRepo = orderRepo;
         this.storeRepository = storeRepository;
         this.deviceRepo = deviceRepo;
@@ -67,6 +70,7 @@ import static java.lang.String.format;
         this.userProfileRepo = userProfileRepo;
         this.applicationEventPublisher = applicationEventPublisher;
         this.reconService = reconService;
+        this.shoppingListService = shoppingListService;
     }
 
     @Scheduled(fixedDelay = 600000, initialDelay = 10000)// 10 minutes
@@ -208,6 +212,50 @@ import static java.lang.String.format;
                     order.setPayoutCreated(true);
                     orderRepo.save(order);
                 });
+    }
+
+    @Scheduled(fixedDelay = 10000000, initialDelay = 100000)// 10 minutes
+    public void buildRecommendations() {
+        LOG.info("Finding all order ...");
+        var orderItemCounts = orderRepo.findAll()
+                .stream()
+                .flatMap(order -> {
+                    var items = order.getBasket().getItems();
+                    items.forEach(it -> it.setCustomerId(order.getCustomerId()));
+                    return items.stream();
+                })
+                .collect(Collectors.groupingBy(
+                        item -> new AbstractMap.SimpleEntry<>(item.getCustomerId(), item.getName()),
+                        Collectors.counting()));
+
+        orderItemCounts.forEach((key, count) -> {
+            String customerId = key.getKey();
+            String itemName = key.getValue();
+            LOG.info("Customer: {}, Item: {}, Count: {}", customerId, itemName, count);
+        });
+    }
+
+    @Scheduled(fixedDelay = 10000, initialDelay = 10000)// 10 minutes
+    public void findShoppingListsToAction() {
+        Date dateFrom = Date.from(LocalDateTime.now()
+                        .withHour(0)
+                        .withMinute(0)
+                        .withSecond(0)
+                        .atZone(ZoneId.systemDefault())
+                        .toInstant());
+        Date dateTo = Date.from(LocalDateTime.now()
+                        .plusDays(1)
+                        .withMinute(0)
+                        .withSecond(0)
+                        .withHour(0)
+                        .atZone(ZoneId.systemDefault())
+                        .toInstant());
+        LOG.info("Finding all shopping lists from {} to {}", dateFrom, dateTo);
+        var shoppingLists = shoppingListService.getShoppingListsScheduledBetween(dateFrom, dateTo);
+        shoppingLists.forEach(shoppingList -> {
+            LOG.info("Shopping List: Next Run Date: {}", shoppingList.getName());
+            applicationEventPublisher.publishEvent(new ShoppingListRunEvent(this, shoppingList));
+        });
     }
 
     @Scheduled(cron = "* 15 7,10 * * *")// 10 minutes

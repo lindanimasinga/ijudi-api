@@ -97,7 +97,8 @@ public class StoreControler {
 
         return ResponseEntity.ok(stores.stream()
                 .flatMap(store -> store.getStockList().stream())
-                .map(stock -> "%s#!#%s#!#%s".formatted(stock.getName(),
+                .map(stock -> "%s#!#%s#!#%s".formatted(
+                        stock.getName(),
                         stock.getId(),
                         stock.getImages() != null && !stock.getImages().isEmpty() ? stock.getImages().get(0) : ""))
                 .toList());

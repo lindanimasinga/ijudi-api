@@ -8,6 +8,7 @@ import io.curiousoft.izinga.commons.model.UserProfile;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsAppService;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsappTemplateRequest;
 import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
+import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -197,5 +198,51 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
         request.setTemplate(template);
         whatsAppService.sendMessage(whatsappConfig.phoneId(), request)
                 .execute();
+    }
+
+    public void notifyShoppingListRun(UserProfile customer, StoreProfile shop, ShoppingList shoppingList) throws IOException {
+        WhatsappTemplateRequest request = new WhatsappTemplateRequest();
+        request.setTo(customer.getMobileNumber().startsWith("0")
+                ? customer.getMobileNumber().replaceFirst("0", "+27")
+                : customer.getMobileNumber());
+        var requestStr = """
+                {
+                    "messaging_product": "whatsapp",
+                    "to": "27831234567",
+                    "type": "template",
+                    "template": {
+                      "name": "scheduled_groceries_purchuse_due",
+                      "language": {
+                        "code": "en"
+                      },
+                      "components": [
+                        {
+                          "type": "BODY",
+                          "parameters": [
+                            { "type": "TEXT", "text": "#customerName" },
+                            { "type": "TEXT", "text": "#shoppingListName" },
+                            { "type": "TEXT", "text": "1500.00" }
+                          ]
+                        },
+                        {
+                          "type": "BUTTON",
+                          "sub_type": "URL",
+                          "index": "0",
+                          "parameters": [
+                            { "type": "TEXT", "text": "#shoppingListId" }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                """;
+        requestStr = requestStr
+                .replaceAll("#customerName", customer.getName())
+                .replaceAll("#shoppingListName", shoppingList.getName())
+                .replaceAll("#amount", shoppingList.getItems().get(0).getPriceRage())
+                .replaceAll("#shoppingListId", shoppingList.getId());
+        var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
+        request.setTemplate(template);
+        whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
     }
 }
