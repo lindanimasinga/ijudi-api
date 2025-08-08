@@ -1,11 +1,15 @@
 package io.curiousoft.izinga.commons.model
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonProperty
 
 class BasketItem(@JsonProperty("name") var name: String,
                  @JsonProperty("quantity") var quantity: Int,
                  @JsonProperty("price") var price: Double,
                  @JsonProperty("discountPerc") var discountPerc: Double) {
+
+    @JsonIgnore
+    var customerId: String? = null
     var externalUrl: String? = null
     var storePrice = 0.0
     var options: List<SelectionOption>? = null
