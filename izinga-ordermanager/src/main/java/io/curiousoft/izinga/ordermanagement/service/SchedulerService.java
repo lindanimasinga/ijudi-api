@@ -214,7 +214,7 @@ import static java.lang.String.format;
                 });
     }
 
-    @Scheduled(fixedDelay = 10000000, initialDelay = 100000)// 10 minutes
+    @Scheduled(cron = "* 15 6,8 * * *")// 10 minutes
     public void buildRecommendations() {
         LOG.info("Finding all order ...");
         var orderItemCounts = orderRepo.findAll()
@@ -235,7 +235,7 @@ import static java.lang.String.format;
         });
     }
 
-    @Scheduled(fixedDelay = 10000, initialDelay = 10000)// 10 minutes
+    @Scheduled(cron = "* 15 8,9 * * *")// 10 minutes
     public void findShoppingListsToAction() {
         Date dateFrom = Date.from(LocalDateTime.now()
                         .withHour(0)
