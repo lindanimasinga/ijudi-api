@@ -8,6 +8,6 @@ public class ShoppingItem {
     private String shopName;
     private String shopId;
     private String imageUrl;
-    private int quality;
+    private int quantity;
     private String priceRage;
 }
