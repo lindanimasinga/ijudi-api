@@ -214,7 +214,7 @@ import static java.lang.String.format;
                 });
     }
 
-    @Scheduled(cron = "* 15 6,8 * * *")// 10 minutes
+/*    @Scheduled(cron = "* 15 6,8 * * *")// 10 minutes
     public void buildRecommendations() {
         LOG.info("Finding all order ...");
         var orderItemCounts = orderRepo.findAll()
@@ -233,7 +233,7 @@ import static java.lang.String.format;
             String itemName = key.getValue();
             LOG.info("Customer: {}, Item: {}, Count: {}", customerId, itemName, count);
         });
-    }
+    }*/
 
     @Scheduled(cron = "* 15 8,9 * * *")// 10 minutes
     public void findShoppingListsToAction() {
