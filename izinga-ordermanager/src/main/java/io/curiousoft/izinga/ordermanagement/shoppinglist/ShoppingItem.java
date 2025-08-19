@@ -9,5 +9,5 @@ public class ShoppingItem {
     private String shopId;
     private String imageUrl;
     private int quantity;
-    private String priceRage;
+    private double price;
 }

@@ -239,7 +239,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
         requestStr = requestStr
                 .replaceAll("#customerName", customer.getName())
                 .replaceAll("#shoppingListName", shoppingList.getName())
-                .replaceAll("#amount", shoppingList.getItems().get(0).getPriceRage())
+                .replaceAll("#amount", ""+shoppingList.getTotalAmount().setScale(2, RoundingMode.HALF_EVEN))
                 .replaceAll("#shoppingListId", shoppingList.getId());
         var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
         request.setTemplate(template);

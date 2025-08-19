@@ -5,6 +5,7 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.annotation.Id;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -28,24 +29,21 @@ public class ShoppingList {
     private String name;
     private String shopId;
 
-    public ShoppingList(String name, Schedule schedule, Date startDate, Date endDate, List<String> userIds) {
-        this.name = name;
-        this.schedule = schedule;
-        this.startDate = startDate;
-        this.endDate = endDate;
-        this.userIds = userIds;
-        this.nextRunDate = startDate;
+    public ShoppingList() {
     }
 
-    public ShoppingList() {
+    public BigDecimal getTotalAmount() {
+        return items.stream()
+                .map(item -> BigDecimal.valueOf(item.getPrice()).multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     public enum Schedule {
         ONCE_OFF, DAILY, WEEKLY, MONTHLY, YEARLY
     }
 
-    public void getNextRunDate() {
-        nextRunDate = switch (schedule) {
+    public Date getNextRunDate() {
+        return switch (schedule) {
             case ONCE_OFF -> startDate;
             case DAILY -> new Date(startDate.getTime() + 24L * 60 * 60 * 1000);
             case WEEKLY -> LocalDateTime.ofInstant(startDate.toInstant(), ZoneId.systemDefault())
