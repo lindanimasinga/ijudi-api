@@ -5,6 +5,7 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.annotation.Id;
 
+import javax.validation.constraints.NotEmpty;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -26,7 +27,9 @@ public class ShoppingList {
     private Date startDate, endDate;
     private Date nextRunDate;
     private List<String> userIds;
+    @NotEmpty(message = "Shopping list name cannot be empty")
     private String name;
+    @NotEmpty(message = "Shop not is not selected")
     private String shopId;
 
     public ShoppingList() {

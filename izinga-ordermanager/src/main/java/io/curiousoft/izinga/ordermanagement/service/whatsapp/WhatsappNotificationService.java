@@ -207,34 +207,29 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 : customer.getMobileNumber());
         var requestStr = """
                 {
-                    "messaging_product": "whatsapp",
-                    "to": "27831234567",
-                    "type": "template",
-                    "template": {
-                      "name": "scheduled_groceries_purchuse_due",
-                      "language": {
-                        "code": "en"
-                      },
-                      "components": [
-                        {
-                          "type": "BODY",
-                          "parameters": [
-                            { "type": "TEXT", "text": "#customerName" },
-                            { "type": "TEXT", "text": "#shoppingListName" },
-                            { "type": "TEXT", "text": "1500.00" }
-                          ]
-                        },
-                        {
-                          "type": "BUTTON",
-                          "sub_type": "URL",
-                          "index": "0",
-                          "parameters": [
-                            { "type": "TEXT", "text": "#shoppingListId" }
-                          ]
-                        }
+                  "name": "scheduled_groceries_purchuse_due",
+                  "language": {
+                    "code": "en"
+                  },
+                  "components": [
+                    {
+                      "type": "BODY",
+                      "parameters": [
+                        { "type": "TEXT", "text": "#customerName" },
+                        { "type": "TEXT", "text": "#shoppingListName" },
+                        { "type": "TEXT", "text": "#amount" }
+                      ]
+                    },
+                    {
+                      "type": "BUTTON",
+                      "sub_type": "URL",
+                      "index": "0",
+                      "parameters": [
+                        { "type": "TEXT", "text": "#shoppingListId" }
                       ]
                     }
-                  }
+                  ]
+                }
                 """;
         requestStr = requestStr
                 .replaceAll("#customerName", customer.getName())
