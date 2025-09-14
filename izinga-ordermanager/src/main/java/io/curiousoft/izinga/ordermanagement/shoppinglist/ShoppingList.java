@@ -45,7 +45,7 @@ public class ShoppingList {
         ONCE_OFF, DAILY, WEEKLY, MONTHLY, YEARLY
     }
 
-    public Date getNextRunDate() {
+    public Date generateNextRunDate() {
         return switch (schedule) {
             case ONCE_OFF -> startDate;
             case DAILY -> new Date(startDate.getTime() + 24L * 60 * 60 * 1000);

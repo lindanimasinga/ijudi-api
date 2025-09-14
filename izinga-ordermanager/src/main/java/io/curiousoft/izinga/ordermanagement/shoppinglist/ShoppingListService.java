@@ -18,6 +18,8 @@ public class ShoppingListService {
     }
 
     public ShoppingList createShoppingList(ShoppingList shoppingList) {
+        var nextRunDate = shoppingList.generateNextRunDate();
+        shoppingList.setNextRunDate(nextRunDate);
         return shoppingListRepository.save(shoppingList);
     }
 
@@ -27,6 +29,8 @@ public class ShoppingListService {
             item.setStartDate(updatedList.getStartDate());
             item.setEndDate(updatedList.getEndDate());
             item.setUserIds(updatedList.getUserIds());
+            var nextRunDate = item.generateNextRunDate();
+            item.setNextRunDate(nextRunDate);
             return shoppingListRepository.save(item);
         }).orElseThrow(() -> new ResourceNotFoundException("Shopping List not found with id %d".formatted(id)));
     }

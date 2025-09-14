@@ -207,11 +207,22 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 : customer.getMobileNumber());
         var requestStr = """
                 {
-                  "name": "scheduled_groceries_purchuse_due",
+                  "name": "scheduled_groceries_purchuse_due3",
                   "language": {
                     "code": "en"
                   },
                   "components": [
+                    {
+                            "type": "HEADER",
+                            "parameters": [
+                              {
+                                "type": "IMAGE",
+                                "image": {
+                                  "link": "#headerImage"
+                                }
+                              }
+                            ]
+                          },
                     {
                       "type": "BODY",
                       "parameters": [
@@ -232,10 +243,11 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 }
                 """;
         requestStr = requestStr
-                .replaceAll("#customerName", customer.getName())
+                .replaceAll("#customerName", customer.getName() != null ? customer.getName() : "Customer")
                 .replaceAll("#shoppingListName", shoppingList.getName())
                 .replaceAll("#amount", ""+shoppingList.getTotalAmount().setScale(2, RoundingMode.HALF_EVEN))
-                .replaceAll("#shoppingListId", shoppingList.getId());
+                .replaceAll("#shoppingListId", shoppingList.getId())
+                .replaceAll("#headerImage", shop.getImageUrl());
         var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
         request.setTemplate(template);
         whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();

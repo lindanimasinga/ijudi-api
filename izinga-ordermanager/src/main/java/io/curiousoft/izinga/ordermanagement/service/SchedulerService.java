@@ -241,6 +241,7 @@ import static java.lang.String.format;
                         .withHour(0)
                         .withMinute(0)
                         .withSecond(0)
+                        .minusMinutes(1)
                         .atZone(ZoneId.systemDefault())
                         .toInstant());
         Date dateTo = Date.from(LocalDateTime.now()
