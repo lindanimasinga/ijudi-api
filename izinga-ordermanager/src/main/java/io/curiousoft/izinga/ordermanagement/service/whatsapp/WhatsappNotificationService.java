@@ -209,7 +209,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 {
                   "name": "scheduled_groceries_purchuse_due3",
                   "language": {
-                    "code": "en"
+                    "code": "en_US"
                   },
                   "components": [
                     {
