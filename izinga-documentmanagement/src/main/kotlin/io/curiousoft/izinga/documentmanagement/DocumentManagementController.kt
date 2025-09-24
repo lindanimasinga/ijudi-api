@@ -1,5 +1,7 @@
 package io.curiousoft.izinga.documentmanagement
 
+import io.curiousoft.izinga.documentmanagement.type.DocType
+import io.curiousoft.izinga.documentmanagement.type.DocTypesEnum
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 import software.amazon.awssdk.services.s3.S3Client
@@ -7,23 +9,31 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest
 import java.net.URL
 import java.util.*
+import kotlin.reflect.KClass
 
 @RestController
 @RequestMapping("/document")
-class DocumentManagementController(private val s3Client: S3Client) {
+class DocumentManagementController(private val s3Client: S3Client, private val documentInfoService: DocumentInfoService) {
 
     private val bucketName = "izinga-aut"
 
     @PostMapping
-    fun uploadFile(@RequestParam("file") file: MultipartFile): Map<String, String> {
+    fun uploadFile(@RequestParam("file") file: MultipartFile,
+                   @RequestParam("metadata") metadata: Boolean = false,
+                   @RequestParam("docType", required = false) documentType: DocTypesEnum?): Map<String, Any?> {
         val fileName = UUID.randomUUID().toString() + "_" + file.originalFilename
         val putObjectRequest = PutObjectRequest.builder()
             .bucket(bucketName)
             .key(fileName)
             .build()
         s3Client.putObject(putObjectRequest, software.amazon.awssdk.core.sync.RequestBody.fromBytes(file.bytes))
-
         val fileUrl: URL = s3Client.utilities().getUrl { it.bucket(bucketName).key(fileName) }
+        if (metadata && documentType != null) {
+            val metadata = documentInfoService.analyzeImageWithResponsesApi(fileUrl.toString(), documentType.klass as KClass<DocType>)
+            return mapOf("fileName" to fileName,
+                "url" to fileUrl.toString(),
+                "metadata" to metadata)
+        }
         return mapOf("fileName" to fileName, "url" to fileUrl.toString())
     }
 
