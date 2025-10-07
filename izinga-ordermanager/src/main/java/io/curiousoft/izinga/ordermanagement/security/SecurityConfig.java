@@ -44,12 +44,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
-                "http://localhost:4200",
-                "https://api.izinga.co.za",
-                "https://shop.izinga.co.za",
-                "https://izinga.store",
-                "https://admin.izinga.co.za",
-                "https://onboard.izinga.co.za"
+                "*"
         ));
         configuration.setAllowedMethods(List.of("*"));
         configuration.setAllowedHeaders(List.of("*"));
