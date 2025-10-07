@@ -64,6 +64,12 @@ feign:
     okhttp:
         enabled: true
 spring:
+    security:
+        oauth2:
+            resourceserver:
+                jwt:
+                    jws-algorithms: RS512
+                    issuer-uri: https://securetoken.google.com/ijudi-d19bd
     cloud:
         openfeign:
             client:

@@ -2,6 +2,9 @@ package io.curiousoft.izinga.ordermanagement.conroller;
 
 import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.ordermanagement.orders.OrderService;
+import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.servers.Server;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +21,9 @@ import static org.springframework.util.StringUtils.isEmpty;
 
 @RestController
 @RequestMapping({"/order", "//order"})
+@OpenAPIDefinition(servers = {
+        @Server(url = "/v2", description = "v2 Server URL")
+})
 public class OrderController {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OrderController.class);
