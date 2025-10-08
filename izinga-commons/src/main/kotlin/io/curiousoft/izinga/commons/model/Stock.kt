@@ -17,6 +17,12 @@ class Stock: Comparable<Stock> {
     var group: String? = null
     var position = 10000
     var quantity = 0
+    var minWieght: Double? = null
+    var maxWeight: Double? = null
+    var weight: Double? = null
+    var width: Double? = null
+    var height: Double? = null
+    var depth: Double? = null
     var storePrice = 0.0
     var discountPerc = 0.0
     var images: List<String>? = null
