@@ -123,6 +123,14 @@ class StoreProfile(
     //should not accept orders 15 minutes before store closes
     val isDeliverNowAllowed: Boolean
         get() {
+            if (availability == AVAILABILITY.ONLINE24_7) {
+                return true
+            }
+
+            if (availability == AVAILABILITY.OFFLINE) {
+                return false
+            }
+            
             if (businessHours == null || businessHours!!.isEmpty()) {
                 return false
             }
