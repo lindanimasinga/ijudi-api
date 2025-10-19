@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.yocopay
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.curiousoft.izinga.commons.model.PaymentType
 import io.curiousoft.izinga.yocopay.api.YocoPaymentClient
 import io.curiousoft.izinga.yocopay.api.YocoPaymentInitiate
@@ -49,9 +50,10 @@ class YocoPaymentController(private val yocoConfiguration: YocoConfiguration,
     @PostMapping("/finalise/json")
     fun verifyPaymentSuccess(@RequestBody successEvent: YocoEvent, yocoHash: String): ResponseEntity<Any> {
         log.info("yoco payment is ${successEvent.type}")
-        log.info("yoco payment event payload ${successEvent}")
+        //log as json
+        log.info("yoco payment event payload ${jacksonObjectMapper().writeValueAsString(successEvent)}")
         val paymentSuccessful = successEvent.type == "payment.succeeded"
-        val orderId = successEvent.payload?.metadata?.orderId!!
+        val orderId = successEvent.payload?.metadata?.externalId!!
         return when(successEvent.type) {
             "payment.succeeded" -> Result.runCatching {
                     log.info("fetching order $orderId")

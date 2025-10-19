@@ -45,13 +45,13 @@ class PaymentData {
 @JsonIgnoreProperties(ignoreUnknown = true)
 class PaymentMetadata {
     var checkoutId: String? = null
-    var orderId: String? = null
+    var externalId: String? = null
     var productType: String? = null
 
     constructor()
-    constructor(checkoutId: String, orderId: String) {
+    constructor(checkoutId: String, externalId: String) {
         this.checkoutId = checkoutId
-        this.orderId = orderId
+        this.externalId = externalId
     }
 }
 
