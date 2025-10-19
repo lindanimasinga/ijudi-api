@@ -130,7 +130,7 @@ class StoreProfile(
             if (availability == AVAILABILITY.OFFLINE) {
                 return false
             }
-            
+
             if (businessHours == null || businessHours!!.isEmpty()) {
                 return false
             }
