@@ -50,7 +50,6 @@ class YocoPaymentController(private val yocoConfiguration: YocoConfiguration,
     @PostMapping("/finalise/json")
     fun verifyPaymentSuccess(@RequestBody successEvent: YocoEvent, yocoHash: String): ResponseEntity<Any> {
         log.info("yoco payment is ${successEvent.type}")
-        //log as json
         log.info("yoco payment event payload ${jacksonObjectMapper().writeValueAsString(successEvent)}")
         val paymentSuccessful = successEvent.type == "payment.succeeded"
         val orderId = successEvent.payload?.metadata?.externalId!!
