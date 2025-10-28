@@ -1,19 +1,33 @@
 package io.curiousoft.izinga.yocopay
 
 import io.curiousoft.izinga.commons.model.Order
-import org.springframework.cloud.openfeign.FeignClient
-import org.springframework.web.bind.annotation.*
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.http.*
+import org.springframework.stereotype.Service
+import org.springframework.web.client.RestTemplate
 
-@FeignClient(value = "izinga-order-manager", url = "\${yoco.verifier.order-manager-url}")
-interface IzingaOrderManagerClient {
+@Service
+class IzingaOrderManagerClient(private val restTemplate: RestTemplate,
+                               @Value("\${yoco.verifier.order-manager-url}") private val baseUrl: String) {
 
-    @GetMapping(value = ["order/{orderId}"], consumes = ["application/json"])
-    fun findOrder(@PathVariable orderId: String): Order
+    fun findOrder(orderId: String): Order {
+        val url = "$baseUrl/order/$orderId"
+        return restTemplate.getForObject(url, Order::class.java)!!
+    }
 
-    @PatchMapping(value = ["order/{orderId}"], consumes = ["application/json"], produces = ["application/json"])
-    fun finishOrder(@PathVariable orderId: String, @RequestBody order: Order): Order
+    fun finishOrder(orderId: String, order: Order): Order {
+        val url = "$baseUrl/order/$orderId"
+        val headers = HttpHeaders().also {
+            it.contentType = MediaType.APPLICATION_JSON
+            it.set("Origin" , "app://izinga")
+        }
+        val entity = HttpEntity(order, headers)
+        val response = restTemplate.patchForObject(url, entity, Order::class.java)
+        return response!!
+    }
 
-    @DeleteMapping(value = ["order/{orderId}"], consumes = ["application/json"], produces = ["application/json"])
-    fun cancelOrder(orderId: String)
-
+    fun cancelOrder(orderId: String) {
+        val url = "$baseUrl/order/$orderId"
+        restTemplate.delete(url)
+    }
 }

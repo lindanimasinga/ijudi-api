@@ -1,7 +1,7 @@
 package io.curiousoft.izinga.yocopay.config
 
 import feign.RequestInterceptor
-import okhttp3.OkHttpClient
+import org.apache.http.impl.client.HttpClientBuilder
 import org.bouncycastle.crypto.digests.SHA256Digest
 import org.bouncycastle.crypto.macs.HMac
 import org.bouncycastle.crypto.params.KeyParameter
@@ -11,6 +11,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.ConstructorBinding
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
+import org.springframework.web.client.RestTemplate
 import java.math.BigInteger
 import java.security.MessageDigest
 import java.util.*
@@ -63,7 +65,8 @@ private fun convertToHex(messageDigest: ByteArray): String {
 }
 
 @Configuration
-class HeaderConfig {
+class YocoHeaderConfig {
+
     @Bean
     fun basicAuthRequestInterceptor(@Value("\${yoco.api.key}") apiKey: String, yocoDashBoard: YocoDashBoardConfiguration): RequestInterceptor = RequestInterceptor {
         it.header("Authorization", "Bearer $apiKey")
@@ -71,4 +74,13 @@ class HeaderConfig {
         it.header("useruuid", yocoDashBoard.user)
         it.header("businessuuid", yocoDashBoard.businessuuid)
     };
+
+    @Bean
+    fun restTemplate(): RestTemplate = RestTemplate().apply {
+        val httpClient = HttpClientBuilder.create()
+            .setMaxConnTotal(200) // Max connections in the pool
+            .setMaxConnPerRoute(20) // Max connections per route
+            .build()
+        requestFactory = HttpComponentsClientHttpRequestFactory(httpClient)
+    }
 }

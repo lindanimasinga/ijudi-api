@@ -70,32 +70,6 @@ spring:
                 jwt:
                     jws-algorithms: RS512
                     issuer-uri: https://securetoken.google.com/ijudi-d19bd
-    cloud:
-        openfeign:
-            client:
-                config:
-                    default:
-                        loggerLevel: testing
-                    izinga-order-manager:
-                        url: ./
-                        connectTimeout: 20000
-                    promo-code-service:
-                        url: ./
-                        connectTimeout: 20000
-                    yoco-api:
-                        loggerLevel: full
-                        connectTimeout: 20000
-                        url: https://payments.yoco.com/api/
-                        defaultRequestHeaders:
-                            Authorization: Bearer ${yoco.api.key}
-                    yocoDashboard-api:
-                        loggerLevel: full
-                        connectTimeout: 20000
-                        url: https://payments.yoco.com/api/
-                        defaultRequestHeaders:
-                            x-auth-token: ${yoco.dashboard-api.token}
-                            useruuid: ${yoco.dashboard-api.user}
-                            businessuuid: ${yoco.dashboard-api.businessuuid}
     data:
         mongodb:
             uri: mongodb+srv://onusmongouser:wfsuser@cluster0-7odiz.mongodb.net/ijudi?retryWrites=true&w=majority
@@ -131,3 +105,31 @@ zoomconnectsms:
 promocodes:
     verifier:
         url: http://localhost/
+izinga:
+    api:
+        url: http://localhost
+
+client:
+    config:
+        default:
+            loggerLevel: DEBUG
+        izinga-order-manager:
+            url: ./
+            connectTimeout: 20000
+        promo-code-service:
+            url: ./
+            connectTimeout: 20000
+        yoco-api:
+            loggerLevel: full
+            connectTimeout: 20000
+            url: https://payments.yoco.com/api/
+            defaultRequestHeaders:
+                Authorization: Bearer ${yoco.api.key}
+        yocoDashboard-api:
+            loggerLevel: full
+            connectTimeout: 20000
+            url: https://payments.yoco.com/api/
+            defaultRequestHeaders:
+                x-auth-token: ${yoco.dashboard-api.token}
+                useruuid: ${yoco.dashboard-api.user}
+                businessuuid: ${yoco.dashboard-api.businessuuid}

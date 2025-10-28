@@ -32,9 +32,7 @@ public class IjudiErrorHandler {
             errorResponse.setMessage(e.getMessage());
             errorResponse.setStatus(HttpStatus.INTERNAL_SERVER_ERROR);
         }
-
         LOGGER.error(e.getMessage(), e);
-
         return new ResponseEntity<>(errorResponse, errorResponse.getStatus());
     }
 
