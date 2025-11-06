@@ -6,6 +6,7 @@ import feign.codec.ErrorDecoder;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.Optional;
 
 @Component
 public class CustomErrorDecoder implements ErrorDecoder {
@@ -16,7 +17,9 @@ public class CustomErrorDecoder implements ErrorDecoder {
     public Exception decode(String methodKey, Response response) {
         try {
             var responseBody = mapper.readTree(response.body().asInputStream());
-            return new Exception(responseBody.get("message").asText());
+            return Optional.ofNullable(responseBody.get("message"))
+                    .map(it -> new Exception(it.asText()))
+                    .orElse(new Exception(responseBody.toPrettyString()));
         } catch (IOException e) {
             return new RuntimeException(e);
         }
