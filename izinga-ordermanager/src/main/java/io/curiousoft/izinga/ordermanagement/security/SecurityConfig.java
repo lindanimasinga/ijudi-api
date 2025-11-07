@@ -89,16 +89,6 @@ public class SecurityConfig {
         return firewall;
     }
 
-    @Bean
-    public WebSecurityConfigurerAdapter webSecurityConfigurerAdapter() {
-        return new WebSecurityConfigurerAdapter() {
-            @Override
-            public void configure(WebSecurity web) throws Exception {
-                web.httpFirewall(allowUrlEncodedSlashHttpFirewall());
-            }
-        };
-    }
-
 /*    @Bean
     static RoleHierarchy roleHierarchy() {
         return new RoleHierarchyImpl.builder()
