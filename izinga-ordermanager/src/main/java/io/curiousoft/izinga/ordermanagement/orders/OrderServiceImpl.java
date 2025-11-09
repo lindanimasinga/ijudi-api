@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.ordermanagement.orders;
 
 import io.curiousoft.izinga.commons.model.*;
+import io.curiousoft.izinga.commons.order.OrderService;
 import io.curiousoft.izinga.commons.order.events.OrderEvent;
 import io.curiousoft.izinga.commons.order.events.OrderUpdatedEvent;
 import io.curiousoft.izinga.commons.order.events.ScheduledOrderEvent;
@@ -31,7 +32,6 @@ import static io.curiousoft.izinga.commons.model.OrderKt.generateId;
 import static io.curiousoft.izinga.commons.model.OrderType.INSTORE;
 import static io.curiousoft.izinga.commons.model.OrderType.ONLINE;
 import static io.curiousoft.izinga.commons.utils.IjudiUtilsKt.*;
-import static java.lang.String.format;
 
 @Service
 public class OrderServiceImpl implements OrderService {

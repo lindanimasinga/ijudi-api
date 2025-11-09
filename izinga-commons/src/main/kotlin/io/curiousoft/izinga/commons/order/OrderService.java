@@ -1,7 +1,6 @@
-package io.curiousoft.izinga.ordermanagement.orders;
+package io.curiousoft.izinga.commons.order;
 
 import io.curiousoft.izinga.commons.model.Order;
-import org.springframework.scheduling.annotation.Scheduled;
 
 import java.util.List;
 

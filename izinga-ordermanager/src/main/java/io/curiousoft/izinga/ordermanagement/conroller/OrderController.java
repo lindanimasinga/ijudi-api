@@ -1,16 +1,14 @@
 package io.curiousoft.izinga.ordermanagement.conroller;
 
 import io.curiousoft.izinga.commons.model.Order;
-import io.curiousoft.izinga.ordermanagement.orders.OrderService;
+import io.curiousoft.izinga.commons.order.OrderService;
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
-import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.servers.Server;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
