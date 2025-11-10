@@ -73,7 +73,7 @@ public class SecurityConfig {
     @Bean
     public HttpFirewall allowUrlEncodedSlashHttpFirewall() {
         StrictHttpFirewall firewall = new StrictHttpFirewall();
-        firewall.getDecodedUrlBlocklist().remove("//");
+        firewall.setAllowUrlEncodedDoubleSlash(true);
         return firewall;
     }
 
