@@ -16,7 +16,7 @@ public abstract class PaymentProvider<P extends PaymentData> {
         this.paymentType = paymentType;
     }
 
-    protected abstract boolean paymentReceived(Order order) throws Exception;
+    protected abstract boolean paymentReceived(Order order);
 
     public PaymentType getPaymentType() {
         return paymentType;
@@ -34,7 +34,7 @@ public abstract class PaymentProvider<P extends PaymentData> {
 
     public abstract void makePaymentToMessenger(Order order, double amount) throws Exception;
 
-    public boolean reversePayment(Order order) throws JsonProcessingException {
+    public boolean reversePayment(Order order) {
         return false;
     }
 }

@@ -47,19 +47,19 @@ public class PaymentService {
         this.izingaCommissionPerc = izingaCommissionPerc;
     }
 
-    public boolean paymentReceived(Order order) throws Exception {
+    public boolean paymentReceived(Order order) {
         PaymentProvider paymentProvider = paymentProviders.stream()
                 .filter(service -> order.getPaymentType() == service.getPaymentType())
                 .findFirst()
-                .orElseThrow(() -> new Exception("Your order has no ukheshe type set or the ukheshe provider for " + order.getPaymentType() + " not configured on the server"));
+                .orElseThrow(() -> new IllegalArgumentException("Your order has no ukheshe type set or the ukheshe provider for " + order.getPaymentType() + " not configured on the server"));
         return paymentProvider.paymentReceived(order);
     }
 
-    public boolean reversePayment(Order order) throws Exception {
+    public boolean reversePayment(Order order) {
         PaymentProvider paymentProvider = paymentProviders.stream()
                 .filter(service -> order.getPaymentType() == service.getPaymentType())
                 .findFirst()
-                .orElseThrow(() -> new Exception("Your order has no ukheshe type set or the ukheshe provider for " + order.getPaymentType() + " not configured on the server"));
+                .orElseThrow(() -> new IllegalArgumentException("Your order has no ukheshe type set or the ukheshe provider for " + order.getPaymentType() + " not configured on the server"));
         return paymentProvider.reversePayment(order);
     }
 

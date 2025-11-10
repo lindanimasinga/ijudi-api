@@ -7,11 +7,11 @@ import org.springframework.stereotype.Service
 @Service
 class IzingaOrderManagerClient(private val orderService: OrderService) {
 
-    fun findOrder(orderId: String): Order {
+    fun findOrder(orderId: String): Order? {
         return orderService.findOrder(orderId)
     }
 
-    fun finishOrder(orderId: String, order: Order): Order {
+    fun finishOrder(orderId: String, order: Order): Order? {
         return orderService.finishOder(order)
     }
 

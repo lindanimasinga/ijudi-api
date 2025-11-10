@@ -44,7 +44,6 @@ fun calculateMarkupPrice(storePrice: Double, markPercentage: Double): Double {
     return markupPrice.toInt() + if (cents > 0.45) cents else 1 + cents
 }
 
-@Throws(IOException::class)
 fun calculateDrivingDirectionKM(apiKey: String?, order: Order, store: StoreProfile): Double {
     val googleMapsInstance = GoogleMaps.instance
     // from lat long

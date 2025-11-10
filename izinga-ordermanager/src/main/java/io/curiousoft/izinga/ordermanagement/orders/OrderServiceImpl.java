@@ -108,30 +108,30 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public Order startOrder(Order order) throws Exception {
+    public Order startOrder(Order order) {
 
         validate(order);
         if (!userProfileRepo.existsById(order.getCustomerId())) {
-            throw new Exception("user with id " + order.getCustomerId() + " does not exist");
+            throw new IllegalArgumentException("user with id " + order.getCustomerId() + " does not exist");
         }
 
         Optional<StoreProfile> storeOptional = storeRepository.findById(order.getShopId());
         if (!storeOptional.isPresent()) {
-            throw new Exception("shop with id " + order.getShopId() + " does not exist");
+            throw new IllegalArgumentException("shop with id " + order.getShopId() + " does not exist");
         }
 
         if (!storeOptional.get().getScheduledDeliveryAllowed() && order.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY) {
-            throw new Exception("Collection or scheduled orders not allowed for " + storeOptional.get().getName());
+            throw new IllegalArgumentException("Collection or scheduled orders not allowed for " + storeOptional.get().getName());
         }
 
         if (storeOptional.get().isStoreOffline()) {
-            throw new Exception("Shop not available " + storeOptional.get().getName());
+            throw new IllegalArgumentException("Shop not available " + storeOptional.get().getName());
         }
 
         if(order.getOrderType() == ONLINE
                 && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
                 && !storeOptional.get().isDeliverNowAllowed()) {
-            throw new Exception("Only Scheduled delivery is allowed at this time");
+            throw new IllegalArgumentException("Only Scheduled delivery is allowed at this time");
         }
 
         List<String> stockItemNames = storeOptional.get()
@@ -141,7 +141,7 @@ public class OrderServiceImpl implements OrderService {
 
         boolean isValidBasketItems = stockItemNames.containsAll(basketItemNames);
         if (!INSTORE.equals(order.getOrderType()) && !isValidBasketItems) {
-            throw new Exception("Some basket item are not available in the shop.");
+            throw new IllegalArgumentException("Some basket item are not available in the shop.");
         }
 
         order.setHasVat(storeOptional.get().getHasVat());
@@ -199,10 +199,10 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public Order finishOder(Order order) throws Exception {
+    public Order finishOder(Order order) {
         validate(order);
         Order persistedOrder = orderRepo.findById(order.getId())
-                .orElseThrow(() -> new Exception("Order with id %s not found.".formatted(order.getId())));
+                .orElseThrow(() -> new IllegalArgumentException("Order with id %s not found.".formatted(order.getId())));
 
         if(order.getStage() != OrderStage.STAGE_0_CUSTOMER_NOT_PAID) {
             return persistedOrder;
@@ -212,7 +212,7 @@ public class OrderServiceImpl implements OrderService {
         persistedOrder.setPaymentType(order.getPaymentType());
 
         if (!paymentService.paymentReceived(persistedOrder)) {
-            throw new Exception("Payment not cleared yet. please verify again.");
+            throw new IllegalArgumentException("Payment not cleared yet. please verify again.");
         }
 
         if (persistedOrder.getOrderType() != INSTORE) {
@@ -273,12 +273,12 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public Order progressNextStage(String orderId) throws Exception {
+    public Order progressNextStage(String orderId) {
         Order order = orderRepo.findById(orderId)
-                .orElseThrow(() -> new Exception("Order with id " + orderId + " not found."));
+                .orElseThrow(() -> new IllegalArgumentException("Order with id " + orderId + " not found."));
         int index = onlineDeliveryStages.indexOf(order.getStage());
 
-        if(order.getStage() == OrderStage.CANCELLED) throw new Exception("Order with id " + orderId + " has been cancelled");
+        if(order.getStage() == OrderStage.CANCELLED) throw new IllegalArgumentException("Order with id " + orderId + " has been cancelled");
 
         OrderStage stage = onlineDeliveryStages.get(index + 1);
         order.setStage(stage);
@@ -289,10 +289,10 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public Order applyPromoCode(String promoCode, Order order) throws Exception {
+    public Order applyPromoCode(String promoCode, Order order) {
         var promoData = promoCodeClient.findForUser(order.getId(), order.getCustomerId(), promoCode);
         if (!promoData.verified()) {
-            throw new Exception("Promo code not verified.");
+            throw new IllegalArgumentException("Promo code not verified.");
         }
         return orderRepo.findById(order.getId())
                 .map(ord -> {
@@ -312,7 +312,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public List<Order> findOrderByPhone(String phone) throws Exception {
+    public List<Order> findOrderByPhone(String phone) {
         String last9Digits = phone.substring(phone.length() - 9);
         for(String code : List.of("0", "+27", "27")) {
             Optional<UserProfile> user = Optional.ofNullable(userProfileRepo.findByMobileNumber("%s%s".formatted(code, last9Digits)));
@@ -320,13 +320,13 @@ public class OrderServiceImpl implements OrderService {
                 return orderRepo.findByCustomerId(user.get().getId()).orElse(new ArrayList<>());
             }
         }
-        throw new Exception("User not found");
+        throw new IllegalArgumentException("User not found");
     }
 
     @Override
-    public List<Order> findOrderByStoreId(String shopId) throws Exception {
+    public List<Order> findOrderByStoreId(String shopId) {
         StoreProfile store = storeRepository.findById(shopId)
-                .orElseThrow(() -> new Exception("Store not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Store not found"));
         return orderRepo.findByShopIdAndStageNot(store.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
     }
 
@@ -341,15 +341,15 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public Order cancelOrder(String id) throws Exception {
+    public Order cancelOrder(String id) {
         Order order = orderRepo.findById(id)
-                .orElseThrow(() -> new Exception("Order with id " + id + " not found."));
+                .orElseThrow(() -> new IllegalArgumentException("Order with id " + id + " not found."));
 
         if(order.getStage() == OrderStage.STAGE_6_WITH_CUSTOMER || order.getStage() == OrderStage.STAGE_7_ALL_PAID) {
-            throw  new Exception("Cannot cancel this order. Please cancel manually.");
+            throw  new IllegalArgumentException("Cannot cancel this order. Please cancel manually.");
         }
         boolean successful = paymentService.reversePayment(order);
-        if(!successful) throw  new Exception("Unable to reserve payment. Please reverse manually.");
+        if(!successful) throw  new IllegalArgumentException("Unable to reserve payment. Please reverse manually.");
 
         order.setStage(OrderStage.CANCELLED);
         order = orderRepo.save(order);
@@ -369,10 +369,10 @@ public class OrderServiceImpl implements OrderService {
         return order;
     }
 
-    private void validate(Order order) throws Exception {
+    private void validate(Order order) {
         Set<ConstraintViolation<Order>> violations = validator.validate(order);
         if (violations.size() > 0) {
-            throw new Exception(violations.iterator().next().getMessage());
+            throw new IllegalArgumentException(violations.iterator().next().getMessage());
         }
     }
 }

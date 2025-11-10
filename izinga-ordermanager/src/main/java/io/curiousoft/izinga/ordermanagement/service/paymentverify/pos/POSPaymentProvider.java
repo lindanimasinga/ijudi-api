@@ -21,7 +21,7 @@ public class POSPaymentProvider extends PaymentProvider {
     }
 
     @Override
-    public boolean paymentReceived(Order order) throws Exception {
+    public boolean paymentReceived(Order order) {
         var pastOrderCount = orderRepo.findByCustomerId(order.getCustomerId()).map(List::size).orElse(0);
         return pastOrderCount > 2;
     }
