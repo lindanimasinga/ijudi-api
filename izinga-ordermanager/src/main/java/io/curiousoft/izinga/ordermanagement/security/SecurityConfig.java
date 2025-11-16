@@ -19,7 +19,11 @@ import static org.springframework.http.HttpMethod.GET;
 @Configuration
 public class SecurityConfig {
 
-    private final ApiVersionRewriteFilter apiVersionRewriteFilter = new ApiVersionRewriteFilter();
+    private final ApiVersionRewriteFilter apiVersionRewriteFilter;
+
+    public SecurityConfig(ApiVersionRewriteFilter apiVersionRewriteFilter) {
+        this.apiVersionRewriteFilter = apiVersionRewriteFilter;
+    }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -29,8 +33,8 @@ public class SecurityConfig {
                 .regexMatchers("^/v2/.*").authenticated()
                 .anyRequest().permitAll()
                 .and()
+                //.addFilterBefore(doubleSlashSanitizingFilter, DoubleSlashSanitizingFilter.class)
                 .oauth2ResourceServer().jwt();
-                //.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
                 //.addFilterAfter(apiVersionRewriteFilter, SecurityFilterChain.class);
         return http.build();
     }
