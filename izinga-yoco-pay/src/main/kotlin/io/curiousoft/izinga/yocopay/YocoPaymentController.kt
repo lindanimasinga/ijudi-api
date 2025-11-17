@@ -29,6 +29,7 @@ class YocoPaymentController(private val yocoConfiguration: YocoConfiguration,
 
     @PostMapping("/finalise/raw")
     fun verifyPaymentSuccess(request: HttpServletRequest): ResponseEntity<Any>  {
+        log.info("Received yoco webhook request {}", request.getHeader("webhook-id"))
         val reader = request.reader
         val body = reader.lines().collect(Collectors.joining("\n"))
         val webhookId = request.getHeader("webhook-id")
