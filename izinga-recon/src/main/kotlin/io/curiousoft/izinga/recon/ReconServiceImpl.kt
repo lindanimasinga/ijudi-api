@@ -67,8 +67,8 @@ class ReconServiceImpl(
         }
 
         //val tips = tipsService.getTodayTips()
-        val payout = messengerPayoutRepository.findByToIdAndPayoutStage(order.shopId, PayoutStage.PENDING) ?: MessengerPayout(
-            toId = messng?.id!!,
+        val payout = messengerPayoutRepository.findByToIdAndPayoutStage(messng?.id!!, PayoutStage.PENDING) ?: MessengerPayout(
+            toId = messng.id!!,
             toName = messng.name!!,
             toBankName = messng.bank?.name!!,
             toType = messng.bank?.type!!,
