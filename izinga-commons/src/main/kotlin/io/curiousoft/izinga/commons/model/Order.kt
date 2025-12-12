@@ -48,7 +48,7 @@ class Order : BaseModel() {
         .toDouble()
 
     override fun equals(obj: Any?): Boolean {
-        return obj is Order && id == obj.id
+        return obj is Order && id.equals(obj.id)
     }
 
     val basketAmount: Double

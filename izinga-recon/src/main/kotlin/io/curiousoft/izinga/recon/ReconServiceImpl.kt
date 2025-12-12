@@ -8,7 +8,6 @@ import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.payout.*
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
-import lombok.extern.slf4j.Slf4j
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.repository.findByIdOrNull
@@ -85,8 +84,12 @@ class ReconServiceImpl(
             it.isPermEmployed = messng.isPermanentEmployed ?: false
         }
 
-        payout.orders.add(order)
-        payout.emailSent = false
+        payout.orders.firstOrNull { it == order }
+            ?.let { logger.info("payout already processed for the order {}", it.id) } ?: run {
+                logger.info("adding order {} to messenger payout {}", order.id, payout.id)
+                payout.orders.add(order)
+                payout.emailSent = false
+            }
         return messengerPayoutRepository.save(payout)
     }
 
@@ -155,7 +158,7 @@ class ReconServiceImpl(
     override fun getAllPayouts(payoutType: PayoutType, from: Date, toDate: Date, toId: String): List<Payout> {
         return when (payoutType) {
             PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetweenAndToId(from, toDate, toId)
-            PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateAndToId(from, toDate, toId)
+            PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateBetweenAndToId(from, toDate, toId)
         }
     }
 
