@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.commons.model
 
 import com.fasterxml.jackson.annotation.JsonIgnore
+import java.util.Date
 import javax.validation.constraints.NotBlank
 import javax.validation.constraints.NotNull
 
@@ -16,6 +17,9 @@ class UserProfile(
     var isPermanentEmployed: Boolean? = null
 
     var idNumber: String? = null
+    var dateOfBirth: String? = null
+    var termsAccepted: Boolean? = null
+    var termsAcceptedDate: Date? = null
 
     enum class SignUpReason {
         DELIVERY_DRIVER, SELL, BUY, LICENSING
