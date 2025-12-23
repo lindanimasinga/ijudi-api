@@ -58,11 +58,60 @@ public class UserControllerTest {
     }
 
     @Test
-    public void update() {
+    public void update() throws URISyntaxException, JsonProcessingException {
+        // First create a user
+        UserProfile user = new UserProfile("name",
+                UserProfile.SignUpReason.BUY,
+                "myaddress",
+                "path to image",
+                "9111111707",
+                ProfileRoles.CUSTOMER);
+
+        ResponseEntity<String> createResult = this.rest.exchange(
+                RequestEntity.post(new URI("/user")).body(user), String.class);
+        UserProfile createdUser = new Gson().fromJson(createResult.getBody(), UserProfile.class);
+
+        // Update the user
+        createdUser.setName("updated name");
+        createdUser.setAddress("updated address");
+
+        ResponseEntity<String> updateResult = this.rest.exchange(
+                RequestEntity.patch(new URI("/user/" + createdUser.getId())).body(createdUser), String.class);
+
+        System.out.println(new ObjectMapper().writeValueAsString(updateResult.getBody()));
+        Assert.assertTrue(updateResult.getStatusCode().is2xxSuccessful());
+
+        UserProfile updatedUser = new Gson().fromJson(updateResult.getBody(), UserProfile.class);
+        Assert.assertEquals("updated name", updatedUser.getName());
+        Assert.assertEquals("updated address", updatedUser.getAddress());
+        Assert.assertEquals("9111111707", updatedUser.getMobileNumber());
     }
 
     @Test
-    public void findUser() {
+    public void findUser() throws URISyntaxException, JsonProcessingException {
+        // First create a user
+        UserProfile user = new UserProfile("name",
+                UserProfile.SignUpReason.BUY,
+                "myaddress",
+                "path to image",
+                "9111111707",
+                ProfileRoles.CUSTOMER);
+
+        ResponseEntity<String> createResult = this.rest.exchange(
+                RequestEntity.post(new URI("/user")).body(user), String.class);
+        UserProfile createdUser = new Gson().fromJson(createResult.getBody(), UserProfile.class);
+
+        // Find the user by ID
+        ResponseEntity<String> findResult = this.rest.exchange(
+                RequestEntity.get(new URI("/user/" + createdUser.getId())).build(), String.class);
+
+        System.out.println(new ObjectMapper().writeValueAsString(findResult.getBody()));
+        Assert.assertTrue(findResult.getStatusCode().is2xxSuccessful());
+
+        UserProfile foundUser = new Gson().fromJson(findResult.getBody(), UserProfile.class);
+        Assert.assertEquals(createdUser.getId(), foundUser.getId());
+        Assert.assertEquals("name", foundUser.getName());
+        Assert.assertEquals("9111111707", foundUser.getMobileNumber());
     }
 
     @After
