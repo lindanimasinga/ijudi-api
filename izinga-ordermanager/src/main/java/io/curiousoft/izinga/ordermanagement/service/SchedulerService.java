@@ -334,7 +334,7 @@ import static java.lang.String.format;
     }
 
     //every 3am check for stores with flag generate missing images
-    @Scheduled(fixedDelay = 10000)// 10 minutes
+    @Scheduled(cron = "0 0 3 * * *")
     public void generateMissingImagesForStores() throws IOException, InterruptedException {
         var storesWithMissingImages = storeRepository.findByGenerateMissingImagesTrue();
         for (var store : storesWithMissingImages) {
