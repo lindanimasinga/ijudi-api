@@ -33,7 +33,7 @@ open class Profile(
     var latitude = 0.0
     var longitude = 0.0
     var documents: Set<DocumentAttachment>? = null
-    var availabilityStatus: ProfileAvailabilityStatus = ProfileAvailabilityStatus.ONLINE
+    var availabilityStatus: ProfileAvailabilityStatus = ProfileAvailabilityStatus.OFFLINE
 }
 
 enum class ProfileAvailabilityStatus {

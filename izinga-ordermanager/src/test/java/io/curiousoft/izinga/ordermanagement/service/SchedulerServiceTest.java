@@ -89,7 +89,9 @@ public class SchedulerServiceTest {
                 userRepo,
                 applicationEventPublisher,
                 reconService,
-                shoppingListService
+                shoppingListService,
+                null,
+                null
         );
     }
 

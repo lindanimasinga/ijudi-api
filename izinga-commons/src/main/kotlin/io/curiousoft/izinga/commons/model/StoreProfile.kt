@@ -43,6 +43,7 @@ class StoreProfile(
     var ratePerKm = 0.0
     var franchiseName: String? = null
     var deliversFromMultipleAddresses: Boolean? = null;
+    var generateMissingImages: Boolean = false;
 
     init {
         super.bank = bank

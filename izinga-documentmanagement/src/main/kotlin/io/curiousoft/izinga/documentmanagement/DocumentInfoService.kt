@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.documentmanagement
 
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -21,7 +22,7 @@ class DocumentInfoService(
     @Value("\${openai.api.key}") private val openAiApiKey: String
 ) {
 
-    fun analyzeImageWithResponsesApi(imageUrl: String, docType: KClass<DocType>): DocType? {
+    fun analyzeImageWithResponsesApi(imageUrl: String, docType: String, jsonSchemaNode: JsonNode?): JsonNode? {
         val apiUrl = "https://api.openai.com/v1/responses"
         val headers = HttpHeaders().apply {
             contentType = MediaType.APPLICATION_JSON
@@ -33,7 +34,7 @@ class DocumentInfoService(
             "input" to listOf(
                 mapOf(
                     "role" to "user",
-                    "content" to listOf(
+                    "content" to listOf(    
                         mapOf(
                             "type" to "input_text",
                             "text" to "what is in this image, return data in json?"
@@ -48,8 +49,8 @@ class DocumentInfoService(
             "text" to mapOf(
                 "format" to mapOf(
                     "type" to "json_schema",
-                    "name" to docType.simpleName,
-                    "schema" to generateJsonSchema(docType)
+                    "name" to docType,
+                    "schema" to jsonSchemaNode
                 )
             )
         )
@@ -58,21 +59,27 @@ class DocumentInfoService(
         return restTemplate.postForObject(apiUrl, entity, ResponsesData::class.java)
             ?.let {
                 it.output.firstOrNull()?.content?.firstOrNull()?.text
-                    ?.let { text -> jacksonObjectMapper().readValue(text, docType.java) }
+                    ?.let { text -> jacksonObjectMapper().readTree(text) }
             }
     }
 
-    fun generateJsonSchema(clazz: KClass<*>): ObjectNode? {
-        val mapper: ObjectMapper = jacksonObjectMapper()
-        val configBuilder = SchemaGeneratorConfigBuilder(
-            mapper,
-            SchemaVersion.DRAFT_2020_12,
-            OptionPreset.PLAIN_JSON)
-        val generator = SchemaGenerator(configBuilder.build())
-        return generator.generateSchema(clazz.java)
-            ?.also {
-                it.put("additionalProperties", false)
-                it.putPOJO("required", it.get("properties")?.fieldNames()?.asSequence()?.toList())
-            }
+    fun createImage(prompt: String, n: Int = 1, size: String = "1024x1024"): List<String> {
+        val apiUrl = "https://api.openai.com/v1/images/generations"
+        val headers = HttpHeaders().apply {
+            contentType = MediaType.APPLICATION_JSON
+            setBearerAuth(openAiApiKey)
+        }
+
+        val requestBody = mapOf(/*
+            "model" to "gpt-image-1.5",*/
+            "prompt" to prompt,
+            "n" to n,
+            "size" to size
+        )
+
+        val entity = HttpEntity(requestBody, headers)
+        val response = restTemplate.postForObject(apiUrl, entity, Map::class.java)
+        val data = response?.get("data") as? List<Map<String, String>>
+        return data?.mapNotNull { it["url"] } ?: emptyList()
     }
 }

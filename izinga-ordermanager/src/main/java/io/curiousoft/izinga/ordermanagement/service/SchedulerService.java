@@ -7,6 +7,8 @@ import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.documentmanagement.CloudBucketService;
+import io.curiousoft.izinga.documentmanagement.DocumentInfoService;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingListRunEvent;
@@ -51,14 +53,21 @@ import static java.lang.String.format;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final ReconService reconService;
     private final ShoppingListService shoppingListService;
+    private final DocumentInfoService documentInfoService;
+    private final CloudBucketService cloudBucketService;
 
     public SchedulerService(OrderRepository orderRepo, StoreRepository storeRepository,
                             DeviceRepository deviceRepo, PushNotificationService pushNotificationService,
                             AdminOnlyNotificationService smsNotifcationService,
                             EmailNotificationService emailNotificationService,
                             PromotionService promotionService,
-                            @Value("${order.cleanup.unpaid.minutes}") long cleanUpMinutes, UserProfileRepo userProfileRepo,
-                            ApplicationEventPublisher applicationEventPublisher, ReconService reconService, ShoppingListService shoppingListService) {
+                            @Value("${order.cleanup.unpaid.minutes}") long cleanUpMinutes,
+                            UserProfileRepo userProfileRepo,
+                            ApplicationEventPublisher applicationEventPublisher,
+                            ReconService reconService,
+                            ShoppingListService shoppingListService,
+                            DocumentInfoService documentInfoService,
+                            CloudBucketService cloudBucketService) {
         this.orderRepo = orderRepo;
         this.storeRepository = storeRepository;
         this.deviceRepo = deviceRepo;
@@ -71,6 +80,8 @@ import static java.lang.String.format;
         this.applicationEventPublisher = applicationEventPublisher;
         this.reconService = reconService;
         this.shoppingListService = shoppingListService;
+        this.documentInfoService = documentInfoService;
+        this.cloudBucketService = cloudBucketService;
     }
 
     @Scheduled(fixedDelay = 600000, initialDelay = 10000)// 10 minutes
@@ -319,6 +330,61 @@ import static java.lang.String.format;
 
     @Scheduled(fixedDelay = 10000000L , initialDelay = 5000)// 10 minutes
     public void publishMenuOfTheDay() throws IOException, InterruptedException {
-       Application.main(new String[]{});
+     //  Application.main(new String[]{});
     }
+
+    //every 3am check for stores with flag generate missing images
+    @Scheduled(fixedDelay = 10000)// 10 minutes
+    public void generateMissingImagesForStores() throws IOException, InterruptedException {
+        var storesWithMissingImages = storeRepository.findByGenerateMissingImagesTrue();
+        for (var store : storesWithMissingImages) {
+            LOG.info("Generating missing images for store {}", store.getName());
+            for (var stock : store.getStockList()) {
+                if (stock.getImages() == null || stock.getImages().isEmpty()) {
+                    LOG.info("Generating image for stock item {}", stock.getName());
+                    try {
+                        var urls = documentInfoService.createImage(
+                                "Create a photorealistic, high-quality image of a " + stock.getName() +
+                                        ". No text, no logos, no watermarks. Professional commercial photography style, suitable for a TV advertisement. " +
+                                        "Natural lighting, shallow depth of field, sharp focus, premium composition. " +
+                                        "Clean background, realistic textures, studio-quality color grading.",
+                                1,
+                                "256x256")
+                                .stream()
+                                .map(url -> {
+                                    LOG.info("upload to aws {}", url);
+                                    try {
+                                        var fileName = url.substring(url.lastIndexOf("/") + 1);
+                                        var fileBytes = createMultipartFileFromUrl(url);
+                                        cloudBucketService.putObject(fileName, fileBytes);
+                                        return cloudBucketService.getUrl(fileName).toString();
+                                    } catch (Exception e) {
+                                        LOG.error("Failed to download or upload image from url {}", url, e);
+                                    }
+                                    return null;
+                                }).collect(Collectors.toList());
+                        stock.setImages(urls);
+                        storeRepository.save(store);
+                        LOG.info("Image generated for stock item {}", stock.getName());
+                    } catch (Exception e) {
+                        LOG.error("Failed to generate image for stock item {}", stock.getName(), e);
+                    }
+                }
+            }
+        }
+    }
+
+    public byte[] createMultipartFileFromUrl(String imageUrl) throws IOException {
+        java.net.URL url = new java.net.URL(imageUrl);
+        java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+        connection.connect();
+        return connection.getInputStream().readAllBytes();
+    }
+
 }
+
+
+
+
+

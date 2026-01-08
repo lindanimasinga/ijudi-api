@@ -16,4 +16,5 @@ interface StoreRepository : ProfileRepo<StoreProfile> {
 
     fun findOneByIdOrShortName(id: String?, shortname: String?): Optional<StoreProfile>?
     fun findByIdIn(shopIds: List<String>): List<StoreProfile>
+    fun findByGenerateMissingImagesTrue(): List<StoreProfile>
 }
