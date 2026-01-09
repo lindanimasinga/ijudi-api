@@ -334,7 +334,7 @@ import static java.lang.String.format;
     }
 
     //every 3am check for stores with flag generate missing images
-    @Scheduled(cron = "0 0 3 * * *")
+    @Scheduled(fixedDelay = 3000)
     public void generateMissingImagesForStores() throws IOException, InterruptedException {
         var storesWithMissingImages = storeRepository.findByGenerateMissingImagesTrue();
         for (var store : storesWithMissingImages) {
@@ -345,7 +345,8 @@ import static java.lang.String.format;
                     try {
                         var urls = documentInfoService.createImage(
                                 "Create a photorealistic, high-quality image of a " + stock.getName() +
-                                        ". No text, no logos, no watermarks. Professional commercial photography style, suitable for a TV advertisement. " +
+                                        ". Details include: " + (stock.getDescription() != null ? stock.getDescription() : "no description")
+                                        + ". No text, no logos, no watermarks. Professional commercial photography style, suitable for a TV advertisement. " +
                                         "Natural lighting, shallow depth of field, sharp focus, premium composition. " +
                                         "Clean background, realistic textures, studio-quality color grading.",
                                 1,

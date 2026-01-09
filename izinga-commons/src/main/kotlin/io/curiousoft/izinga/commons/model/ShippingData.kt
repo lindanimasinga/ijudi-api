@@ -10,11 +10,15 @@ class ShippingData {
     var fromAddress: @NotBlank(message = "shipping address not valid") String? = null
     var fromBuildingType: BuildingType? = null
     var fromUnitNumber: String? = null
+    var fromFloorLevel: Int? = null
     var fromBuildingName: String? = null
+    var fromBuildingHasElevator: Boolean? = null
     var toAddress: @NotBlank(message = "Shipping address not valid") String? = null
     var buildingType: BuildingType? = null
     var unitNumber: String? = null
     var buildingName: String? = null
+    var floorLevel: Int? = null
+    var buildingHasElevator: Boolean? = null
     var additionalInstructions: String? = null
     var type: @NotNull(message = "shipping type not valid") ShippingType? = null
     var fee: Double = 0.0
