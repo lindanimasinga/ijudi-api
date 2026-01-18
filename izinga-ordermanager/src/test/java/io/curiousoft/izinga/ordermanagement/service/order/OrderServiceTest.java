@@ -386,9 +386,9 @@ public class OrderServiceTest {
         //given
         StoreProfile storeProfile = createStoreProfile(StoreType.CLOTHING);
 
-        storeProfile.setStandardDeliveryPrice(20.00);
-        storeProfile.setStandardDeliveryKm(3);
-        storeProfile.setRatePerKm(5);
+        storeProfile.getRates().setStandardDeliveryPrice(20.00);
+        storeProfile.getRates().setStandardDeliveryKm(3.00);
+        storeProfile.getRates().setRatePerKm(5.00);
 
         HashSet<Stock> stockItems = new HashSet<>();
         stockItems.add(new Stock("skirt", 2, 10, 0, Collections.emptyList()));
