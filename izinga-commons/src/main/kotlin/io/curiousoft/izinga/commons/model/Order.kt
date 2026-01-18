@@ -40,12 +40,26 @@ class Order : BaseModel() {
     var minimumDepositAllowedPerc = 0.0
     var payoutCreated = false
     var documents: Set<DocumentAttachment>? = null
+    // per-order computed fees (set by business logic)
+    var weightFee: Double = 0.0
+    var volumeFee: Double = 0.0
+
     val totalAmount: Double
         get() = BigDecimal.valueOf(
-            serviceFee + basket.totalPrice + (!freeDelivery && shippingData != null).isTrue({shippingData?.fee!!}) { 0.00 }
+            weightFee + volumeFee + serviceFee + basket.totalPrice + (!freeDelivery && shippingData != null).isTrue({shippingData?.fee!!}) { 0.00 }
         )
         .setScale(2, RoundingMode.HALF_EVEN)
         .toDouble()
+
+    // total weight (kg) across all items in the basket
+    val totalWeight: Double
+        get() = basket.items
+            .sumOf { it.weightKg * it.quantity }
+
+    // total volumetric measure across all items in the basket
+    val totalVolume: Double
+        get() = basket.items
+            .sumOf { it.volumeCm2 * it.quantity }
 
     override fun equals(obj: Any?): Boolean {
         return obj is Order && id.equals(obj.id)
@@ -58,9 +72,8 @@ class Order : BaseModel() {
             .setScale(2, RoundingMode.HALF_EVEN)
             .toDouble()
     val depositAmount: Double
-        get() = BigDecimal.valueOf(serviceFee
-                + basket.items.sumOf { obj: BasketItem -> obj.totalPrice } * minimumDepositAllowedPerc + (!freeDelivery && shippingData != null).isTrue({ shippingData?.fee!! }) { 0.00 }
-        )
+        get() = BigDecimal.valueOf(serviceFee +
+                basket.items.sumOf { obj: BasketItem -> obj.totalPrice } * minimumDepositAllowedPerc + (!freeDelivery && shippingData != null).isTrue({ shippingData?.fee!! }) { 0.00 })
             .setScale(2, RoundingMode.HALF_EVEN)
             .toDouble()
 }

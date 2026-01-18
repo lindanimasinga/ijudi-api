@@ -27,6 +27,7 @@ import javax.validation.Validation;
 import javax.validation.Validator;
 import javax.validation.ValidatorFactory;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static io.curiousoft.izinga.commons.model.OrderKt.generateId;
 import static io.curiousoft.izinga.commons.model.OrderType.INSTORE;
@@ -167,12 +168,33 @@ public class OrderServiceImpl implements OrderService {
             // if there are current orders for this user and its same messenger than don't charge a delivery fee.
             double distance = calculateDrivingDirectionKM(googleMapsApiKey, order, storeOptional.get());
             if(allOrdersCurrentForCustomer.isEmpty()) {
-                double standardFee = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ? storeOptional.get().getStandardDeliveryPrice() : this.starndardDeliveryFee;
-                double standardDistance = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ? storeOptional.get().getStandardDeliveryKm() : this.starndardDeliveryKm;
-                double ratePerKM = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ? storeOptional.get().getRatePerKm() : this.ratePerKm;
+                double standardFee = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ?
+                        storeOptional.map(s -> s.getRates())
+                                .map(r -> r.getStandardDeliveryPrice())
+                                .orElse(this.starndardDeliveryFee): this.starndardDeliveryFee;
+
+                double standardDistance = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ?
+                        storeOptional.map(s -> s.getRates())
+                                .map(r -> r.getStandardDeliveryKm())
+                                .orElse(this.starndardDeliveryKm) : this.starndardDeliveryKm;
+
+                double ratePerKM = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ?
+                        storeOptional.map( s -> s.getRates())
+                                .map( r -> r.getRatePerKm())
+                                .orElse(this.ratePerKm) : this.ratePerKm;
+
                 deliveryFee = calculateDeliveryFee(standardFee, standardDistance, ratePerKM, distance);
                 //if the customer has already paid delivery in the previous orders going the same direction, then
-                deliveryFee = deliveryFee - allOrdersCurrentForCustomer.stream().map(o -> o.getShippingData().getFee()).reduce(Double::sum).orElse(0.0);
+                deliveryFee = deliveryFee - allOrdersCurrentForCustomer.stream()
+                        .map(o -> o.getShippingData().getFee())
+                        .reduce(Double::sum)
+                        .orElse(0.0);
+            }
+
+            //if store has weight and volume fee, add to the total fee
+            if(storeOptional.get().getRates() != null) {
+                order.setWeightFee(storeOptional.get().getRates().getRatePerWeightKg() * order.getTotalWeight());
+                order.setVolumeFee(storeOptional.get().getRates().getRatePerVolumeCM2() * order.getTotalVolume());
             }
             order.getShippingData().setFee(deliveryFee);
             order.getShippingData().setDistance(distance);
@@ -237,7 +259,7 @@ public class OrderServiceImpl implements OrderService {
         //decrease stock available
         Optional<StoreProfile> optional = storeRepository.findById(persistedOrder.getShopId());
         StoreProfile store = optional.get();
-        Set<Stock> stock = store.getStockList();
+        Collection<Stock> stock = store.getStockList() == null ? new ArrayList<>() : new ArrayList<>(store.getStockList());
         persistedOrder.getBasket()
                 .getItems()
                 .forEach(item -> stock.stream()

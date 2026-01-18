@@ -38,12 +38,10 @@ class StoreProfile(
     var freeDeliveryMinAmount = 0.0
     var markUpPrice = true
     var minimumDepositAllowedPerc = 1.0
-    var standardDeliveryPrice = 0.0
-    var standardDeliveryKm = 0.0
-    var ratePerKm = 0.0
     var franchiseName: String? = null
     var deliversFromMultipleAddresses: Boolean? = null;
     var generateMissingImages: Boolean = false;
+    var rates: Rates? = null
 
     init {
         super.bank = bank
@@ -177,4 +175,12 @@ class StoreProfile(
     enum class AVAILABILITY {
         OFFLINE, SPECIFIC_HOURS, ONLINE24_7
     }
+}
+
+class Rates() {
+    var standardDeliveryPrice: Double? = null
+    var standardDeliveryKm: Double? = null
+    var ratePerKm: Double? = null
+    var ratePerVolumeCM2: Double? = null
+    var ratePerWeightKg: Double? = null
 }
