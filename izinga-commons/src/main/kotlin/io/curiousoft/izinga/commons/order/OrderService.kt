@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.commons.order
 
 import io.curiousoft.izinga.commons.model.Order
+import io.curiousoft.izinga.commons.model.QouteApproval
 
 interface OrderService {
     fun startOrder(order: Order?): Order?
@@ -24,4 +25,5 @@ interface OrderService {
     fun findAll(): MutableList<Order?>?
 
     fun cancelOrder(id: String?): Order?
+    fun acceptQuote(orderId: String, quoteApproval: QouteApproval): Order?
 }

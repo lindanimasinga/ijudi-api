@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.commons.model
 
 import java.util.*
+import javax.validation.Valid
 import javax.validation.constraints.Future
 import javax.validation.constraints.NotBlank
 import javax.validation.constraints.NotNull
@@ -25,6 +26,7 @@ class ShippingData {
     var messengerId: String? = null
     var pickUpTime: @Future(message = "pickup date must be at least 15 minutes ahead") Date? = null
     var distance: Double = 0.0
+    var shippingDataGeoData: ShipingGeoData? = null
 
     constructor()
     constructor(
@@ -41,3 +43,5 @@ class ShippingData {
         COLLECTION, DELIVERY, SCHEDULED_DELIVERY
     }
 }
+
+class ShipingGeoData(val fromGeoPoint: @Valid GeoPoint, val toGeoPoint: @Valid GeoPoint, val distance: Double)

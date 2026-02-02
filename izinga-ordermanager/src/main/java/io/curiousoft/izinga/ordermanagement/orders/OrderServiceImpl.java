@@ -2,9 +2,7 @@ package io.curiousoft.izinga.ordermanagement.orders;
 
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.order.OrderService;
-import io.curiousoft.izinga.commons.order.events.OrderEvent;
-import io.curiousoft.izinga.commons.order.events.OrderUpdatedEvent;
-import io.curiousoft.izinga.commons.order.events.ScheduledOrderEvent;
+import io.curiousoft.izinga.commons.order.events.*;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
@@ -13,14 +11,16 @@ import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationServic
 import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
 import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
-import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import javax.validation.ConstraintViolation;
 import javax.validation.Validation;
@@ -166,7 +166,7 @@ public class OrderServiceImpl implements OrderService {
                     OrderStage.STAGE_2_STORE_PROCESSING, OrderStage.STAGE_2_STORE_PROCESSING) : List.of();
 
             // if there are current orders for this user and its same messenger than don't charge a delivery fee.
-            double distance = calculateDrivingDirectionKM(googleMapsApiKey, order, storeOptional.get());
+            var shipingGeoData = calculateDrivingDirectionKM(googleMapsApiKey, order, storeOptional.get());
             if(allOrdersCurrentForCustomer.isEmpty()) {
                 double standardFee = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ?
                         storeOptional.map(s -> s.getRates())
@@ -183,7 +183,7 @@ public class OrderServiceImpl implements OrderService {
                                 .map( r -> r.getRatePerKm())
                                 .orElse(this.ratePerKm) : this.ratePerKm;
 
-                deliveryFee = calculateDeliveryFee(standardFee, standardDistance, ratePerKM, distance);
+                deliveryFee = calculateDeliveryFee(standardFee, standardDistance, ratePerKM, shipingGeoData.getDistance());
                 //if the customer has already paid delivery in the previous orders going the same direction, then
                 deliveryFee = deliveryFee - allOrdersCurrentForCustomer.stream()
                         .map(o -> o.getShippingData().getFee())
@@ -197,7 +197,8 @@ public class OrderServiceImpl implements OrderService {
                 order.setVolumeFee(storeOptional.get().getRates().getRatePerVolumeCM2() * order.getTotalVolume());
             }
             order.getShippingData().setFee(deliveryFee);
-            order.getShippingData().setDistance(distance);
+            order.getShippingData().setDistance(shipingGeoData.getDistance());
+            order.getShippingData().setShippingDataGeoData(shipingGeoData);
         }
 
         boolean isEligibleForFreeDelivery = storeOptional.get().isEligibleForFreeDelivery(order);
@@ -205,6 +206,13 @@ public class OrderServiceImpl implements OrderService {
 
         if (canChargeServiceFees(storeOptional.get())) {
             order.setServiceFee(serviceFeePerc * (order.getBasketAmount() + (order.getFreeDelivery() ? 0 : deliveryFee)));
+        }
+
+        var isQuoteRequired = storeOptional.get().isQuoteRequired();
+        if (isQuoteRequired) {
+            order.getTag().put("quoteRequired", String.valueOf(isQuoteRequired));
+            OrderQuoteCreatedEvent quoteRequestedEvent = new OrderQuoteCreatedEvent(this, order, storeOptional.get());
+            applicationEventPublisher.publishEvent(quoteRequestedEvent);
         }
 
         List<PaymentType> paymentTypes = paymentService.getAllowedPaymentTypes(order.getCustomerId(), storeOptional.get().getStoreType());
@@ -396,5 +404,50 @@ public class OrderServiceImpl implements OrderService {
         if (violations.size() > 0) {
             throw new IllegalArgumentException(violations.iterator().next().getMessage());
         }
+    }
+
+    @Override
+    public @Nullable Order acceptQuote(@NotNull String orderId, @NotNull QouteApproval quoteApproval) {
+        // load order
+        Order order = orderRepo.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order with id " + orderId + " not found."));
+
+        if (order.getStage() == OrderStage.CANCELLED) {
+            throw new IllegalArgumentException("Order with id " + orderId + " has been cancelled");
+        }
+
+        // basic sanity: ensure the approval references the same order
+        if (quoteApproval.getOrderId() != null && !quoteApproval.getOrderId().equals(orderId)) {
+            throw new IllegalArgumentException("Quote approval orderId does not match path orderId");
+        }
+
+        boolean isAlreadyAccepted = StringUtils.hasText(order.getTag().get("quoteAcceptedBy"));
+        if(isAlreadyAccepted) {
+            throw new IllegalArgumentException("Quote for order " + orderId + " has already been processed");
+        }
+
+        // if approved, assign messenger and (if appropriate) advance stage
+        if (quoteApproval.getApproved()) {
+            order.getShippingData().setMessengerId(quoteApproval.getMessengerId());
+            order.getTag().put("quoteAcceptedBy", quoteApproval.getMessengerId());
+        } else {
+            // record rejection reason and messenger that rejected
+            order.getTag().put("quoteRejectedBy", quoteApproval.getMessengerId());
+            if (quoteApproval.getReason() != null) {
+                order.getTag().put("quoteRejectionReason", quoteApproval.getReason());
+            }
+        }
+
+        Order saved = orderRepo.save(order);
+        // publish update event so other services can react (e.g., push notifications)
+        var store = storeRepository.findById(order.getShopId()).orElse(null);
+        if (store != null) {
+            QuoteAcceptedEvent event = new QuoteAcceptedEvent(this, saved, quoteApproval.getMessengerId(), store);
+            applicationEventPublisher.publishEvent(event);
+        } else {
+            LOG.warn("Store not found when publishing quote acceptance event for order {}", orderId);
+        }
+
+        return saved;
     }
 }

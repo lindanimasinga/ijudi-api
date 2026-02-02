@@ -1,13 +1,15 @@
 package io.curiousoft.izinga.commons.utils
 
+import io.curiousoft.izinga.commons.model.GeoPoint
+import io.curiousoft.izinga.commons.model.GeoPointImpl
 import io.curiousoft.izinga.messaging.domain.directions.Leg
 import io.curiousoft.izinga.messaging.domain.directions.Route
 import io.curiousoft.izinga.messaging.firebase.GoogleServices.GoogleMaps
 import io.curiousoft.izinga.commons.model.Order
+import io.curiousoft.izinga.commons.model.ShipingGeoData
 import io.curiousoft.izinga.commons.model.StoreProfile
 import org.hibernate.validator.internal.constraintvalidators.hv.LuhnCheckValidator
 import org.slf4j.LoggerFactory
-import java.io.IOException
 import java.util.*
 
 object IjudiUtils
@@ -44,7 +46,7 @@ fun calculateMarkupPrice(storePrice: Double, markPercentage: Double): Double {
     return markupPrice.toInt() + if (cents > 0.45) cents else 1 + cents
 }
 
-fun calculateDrivingDirectionKM(apiKey: String?, order: Order, store: StoreProfile): Double {
+fun calculateDrivingDirectionKM(apiKey: String?, order: Order, store: StoreProfile): ShipingGeoData {
     val googleMapsInstance = GoogleMaps.instance
     // from lat long
     val fromLatLong = if (store.deliversFromMultipleAddresses == true)
@@ -58,11 +60,20 @@ fun calculateDrivingDirectionKM(apiKey: String?, order: Order, store: StoreProfi
     val location = geoCode.results[0].geometry.location
     val toLatLong = location.lat.toString() + "," + location.lng
     val directions = googleMapsInstance.findDirections(apiKey, fromLatLong, toLatLong).execute().body()
-    return directions.routes.stream()
+    var distance = directions.routes.stream()
         .flatMap { route: Route -> route.legs.stream() }
         .min(Comparator.comparingInt { leg1: Leg -> leg1.distance.value })
         .map { value: Leg -> value.distance.value / 1000 }.orElse(0)
         .toDouble() // kilometers
+    val fromGeo = GeoPointImpl(
+        fromLatLong.split(",")[0].toDouble(),
+        fromLatLong.split(",")[1].toDouble()
+    )
+    val toGeo = GeoPointImpl(
+        location.lat,
+        location.lng
+    )
+    return ShipingGeoData(fromGeoPoint = fromGeo, toGeoPoint = toGeo, distance = distance)
 }
 
 fun calculateDeliveryFee(

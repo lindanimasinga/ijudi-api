@@ -52,6 +52,7 @@ public class WhatsappTemplateRequest {
         private MediaObject image;                // Required if type == IMAGE
         private MediaObject document;             // Required if type == DOCUMENT
         private MediaObject video;                // Required if type == VIDEO
+        private Location location;               // Required if type == LOCATION
     }
 
     public enum ParameterType {
@@ -60,7 +61,8 @@ public class WhatsappTemplateRequest {
         DATE_TIME,
         DOCUMENT,
         IMAGE,
-        VIDEO
+        VIDEO,
+        LOCATION
     }
 
     @Data
@@ -73,6 +75,14 @@ public class WhatsappTemplateRequest {
     @Data
     public static class DateTime {
         private String fallback_value;            // Required
+    }
+
+    @Data
+    public static class Location {
+        private Double latitude;
+        private Double longitude;
+        private String name;
+        private String address;
     }
 
     @Data

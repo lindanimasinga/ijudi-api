@@ -42,6 +42,7 @@ class StoreProfile(
     var deliversFromMultipleAddresses: Boolean? = null;
     var generateMissingImages: Boolean = false;
     var rates: Rates? = null
+    var isQuoteRequired: Boolean = false
 
     init {
         super.bank = bank

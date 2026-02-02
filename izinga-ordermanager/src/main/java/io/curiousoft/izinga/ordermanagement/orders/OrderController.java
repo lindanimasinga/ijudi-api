@@ -1,6 +1,7 @@
-package io.curiousoft.izinga.ordermanagement.conroller;
+package io.curiousoft.izinga.ordermanagement.orders;
 
 import io.curiousoft.izinga.commons.model.Order;
+import io.curiousoft.izinga.commons.model.QouteApproval;
 import io.curiousoft.izinga.commons.order.OrderService;
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.servers.Server;
@@ -54,6 +55,13 @@ public class OrderController {
     public ResponseEntity<Order> applyPromoCode(@PathVariable String orderId, @PathVariable String promocode) throws Exception {
         var order = orderService.findOrder(orderId);
         order = orderService.applyPromoCode(promocode, order);
+        return ResponseEntity.ok(order);
+    }
+
+    @PatchMapping(value = "/{orderId}/quote")
+    public ResponseEntity<Order> acceptQuote(@PathVariable String orderId,
+                                             @RequestBody QouteApproval quoteApproval) throws Exception {
+        var order = orderService.acceptQuote(orderId, quoteApproval);
         return ResponseEntity.ok(order);
     }
 
