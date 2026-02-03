@@ -313,7 +313,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
 
         // Build Template programmatically to ensure types match (HEADER expects LOCATION)
         WhatsappTemplateRequest.Template template = new WhatsappTemplateRequest.Template();
-        template.setName("quote_request_for_acceptance");
+        template.setName("quote_request_for_acceptance2");
         var lang = new WhatsappTemplateRequest.Language();
         lang.setCode("en"); // matches template language
         template.setLanguage(lang);
