@@ -168,20 +168,17 @@ public class OrderServiceImpl implements OrderService {
             // if there are current orders for this user and its same messenger than don't charge a delivery fee.
             var shipingGeoData = calculateDrivingDirectionKM(googleMapsApiKey, order, storeOptional.get());
             if(allOrdersCurrentForCustomer.isEmpty()) {
-                double standardFee = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ?
-                        storeOptional.map(s -> s.getRates())
-                                .map(r -> r.getStandardDeliveryPrice())
-                                .orElse(this.starndardDeliveryFee): this.starndardDeliveryFee;
+                double standardFee = storeOptional.map(StoreProfile::getRates)
+                                .map(Rates::getStandardDeliveryPrice)
+                                .orElse(this.starndardDeliveryFee);
 
-                double standardDistance = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ?
-                        storeOptional.map(s -> s.getRates())
-                                .map(r -> r.getStandardDeliveryKm())
-                                .orElse(this.starndardDeliveryKm) : this.starndardDeliveryKm;
+                double standardDistance = storeOptional.map(StoreProfile::getRates)
+                                .map(Rates::getStandardDeliveryKm)
+                                .orElse(this.starndardDeliveryKm);
 
-                double ratePerKM = !isNullOrEmpty(storeOptional.get().getStoreMessenger()) ?
-                        storeOptional.map( s -> s.getRates())
-                                .map( r -> r.getRatePerKm())
-                                .orElse(this.ratePerKm) : this.ratePerKm;
+                double ratePerKM = storeOptional.map(StoreProfile::getRates)
+                                .map(Rates::getRatePerKm)
+                                .orElse(this.ratePerKm);
 
                 deliveryFee = calculateDeliveryFee(standardFee, standardDistance, ratePerKM, shipingGeoData.getDistance());
                 //if the customer has already paid delivery in the previous orders going the same direction, then
@@ -194,7 +191,7 @@ public class OrderServiceImpl implements OrderService {
             //if store has weight and volume fee, add to the total fee
             if(storeOptional.get().getRates() != null) {
                 order.setWeightFee(storeOptional.get().getRates().getRatePerWeightKg() * order.getTotalWeight());
-                order.setVolumeFee(storeOptional.get().getRates().getRatePerVolumeCM2() * order.getTotalVolume());
+                order.setVolumeFee(storeOptional.get().getRates().getRatePerVolumeCM2() * order.getTotalArea());
             }
             order.getShippingData().setFee(deliveryFee);
             order.getShippingData().setDistance(shipingGeoData.getDistance());

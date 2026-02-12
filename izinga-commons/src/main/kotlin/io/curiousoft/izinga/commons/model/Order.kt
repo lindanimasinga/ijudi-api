@@ -53,13 +53,14 @@ class Order : BaseModel() {
 
     // total weight (kg) across all items in the basket
     val totalWeight: Double
-        get() = basket.items
-            .sumOf { it.weightKg * it.quantity }
+        get() = basket.totalWeight
 
     // total volumetric measure across all items in the basket
     val totalVolume: Double
-        get() = basket.items
-            .sumOf { it.volumeCm2 * it.quantity }
+        get() = basket.totalVolume
+
+    val totalArea: Double
+        get() = basket.totalArea
 
     override fun equals(obj: Any?): Boolean {
         return obj is Order && id.equals(obj.id)

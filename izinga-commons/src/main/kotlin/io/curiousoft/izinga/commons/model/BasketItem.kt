@@ -15,10 +15,10 @@ class BasketItem(@JsonProperty("name") var name: String,
     var options: List<SelectionOption>? = null
 
     // weight in kilograms for this single item (default 0.0)
-    var weightKg: Double = 0.0
-
-    // volumetric area/volume measure in square centimetres (or whatever unit rates expect)
-    var volumeCm2: Double = 0.0
+    var weight: Double = 0.0
+    var width: Double = 0.0
+    var length: Double = 0.0
+    var height: Double = 0.0
 
     val totalPrice: Double
         get() = price * quantity
