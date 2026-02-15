@@ -334,7 +334,7 @@ import static java.lang.String.format;
     }
 
     //every 3am check for stores with flag generate missing images
-    @Scheduled(fixedDelay = 3000)
+    @Scheduled(fixedDelay = 600000)
     public void generateMissingImagesForStores() throws IOException, InterruptedException {
         var storesWithMissingImages = storeRepository.findByGenerateMissingImagesTrue();
         for (var store : storesWithMissingImages) {
@@ -370,6 +370,7 @@ import static java.lang.String.format;
                     } catch (Exception e) {
                         LOG.error("Failed to generate image for stock item {}", stock.getName(), e);
                     }
+                    Thread.sleep(12000);
                 }
             }
         }
