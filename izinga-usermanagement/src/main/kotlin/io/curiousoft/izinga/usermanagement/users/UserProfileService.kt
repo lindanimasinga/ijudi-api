@@ -32,4 +32,8 @@ class UserProfileService(userProfileRepo: UserProfileRepo) : ProfileServiceImpl<
         if (profileRepo.existsByMobileNumber(profile.mobileNumber!!)) throw Exception("User with phone number " + profile.mobileNumber + " already exist.")
         return super.create(profile)
     }
+
+    fun pendingAproval(): List<UserProfile> {
+        return profileRepo.findByProfileApproved(false)
+    }
 }

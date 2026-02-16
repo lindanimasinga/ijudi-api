@@ -34,6 +34,8 @@ open class Profile(
     var longitude = 0.0
     var documents: Set<DocumentAttachment>? = null
     var availabilityStatus: ProfileAvailabilityStatus = ProfileAvailabilityStatus.OFFLINE
+    var profileApproved = false
+    var profileApprovedDate: String? = null
 }
 
 enum class ProfileAvailabilityStatus {

@@ -82,7 +82,8 @@ public class OrderQuoteCreatedEventHandler {
                 maxLng)
                 .stream()
                 .filter(it-> Boolean.TRUE.equals(it.getTermsAccepted())
-                        && it.getAvailabilityStatus() == ProfileAvailabilityStatus.ONLINE)
+                        && it.getAvailabilityStatus() == ProfileAvailabilityStatus.ONLINE
+                        && it.getProfileApproved())
                 .toList();
 
         return messengers != null ? messengers : List.of();

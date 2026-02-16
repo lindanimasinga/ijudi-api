@@ -14,4 +14,5 @@ interface UserProfileRepo : ProfileRepo<UserProfile> {
     ): List<UserProfile>?
 
     fun findByIdIn(inactiveCustomers45Days: MutableSet<String>): MutableList<UserProfile>
+    fun findByProfileApproved(bool: Boolean): List<UserProfile>
 }
