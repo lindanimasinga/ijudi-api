@@ -44,4 +44,4 @@ class ShippingData {
     }
 }
 
-class ShipingGeoData(val fromGeoPoint: @Valid GeoPoint, val toGeoPoint: @Valid GeoPoint, val distance: Double)
+class ShipingGeoData(val fromGeoPoint: @Valid GeoPointImpl, val toGeoPoint: @Valid GeoPointImpl, val distance: Double)
