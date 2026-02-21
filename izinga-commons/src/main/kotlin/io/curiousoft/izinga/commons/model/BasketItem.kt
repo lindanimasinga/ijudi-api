@@ -13,6 +13,7 @@ class BasketItem(@JsonProperty("name") var name: String,
     var externalUrl: String? = null
     var storePrice = 0.0
     var options: List<SelectionOption>? = null
+    var imageUrl: List<String> = emptyList()
 
     // weight in kilograms for this single item (default 0.0)
     var weight: Double = 0.0

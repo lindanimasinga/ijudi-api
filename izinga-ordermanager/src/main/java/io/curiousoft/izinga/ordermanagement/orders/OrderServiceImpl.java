@@ -162,8 +162,10 @@ public class OrderServiceImpl implements OrderService {
         if (order.getOrderType() == OrderType.ONLINE) {
             //if there are orders in progress going to the same location for the same customer and same messenger then add a discount
             List<Order> allOrdersCurrentForCustomer = order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY ?
-                    findAllOrdersWithStateForCustomer(order.getCustomerId(), order.getShippingData().getMessengerId(), OrderStage.STAGE_3_READY_FOR_COLLECTION,
-                    OrderStage.STAGE_2_STORE_PROCESSING, OrderStage.STAGE_2_STORE_PROCESSING) : List.of();
+                    findAllOrdersWithStateForCustomer(order.getCustomerId(), order.getShippingData().getMessengerId(),
+                            OrderStage.STAGE_3_READY_FOR_COLLECTION,
+                            OrderStage.STAGE_1_WAITING_STORE_CONFIRM,
+                            OrderStage.STAGE_2_STORE_PROCESSING) : List.of();
 
             // if there are current orders for this user and its same messenger than don't charge a delivery fee.
             var shipingGeoData = calculateDrivingDirectionKM(googleMapsApiKey, order, storeOptional.get());
