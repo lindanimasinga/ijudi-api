@@ -78,7 +78,8 @@ public class OrderServiceTest {
                 pushNotificationService,
                 smsNotifcation, emailNotificationService,
                 null,
-                applicationEventPublisher
+                applicationEventPublisher,
+                null
                 );
     }
 

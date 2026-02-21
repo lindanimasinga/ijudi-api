@@ -22,12 +22,10 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import javax.validation.ConstraintViolation;
 import javax.validation.Validation;
 import javax.validation.Validator;
 import javax.validation.ValidatorFactory;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static io.curiousoft.izinga.commons.model.OrderKt.generateId;
 import static io.curiousoft.izinga.commons.model.OrderType.INSTORE;
@@ -55,6 +53,7 @@ public class OrderServiceImpl implements OrderService {
     private final double ratePerKm;
     private final PromoCodeClient promoCodeClient;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final RestrictedRegionService restrictedRegionService;
 
     @Autowired
     public OrderServiceImpl(@Value("${service.delivery.standardFee}") double starndardDeliveryFee,
@@ -72,7 +71,8 @@ public class OrderServiceImpl implements OrderService {
                             AdminOnlyNotificationService smsNotifcationService,
                             EmailNotificationService emailNotificationService,
                             PromoCodeClient promoCodeClient,
-                            ApplicationEventPublisher applicationEventPublisher) {
+                            ApplicationEventPublisher applicationEventPublisher,
+                            RestrictedRegionService restrictedRegionService) {
         this.starndardDeliveryFee = starndardDeliveryFee;
         this.starndardDeliveryKm = starndardDeliveryKm;
         this.ratePerKm = ratePerKm;
@@ -86,6 +86,7 @@ public class OrderServiceImpl implements OrderService {
         this.googleMapsApiKey = googleMapsApiKey;
         this.promoCodeClient = promoCodeClient;
         this.applicationEventPublisher = applicationEventPublisher;
+        this.restrictedRegionService = restrictedRegionService;
         ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
         validator = factory.getValidator();
 
@@ -111,7 +112,6 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Order startOrder(Order order) {
 
-        validate(order);
         if (!userProfileRepo.existsById(order.getCustomerId())) {
             throw new IllegalArgumentException("user with id " + order.getCustomerId() + " does not exist");
         }
@@ -201,6 +201,7 @@ public class OrderServiceImpl implements OrderService {
             order.getShippingData().setFee(deliveryFee);
             order.getShippingData().setDistance(shipingGeoData.getDistance());
             order.getShippingData().setShippingDataGeoData(shipingGeoData);
+            restrictedRegionService.validationRestrictedRegions(order);
         }
 
         boolean isEligibleForFreeDelivery = storeOptional.get().isEligibleForFreeDelivery(order);
@@ -232,7 +233,6 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Order finishOder(Order order) {
-        validate(order);
         Order persistedOrder = orderRepo.findById(order.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Order with id %s not found.".formatted(order.getId())));
 
@@ -399,13 +399,6 @@ public class OrderServiceImpl implements OrderService {
             }
         });
         return order;
-    }
-
-    private void validate(Order order) {
-        Set<ConstraintViolation<Order>> violations = validator.validate(order);
-        if (violations.size() > 0) {
-            throw new IllegalArgumentException(violations.iterator().next().getMessage());
-        }
     }
 
     @Override
