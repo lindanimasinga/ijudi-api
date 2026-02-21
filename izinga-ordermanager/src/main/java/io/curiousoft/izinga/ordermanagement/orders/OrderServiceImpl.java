@@ -172,14 +172,17 @@ public class OrderServiceImpl implements OrderService {
             if(allOrdersCurrentForCustomer.isEmpty()) {
                 double standardFee = storeOptional.map(StoreProfile::getRates)
                                 .map(Rates::getStandardDeliveryPrice)
+                                .filter(it -> it > 0)
                                 .orElse(this.starndardDeliveryFee);
 
                 double standardDistance = storeOptional.map(StoreProfile::getRates)
                                 .map(Rates::getStandardDeliveryKm)
+                                .filter(it -> it > 0)
                                 .orElse(this.starndardDeliveryKm);
 
                 double ratePerKM = storeOptional.map(StoreProfile::getRates)
                                 .map(Rates::getRatePerKm)
+                                .filter(it -> it > 0)
                                 .orElse(this.ratePerKm);
 
                 deliveryFee = calculateDeliveryFee(standardFee, standardDistance, ratePerKM, shipingGeoData.getDistance());
