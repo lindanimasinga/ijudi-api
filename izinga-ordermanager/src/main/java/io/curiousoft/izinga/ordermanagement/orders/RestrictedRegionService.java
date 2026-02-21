@@ -74,18 +74,18 @@ public class RestrictedRegionService {
         LOG.info("Found {} active restricted regions to check for orderId={}", regions.size(), order.getId());
         for (RestrictedRegion region : regions) {
             if (from != null) {
-                double distanceFrom = GeoDistance.Companion.getDistanceInKiloMetersBetweenTwoGeoPoints(from, region.getCenter());
-                LOG.debug("Order {} origin distance to region {} = {} km (radius={})", order.getId(), region.getName(), distanceFrom, region.getRadius());
-                if (distanceFrom <= region.getRadius()) {
-                    LOG.warn("Order {} origin falls within restricted region {} (distance={} km, radius={} km)", order.getId(), region.getName(), distanceFrom, region.getRadius());
+                double distanceFromInM = GeoDistance.Companion.getDistanceInKiloMetersBetweenTwoGeoPoints(from, region.getCenter()) * 1000;
+                LOG.debug("Order {} origin distance to region {} = {} km (radius={})", order.getId(), region.getName(), distanceFromInM, region.getRadius());
+                if (distanceFromInM <= region.getRadius()) {
+                    LOG.warn("Order {} origin falls within restricted region {} (distance={} km, radius={} km)", order.getId(), region.getName(), distanceFromInM, region.getRadius());
                     throw new IllegalArgumentException("Order falls within restricted region: " + region.getName());
                 }
             }
             if (to != null) {
-                double distanceTo = GeoDistance.Companion.getDistanceInKiloMetersBetweenTwoGeoPoints(to, region.getCenter());
-                LOG.debug("Order {} destination distance to region {} = {} km (radius={})", order.getId(), region.getName(), distanceTo, region.getRadius());
-                if (distanceTo <= region.getRadius()) {
-                    LOG.warn("Order {} destination falls within restricted region {} (distance={} km, radius={} km)", order.getId(), region.getName(), distanceTo, region.getRadius());
+                double distanceToInM = GeoDistance.Companion.getDistanceInKiloMetersBetweenTwoGeoPoints(to, region.getCenter()) * 1000;
+                LOG.debug("Order {} destination distance to region {} = {} km (radius={})", order.getId(), region.getName(), distanceToInM, region.getRadius());
+                if (distanceToInM <= region.getRadius()) {
+                    LOG.warn("Order {} destination falls within restricted region {} (distance={} km, radius={} km)", order.getId(), region.getName(), distanceToInM, region.getRadius());
                     throw new IllegalArgumentException("Destination falls within restricted region: " + region.getName());
                 }
             }
