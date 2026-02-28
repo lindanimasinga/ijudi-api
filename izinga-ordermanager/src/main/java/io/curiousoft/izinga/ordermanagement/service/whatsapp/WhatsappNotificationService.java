@@ -24,11 +24,11 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
 
     private static final Logger LOGGER = LoggerFactory.getLogger(WhatsappNotificationService.class);
     private final WhatsAppService whatsAppService;
-    private final WhatsappConfig whatsappConfig;
+    private final io.curiousoft.izinga.messaging.whatsapp.WhatsappConfig whatsappConfig;
     private final ObjectMapper mapper;
 
     public WhatsappNotificationService(WhatsAppService whatsAppService,
-                                       WhatsappConfig whatsappConfig, ObjectMapper mapper) {
+                                       io.curiousoft.izinga.messaging.whatsapp.WhatsappConfig whatsappConfig, ObjectMapper mapper) {
         this.whatsAppService = whatsAppService;
         this.whatsappConfig = whatsappConfig;
         this.mapper = mapper;

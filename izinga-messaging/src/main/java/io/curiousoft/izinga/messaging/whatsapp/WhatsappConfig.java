@@ -1,4 +1,4 @@
-package io.curiousoft.izinga.ordermanagement.service.whatsapp;
+package io.curiousoft.izinga.messaging.whatsapp;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.ConstructorBinding;

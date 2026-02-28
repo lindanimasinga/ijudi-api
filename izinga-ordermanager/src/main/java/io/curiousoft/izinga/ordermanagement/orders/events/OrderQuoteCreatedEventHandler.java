@@ -40,13 +40,12 @@ public class OrderQuoteCreatedEventHandler {
             }
 
             // Find messengers near the store location
-            List<UserProfile> nearbyMessengers = findNearbyMessengers(
-                    order.getShippingData().getShippingDataGeoData().getFromGeoPoint().getLatitude(),
-                    order.getShippingData().getShippingDataGeoData().getFromGeoPoint().getLongitude() ,
-                    SEARCH_RADIUS_KM
-            );
+            var lat = order.getShippingData().getShippingDataGeoData().getFromGeoPoint().getLatitude();
+            var lng = order.getShippingData().getShippingDataGeoData().getFromGeoPoint().getLongitude();
+            List<UserProfile> nearbyMessengers = findNearbyMessengers(lat, lng , SEARCH_RADIUS_KM);
 
-            LOG.info("Found {} nearby messengers for order quote {}", nearbyMessengers.size(), order.getId());
+            LOG.info("Found {} nearby messengers for order quote {} lat {}, long {} radius {}km",
+                    nearbyMessengers.size(), order.getId(), lat, lng, SEARCH_RADIUS_KM);
 
             // Send WhatsApp notification to each messenger
             for (UserProfile messenger : nearbyMessengers) {
