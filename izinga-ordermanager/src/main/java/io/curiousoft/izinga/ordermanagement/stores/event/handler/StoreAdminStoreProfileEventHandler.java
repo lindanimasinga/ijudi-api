@@ -4,8 +4,9 @@ import io.curiousoft.izinga.commons.model.Device;
 import io.curiousoft.izinga.commons.model.PushHeading;
 import io.curiousoft.izinga.commons.model.PushMessage;
 import io.curiousoft.izinga.commons.model.PushMessageType;
+import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
-import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
+import io.curiousoft.izinga.messaging.firebase.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.DeviceService;
 import io.curiousoft.izinga.ordermanagement.stores.event.StoreCreatedEvent;
@@ -14,13 +15,11 @@ import io.curiousoft.izinga.ordermanagement.stores.event.StoreUpdatedEvent;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
-import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 import java.util.List;
 
 
-public record StoreAdminStoreProfileEventHandler(PushNotificationService pushNotificationService,
+public record StoreAdminStoreProfileEventHandler(FirebaseNotificationService pushNotificationService,
                                                  AdminOnlyNotificationService adminOnlyNotificationService,
                                                  EmailNotificationService emailNotificationService,
                                                  DeviceService deviceService,

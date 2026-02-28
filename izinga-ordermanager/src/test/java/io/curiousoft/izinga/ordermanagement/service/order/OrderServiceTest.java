@@ -5,8 +5,9 @@ import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
-import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
+import io.curiousoft.izinga.messaging.firebase.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
 import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
@@ -40,7 +41,7 @@ public class OrderServiceTest {
     @Mock
     private PaymentService paymentService;
     @Mock
-    private PushNotificationService pushNotificationService;
+    private FirebaseNotificationService pushNotificationService;
     @Mock
     private AdminOnlyNotificationService smsNotifcation;
     @Mock

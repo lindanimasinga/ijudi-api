@@ -3,9 +3,10 @@ package io.curiousoft.izinga.ordermanagement.orders.events;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.order.events.OrderCancelledEvent;
 import io.curiousoft.izinga.commons.order.events.OrderUpdatedEvent;
+import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
-import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
+import io.curiousoft.izinga.messaging.firebase.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.DeviceService;
 import io.curiousoft.izinga.ordermanagement.service.whatsapp.WhatsappNotificationService;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
@@ -17,7 +18,7 @@ import java.io.IOException;
 import java.util.List;
 
 @Service
-public record CustomerOrderEventHandler(PushNotificationService pushNotificationService,
+public record CustomerOrderEventHandler(FirebaseNotificationService pushNotificationService,
                                         EmailNotificationService emailNotificationService,
                                         WhatsappNotificationService whatsappNotificationService,
                                         DeviceService deviceService,

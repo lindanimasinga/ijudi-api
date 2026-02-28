@@ -1,5 +1,4 @@
-package io.curiousoft.izinga.ordermanagement.notification;
-
+package io.curiousoft.izinga.messaging.firebase;
 
 import io.curiousoft.izinga.commons.model.Device;
 import io.curiousoft.izinga.commons.model.Order;
@@ -9,7 +8,6 @@ import org.springframework.scheduling.annotation.Async;
 
 import java.util.List;
 import java.util.Map;
-
 
 public interface PushNotificationService {
 

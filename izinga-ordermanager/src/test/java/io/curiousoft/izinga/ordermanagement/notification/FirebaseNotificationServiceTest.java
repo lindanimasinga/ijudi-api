@@ -21,7 +21,7 @@ import static org.mockito.Mockito.*;
 @RunWith(MockitoJUnitRunner.class)
 public class FirebaseNotificationServiceTest {
 
-    private FirebaseNotificationService firebaseNotificationService;
+    private io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService firebaseNotificationService;
     @Mock
     private FirebaseConnectionWrapper wrapper;
     @Mock
@@ -29,7 +29,7 @@ public class FirebaseNotificationServiceTest {
 
     @Before
     public void setUp() throws Exception {
-        firebaseNotificationService = new FirebaseNotificationService(wrapper, deviceRepo);
+        firebaseNotificationService = new io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService(wrapper, deviceRepo);
     }
 
     @Test

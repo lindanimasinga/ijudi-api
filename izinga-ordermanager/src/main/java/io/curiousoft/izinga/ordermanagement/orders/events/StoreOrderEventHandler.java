@@ -4,8 +4,9 @@ import io.curiousoft.izinga.commons.model.Device;
 import io.curiousoft.izinga.commons.model.OrderStage;
 import io.curiousoft.izinga.commons.order.events.OrderCancelledEvent;
 import io.curiousoft.izinga.commons.order.events.OrderUpdatedEvent;
+import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
-import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
+import io.curiousoft.izinga.messaging.firebase.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.DeviceService;
 import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
@@ -21,7 +22,7 @@ import java.util.List;
 
 @Slf4j
 @Service
-public record StoreOrderEventHandler(PushNotificationService pushNotificationService,
+public record StoreOrderEventHandler(FirebaseNotificationService pushNotificationService,
                                      AdminOnlyNotificationService adminOnlyNotificationService,
                                      EmailNotificationService emailNotificationService,
                                      DeviceService deviceService,

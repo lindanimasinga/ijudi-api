@@ -1,7 +1,12 @@
 package io.curiousoft.izinga.messaging.whatsapp;
 
+import io.curiousoft.izinga.commons.model.*;
+import io.curiousoft.izinga.commons.repo.DeviceRepository;
+import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.firebase.FireStoreTextMessage;
+import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.messaging.firebase.FirestoreService;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -20,11 +25,19 @@ public class WhatsappInboundEventHandler {
     private static final Logger LOG = LoggerFactory.getLogger(WhatsappInboundEventHandler.class);
 
     private final ApplicationEventPublisher eventPublisher;
+    private final UserProfileRepo userProfileRepo;
     private final FirestoreService firestoreService;
+    private final FirebaseNotificationService firebaseNotificationService;
+    private final DeviceRepository deviceRepo;
 
-    public WhatsappInboundEventHandler(ApplicationEventPublisher eventPublisher, FirestoreService firestoreService) {
+    public WhatsappInboundEventHandler(ApplicationEventPublisher eventPublisher, FirestoreService firestoreService,
+                                       FirebaseNotificationService firebaseNotificationService, UserProfileRepo userProfileRepo,
+                                       FirebaseNotificationService firebaseNotificationService1, DeviceRepository deviceRepo) {
         this.eventPublisher = eventPublisher;
         this.firestoreService = firestoreService;
+        this.userProfileRepo = userProfileRepo;
+        this.firebaseNotificationService = firebaseNotificationService1;
+        this.deviceRepo = deviceRepo;
     }
 
     @Async
@@ -55,6 +68,11 @@ public class WhatsappInboundEventHandler {
                             // delegate based on message type / content
                             if ("text".equals(type) || message.getText() != null) {
                                 handleTextMessage(message, value.getContacts());
+                                List<String> adminIds = userProfileRepo.findByRole(ProfileRoles.ADMIN)
+                                        .stream().map(BaseModel::getId).toList();
+                                List<Device> devices = deviceRepo.findByUserIdIn(adminIds);
+                                PushMessage pushMessage = getPushMessage(from);
+                                firebaseNotificationService.sendNotifications(devices, pushMessage);
                             } else if (message.getInteractive() != null) {
                                 handleInteractiveMessage(message);
                             } else if ("location".equals(type) || message.getLocation() != null) {
@@ -74,6 +92,22 @@ public class WhatsappInboundEventHandler {
         } catch (Exception e) {
             LOG.error("Error handling inbound WhatsApp event", e);
         }
+    }
+
+    @NotNull
+    private static PushMessage getPushMessage(String from) {
+        PushHeading pushHeading = new PushHeading(
+                "New message from WhatsApp customer " + from,
+                "New WhatsApp Message",
+                null,
+                null);
+
+        PushMessage pushMessage = new PushMessage(
+                PushMessageType.WHATSAPP,
+                pushHeading,
+                String.format("https://onboard.izinga.co.za/messaging/whatsapp/%s", from)
+        );
+        return pushMessage;
     }
 
     private void handleTextMessage(WhatsappWebhookPayload.Value.Message message, List<WhatsappWebhookPayload.Value.Contact> contacts) {

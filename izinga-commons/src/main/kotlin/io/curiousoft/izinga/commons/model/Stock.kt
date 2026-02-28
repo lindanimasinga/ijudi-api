@@ -1,6 +1,5 @@
 package io.curiousoft.izinga.commons.model
 
-import io.curiousoft.izinga.commons.utils.calculateMarkupPrice
 import org.springframework.data.annotation.Transient
 import java.util.*
 import javax.validation.constraints.DecimalMin
@@ -67,4 +66,12 @@ class Stock: Comparable<Stock> {
 
     override operator fun compareTo(other: Stock): Int = if(this.hashCode() > other.hashCode()) 1 else -1
 
+    /**
+     * Calculates markup price keeping original decimals/cents similar to Kotlin version.
+     */
+    fun calculateMarkupPrice(storePrice: Double, markPercentage: Double): Double {
+        val cents = storePrice - storePrice.toInt()
+        val markupPrice = storePrice + storePrice * markPercentage
+        return markupPrice.toInt() + (if (cents > 0.45) cents else 1 + cents)
+    }
 }

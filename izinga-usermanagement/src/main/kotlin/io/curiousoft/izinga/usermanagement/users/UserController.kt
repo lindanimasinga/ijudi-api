@@ -3,7 +3,7 @@ package io.curiousoft.izinga.usermanagement.users
 import io.curiousoft.izinga.commons.model.Profile
 import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.UserProfile
-import io.curiousoft.izinga.commons.utils.isSAMobileNumber
+import io.curiousoft.izinga.usermanagement.utils.IjudiUtils.isSAMobileNumber
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*

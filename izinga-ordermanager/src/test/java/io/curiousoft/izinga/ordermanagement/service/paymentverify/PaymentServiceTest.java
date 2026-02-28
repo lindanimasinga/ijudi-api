@@ -5,7 +5,7 @@ import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
-import io.curiousoft.izinga.ordermanagement.notification.FirebaseNotificationService;
+import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;

@@ -5,8 +5,9 @@ import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.order.events.OrderCancelledEvent;
 import io.curiousoft.izinga.commons.order.events.OrderUpdatedEvent;
 import io.curiousoft.izinga.commons.payout.events.PayoutBalanceUpdatedEvent;
+import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
-import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
+import io.curiousoft.izinga.messaging.firebase.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
 import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.DeviceService;
@@ -24,12 +25,11 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
 @Service
-public record MessengerOrderEventHandler(PushNotificationService pushNotificationService,
+public record MessengerOrderEventHandler(FirebaseNotificationService pushNotificationService,
                                          AdminOnlyNotificationService smsNotificationService,
                                          EmailNotificationService emailNotificationService,
                                          DeviceService deviceService,

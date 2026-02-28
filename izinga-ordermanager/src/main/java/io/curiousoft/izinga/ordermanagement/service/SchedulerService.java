@@ -1,6 +1,5 @@
 package io.curiousoft.izinga.ordermanagement.service;
 
-import co.za.izinga.menuupdater.Application;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
@@ -9,8 +8,9 @@ import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.documentmanagement.CloudBucketService;
 import io.curiousoft.izinga.documentmanagement.DocumentInfoService;
+import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
-import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
+import io.curiousoft.izinga.messaging.firebase.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingListRunEvent;
 import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingListService;
 import io.curiousoft.izinga.recon.ReconService;
@@ -45,7 +45,7 @@ import static java.lang.String.format;
     private final OrderRepository orderRepo;
     private final StoreRepository storeRepository;
     private final DeviceRepository deviceRepo;
-    private final PushNotificationService pushNotificationService;
+    private final FirebaseNotificationService pushNotificationService;
     private final AdminOnlyNotificationService smsNotificationService;
     private final EmailNotificationService emailNotificationService;
     private final PromotionService promotionService;
@@ -57,7 +57,7 @@ import static java.lang.String.format;
     private final CloudBucketService cloudBucketService;
 
     public SchedulerService(OrderRepository orderRepo, StoreRepository storeRepository,
-                            DeviceRepository deviceRepo, PushNotificationService pushNotificationService,
+                            DeviceRepository deviceRepo, FirebaseNotificationService pushNotificationService,
                             AdminOnlyNotificationService smsNotifcationService,
                             EmailNotificationService emailNotificationService,
                             PromotionService promotionService,

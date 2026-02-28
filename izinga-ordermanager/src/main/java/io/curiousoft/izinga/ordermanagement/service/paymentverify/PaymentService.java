@@ -7,7 +7,8 @@ import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
-import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
+import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
+import io.curiousoft.izinga.messaging.firebase.PushNotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,13 +25,13 @@ public class PaymentService {
     private final List<PaymentProvider> paymentProviders;
     private final OrderRepository orderRepo;
     private final long processPaymentIntervalMinutes;
-    private final PushNotificationService pushNotificationService;
+    private final FirebaseNotificationService pushNotificationService;
     private final DeviceRepository deviceRepo;
     private final StoreRepository storeRepository;
     private final UserProfileRepo userProfileRepo;
     private final double izingaCommissionPerc;
 
-    public PaymentService(PushNotificationService pushNotificationService,
+    public PaymentService(FirebaseNotificationService pushNotificationService,
                           List<PaymentProvider> paymentProviders, OrderRepository orderRepo,
                           DeviceRepository deviceRepo,
                           StoreRepository storeRepository,

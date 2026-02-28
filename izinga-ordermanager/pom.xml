@@ -61,6 +61,12 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
+            <groupId>io.curiousoft.izinga</groupId>
+            <artifactId>izinga-messaging</artifactId>
+            <version>1.3.0</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
             <groupId>io.curiousoft.storemenu</groupId>
             <artifactId>store-menu-to-izinga-menu</artifactId>
             <version>1.0.3</version>

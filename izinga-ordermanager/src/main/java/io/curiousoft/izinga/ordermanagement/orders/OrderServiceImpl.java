@@ -7,8 +7,9 @@ import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
-import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
+import io.curiousoft.izinga.messaging.firebase.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
 import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
@@ -30,7 +31,8 @@ import java.util.*;
 import static io.curiousoft.izinga.commons.model.OrderKt.generateId;
 import static io.curiousoft.izinga.commons.model.OrderType.INSTORE;
 import static io.curiousoft.izinga.commons.model.OrderType.ONLINE;
-import static io.curiousoft.izinga.commons.utils.IjudiUtilsKt.*;
+import static io.curiousoft.izinga.ordermanagement.utils.IjudiUtils.calculateDeliveryFee;
+import static io.curiousoft.izinga.ordermanagement.utils.IjudiUtils.calculateDrivingDirectionKM;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -45,7 +47,7 @@ public class OrderServiceImpl implements OrderService {
     private final Validator validator;
     private final PaymentService paymentService;
     private final DeviceRepository deviceRepo;
-    private final PushNotificationService pushNotificationService;
+    private final FirebaseNotificationService pushNotificationService;
     private final double starndardDeliveryFee;
     private final double serviceFeePerc;
     private final String googleMapsApiKey;
@@ -67,7 +69,7 @@ public class OrderServiceImpl implements OrderService {
                             StoreRepository storeRepository,
                             UserProfileRepo userProfileRepo, PaymentService paymentService,
                             DeviceRepository deviceRepo,
-                            PushNotificationService pushNotificationService,
+                            FirebaseNotificationService pushNotificationService,
                             AdminOnlyNotificationService smsNotifcationService,
                             EmailNotificationService emailNotificationService,
                             PromoCodeClient promoCodeClient,
