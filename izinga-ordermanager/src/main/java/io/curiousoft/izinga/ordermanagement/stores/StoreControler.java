@@ -73,7 +73,7 @@ public class StoreControler {
         List<StoreProfile> stores = featured ?
                 storeService.findFeatured(latitude, longitude, storeType, range, size) :
                 !StringUtils.isEmpty(ownerId) && !isAdmin ? storeService.findByOwner(ownerId) :
-                !StringUtils.isEmpty(ownerId) && isAdmin ?  storeService.findNearbyStores(0, 0, storeType, 100, 1000)
+                isAdmin ?  storeService.findStoresAdmin(0, 0, 100, 1000)
                         : storeService.findNearbyStores(latitude, longitude, storeType, range, size);
         return stores != null ? ResponseEntity.ok(stores) : ResponseEntity.notFound().build();
     }
@@ -92,7 +92,7 @@ public class StoreControler {
         List<StoreProfile> stores = featured ?
                 storeService.findFeatured(latitude, longitude, storeType, range, size) :
                 !StringUtils.isEmpty(ownerId) && !isAdmin ? storeService.findByOwner(ownerId) :
-                        !StringUtils.isEmpty(ownerId) && isAdmin ?  storeService.findNearbyStores(0, 0, storeType, 100, 1000)
+                        isAdmin ?  storeService.findStoresAdmin(0, 0, 100, 1000)
                                 : storeService.findNearbyStores(latitude, longitude, storeType, range, size);
 
         return ResponseEntity.ok(stores.stream()
@@ -118,7 +118,7 @@ public class StoreControler {
         List<StoreProfile> stores = featured ?
                 storeService.findFeatured(latitude, longitude, storeType, range, size) :
                 !StringUtils.isEmpty(ownerId) && !isAdmin ? storeService.findByOwner(ownerId) :
-                        !StringUtils.isEmpty(ownerId) && isAdmin ?  storeService.findNearbyStores(0, 0, storeType, 100, 1000)
+                        isAdmin ?  storeService.findStoresAdmin(0, 0, 100, 1000)
                                 : storeService.findNearbyStores(latitude, longitude, storeType, range, size);
         var storeNames = stores
                 .stream()
@@ -126,7 +126,7 @@ public class StoreControler {
                         store.getId(),
                         store.getFranchiseName(),
                         store.getLatitude(),
-                        store.getLatitude(),
+                        store.getLongitude(),
                         store.getImageUrl(),
                         store.getDescription(),
                         store.isStoreOffline()))

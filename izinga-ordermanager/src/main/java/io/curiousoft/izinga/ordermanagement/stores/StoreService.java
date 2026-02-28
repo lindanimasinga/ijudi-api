@@ -153,6 +153,35 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         return maxLocations > stores.size() ?  stores : stores.subList(0, maxLocations);
     }
 
+    public List<StoreProfile> findStoresAdmin(double latitude,
+                                               double longitude,
+                                               double range,
+                                               int maxLocations) {
+        double maxLong = longitude + range,
+                minLong = longitude - range;
+        double maxLat = latitude + range,
+                minLat = latitude - range;
+
+        List<StoreProfile> stores = profileRepo.findByLatitudeBetweenAndLongitudeBetween(
+                        minLat,maxLat, minLong, maxLong).stream()
+                .peek(profile -> {
+                    profile.getBank().setAccountId(mainPayAccount);
+                    profile.setMarkUp(markupPercentage);
+                })
+                .collect(Collectors.toList());
+
+        GeoPoint origin = new GeoPointImpl(latitude, longitude);
+        stores.sort((a, b) -> {
+            double distanceToA = GeoDistance.Companion.getDistanceInKiloMetersBetweenTwoGeoPoints(origin, a);
+            double distanceToB = GeoDistance.Companion.getDistanceInKiloMetersBetweenTwoGeoPoints(origin, b);
+            var difference = distanceToA - distanceToB;
+            return  difference < 0 ? -1 : difference > 0 ? 1 : 0;
+        });
+
+        maxLocations = maxLocations <= 0 ? 30 : maxLocations;
+        return maxLocations > stores.size() ?  stores : stores.subList(0, maxLocations);
+    }
+
     public StoreProfile findOneByIdOrShortName(String id, String shortname) throws Exception {
         var store = profileRepo.findOneByIdOrShortName(id, shortname).orElseThrow(() -> new Exception("Shop Profile not found"));
         store.setMarkUp(markupPercentage);
