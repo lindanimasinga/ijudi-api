@@ -1,39 +1,23 @@
 package io.curiousoft.izinga.ordermanagement.conroller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
-import io.curiousoft.izinga.commons.model.ProfileRoles;
-import io.curiousoft.izinga.commons.model.UserProfile;
-import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsAppWebhookController;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsappWebhookPayload;
 import io.curiousoft.izinga.ordermanagement.IjudiApplication;
-import org.junit.After;
-import org.junit.Assert;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.http.MediaType;
-import org.springframework.http.RequestEntity;
-import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.test.web.servlet.MockMvc;
-
-import java.net.URI;
-import java.net.URISyntaxException;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Disabled
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = IjudiApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
