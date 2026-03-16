@@ -29,11 +29,20 @@ class UserProfileService(userProfileRepo: UserProfileRepo) : ProfileServiceImpl<
 
     @Throws(Exception::class)
     override fun create(profile: UserProfile): UserProfile {
+        //remove empty spaces and dashes from the mobile number
+        profile.mobileNumber = fomatMobileNumber(profile.mobileNumber!!)
         if (profileRepo.existsByMobileNumber(profile.mobileNumber!!)) throw Exception("User with phone number " + profile.mobileNumber + " already exist.")
         return super.create(profile)
     }
 
     fun pendingAproval(): List<UserProfile> {
         return profileRepo.findByProfileApproved(false)
+    }
+
+    private fun fomatMobileNumber(mobileNumber: String): String {
+        val last9Digits = mobileNumber.substring(mobileNumber.length - 9)
+        var mobileNumberFormmatted = last9Digits.replace("\\s".toRegex(), "")
+        mobileNumberFormmatted = mobileNumberFormmatted.replace("-", "")
+        return mobileNumberFormmatted
     }
 }
