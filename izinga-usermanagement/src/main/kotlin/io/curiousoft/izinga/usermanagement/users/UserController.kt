@@ -48,6 +48,7 @@ class UserController(private val profileService: UserProfileService) {
 
     @GetMapping(produces = ["application/json"])
     fun findUsers(
+        @RequestParam(required = false, defaultValue = "false") includePendingUsers: Boolean,
         @RequestParam(required = false) role: ProfileRoles?,
         @RequestParam(required = false) latitude: Double,
         @RequestParam(required = false) longitude: Double,
@@ -60,7 +61,7 @@ class UserController(private val profileService: UserProfileService) {
             longitude,
             range) else profileService.findAll()
         logger.info("Returning {} users", users?.size)
-        return ResponseEntity.ok(users)
+        return ResponseEntity.ok(users?.filter { user -> includePendingUsers || (user.profileApproved && user.termsAccepted == true) })
     }
 
     @GetMapping(value = ["/pending-approvals"], produces = ["application/json"])
