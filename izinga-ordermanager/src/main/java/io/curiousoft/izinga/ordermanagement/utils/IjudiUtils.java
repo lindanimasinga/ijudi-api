@@ -119,7 +119,7 @@ public final class IjudiUtils {
         return new ShipingGeoData(fromGeo, toGeo, distanceKm);
     }
 
-    public static double calculateDeliveryFee(double standardFee, double standardDistance, double ratePerKM, double distance) {
+    public static double calculateDeliveryDistanceFee(double standardFee, double standardDistance, double ratePerKM, double distance) {
         return distance > standardDistance ? standardFee + ratePerKM * (distance - standardDistance) : standardFee;
     }
 

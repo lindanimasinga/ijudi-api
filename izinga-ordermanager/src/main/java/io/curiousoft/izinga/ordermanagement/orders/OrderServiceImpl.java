@@ -9,7 +9,6 @@ import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
-import io.curiousoft.izinga.messaging.firebase.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
 import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
@@ -31,7 +30,7 @@ import java.util.*;
 import static io.curiousoft.izinga.commons.model.OrderKt.generateId;
 import static io.curiousoft.izinga.commons.model.OrderType.INSTORE;
 import static io.curiousoft.izinga.commons.model.OrderType.ONLINE;
-import static io.curiousoft.izinga.ordermanagement.utils.IjudiUtils.calculateDeliveryFee;
+import static io.curiousoft.izinga.ordermanagement.utils.IjudiUtils.calculateDeliveryDistanceFee;
 import static io.curiousoft.izinga.ordermanagement.utils.IjudiUtils.calculateDrivingDirectionKM;
 
 @Service
@@ -187,7 +186,7 @@ public class OrderServiceImpl implements OrderService {
                                 .filter(it -> it > 0)
                                 .orElse(this.ratePerKm);
 
-                deliveryFee = calculateDeliveryFee(standardFee, standardDistance, ratePerKM, shipingGeoData.getDistance());
+                deliveryFee = calculateDeliveryDistanceFee(standardFee, standardDistance, ratePerKM, shipingGeoData.getDistance());
                 //if the customer has already paid delivery in the previous orders going the same direction, then
                 deliveryFee = deliveryFee - allOrdersCurrentForCustomer.stream()
                         .map(o -> o.getShippingData().getFee())
@@ -200,6 +199,26 @@ public class OrderServiceImpl implements OrderService {
                 order.setWeightFee(storeOptional.get().getRates().getRatePerWeightKg() * order.getTotalWeight());
                 order.setVolumeFee(storeOptional.get().getRates().getRatePerVolumeCM2() * order.getTotalArea());
             }
+
+
+
+            //if store has labour fee per floor, add to the total fee
+            if (storeOptional.get().getRates() != null && storeOptional.get().getRates().getLabourRatePerFloor() != null) {
+                var fromHasElevator = order.getShippingData().getFromBuildingHasElevator() != null ?
+                        order.getShippingData().getFromBuildingHasElevator() : false;
+                var toHasElevator = order.getShippingData().getBuildingHasElevator() != null ?
+                        order.getShippingData().getBuildingHasElevator() : false;
+
+                //if there is no elevator, calculate the labour fee based on the floor level, otherwise, no labour fee
+                var fromFloor = !fromHasElevator && order.getShippingData().getFromFloorLevel() != null ? order.getShippingData().getFromFloorLevel() : 0;
+                var toFloor = !toHasElevator && order.getShippingData().getFloorLevel() != null ? order.getShippingData().getFloorLevel() : 0;
+
+                var labourFee = deliveryFee
+                        + storeOptional.get().getRates().getLabourRatePerFloor() * fromFloor * order.getTotalWeight()
+                        + storeOptional.get().getRates().getLabourRatePerFloor() * toFloor * order.getTotalWeight();
+                order.setLabourFee(labourFee);
+            }
+
             order.getShippingData().setFee(deliveryFee);
             order.getShippingData().setDistance(shipingGeoData.getDistance());
             order.getShippingData().setShippingDataGeoData(shipingGeoData);

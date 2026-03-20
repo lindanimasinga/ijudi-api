@@ -43,10 +43,11 @@ class Order : BaseModel() {
     // per-order computed fees (set by business logic)
     var weightFee: Double = 0.0
     var volumeFee: Double = 0.0
+    var labourFee: Double = 0.0
 
     val totalAmount: Double
         get() = BigDecimal.valueOf(
-            weightFee + volumeFee + serviceFee + basket.totalPrice + (!freeDelivery && shippingData != null).isTrue({shippingData?.fee!!}) { 0.00 }
+            labourFee + weightFee + volumeFee + serviceFee + basket.totalPrice + (!freeDelivery && shippingData != null).isTrue({shippingData?.fee!!}) { 0.00 }
         )
         .setScale(2, RoundingMode.HALF_EVEN)
         .toDouble()

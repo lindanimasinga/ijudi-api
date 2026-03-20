@@ -179,6 +179,7 @@ class StoreProfile(
 }
 
 class Rates() {
+    var labourRatePerFloor: Double? = null
     var standardDeliveryPrice: Double? = null
     var standardDeliveryKm: Double? = null
     var ratePerKm: Double? = null
