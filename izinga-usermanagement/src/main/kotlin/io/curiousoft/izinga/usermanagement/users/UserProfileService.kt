@@ -43,6 +43,6 @@ class UserProfileService(userProfileRepo: UserProfileRepo) : ProfileServiceImpl<
         val last9Digits = mobileNumber.substring(mobileNumber.length - 9)
         var mobileNumberFormmatted = last9Digits.replace("\\s".toRegex(), "")
         mobileNumberFormmatted = mobileNumberFormmatted.replace("-", "")
-        return mobileNumberFormmatted
+        return "+27$mobileNumberFormmatted"
     }
 }

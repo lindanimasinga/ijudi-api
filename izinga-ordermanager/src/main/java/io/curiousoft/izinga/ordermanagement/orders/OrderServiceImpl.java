@@ -200,8 +200,6 @@ public class OrderServiceImpl implements OrderService {
                 order.setVolumeFee(storeOptional.get().getRates().getRatePerVolumeCM2() * order.getTotalArea());
             }
 
-
-
             //if store has labour fee per floor, add to the total fee
             if (storeOptional.get().getRates() != null && storeOptional.get().getRates().getLabourRatePerFloor() != null) {
                 var fromHasElevator = order.getShippingData().getFromBuildingHasElevator() != null ?
