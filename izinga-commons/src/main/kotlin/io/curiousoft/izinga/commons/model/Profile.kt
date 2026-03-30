@@ -19,7 +19,7 @@ open class Profile(
     var description: String? = null
     var yearsInService = 0
     var likes = 0
-
+    var serviceType = StoreType.MOVERS
     @set:JsonIgnore
     var servicesCompleted = 0
 

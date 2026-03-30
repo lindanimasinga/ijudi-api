@@ -2,6 +2,7 @@ package io.curiousoft.izinga.usermanagement.users
 
 import io.curiousoft.izinga.commons.model.Profile
 import io.curiousoft.izinga.commons.model.ProfileRoles
+import io.curiousoft.izinga.commons.model.StoreType
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.usermanagement.utils.IjudiUtils.isSAMobileNumber
 import org.slf4j.LoggerFactory
@@ -52,14 +53,15 @@ class UserController(private val profileService: UserProfileService) {
         @RequestParam(required = false) role: ProfileRoles?,
         @RequestParam(required = false) latitude: Double,
         @RequestParam(required = false) longitude: Double,
-        @RequestParam(required = false) range: Double
-    ): ResponseEntity<List<UserProfile?>?> {
+        @RequestParam(required = false) range: Double,
+        @RequestParam(required = false) storeType: StoreType = StoreType.FOOD) : ResponseEntity<List<UserProfile?>?> {
         logger.info("Find users request role={} latitude={} longitude={} range={}", role, latitude, longitude, range)
         val users = if (role != null) profileService.findByLocation(
             role,
             latitude,
             longitude,
-            range) else profileService.findAll()
+            range,
+            storeType) else profileService.findAll()
         logger.info("Returning {} users", users?.size)
         return ResponseEntity.ok(users?.filter { user -> includePendingUsers || (user.profileApproved && user.termsAccepted == true) })
     }

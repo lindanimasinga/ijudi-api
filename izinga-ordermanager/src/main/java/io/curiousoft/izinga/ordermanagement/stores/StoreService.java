@@ -6,6 +6,7 @@ import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.ordermanagement.service.ProfileServiceImpl;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
@@ -22,8 +23,9 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
     public  StoreService(StoreRepository storeRepository,
                         UserProfileRepo userProfileRepo,
                         @Value("${ukheshe.main.account}") String mainPayAccount,
-                        @Value("${service.markup.perc}") double markupPercentage) {
-        super(storeRepository);
+                        @Value("${service.markup.perc}") double markupPercentage,
+                        ApplicationEventPublisher applicationEventPublisher) {
+        super(storeRepository, applicationEventPublisher);
         this.userProfileRepo = userProfileRepo;
         this.mainPayAccount = mainPayAccount;
         this.markupPercentage = markupPercentage;

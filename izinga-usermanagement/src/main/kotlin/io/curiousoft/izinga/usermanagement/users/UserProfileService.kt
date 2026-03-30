@@ -1,28 +1,29 @@
 package io.curiousoft.izinga.usermanagement.users
 
-import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.commons.model.ProfileRoles
+import io.curiousoft.izinga.commons.model.StoreType
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import org.springframework.stereotype.Service
-import java.util.*
+import org.springframework.context.ApplicationEventPublisher
+import org.springframework.beans.factory.annotation.Autowired
 
 @Service
-class UserProfileService(userProfileRepo: UserProfileRepo) : ProfileServiceImpl<UserProfileRepo, UserProfile>(userProfileRepo) {
-    
+class UserProfileService @Autowired constructor(userProfileRepo: UserProfileRepo, eventPublisher: ApplicationEventPublisher)
+    : ProfileServiceImpl<UserProfileRepo, UserProfile>(userProfileRepo, eventPublisher) {
+
     fun findUserByPhone(phone: String): UserProfile? {
         val last9Digits = phone.substring(phone.length - 9)
         return listOf("0", "+27", "27")
             .firstNotNullOfOrNull { profileRepo.findByMobileNumber("$it$last9Digits") }
     }
 
-    fun findByLocation(role: ProfileRoles, latitude: Double, longitude: Double, range: Double): List<UserProfile>? {
+    fun findByLocation(role: ProfileRoles, latitude: Double, longitude: Double, range: Double, storeType: StoreType): List<UserProfile>? {
         val maxLong = longitude + range
         val minLong = longitude - range
         val maxLat = latitude + range
         val minLat = latitude - range
-        return profileRepo.findByRoleAndLatitudeBetweenAndLongitudeBetween(
-            role, minLat,
+        return profileRepo.findByRoleAndServiceTypeAndLatitudeBetweenAndLongitudeBetween(role, storeType, minLat,
             maxLat, minLong, maxLong
         )
     }

@@ -10,6 +10,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
@@ -30,15 +31,16 @@ public class StoreServiceTest {
     private StoreRepository storeRepository;
     @Mock
     UserProfileRepo userProfileRepo;
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
 
     @Before
     public void setUp() {
-        storeService = new StoreService(storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, 0.1);
+        storeService = new StoreService(storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, 0.1, applicationEventPublisher);
     }
 
     @Test
     public void create() throws Exception {
-
         //given
         UserProfile user = new UserProfile(
                 "name",
@@ -69,7 +71,6 @@ public class StoreServiceTest {
                 businessHours,
                 "ownerId",
                 new Bank());
-
 
         //when
         when(userProfileRepo.findById(initialProfile.getOwnerId())).thenReturn(Optional.of(user));

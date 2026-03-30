@@ -1,7 +1,6 @@
 package io.curiousoft.izinga.ordermanagement.service;
 
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.model.Profile;
 import io.curiousoft.izinga.commons.model.StoreProfile;
@@ -13,6 +12,9 @@ import java.math.BigDecimal;
 public interface AdminOnlyNotificationService {
 
     void sendMessage(String mobileNumber, String message);
+
+    // send welcome message to a newly registered driver (optional)
+    void sendWelcomeMessageDriver(String mobileNumber, String driverName);
 
     void sendTipReceivedMessageWithReward(String mobileNumber, BigDecimal tip, BigDecimal reward, BigDecimal payoutTotal) throws IOException;
 

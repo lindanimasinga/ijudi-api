@@ -8,6 +8,7 @@ import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService
 import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.validation.constraints.NotNull;
@@ -26,17 +27,65 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
     private final WhatsAppService whatsAppService;
     private final io.curiousoft.izinga.messaging.whatsapp.WhatsappConfig whatsappConfig;
     private final ObjectMapper mapper;
+    private final String driverWelcomeVideoUrl;
 
     public WhatsappNotificationService(WhatsAppService whatsAppService,
-                                       io.curiousoft.izinga.messaging.whatsapp.WhatsappConfig whatsappConfig, ObjectMapper mapper) {
+                                       io.curiousoft.izinga.messaging.whatsapp.WhatsappConfig whatsappConfig, ObjectMapper mapper,
+                                       @Value("${whatsapp.driver.welcome.videoUrl:https://izinga-aut.s3.af-south-1.amazonaws.com/izinga-driver-pickup.mp4}") String driverWelcomeVideoUrl) {
         this.whatsAppService = whatsAppService;
         this.whatsappConfig = whatsappConfig;
         this.mapper = mapper;
+        this.driverWelcomeVideoUrl = driverWelcomeVideoUrl;
     }
 
     @Override
     public void sendMessage(String mobileNumber, String message) {
 
+    }
+
+    @Override
+    public void sendWelcomeMessageDriver(String mobileNumber, String driverName) {
+        try {
+            WhatsappTemplateRequest request = new WhatsappTemplateRequest();
+            String to = mobileNumber != null && mobileNumber.startsWith("0") ? mobileNumber.replaceFirst("0", "+27") : mobileNumber;
+            request.setTo(to);
+
+            // The registered template 'driver_welcome' expects a HEADER (VIDEO) parameter and one positional BODY TEXT parameter.
+            String displayName = driverName != null && !driverName.isBlank() ? driverName : "Driver";
+
+            WhatsappTemplateRequest.Template template = new WhatsappTemplateRequest.Template();
+            template.setName("driver_welcome_2");
+            WhatsappTemplateRequest.Language lang = new WhatsappTemplateRequest.Language();
+            // template language configured as "en" in the template metadata
+            lang.setCode("en_US");
+            template.setLanguage(lang);
+
+            // HEADER component with VIDEO parameter (use the same video URL configured in properties if available)
+            WhatsappTemplateRequest.Component header = new WhatsappTemplateRequest.Component();
+            header.setType(WhatsappTemplateRequest.ComponentType.HEADER);
+            WhatsappTemplateRequest.Parameter headerParam = new WhatsappTemplateRequest.Parameter();
+            headerParam.setType(WhatsappTemplateRequest.ParameterType.VIDEO);
+            WhatsappTemplateRequest.MediaObject video = new WhatsappTemplateRequest.MediaObject();
+            // Use the configured template video URL (same for all envs unless overridden).
+            video.setLink(this.driverWelcomeVideoUrl);
+            headerParam.setVideo(video);
+            header.setParameters(List.of(headerParam));
+
+            // BODY component with a single positional TEXT parameter (driver's name)
+            WhatsappTemplateRequest.Component body = new WhatsappTemplateRequest.Component();
+            body.setType(WhatsappTemplateRequest.ComponentType.BODY);
+            WhatsappTemplateRequest.Parameter p = new WhatsappTemplateRequest.Parameter();
+            p.setType(WhatsappTemplateRequest.ParameterType.TEXT);
+            p.setText(displayName);
+            body.setParameters(List.of(p));
+
+            template.setComponents(List.of(header, body));
+            request.setTemplate(template);
+            whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+            LOGGER.info("Sent driver welcome message to {}", to);
+        } catch (IOException e) {
+            LOGGER.error("Failed to send welcome message to driver {}", mobileNumber, e);
+        }
     }
 
     @Override

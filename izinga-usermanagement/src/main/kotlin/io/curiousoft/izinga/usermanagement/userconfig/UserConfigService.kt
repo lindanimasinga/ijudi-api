@@ -15,6 +15,7 @@ class UserConfigService(private val userConfigRepo: UserConfigRepo) {
         // copy fields (preserve the id/userType)
         persisted.mandatoryFields = config.mandatoryFields
         persisted.optionalFields = config.optionalFields
+        persisted.label = config.label
         return userConfigRepo.save(persisted)
     }
 

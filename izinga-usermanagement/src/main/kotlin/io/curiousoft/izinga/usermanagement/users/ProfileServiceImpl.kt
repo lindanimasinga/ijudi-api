@@ -2,13 +2,18 @@ package io.curiousoft.izinga.usermanagement.users
 
 import io.curiousoft.izinga.commons.model.Profile
 import io.curiousoft.izinga.commons.model.ProfileRoles
+import io.curiousoft.izinga.commons.profile.events.ProfileCreatedEvent
+import io.curiousoft.izinga.commons.profile.events.ProfileDeletedEvent
+import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent
 import io.curiousoft.izinga.commons.repo.ProfileRepo
 import org.springframework.beans.BeanUtils
+import org.springframework.context.ApplicationEventPublisher
 import java.util.*
 import javax.validation.Validation
 import javax.validation.Validator
 
-abstract class ProfileServiceImpl<E : ProfileRepo<U>, U : Profile>(protected val profileRepo: E) : ProfileService<U> {
+abstract class ProfileServiceImpl<E : ProfileRepo<U>, U : Profile>(protected val profileRepo: E,
+                                                                     private val eventPublisher: ApplicationEventPublisher) : ProfileService<U> {
 
     private val validator: Validator
 
@@ -21,7 +26,9 @@ abstract class ProfileServiceImpl<E : ProfileRepo<U>, U : Profile>(protected val
     override fun create(profile: U): U {
         validate(profile)
         profile.id = UUID.randomUUID().toString()
-        return profileRepo.save<U>(profile)
+        val saved = profileRepo.save<U>(profile)
+        eventPublisher.publishEvent(ProfileCreatedEvent(this, saved))
+        return saved
     }
 
     @Throws(Exception::class)
@@ -29,11 +36,15 @@ abstract class ProfileServiceImpl<E : ProfileRepo<U>, U : Profile>(protected val
         val persistedProfile = profileRepo.findById(profileId)
             .orElseThrow { Exception("Profile not found") }
         BeanUtils.copyProperties(profile, persistedProfile)
-        return profileRepo.save(persistedProfile)
+        val saved = profileRepo.save(persistedProfile)
+        eventPublisher.publishEvent(ProfileUpdatedEvent(this, saved))
+        return saved
     }
 
     override fun delete(id: String) {
+        val p = profileRepo.findById(id).orElse(null)
         profileRepo.deleteById(id)
+        p?.let { eventPublisher.publishEvent(ProfileDeletedEvent(this, it)) }
     }
 
     override fun find(profileId: String): U? {

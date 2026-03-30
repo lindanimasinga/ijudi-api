@@ -153,6 +153,20 @@ import static java.lang.String.format;
         });
     }
 
+/*    @Scheduled(fixedDelay = 600000, initialDelay = 3000)// 10 minutes
+    public void newDrivers() {
+       var driver = userProfileRepo.findByProfileApproved(false);
+         driver.forEach(profile -> {
+              try {
+                smsNotificationService.sendWelcomeMessageDriver(profile.getMobileNumber(), profile.getName());
+                profile.setProfileApproved(true);
+                userProfileRepo.save(profile);
+              } catch (Exception e) {
+                LOG.error("Failed to send welcome message to driver {}. ", profile.getName(), e);
+              }
+         });
+    }*/
+
     @Scheduled(fixedDelay = 900000, initialDelay = 900000) // 15 minutes
     public void cleanUnpaidOrders() {
         Date pastDate = Date.from(LocalDateTime.now()
