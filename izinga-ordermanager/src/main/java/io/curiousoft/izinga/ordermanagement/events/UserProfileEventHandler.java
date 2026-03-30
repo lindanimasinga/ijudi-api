@@ -41,7 +41,9 @@ public class UserProfileEventHandler {
 
         UserProfile p = (UserProfile) event.getProfile();
         LOG.info("[user-profile-event] updated: id={} name={} mobile={}", p.getId(), p.getName(), p.getMobileNumber());
-        // add user-specific update handling here
+        if (p.getRole() == ProfileRoles.MESSENGER) {
+            p.setProfileApproved(false);
+        }
 
     }
 
