@@ -126,7 +126,7 @@ class UserServiceTest {
 
 
         //when
-        val profile: Profile = profileService.find(profileId)
+        val profile: Profile? = profileService.find(profileId)
 
         //verify
         Mockito.verify(profileRepo).findById(profileId)
@@ -166,7 +166,7 @@ class UserServiceTest {
             )
         )
             .thenReturn(listOf(patchProfileRequest))
-        val messangers = profileService.findByLocation(ProfileRoles.MESSENGER, latitude, longitude, range)
+        val messangers = profileService.findByLocation(ProfileRoles.MESSENGER, latitude, longitude, range,)
 
         //verify
         Assert.assertEquals(1L, messangers?.size?.toLong())
