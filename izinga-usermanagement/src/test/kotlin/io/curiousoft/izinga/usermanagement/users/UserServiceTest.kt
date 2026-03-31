@@ -2,6 +2,7 @@ package io.curiousoft.izinga.usermanagement.users
 
 import io.curiousoft.izinga.commons.model.Profile
 import io.curiousoft.izinga.commons.model.ProfileRoles
+import io.curiousoft.izinga.commons.model.StoreType
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import org.junit.Assert
@@ -11,6 +12,7 @@ import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.junit.MockitoJUnitRunner
+import org.springframework.context.ApplicationEventPublisher
 import java.util.*
 
 @RunWith(MockitoJUnitRunner::class)
@@ -19,10 +21,12 @@ class UserServiceTest {
     lateinit var profileService: UserProfileService
     @Mock
     lateinit var profileRepo: UserProfileRepo
+    @Mock
+    lateinit var profileUpdatedEventPublisher: ApplicationEventPublisher
     
     @Before
     fun setUp() {
-        profileService = UserProfileService(profileRepo)
+        profileService = UserProfileService(profileRepo, profileUpdatedEventPublisher)
     }
 
     @Test
@@ -166,7 +170,7 @@ class UserServiceTest {
             )
         )
             .thenReturn(listOf(patchProfileRequest))
-        val messangers = profileService.findByLocation(ProfileRoles.MESSENGER, latitude, longitude, range,)
+        val messangers = profileService.findByLocation(ProfileRoles.MESSENGER, latitude, longitude, range, StoreType.FOOD)
 
         //verify
         Assert.assertEquals(1L, messangers?.size?.toLong())
