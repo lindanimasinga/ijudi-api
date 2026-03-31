@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.messaging.whatsapp;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,11 +20,13 @@ public class WhatsAppWebhookController {
 
     private final String verifyToken;
     private final ApplicationEventPublisher eventPublisher;
+    private final ObjectMapper objectMapper;
 
     public WhatsAppWebhookController(@Value("${whatsapp.webhook.verify-token:}") String verifyToken,
-                                     ApplicationEventPublisher eventPublisher) {
+                                     ApplicationEventPublisher eventPublisher, ObjectMapper objectMapper) {
         this.verifyToken = verifyToken;
         this.eventPublisher = eventPublisher;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -53,7 +56,7 @@ public class WhatsAppWebhookController {
     public ResponseEntity<String> receiveWebhook(@RequestBody WhatsappWebhookPayload payload) {
         try {
             //log the incoming payload in json format for debugging
-            LOG.info("Received WhatsApp webhook payload: {}", payload);
+            LOG.info("Received WhatsApp webhook payload: {}", objectMapper.writeValueAsString(payload));
             // publish an application event so other modules can react
             var event = new WhatsappInboundEvent(this, payload);
             eventPublisher.publishEvent(event);
