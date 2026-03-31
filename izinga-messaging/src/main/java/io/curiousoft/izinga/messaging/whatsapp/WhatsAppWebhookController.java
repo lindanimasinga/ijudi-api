@@ -52,7 +52,8 @@ public class WhatsAppWebhookController {
     @PostMapping(value = "/webhook", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> receiveWebhook(@RequestBody WhatsappWebhookPayload payload) {
         try {
-            LOG.info("Incoming WhatsApp webhook payload: {}", payload.getObject());
+            //log the incoming payload in json format for debugging
+            LOG.info("Received WhatsApp webhook payload: {}", payload);
             // publish an application event so other modules can react
             var event = new WhatsappInboundEvent(this, payload);
             eventPublisher.publishEvent(event);
