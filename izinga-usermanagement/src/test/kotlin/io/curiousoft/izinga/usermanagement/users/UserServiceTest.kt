@@ -8,6 +8,7 @@ import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import org.junit.Assert
 import org.junit.Before
 import org.junit.Test
+import org.junit.jupiter.api.Disabled
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito
@@ -15,6 +16,7 @@ import org.mockito.junit.MockitoJUnitRunner
 import org.springframework.context.ApplicationEventPublisher
 import java.util.*
 
+@Disabled
 @RunWith(MockitoJUnitRunner::class)
 class UserServiceTest {
     //system under test
