@@ -31,6 +31,7 @@ public class UserProfileEventHandler {
         LOG.info("[user-profile-event] created: id={} name={} mobile={}", p.getId(), p.getName(), p.getMobileNumber());
         if (p.getRole() == ProfileRoles.MESSENGER) {
             whatsappNotificationService.sendWelcomeMessageDriver(p.getMobileNumber(), p.getName());
+            p.setWelcomeMessageSent(true);
         }
     }
 
