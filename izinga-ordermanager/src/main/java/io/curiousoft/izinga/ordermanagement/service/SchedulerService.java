@@ -17,6 +17,7 @@ import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.recon.payout.PayoutStage;
 import io.curiousoft.izinga.recon.payout.PayoutType;
 import lombok.extern.slf4j.Slf4j;
+import org.openqa.selenium.devtools.v85.log.Log;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -154,8 +155,9 @@ import static java.lang.String.format;
     }
 
     //runs every day at 8am to send welcome message to new drivers who registered but not yet approved
-    @Scheduled(cron = "* 0 8 * * *")
+    @Scheduled(cron = "* 15 8 * * *")
     public void newDrivers() {
+       LOG.info("Finding new drivers to send welcome message..");
        var driver = userProfileRepo.findByProfileApproved(false);
          driver.stream()
                  .filter(UserProfile::getWelcomeMessageSent)
@@ -168,6 +170,7 @@ import static java.lang.String.format;
                         LOG.error("Failed to send welcome message to driver {}. ", profile.getName(), e);
                       }
                 });
+        LOG.info("Welcome message sent to new drivers");
     }
 
     @Scheduled(fixedDelay = 900000, initialDelay = 900000) // 15 minutes
