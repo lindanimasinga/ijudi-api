@@ -159,17 +159,18 @@ import static java.lang.String.format;
     public void newDrivers() {
        LOG.info("Finding new drivers to send welcome message..");
        var driver = userProfileRepo.findByProfileApproved(false);
-         driver.stream()
-                 .filter(UserProfile::getWelcomeMessageSent)
-                 .forEach(profile -> {
-                      try {
-                        smsNotificationService.sendWelcomeMessageDriver(profile.getMobileNumber(), profile.getName());
-                        profile.setWelcomeMessageSent(true);
-                        userProfileRepo.save(profile);
-                      } catch (Exception e) {
-                        LOG.error("Failed to send welcome message to driver {}. ", profile.getName(), e);
-                      }
-                });
+     driver.stream()
+             .filter(dr -> dr.getRole() == ProfileRoles.MESSENGER && !dr.getWelcomeMessageSent())
+             .forEach(profile -> {
+                  try {
+                    LOG.info("Sending welcome message to driver {} mobile {}. ", profile.getName(), profile.getMobileNumber());
+                    smsNotificationService.sendWelcomeMessageDriver(profile.getMobileNumber(), profile.getName());
+                    profile.setWelcomeMessageSent(true);
+                    userProfileRepo.save(profile);
+                  } catch (Exception e) {
+                    LOG.error("Failed to send welcome message to driver {}. ", profile.getName(), e);
+                  }
+            });
         LOG.info("Welcome message sent to new drivers");
     }
 
