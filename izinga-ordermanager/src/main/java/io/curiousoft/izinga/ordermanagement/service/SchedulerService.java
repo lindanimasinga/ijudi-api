@@ -155,7 +155,7 @@ import static java.lang.String.format;
     }
 
     //runs every day at 8am to send welcome message to new drivers who registered but not yet approved
-    @Scheduled(cron = "* 15 8 * * *")
+    @Scheduled(cron = "0 15 8 * * *")
     public void newDrivers() {
        LOG.info("Finding new drivers to send welcome message..");
        var driver = userProfileRepo.findByProfileApproved(false);
