@@ -31,7 +31,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
 
     public WhatsappNotificationService(WhatsAppService whatsAppService,
                                        io.curiousoft.izinga.messaging.whatsapp.WhatsappConfig whatsappConfig, ObjectMapper mapper,
-                                       @Value("${whatsapp.driver.welcome.videoUrl:https://izinga-aut.s3.af-south-1.amazonaws.com/izinga-driver-pickup.mp4}") String driverWelcomeVideoUrl) {
+                                       @Value("${whatsapp.driver.welcome.videoUrl:https://izinga-aut.s3.af-south-1.amazonaws.com/output.mp4}") String driverWelcomeVideoUrl) {
         this.whatsAppService = whatsAppService;
         this.whatsappConfig = whatsappConfig;
         this.mapper = mapper;
@@ -53,33 +53,36 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
             // The registered template 'driver_welcome' expects a HEADER (VIDEO) parameter and one positional BODY TEXT parameter.
             String displayName = driverName != null && !driverName.isBlank() ? driverName : "Driver";
 
-            WhatsappTemplateRequest.Template template = new WhatsappTemplateRequest.Template();
-            template.setName("driver_welcome_2");
-            WhatsappTemplateRequest.Language lang = new WhatsappTemplateRequest.Language();
-            // template language configured as "en" in the template metadata
-            lang.setCode("en_US");
-            template.setLanguage(lang);
+            // Build template JSON (matching approved template: HEADER VIDEO + BODY TEXT positional parameter)
+            var requestStr = """
+                    {
+                      "name": "driver_welcome_2",
+                      "language": { "code": "en_US" },
+                      "components": [
+                        {
+                          "type": "HEADER",
+                          "parameters": [
+                            {
+                              "type": "VIDEO",
+                              "video": { "link": "#videoUrl" }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "BODY",
+                          "parameters": [
+                            { "type": "TEXT", "text": "#name" }
+                          ]
+                        }
+                      ]
+                    }
+                    """;
 
-            // HEADER component with VIDEO parameter (use the same video URL configured in properties if available)
-            WhatsappTemplateRequest.Component header = new WhatsappTemplateRequest.Component();
-            header.setType(WhatsappTemplateRequest.ComponentType.HEADER);
-            WhatsappTemplateRequest.Parameter headerParam = new WhatsappTemplateRequest.Parameter();
-            headerParam.setType(WhatsappTemplateRequest.ParameterType.VIDEO);
-            WhatsappTemplateRequest.MediaObject video = new WhatsappTemplateRequest.MediaObject();
-            // Use the configured template video URL (same for all envs unless overridden).
-            video.setLink(this.driverWelcomeVideoUrl);
-            headerParam.setVideo(video);
-            header.setParameters(List.of(headerParam));
+            // Replace tokens safely (avoid regex pitfalls)
+            requestStr = requestStr.replace("#videoUrl", this.driverWelcomeVideoUrl == null ? "" : this.driverWelcomeVideoUrl)
+                                   .replace("#name", displayName);
 
-            // BODY component with a single positional TEXT parameter (driver's name)
-            WhatsappTemplateRequest.Component body = new WhatsappTemplateRequest.Component();
-            body.setType(WhatsappTemplateRequest.ComponentType.BODY);
-            WhatsappTemplateRequest.Parameter p = new WhatsappTemplateRequest.Parameter();
-            p.setType(WhatsappTemplateRequest.ParameterType.TEXT);
-            p.setText(displayName);
-            body.setParameters(List.of(p));
-
-            template.setComponents(List.of(header, body));
+            var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
             request.setTemplate(template);
             whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
             LOGGER.info("Sent driver welcome message to {}", to);
