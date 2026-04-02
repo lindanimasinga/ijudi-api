@@ -64,7 +64,8 @@ public class WhatsappTemplateRequest {
         DOCUMENT,
         IMAGE,
         VIDEO,
-        LOCATION
+        LOCATION,
+        URL
     }
 
     @Data
