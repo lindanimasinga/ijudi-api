@@ -442,13 +442,6 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                           "parameters": [
                             { "type": "TEXT", "text": "#name" }
                           ]
-                        },
-                        {
-                          "type": "BUTTONS",
-                          "buttons": [
-                            { "type": "URL", "text": "#button1Text", "url": "#button1Url" },
-                            { "type": "URL", "text": "Order Food", "url": "https://shop.izinga.co.za/" }
-                          ]
                         }
                       ]
                     }
