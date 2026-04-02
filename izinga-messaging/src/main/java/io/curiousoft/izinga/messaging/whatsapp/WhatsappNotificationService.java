@@ -444,10 +444,6 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                           ]
                         },
                         {
-                          "type": "FOOTER",
-                          "text": "iZinga"
-                        },
-                        {
                           "type": "BUTTONS",
                           "buttons": [
                             { "type": "URL", "text": "#button1Text", "url": "#button1Url" },
