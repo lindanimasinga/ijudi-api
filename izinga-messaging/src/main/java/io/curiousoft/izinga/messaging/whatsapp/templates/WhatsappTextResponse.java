@@ -1,4 +1,4 @@
-package io.curiousoft.izinga.messaging.whatsapp;
+package io.curiousoft.izinga.messaging.whatsapp.templates;
 
 import lombok.Data;
 

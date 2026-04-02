@@ -9,7 +9,6 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -39,7 +38,7 @@ public class ChatSession {
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     private Instant updatedAt;
     // child messages (optional, loaded separately)
-    private java.util.List<io.curiousoft.izinga.messaging.whatsapp.Message> messages;
+    private java.util.List<FireStoreMessage> messages;
     // Additional metadata if needed
     private Map<String, Object> meta;
 

@@ -1,8 +1,8 @@
 package io.curiousoft.izinga.ordermanagement.conroller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.curiousoft.izinga.messaging.whatsapp.WhatsAppWebhookController;
-import io.curiousoft.izinga.messaging.whatsapp.WhatsappWebhookPayload;
+import io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsAppWebhookController;
+import io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsappWebhookPayload;
 import io.curiousoft.izinga.ordermanagement.IjudiApplication;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;

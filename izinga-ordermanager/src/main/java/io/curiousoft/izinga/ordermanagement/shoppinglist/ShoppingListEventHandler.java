@@ -1,7 +1,7 @@
 package io.curiousoft.izinga.ordermanagement.shoppinglist;
 
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
-import io.curiousoft.izinga.ordermanagement.service.whatsapp.WhatsappNotificationService;
+import io.curiousoft.izinga.messaging.whatsapp.WhatsappNotificationService;
 import io.curiousoft.izinga.ordermanagement.stores.StoreService;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import lombok.extern.slf4j.Slf4j;
@@ -10,6 +10,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.math.RoundingMode;
 import java.util.Objects;
 
 @Slf4j
@@ -39,7 +40,7 @@ public class ShoppingListEventHandler {
             var customer = userProfileService.find(userId);
             emailNotificationService.sendShoppingListRunNotification(customer, shoppingList);
             try {
-                whatsappNotificationService.notifyShoppingListRun(customer, shop, shoppingList);
+                whatsappNotificationService.notifyShoppingListRun(customer, shop, shoppingList.getName(), shoppingList.getTotalAmount().setScale(2, RoundingMode.HALF_EVEN), shoppingList.getId());
             } catch (IOException e) {
                 log.error("Failed to send shopping list run notification via WhatsApp for user {}: {}", userId, e.getMessage());
             }

@@ -5,7 +5,7 @@ import io.curiousoft.izinga.commons.model.UserProfile;
 import io.curiousoft.izinga.commons.profile.events.ProfileCreatedEvent;
 import io.curiousoft.izinga.commons.profile.events.ProfileDeletedEvent;
 import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent;
-import io.curiousoft.izinga.ordermanagement.service.whatsapp.WhatsappNotificationService;
+import io.curiousoft.izinga.messaging.whatsapp.WhatsappNotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;

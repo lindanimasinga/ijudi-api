@@ -1,4 +1,4 @@
-package io.curiousoft.izinga.messaging.whatsapp;
+package io.curiousoft.izinga.messaging.whatsapp.webhooks;
 
 import org.springframework.context.ApplicationEvent;
 

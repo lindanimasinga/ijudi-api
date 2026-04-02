@@ -1,5 +1,6 @@
-package io.curiousoft.izinga.messaging.whatsapp;
+package io.curiousoft.izinga.messaging.whatsapp.templates;
 
+import io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsappWebhookPayload;
 import org.springframework.context.ApplicationEvent;
 
 public class WhatsappTemplateReplyEvent extends ApplicationEvent {

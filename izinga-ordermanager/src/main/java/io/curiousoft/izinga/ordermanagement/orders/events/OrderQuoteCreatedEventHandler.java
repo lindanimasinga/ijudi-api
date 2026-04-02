@@ -3,7 +3,7 @@ package io.curiousoft.izinga.ordermanagement.orders.events;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.order.events.OrderQuoteCreatedEvent;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
-import io.curiousoft.izinga.ordermanagement.service.whatsapp.WhatsappNotificationService;
+import io.curiousoft.izinga.messaging.whatsapp.WhatsappNotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;

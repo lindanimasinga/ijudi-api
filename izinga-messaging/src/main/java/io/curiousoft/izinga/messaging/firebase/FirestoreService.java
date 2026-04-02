@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.auth.oauth2.GoogleCredentials;
 import io.curiousoft.izinga.messaging.whatsapp.ChatSession;
-import io.curiousoft.izinga.messaging.whatsapp.Message;
+import io.curiousoft.izinga.messaging.whatsapp.FireStoreMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -254,7 +254,7 @@ public class FirestoreService {
     /**
      * List message documents under chatSessions/{sessionId}/messages and convert to typed Message objects.
      */
-    public List<Message> getMessagesForSession(String sessionId, int limit) throws Exception {
+    public List<FireStoreMessage> getMessagesForSession(String sessionId, int limit) throws Exception {
         Objects.requireNonNull(sessionId, "sessionId must not be null");
         if (limit <= 0) limit = 50;
         String url = String.format("%s/projects/%s/databases/%s/documents/%s/%s/messages?pageSize=%d", FIRESTORE_BASE, projectId, DATABASE, COLLECTION, sessionId, limit);
@@ -270,7 +270,7 @@ public class FirestoreService {
         }
 
         var root = mapper.readTree(resp.getBody());
-        List<Message> messages = new ArrayList<>();
+        List<FireStoreMessage> messages = new ArrayList<>();
 
         // Response may contain 'documents' array
         if (root.has("documents") && root.get("documents").isArray()) {
@@ -279,7 +279,7 @@ public class FirestoreService {
                 if (fieldsNode == null) continue;
                 Map<String, Object> rawFields = mapper.convertValue(fieldsNode, new TypeReference<>() {});
                 Map<String, Object> data = fromFirestoreFields(rawFields);
-                Message msg = Message.fromMap(data);
+                FireStoreMessage msg = FireStoreMessage.fromMap(data);
                 String name = doc.has("name") ? doc.get("name").asText() : null;
                 if (name != null) {
                     String[] parts = name.split("/");
@@ -296,7 +296,7 @@ public class FirestoreService {
                     if (fieldsNode == null) continue;
                     Map<String, Object> rawFields = mapper.convertValue(fieldsNode, new TypeReference<>() {});
                     Map<String, Object> data = fromFirestoreFields(rawFields);
-                    Message msg = Message.fromMap(data);
+                    FireStoreMessage msg = FireStoreMessage.fromMap(data);
                     String name = docNode.has("name") ? docNode.get("name").asText() : null;
                     if (name != null) {
                         String[] parts = name.split("/");
@@ -325,7 +325,7 @@ public class FirestoreService {
     /**
      * Get a single Message document from chatSessions/{sessionId}/messages/{messageId}
      */
-    public Message getMessageForSession(String sessionId, String messageId) throws Exception {
+    public FireStoreMessage getMessageForSession(String sessionId, String messageId) throws Exception {
         Objects.requireNonNull(sessionId, "sessionId must not be null");
         Objects.requireNonNull(messageId, "messageId must not be null");
         String url = String.format("%s/projects/%s/databases/%s/documents/%s/%s/messages/%s", FIRESTORE_BASE, projectId, DATABASE, COLLECTION, sessionId, messageId);
@@ -344,7 +344,7 @@ public class FirestoreService {
         var fieldsNode = node.get("fields");
         Map<String, Object> rawFields = mapper.convertValue(fieldsNode, new TypeReference<>() {});
         Map<String, Object> data = fromFirestoreFields(rawFields);
-        Message msg = Message.fromMap(data);
+        FireStoreMessage msg = FireStoreMessage.fromMap(data);
         msg.setId(messageId);
         return msg;
     }

@@ -1,7 +1,9 @@
 package io.curiousoft.izinga.messaging.whatsapp;
 
-import java.util.Map;
-
+import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateRequest;
+import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateResponse;
+import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTextRequest;
+import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTextResponse;
 import retrofit2.Call;
 import retrofit2.http.Body;
 import retrofit2.http.Headers;

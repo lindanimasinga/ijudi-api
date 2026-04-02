@@ -18,7 +18,7 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Message {
+public class FireStoreMessage {
 
     // Firestore document id (optional, not stored inside fields)
     @JsonIgnore
@@ -61,9 +61,9 @@ public class Message {
     }
 
     @SuppressWarnings("unchecked")
-    public static Message fromMap(Map<String, Object> map) {
+    public static FireStoreMessage fromMap(Map<String, Object> map) {
         if (map == null) return null;
-        Message msg = new Message();
+        FireStoreMessage msg = new FireStoreMessage();
         Object v;
         v = map.get("createdAt");
         if (v instanceof Instant) msg.setCreatedAt((Instant) v);

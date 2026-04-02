@@ -1,5 +1,4 @@
-package io.curiousoft.izinga.ordermanagement.service;
-
+package io.curiousoft.izinga.messaging;
 
 import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.model.Profile;
@@ -25,4 +24,7 @@ public interface AdminOnlyNotificationService {
     void notifyMessengerOrderPlaced(Order order, UserProfile userProfile, StoreProfile shop) throws IOException;
 
     void sendTipReceivedMessage(String mobileNumber, BigDecimal tip, BigDecimal payoutTotal) throws IOException;
+
+    // Send the landing options template to a user (positional parameter: name)
+    void sendLandingOptions(String mobileNumber, String name, io.curiousoft.izinga.commons.model.UserProfile userProfile);
 }

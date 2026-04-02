@@ -9,7 +9,6 @@ import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
-import io.curiousoft.izinga.messaging.firebase.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
 import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingListService;
 import io.curiousoft.izinga.recon.ReconService;
@@ -48,7 +47,7 @@ public class SchedulerServiceTest {
     @Mock
     private FirebaseNotificationService pushNotificationService;
     @Mock
-    private AdminOnlyNotificationService smsNotifcation;
+    private io.curiousoft.izinga.messaging.AdminOnlyNotificationService smsNotifcation;
     @Mock
     private EmailNotificationService emailNotificationService;
     @Mock
@@ -58,7 +57,7 @@ public class SchedulerServiceTest {
     @Mock
     private OrderRepository orderRepository;
     @Mock
-    private AdminOnlyNotificationService adminOnlyNotificationService;
+    private io.curiousoft.izinga.messaging.AdminOnlyNotificationService adminOnlyNotificationService;
     @Mock
     private UserProfileRepo userRepo;
     @Mock

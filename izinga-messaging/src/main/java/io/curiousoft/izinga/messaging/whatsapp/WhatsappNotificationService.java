@@ -1,15 +1,14 @@
-package io.curiousoft.izinga.ordermanagement.service.whatsapp;
+package io.curiousoft.izinga.messaging.whatsapp;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.izinga.commons.model.*;
-import io.curiousoft.izinga.messaging.whatsapp.WhatsAppService;
-import io.curiousoft.izinga.messaging.whatsapp.WhatsappTemplateRequest;
-import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
-import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingList;
+import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import io.curiousoft.izinga.messaging.AdminOnlyNotificationService;
 
 import javax.validation.constraints.NotNull;
 import java.io.IOException;
@@ -25,7 +24,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
 
     private static final Logger LOGGER = LoggerFactory.getLogger(WhatsappNotificationService.class);
     private final WhatsAppService whatsAppService;
-    private final io.curiousoft.izinga.messaging.whatsapp.WhatsappConfig whatsappConfig;
+    private final WhatsappConfig whatsappConfig;
     private final ObjectMapper mapper;
     private final String driverWelcomeVideoUrl;
 
@@ -294,7 +293,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
         whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
     }
 
-    public void notifyShoppingListRun(UserProfile customer, StoreProfile shop, ShoppingList shoppingList) throws IOException {
+    public void notifyShoppingListRun(UserProfile customer, StoreProfile shop, String shoppingListName, BigDecimal shoppingListTotalAmount, String shoppingListId) throws IOException {
         WhatsappTemplateRequest request = new WhatsappTemplateRequest();
         request.setTo(customer.getMobileNumber().startsWith("0")
                 ? customer.getMobileNumber().replaceFirst("0", "+27")
@@ -338,9 +337,9 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 """;
         requestStr = requestStr
                 .replaceAll("#customerName", customer.getName() != null ? customer.getName() : "Customer")
-                .replaceAll("#shoppingListName", shoppingList.getName())
-                .replaceAll("#amount", ""+shoppingList.getTotalAmount().setScale(2, RoundingMode.HALF_EVEN))
-                .replaceAll("#shoppingListId", shoppingList.getId())
+                .replaceAll("#shoppingListName", shoppingListName)
+                .replaceAll("#amount", ""+shoppingListTotalAmount)
+                .replaceAll("#shoppingListId", shoppingListId)
                 .replaceAll("#headerImage", shop.getImageUrl());
         var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
         request.setTemplate(template);
@@ -415,5 +414,64 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                     order.getId(), (messenger != null ? messenger.getMobileNumber() : null), e);
         }
      }
+
+    @Override
+    public void sendLandingOptions(String mobileNumber, String name, UserProfile userProfile) {
+        try {
+            WhatsappTemplateRequest request = new WhatsappTemplateRequest();
+            String to = mobileNumber != null && mobileNumber.startsWith("0") ? mobileNumber.replaceFirst("0", "+27") : mobileNumber;
+            request.setTo(to);
+
+            String displayName = name != null && !name.isBlank() ? name : "Customer";
+
+            String button1Text = "Become A Driver";
+            String button1Url = "https://driver.izinga.co.za/";
+            if (userProfile != null && userProfile.getRole() == ProfileRoles.MESSENGER) {
+                // If already a messenger, show link to their driver profile instead
+                button1Text = "View My Driver Profile";
+                button1Url = "https://driver.izinga.co.za/profile/" + userProfile.getId();
+            }
+
+            var requestStr = """
+                    {
+                      "name": "izinga_landing_options",
+                      "language": { "code": "en" },
+                      "components": [
+                        {
+                          "type": "BODY",
+                          "parameters": [
+                            { "type": "TEXT", "text": "#name" }
+                          ]
+                        },
+                        {
+                          "type": "FOOTER",
+                          "text": "iZinga"
+                        },
+                        {
+                          "type": "BUTTONS",
+                          "buttons": [
+                            { "type": "URL", "text": "#button1Text", "url": "#button1Url" },
+                            { "type": "URL", "text": "Order Food", "url": "https://shop.izinga.co.za/" }
+                          ]
+                        }
+                      ]
+                    }
+                    """;
+
+            // Safe replacements
+            requestStr = requestStr.replace("#name", displayName)
+                                   .replace("#button1Text", button1Text)
+                                   .replace("#button1Url", button1Url);
+
+             var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
+             request.setTemplate(template);
+             whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+             LOGGER.info("Sent landing options to {}", to);
+         } catch (IOException e) {
+             LOGGER.error("Failed to send landing options to {}", mobileNumber, e);
+         }
+     }
+
+
 
  }

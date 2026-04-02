@@ -1,8 +1,6 @@
-package io.curiousoft.izinga.messaging.whatsapp;
+package io.curiousoft.izinga.messaging.whatsapp.templates;
 
 import lombok.Data;
-
-import java.util.Map;
 
 @Data
 public class WhatsappTextRequest {

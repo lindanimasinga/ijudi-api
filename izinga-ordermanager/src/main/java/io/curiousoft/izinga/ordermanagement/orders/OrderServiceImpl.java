@@ -10,7 +10,7 @@ import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
-import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
+import io.curiousoft.izinga.messaging.AdminOnlyNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

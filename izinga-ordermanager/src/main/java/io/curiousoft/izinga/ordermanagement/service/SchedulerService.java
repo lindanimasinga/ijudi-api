@@ -10,14 +10,12 @@ import io.curiousoft.izinga.documentmanagement.CloudBucketService;
 import io.curiousoft.izinga.documentmanagement.DocumentInfoService;
 import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
-import io.curiousoft.izinga.messaging.firebase.PushNotificationService;
 import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingListRunEvent;
 import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingListService;
 import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.recon.payout.PayoutStage;
 import io.curiousoft.izinga.recon.payout.PayoutType;
 import lombok.extern.slf4j.Slf4j;
-import org.openqa.selenium.devtools.v85.log.Log;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,7 +45,7 @@ import static java.lang.String.format;
     private final StoreRepository storeRepository;
     private final DeviceRepository deviceRepo;
     private final FirebaseNotificationService pushNotificationService;
-    private final AdminOnlyNotificationService smsNotificationService;
+    private final io.curiousoft.izinga.messaging.AdminOnlyNotificationService smsNotificationService;
     private final EmailNotificationService emailNotificationService;
     private final PromotionService promotionService;
     private final UserProfileRepo userProfileRepo;
@@ -59,7 +57,7 @@ import static java.lang.String.format;
 
     public SchedulerService(OrderRepository orderRepo, StoreRepository storeRepository,
                             DeviceRepository deviceRepo, FirebaseNotificationService pushNotificationService,
-                            AdminOnlyNotificationService smsNotifcationService,
+                            io.curiousoft.izinga.messaging.AdminOnlyNotificationService smsNotifcationService,
                             EmailNotificationService emailNotificationService,
                             PromotionService promotionService,
                             @Value("${order.cleanup.unpaid.minutes}") long cleanUpMinutes,

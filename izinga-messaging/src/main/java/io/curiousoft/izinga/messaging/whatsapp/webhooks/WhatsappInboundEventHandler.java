@@ -1,4 +1,4 @@
-package io.curiousoft.izinga.messaging.whatsapp;
+package io.curiousoft.izinga.messaging.whatsapp.webhooks;
 
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
@@ -6,6 +6,9 @@ import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.firebase.FireStoreTextMessage;
 import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.messaging.firebase.FirestoreService;
+import io.curiousoft.izinga.messaging.whatsapp.WhatsappNotificationService;
+import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateReplyEvent;
+import io.curiousoft.izinga.messaging.repo.WhatsappSessionRepo;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,15 +32,19 @@ public class WhatsappInboundEventHandler {
     private final FirestoreService firestoreService;
     private final FirebaseNotificationService firebaseNotificationService;
     private final DeviceRepository deviceRepo;
+    private final WhatsappNotificationService whatsappNotificationService;
+    private final WhatsappSessionRepo whatsappSessionRepo;
 
     public WhatsappInboundEventHandler(ApplicationEventPublisher eventPublisher, FirestoreService firestoreService,
                                        FirebaseNotificationService firebaseNotificationService, UserProfileRepo userProfileRepo,
-                                       FirebaseNotificationService firebaseNotificationService1, DeviceRepository deviceRepo) {
+                                       FirebaseNotificationService firebaseNotificationService1, DeviceRepository deviceRepo, WhatsappNotificationService whatsappNotificationService, WhatsappSessionRepo whatsappSessionRepo) {
         this.eventPublisher = eventPublisher;
         this.firestoreService = firestoreService;
         this.userProfileRepo = userProfileRepo;
         this.firebaseNotificationService = firebaseNotificationService1;
         this.deviceRepo = deviceRepo;
+        this.whatsappNotificationService = whatsappNotificationService;
+        this.whatsappSessionRepo = whatsappSessionRepo;
     }
 
     @Async
@@ -63,8 +70,13 @@ public class WhatsappInboundEventHandler {
                             String from = message.getFrom();
                             String id = message.getId();
                             String type = message.getType();
-                            LOG.info("Received message from={} id={} type={}", from, id, type);
-
+                            LOG.info("Received message from={} id={} type={}", from, id, type);// upsert whatsapp session for this sender
+                            var isNewSession = upsertSession(from);
+                            if(isNewSession) {
+                                LOG.info("New WhatsApp session started for {}", from);
+                                var user = userProfileRepo.findByMobileNumber(from);
+                                whatsappNotificationService.sendLandingOptions(from, value.getContacts().get(0).getProfile().getName(), user);
+                            }
                             // delegate based on message type / content
                             if ("text".equals(type) || message.getText() != null) {
                                 handleTextMessage(message, value.getContacts());
@@ -92,6 +104,27 @@ public class WhatsappInboundEventHandler {
         } catch (Exception e) {
             LOG.error("Error handling inbound WhatsApp event", e);
         }
+    }
+
+    private boolean upsertSession(String from) {
+        try {
+            if (from == null) return true;
+            var opt = whatsappSessionRepo.findByFrom(from);
+            var now = Instant.now();
+            if (opt.isPresent()) {
+                var session = opt.get();
+                session.setLastMessageDate(now);
+                whatsappSessionRepo.save(session);
+                return false;
+            } else {
+                var session = new WhatsappSession(from, now);
+                whatsappSessionRepo.save(session);
+                return true;
+            }
+        } catch (Exception e) {
+            LOG.warn("Failed to upsert whatsapp session for {}", from, e);
+        }
+        return true;
     }
 
     @NotNull

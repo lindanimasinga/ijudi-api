@@ -1,9 +1,7 @@
 package io.curiousoft.izinga.messaging.whatsapp;
 
 import io.curiousoft.izinga.messaging.firebase.FirestoreService;
-import io.curiousoft.izinga.messaging.whatsapp.WhatsAppService;
-import io.curiousoft.izinga.messaging.whatsapp.Message;
-import io.curiousoft.izinga.messaging.whatsapp.ChatSession;
+import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTextRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -11,7 +9,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -44,13 +41,13 @@ public class FirestoreToWhatsappController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "chatSession not found"));
             }
 
-            Message msg = firestoreService.getMessageForSession(cSId, msgId);
+            FireStoreMessage msg = firestoreService.getMessageForSession(cSId, msgId);
             if (msg == null) {
                 LOG.warn("Message not found: {}/{}", cSId, msgId);
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "message not found"));
             }
 
-            if (msg.getMessageType() == Message.MessageType.TEXT || msg.getMessageType() == null) {
+            if (msg.getMessageType() == FireStoreMessage.MessageType.TEXT || msg.getMessageType() == null) {
                 // Build the WhatsApp text message payload per Cloud API
                 String to = session.getCustomerMobileNumber();
                 String normalizedTo = to != null && to.startsWith("0") ? to.replaceFirst("0", "+27") : to;
