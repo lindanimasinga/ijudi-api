@@ -35,7 +35,9 @@ public class WhatsappTemplateRequest {
     public enum ComponentType {
         HEADER,
         BODY,
-        BUTTON
+        BUTTON,
+        BUTTONS,
+        FOOTER
     }
 
     public enum ButtonSubType {
