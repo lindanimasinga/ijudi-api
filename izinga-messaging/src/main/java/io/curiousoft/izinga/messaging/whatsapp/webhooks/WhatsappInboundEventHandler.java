@@ -113,9 +113,10 @@ public class WhatsappInboundEventHandler {
             var now = Instant.now();
             if (opt.isPresent()) {
                 var session = opt.get();
+                var startNewSesion = session.getLastMessageDate() == null || now.minusSeconds(90 * 60).isAfter(session.getLastMessageDate());
                 session.setLastMessageDate(now);
                 whatsappSessionRepo.save(session);
-                return false;
+                return startNewSesion;
             } else {
                 var session = new WhatsappSession(from, now);
                 whatsappSessionRepo.save(session);
