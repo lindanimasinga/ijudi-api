@@ -35,29 +35,41 @@ public class VerificationConsentService {
      */
     public boolean handleVerificationConsentReply(WhatsappWebhookPayload.Value.Message message, String from) {
         try {
+            // Check for button type message (quick reply buttons)
+            if ("button".equals(message.getType()) && message.getButton() != null) {
+                var button = message.getButton();
+                String buttonPayload = button.getPayload();
+                String buttonText = button.getText();
+
+                if (isVerificationConsentAccept(buttonPayload) || isVerificationConsentAccept(buttonText)) {
+                    LOG.info("User {} accepted verification consent (button)", from);
+                    updateVerificationConsent(from, true);
+                    return true;
+                } else if (isVerificationConsentDecline(buttonPayload) || isVerificationConsentDecline(buttonText)) {
+                    LOG.info("User {} declined verification consent (button)", from);
+                    updateVerificationConsent(from, false);
+                    return true;
+                }
+            }
+
             // Check for interactive button reply
             var interactive = message.getInteractive();
-            if (interactive == null) {
-                return false;
-            }
+            if (interactive != null) {
+                var buttonReply = interactive.getButtonReply();
+                if (buttonReply != null) {
+                    String buttonId = buttonReply.getId();
+                    String buttonTitle = buttonReply.getTitle();
 
-            var buttonReply = interactive.getButtonReply();
-            if (buttonReply == null) {
-                return false;
-            }
-
-            String buttonId = buttonReply.getId();
-            String buttonTitle = buttonReply.getTitle();
-
-            // Check if this is a verification consent response
-            if (isVerificationConsentAccept(buttonId) || isVerificationConsentAccept(buttonTitle)) {
-                LOG.info("User {} accepted verification consent", from);
-                updateVerificationConsent(from, true);
-                return true;
-            } else if (isVerificationConsentDecline(buttonId) || isVerificationConsentDecline(buttonTitle)) {
-                LOG.info("User {} declined verification consent", from);
-                updateVerificationConsent(from, false);
-                return true;
+                    if (isVerificationConsentAccept(buttonId) || isVerificationConsentAccept(buttonTitle)) {
+                        LOG.info("User {} accepted verification consent (interactive)", from);
+                        updateVerificationConsent(from, true);
+                        return true;
+                    } else if (isVerificationConsentDecline(buttonId) || isVerificationConsentDecline(buttonTitle)) {
+                        LOG.info("User {} declined verification consent (interactive)", from);
+                        updateVerificationConsent(from, false);
+                        return true;
+                    }
+                }
             }
 
             return false;
@@ -160,4 +172,3 @@ public class VerificationConsentService {
                 || isVerificationConsentDecline(message.getInteractive().getButtonReply().getTitle()));
     }
 }
-

@@ -105,6 +105,7 @@ public class WhatsappWebhookPayload {
             private Interactive interactive;
             private Location location; // added to support location messages
             private Image image;       // added to support image messages
+            private Button button;     // added to support button reply messages
 
             @Data
             @NoArgsConstructor
@@ -238,6 +239,16 @@ public class WhatsappWebhookPayload {
                 private String sha256;
                 private String id;
                 private String url;
+            }
+
+            // Button message payload (for quick reply button responses)
+            @Data
+            @NoArgsConstructor
+            @AllArgsConstructor
+            @JsonIgnoreProperties(ignoreUnknown = true)
+            public static class Button {
+                private String payload;
+                private String text;
             }
         }
 

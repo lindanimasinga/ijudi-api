@@ -81,6 +81,7 @@ public class WhatsappInboundEventHandler {
                             // Check for verification consent acceptance before processing new session
                             var isVerificationMessage = verificationConsentService.isVerificationMessage(message);
                             if (isVerificationMessage) {
+                                LOG.info("Received verification consent reply from {}", from);
                                 verificationConsentService.handleVerificationConsentReply(message, from);
                             } else if(isNewSession) {
                                 LOG.info("New WhatsApp session started for {}", from);
