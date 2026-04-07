@@ -16,6 +16,7 @@ import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.recon.payout.PayoutStage;
 import io.curiousoft.izinga.recon.payout.PayoutType;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -153,7 +154,7 @@ import static java.lang.String.format;
     }
 
     //runs every day at 8am to send welcome message to new drivers who registered but not yet approved
-    @Scheduled(cron = "0 15 8 * * *")
+    @Scheduled(/*cron = "0 15 8 * * *"*/ fixedDelay = 600000, initialDelay = 10000)// 10 minutes
     public void newDrivers() {
         LOG.info("Finding new drivers to send welcome message..");
         var driver = userProfileRepo.findByProfileApproved(false);
@@ -163,8 +164,10 @@ import static java.lang.String.format;
                  .forEach(profile -> {
                       try {
                         LOG.info("Sending welcome message to driver {} mobile {}. ", profile.getName(), profile.getMobileNumber());
-                        smsNotificationService.sendCrimnalCheckConsent(profile.getMobileNumber(), profile.getName());
-                        profile.setWelcomeMessageSent(true);
+                        smsNotificationService.sendCrimnalCheckConsent("+27812815707", profile.getName());
+                        CriminalCheckData data = new CriminalCheckData();
+                        data.setCriminalCheckMessageSent(true);
+                        profile.setCrminalCheckData(data);
                         userProfileRepo.save(profile);
                       } catch (Exception e) {
                         LOG.error("Failed to send welcome message to driver {}. ", profile.getName(), e);

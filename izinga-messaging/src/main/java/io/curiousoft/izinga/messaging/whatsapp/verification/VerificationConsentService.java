@@ -164,11 +164,17 @@ public class VerificationConsentService {
     }
 
     public Boolean isVerificationMessage(WhatsappWebhookPayload.Value.Message message) {
-        return message.getInteractive() != null
+        var isVerificationInteraction = message.getInteractive() != null
                 && message.getInteractive().getButtonReply() != null
                 && (isVerificationConsentAccept(message.getInteractive().getButtonReply().getId())
                 || isVerificationConsentDecline(message.getInteractive().getButtonReply().getId())
                 || isVerificationConsentAccept(message.getInteractive().getButtonReply().getTitle())
                 || isVerificationConsentDecline(message.getInteractive().getButtonReply().getTitle()));
+        var isVerificationButton = "button".equals(message.getType()) && message.getButton() != null
+                && (isVerificationConsentAccept(message.getButton().getPayload())
+                || isVerificationConsentDecline(message.getButton().getPayload())
+                || isVerificationConsentAccept(message.getButton().getText())
+                || isVerificationConsentDecline(message.getButton().getText()));
+        return isVerificationInteraction || isVerificationButton;
     }
 }
