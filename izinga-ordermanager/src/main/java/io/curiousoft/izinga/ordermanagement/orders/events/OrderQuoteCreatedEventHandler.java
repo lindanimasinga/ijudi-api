@@ -4,6 +4,7 @@ import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.order.events.OrderQuoteCreatedEvent;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsappNotificationService;
+import io.curiousoft.izinga.ordermanagement.service.messenger.MessengerLookUpService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
@@ -19,12 +20,15 @@ public class OrderQuoteCreatedEventHandler {
     private static final double SEARCH_RADIUS_KM = 10.0; // Search within 10km radius
     UserProfileRepo userProfileRepo;
     WhatsappNotificationService whatsappNotificationService;
+    private final MessengerLookUpService messengerLookUpService;
 
     OrderQuoteCreatedEventHandler(
             UserProfileRepo userProfileRepo,
-            WhatsappNotificationService whatsappNotificationService) {
+            WhatsappNotificationService whatsappNotificationService,
+            io.curiousoft.izinga.ordermanagement.service.messenger.MessengerLookUpService messengerLookUpService) {
         this.userProfileRepo = userProfileRepo;
         this.whatsappNotificationService = whatsappNotificationService;
+        this.messengerLookUpService = messengerLookUpService;
     }
 
     @Async
@@ -42,7 +46,14 @@ public class OrderQuoteCreatedEventHandler {
             // Find messengers near the store location
             var lat = order.getShippingData().getShippingDataGeoData().getFromGeoPoint().getLatitude();
             var lng = order.getShippingData().getShippingDataGeoData().getFromGeoPoint().getLongitude();
-            List<UserProfile> nearbyMessengers = findNearbyMessengers(lat, lng , SEARCH_RADIUS_KM);
+            List<UserProfile> nearbyMessengers = messengerLookUpService.findNearbyMessengers(lat, lng, SEARCH_RADIUS_KM);
+            if(nearbyMessengers.isEmpty()) {
+                LOG.info("No nearby messengers found for order quote {} at lat {}, long {}", order.getId(), lat, lng);
+                LOG.info("Considering messengers from the drop off Location");
+                lat = order.getShippingData().getShippingDataGeoData().getToGeoPoint().getLatitude();
+                lng = order.getShippingData().getShippingDataGeoData().getToGeoPoint().getLongitude();
+                nearbyMessengers = messengerLookUpService.findNearbyMessengers(lat, lng, SEARCH_RADIUS_KM);
+            }
 
             LOG.info("Found {} nearby messengers for order quote {} lat {}, long {} radius {}km",
                     nearbyMessengers.size(), order.getId(), lat, lng, SEARCH_RADIUS_KM);
@@ -60,32 +71,4 @@ public class OrderQuoteCreatedEventHandler {
             LOG.error("Error handling OrderQuoteCreatedEvent for order {}", event.getNewOrder().getId(), e);
         }
     }
-
-    private List<UserProfile> findNearbyMessengers(double latitude, double longitude, double radiusKm) {
-        // Calculate latitude/longitude bounds for the search radius
-        // Approximate: 1 degree latitude ≈ 111km
-        double latDelta = radiusKm / 111.0;
-        double lngDelta = radiusKm / (111.0 * Math.cos(Math.toRadians(latitude)));
-
-        double minLat = latitude - latDelta;
-        double maxLat = latitude + latDelta;
-        double minLng = longitude - lngDelta;
-        double maxLng = longitude + lngDelta;
-
-        // Find messengers within the bounding box
-        List<UserProfile> messengers = userProfileRepo.findByRoleAndLatitudeBetweenAndLongitudeBetween(
-                ProfileRoles.MESSENGER,
-                minLat,
-                maxLat,
-                minLng,
-                maxLng)
-                .stream()
-                .filter(it-> Boolean.TRUE.equals(it.getTermsAccepted())
-                        && it.getAvailabilityStatus() == ProfileAvailabilityStatus.ONLINE
-                        && it.getProfileApproved())
-                .toList();
-
-        return messengers != null ? messengers : List.of();
-    }
 }
-
