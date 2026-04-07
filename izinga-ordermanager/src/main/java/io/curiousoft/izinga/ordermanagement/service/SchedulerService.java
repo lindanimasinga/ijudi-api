@@ -154,7 +154,7 @@ import static java.lang.String.format;
     }
 
     //runs every day at 8am to send welcome message to new drivers who registered but not yet approved
-    @Scheduled(/*cron = "0 15 8 * * *"*/ fixedDelay = 600000, initialDelay = 10000)// 10 minutes
+    @Scheduled(cron = "0 15 8 * * *")// 10 minutes
     public void newDrivers() {
         LOG.info("Finding new drivers to send welcome message..");
         var driver = userProfileRepo.findByProfileApproved(false);
@@ -164,7 +164,7 @@ import static java.lang.String.format;
                  .forEach(profile -> {
                       try {
                         LOG.info("Sending welcome message to driver {} mobile {}. ", profile.getName(), profile.getMobileNumber());
-                        smsNotificationService.sendCrimnalCheckConsent("+27812815707", profile.getName());
+                        smsNotificationService.sendCrimnalCheckConsent(profile.getMobileNumber(), profile.getName());
                         CriminalCheckData data = new CriminalCheckData();
                         data.setCriminalCheckMessageSent(true);
                         profile.setCrminalCheckData(data);
