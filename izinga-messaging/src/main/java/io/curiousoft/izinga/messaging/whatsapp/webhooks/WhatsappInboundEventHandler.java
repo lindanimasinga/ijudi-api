@@ -8,6 +8,7 @@ import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.messaging.firebase.FirestoreService;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsappNotificationService;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateReplyEvent;
+import io.curiousoft.izinga.messaging.whatsapp.verification.VerificationConsentService;
 import io.curiousoft.izinga.messaging.repo.WhatsappSessionRepo;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -34,10 +35,13 @@ public class WhatsappInboundEventHandler {
     private final DeviceRepository deviceRepo;
     private final WhatsappNotificationService whatsappNotificationService;
     private final WhatsappSessionRepo whatsappSessionRepo;
+    private final VerificationConsentService verificationConsentService;
 
     public WhatsappInboundEventHandler(ApplicationEventPublisher eventPublisher, FirestoreService firestoreService,
                                        FirebaseNotificationService firebaseNotificationService, UserProfileRepo userProfileRepo,
-                                       FirebaseNotificationService firebaseNotificationService1, DeviceRepository deviceRepo, WhatsappNotificationService whatsappNotificationService, WhatsappSessionRepo whatsappSessionRepo) {
+                                       FirebaseNotificationService firebaseNotificationService1, DeviceRepository deviceRepo,
+                                       WhatsappNotificationService whatsappNotificationService, WhatsappSessionRepo whatsappSessionRepo,
+                                       VerificationConsentService verificationConsentService) {
         this.eventPublisher = eventPublisher;
         this.firestoreService = firestoreService;
         this.userProfileRepo = userProfileRepo;
@@ -45,6 +49,7 @@ public class WhatsappInboundEventHandler {
         this.deviceRepo = deviceRepo;
         this.whatsappNotificationService = whatsappNotificationService;
         this.whatsappSessionRepo = whatsappSessionRepo;
+        this.verificationConsentService = verificationConsentService;
     }
 
     @Async
@@ -72,11 +77,17 @@ public class WhatsappInboundEventHandler {
                             String type = message.getType();
                             LOG.info("Received message from={} id={} type={}", from, id, type);// upsert whatsapp session for this sender
                             var isNewSession = upsertSession(from);
-                            if(isNewSession) {
+
+                            // Check for verification consent acceptance before processing new session
+                            var isVerificationMessage = verificationConsentService.isVerificationMessage(message);
+                            if (isVerificationMessage) {
+                                verificationConsentService.handleVerificationConsentReply(message, from);
+                            } else if(isNewSession) {
                                 LOG.info("New WhatsApp session started for {}", from);
                                 var user = userProfileRepo.findByMobileNumber(from);
                                 whatsappNotificationService.sendLandingOptions(from, value.getContacts().get(0).getProfile().getName(), user);
                             }
+
                             // delegate based on message type / content
                             if ("text".equals(type) || message.getText() != null) {
                                 handleTextMessage(message, value.getContacts());

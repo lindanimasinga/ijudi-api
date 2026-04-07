@@ -155,21 +155,22 @@ import static java.lang.String.format;
     //runs every day at 8am to send welcome message to new drivers who registered but not yet approved
     @Scheduled(cron = "0 15 8 * * *")
     public void newDrivers() {
-       LOG.info("Finding new drivers to send welcome message..");
-       var driver = userProfileRepo.findByProfileApproved(false);
-     driver.stream()
-             .filter(dr -> dr.getRole() == ProfileRoles.MESSENGER && !dr.getWelcomeMessageSent())
-             .forEach(profile -> {
-                  try {
-                    LOG.info("Sending welcome message to driver {} mobile {}. ", profile.getName(), profile.getMobileNumber());
-                    smsNotificationService.sendWelcomeMessageDriver(profile.getMobileNumber(), profile.getName());
-                    profile.setWelcomeMessageSent(true);
-                    userProfileRepo.save(profile);
-                  } catch (Exception e) {
-                    LOG.error("Failed to send welcome message to driver {}. ", profile.getName(), e);
-                  }
-            });
-        LOG.info("Welcome message sent to new drivers");
+        LOG.info("Finding new drivers to send welcome message..");
+        var driver = userProfileRepo.findByProfileApproved(false);
+        driver.stream()
+                 .filter(dr -> dr.getRole() == ProfileRoles.MESSENGER && (dr.getCrminalCheckData() == null
+                         || !dr.getCrminalCheckData().getCriminalCheckMessageSent()))
+                 .forEach(profile -> {
+                      try {
+                        LOG.info("Sending welcome message to driver {} mobile {}. ", profile.getName(), profile.getMobileNumber());
+                        smsNotificationService.sendCrimnalCheckConsent(profile.getMobileNumber(), profile.getName());
+                        profile.setWelcomeMessageSent(true);
+                        userProfileRepo.save(profile);
+                      } catch (Exception e) {
+                        LOG.error("Failed to send welcome message to driver {}. ", profile.getName(), e);
+                      }
+                });
+            LOG.info("Welcome message sent to new drivers");
     }
 
     @Scheduled(fixedDelay = 900000, initialDelay = 900000) // 15 minutes

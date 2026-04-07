@@ -22,8 +22,17 @@ class UserProfile(
     var dateOfBirth: String? = null
     var termsAccepted: Boolean? = null
     var termsAcceptedDate: Date? = null
+    var crminalCheckData: CriminalCheckData? = null
 
     enum class SignUpReason {
         DELIVERY_DRIVER, SELL, BUY, LICENSING
     }
+}
+
+class CriminalCheckData {
+    var criminalRecordCheckAccepted: Boolean? = null
+    var criminalCheckMessageSent: Boolean = false
+    var criminalRecordCheckDate: Date? = null
+    var criminalRecordCheckDocument: DocumentAttachment? = null
+    var criminalCheckPass: Boolean? = null
 }

@@ -3,6 +3,7 @@ package io.curiousoft.izinga.messaging.whatsapp;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateRequest;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -424,14 +425,6 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
 
             String displayName = name != null && !name.isBlank() ? name : "Customer";
 
-            String button1Text = "Become A Driver";
-            String button1Url = "https://driver.izinga.co.za/";
-            if (userProfile != null && userProfile.getRole() == ProfileRoles.MESSENGER) {
-                // If already a messenger, show link to their driver profile instead
-                button1Text = "View My Driver Profile";
-                button1Url = "https://driver.izinga.co.za/profile/" + userProfile.getId();
-            }
-
             var requestStr = """
                     {
                       "name": "izinga_landing_options",
@@ -448,9 +441,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                     """;
 
             // Safe replacements
-            requestStr = requestStr.replace("#name", displayName)
-                                   .replace("#button1Text", button1Text)
-                                   .replace("#button1Url", button1Url);
+            requestStr = requestStr.replace("#name", displayName);
 
              var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
              request.setTemplate(template);
@@ -461,6 +452,49 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
          }
      }
 
+    @Override
+    public void sendCrimnalCheckConsent(@Nullable String mobileNumber, @Nullable String name) {
+        try {
+            if (mobileNumber == null || mobileNumber.isBlank()) {
+                LOGGER.warn("Cannot send criminal check consent: mobile number is null or blank");
+                return;
+            }
+
+            WhatsappTemplateRequest request = new WhatsappTemplateRequest();
+            String to = mobileNumber.startsWith("0") ? mobileNumber.replaceFirst("0", "+27") : mobileNumber;
+            request.setTo(to);
+
+            String displayName = name != null && !name.isBlank() ? name : "Driver";
+
+            // Template for criminal record check consent request
+            // Body: Hi {{1}}, as part of our driver verification process, we need your consent to perform a criminal background check.
+            // This is required to ensure the safety of our customers and partners.
+            // Please click below to provide your consent.
+            var requestStr = """
+                    {
+                      "name": "_driver_verification_consent_required",
+                      "language": { "code": "en" },
+                      "components": [
+                        {
+                          "type": "BODY",
+                          "parameters": [
+                            { "type": "TEXT", "text": "#name" }
+                          ]
+                        }
+                      ]
+                    }
+                    """;
+
+            requestStr = requestStr.replace("#name", displayName);
+
+            var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
+            request.setTemplate(template);
+            whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+            LOGGER.info("Sent criminal check consent request to {}", to);
+        } catch (IOException e) {
+            LOGGER.error("Failed to send criminal check consent to {}", mobileNumber, e);
+        }
+    }
 
 
- }
+}
