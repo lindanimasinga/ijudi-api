@@ -83,6 +83,7 @@ public class WhatsappInboundEventHandler {
                             if (isVerificationMessage) {
                                 LOG.info("Received verification consent reply from {}", from);
                                 verificationConsentService.handleVerificationConsentReply(message, from);
+                                whatsappNotificationService.sendMessage(from, "Thank you. Your application is being processed.");
                             } else if(isNewSession) {
                                 LOG.info("New WhatsApp session started for {}", from);
                                 var user = userProfileRepo.findByMobileNumber(from);

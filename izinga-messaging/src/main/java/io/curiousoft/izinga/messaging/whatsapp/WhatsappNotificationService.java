@@ -3,6 +3,8 @@ package io.curiousoft.izinga.messaging.whatsapp;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateRequest;
+import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTextRequest;
+import io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsappWebhookPayload;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +42,19 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
 
     @Override
     public void sendMessage(String mobileNumber, String message) {
-
+        // For simple text messages, we can use the "text" type instead of a template
+        try {
+            WhatsappTextRequest request = new WhatsappTextRequest();
+            String to = mobileNumber != null && mobileNumber.startsWith("0") ? mobileNumber.replaceFirst("0", "+27") : mobileNumber;
+            request.setTo(to);
+            var waMessage = new WhatsappTextRequest.Text();
+            waMessage.setBody(message);
+            request.setText(waMessage);
+            whatsAppService.sendTextMessage(whatsappConfig.phoneId(), request).execute();
+            LOGGER.info("Sent text message to {}: {}", to, message);
+        } catch (IOException e) {
+            LOGGER.error("Failed to send text message to {}: {}", mobileNumber, message, e);
+        }
     }
 
     @Override
