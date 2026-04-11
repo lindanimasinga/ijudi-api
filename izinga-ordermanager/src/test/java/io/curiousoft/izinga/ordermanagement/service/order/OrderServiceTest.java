@@ -2019,7 +2019,7 @@ public class OrderServiceTest {
         orders.add(order2);
         //when
         when(repo.findByShippingDataMessengerIdAndStageNot(patchProfileRequest.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID)).thenReturn(orders);
-        List<Order> finalOrder = sut.findOrderByMessengerId(patchProfileRequest.getId());
+        List<Order> finalOrder = sut.findOrderByMessengerId(patchProfileRequest.getId(), false);
         //verify
         Assert.assertNotNull(finalOrder);
         Assert.assertEquals(2, finalOrder.size());

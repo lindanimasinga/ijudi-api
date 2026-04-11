@@ -20,7 +20,7 @@ interface OrderService {
 
     fun findOrderByStoreId(shopId: String?): MutableList<Order?>?
 
-    fun findOrderByMessengerId(id: String?): MutableList<Order?>?
+    fun findOrderByMessengerId(id: String?, allStages: Boolean): MutableList<Order?>?
 
     fun findAll(): MutableList<Order?>?
 
