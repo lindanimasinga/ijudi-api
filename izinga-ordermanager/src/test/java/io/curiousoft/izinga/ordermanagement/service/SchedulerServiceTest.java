@@ -91,6 +91,7 @@ public class SchedulerServiceTest {
                 reconService,
                 shoppingListService,
                 null,
+                null,
                 null
         );
     }

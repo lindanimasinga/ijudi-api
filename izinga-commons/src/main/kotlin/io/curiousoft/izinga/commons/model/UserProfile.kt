@@ -13,6 +13,7 @@ class UserProfile(
     mobileNumber: @NotBlank(message = "profile mobile number not valid") String?,
     role: @NotNull(message = "role not valid") ProfileRoles?) : Profile(name, address, imageUrl, mobileNumber, role) {
 
+    var missingDocumentsReminderSent: Boolean? = null
     var welcomeMessageSent: Boolean = false
 
     @set:JsonIgnore

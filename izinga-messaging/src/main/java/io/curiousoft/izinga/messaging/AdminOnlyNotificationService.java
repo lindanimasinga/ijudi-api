@@ -31,4 +31,6 @@ public interface AdminOnlyNotificationService {
     void sendLandingOptions(String mobileNumber, String name, io.curiousoft.izinga.commons.model.UserProfile userProfile);
 
     void sendCrimnalCheckConsent(@NotBlank(message = "profile mobile not format is not valid. Please put like +27812815577 or 27812815577") @Nullable String mobileNumber, @NotBlank(message = "profile name not valid") @Nullable String name);
+
+    void sendMissingDocumentReminder(@NotBlank(message = "profile mobile not format is not valid. Please put like +27812815577 or 27812815577") @Nullable String mobileNumber, @NotBlank(message = "profile name not valid") @Nullable String name);
 }

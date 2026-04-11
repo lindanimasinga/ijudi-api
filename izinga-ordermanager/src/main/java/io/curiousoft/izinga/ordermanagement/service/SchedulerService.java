@@ -15,6 +15,8 @@ import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingListService;
 import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.recon.payout.PayoutStage;
 import io.curiousoft.izinga.recon.payout.PayoutType;
+import io.curiousoft.izinga.usermanagement.userconfig.FieldSpec;
+import io.curiousoft.izinga.usermanagement.userconfig.UserConfigRepo;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -32,6 +34,7 @@ import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static java.lang.String.format;
 
@@ -55,6 +58,7 @@ import static java.lang.String.format;
     private final ShoppingListService shoppingListService;
     private final DocumentInfoService documentInfoService;
     private final CloudBucketService cloudBucketService;
+    private final UserConfigRepo userConfigRepo;
 
     public SchedulerService(OrderRepository orderRepo, StoreRepository storeRepository,
                             DeviceRepository deviceRepo, FirebaseNotificationService pushNotificationService,
@@ -67,7 +71,7 @@ import static java.lang.String.format;
                             ReconService reconService,
                             ShoppingListService shoppingListService,
                             DocumentInfoService documentInfoService,
-                            CloudBucketService cloudBucketService) {
+                            CloudBucketService cloudBucketService, UserConfigRepo userConfigRepo) {
         this.orderRepo = orderRepo;
         this.storeRepository = storeRepository;
         this.deviceRepo = deviceRepo;
@@ -82,6 +86,7 @@ import static java.lang.String.format;
         this.shoppingListService = shoppingListService;
         this.documentInfoService = documentInfoService;
         this.cloudBucketService = cloudBucketService;
+        this.userConfigRepo = userConfigRepo;
     }
 
     @Scheduled(fixedDelay = 600000, initialDelay = 10000)// 10 minutes
@@ -157,17 +162,31 @@ import static java.lang.String.format;
     @Scheduled(cron = "0 15 8 * * *")// 10 minutes
     public void newDrivers() {
         LOG.info("Finding new drivers to send welcome message..");
+        var userConfig = userConfigRepo.findAll();
         var driver = userProfileRepo.findByProfileApproved(false);
         driver.stream()
-                 .filter(dr -> dr.getRole() == ProfileRoles.MESSENGER && (dr.getCrminalCheckData() == null
-                         || !dr.getCrminalCheckData().getCriminalCheckMessageSent()))
+                 .filter(dr -> dr.getRole() == ProfileRoles.MESSENGER)
                  .forEach(profile -> {
                       try {
                         LOG.info("Sending welcome message to driver {} mobile {}. ", profile.getName(), profile.getMobileNumber());
-                        smsNotificationService.sendCrimnalCheckConsent(profile.getMobileNumber(), profile.getName());
-                        CriminalCheckData data = new CriminalCheckData();
-                        data.setCriminalCheckMessageSent(true);
-                        profile.setCrminalCheckData(data);
+                        var consentSent = (profile.getCrminalCheckData() != null && profile.getCrminalCheckData().getCriminalCheckMessageSent());
+                        if (!consentSent) {
+                            smsNotificationService.sendCrimnalCheckConsent(profile.getMobileNumber(), profile.getName());
+                            CriminalCheckData data = new CriminalCheckData();
+                            data.setCriminalCheckMessageSent(true);
+                            profile.setCrminalCheckData(data);
+                        }
+                        //check missing required documents and send reminder if any
+                        var allFieldsProvided = userConfig.stream()
+                                .filter(it -> it.getLabel().equals(profile.getDescription()))
+                                .flatMap(config -> {
+                                    return Stream.of(config.getMandatoryFields().toArray(FieldSpec[]::new));
+                                }).allMatch(it -> profile.getTag().get(it.getLabel()) != null);
+                        if (!allFieldsProvided) {
+                            smsNotificationService.sendMissingDocumentReminder(profile.getMobileNumber(), profile.getName());
+                            profile.setMissingDocumentsReminderSent(true);
+                        }
+
                         userProfileRepo.save(profile);
                       } catch (Exception e) {
                         LOG.error("Failed to send welcome message to driver {}. ", profile.getName(), e);

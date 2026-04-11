@@ -510,5 +510,45 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
         }
     }
 
+    @Override
+    public void sendMissingDocumentReminder(@Nullable String mobileNumber, @Nullable String name) {
+        try {
+            if (mobileNumber == null || mobileNumber.isBlank()) {
+                LOGGER.warn("Cannot send missing document reminder: mobile number is null or blank");
+                return;
+            }
+
+            WhatsappTemplateRequest request = new WhatsappTemplateRequest();
+            String to = mobileNumber.startsWith("0") ? mobileNumber.replaceFirst("0", "+27") : mobileNumber;
+            request.setTo(to);
+
+            String displayName = name != null && !name.isBlank() ? name : "Driver";
+
+            var requestStr = """
+                    {
+                      "name": "missing_required_information",
+                      "language": { "code": "en" },
+                      "components": [
+                        {
+                          "type": "BODY",
+                          "parameters": [
+                            { "type": "TEXT", "text": "#name" }
+                          ]
+                        }
+                      ]
+                    }
+                    """;
+
+            requestStr = requestStr.replace("#name", displayName);
+
+            var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
+            request.setTemplate(template);
+            whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+            LOGGER.info("Sent missing document reminder to {}", to);
+        } catch (IOException e) {
+            LOGGER.error("Failed to send missing document reminder to {}", mobileNumber, e);
+        }
+    }
+
 
 }
