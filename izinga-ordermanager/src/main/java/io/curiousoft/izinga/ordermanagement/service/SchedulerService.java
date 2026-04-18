@@ -182,7 +182,7 @@ import static java.lang.String.format;
                                 .flatMap(config -> {
                                     return Stream.of(config.getMandatoryFields().toArray(FieldSpec[]::new));
                                 }).allMatch(it -> profile.getTag().get(it.getLabel()) != null);
-                        if (!allFieldsProvided) {
+                        if (!allFieldsProvided && (profile.getMissingDocumentsReminderSent() == null || !profile.getMissingDocumentsReminderSent())) {
                             smsNotificationService.sendMissingDocumentReminder(profile.getMobileNumber(), profile.getName());
                             profile.setMissingDocumentsReminderSent(true);
                         }
