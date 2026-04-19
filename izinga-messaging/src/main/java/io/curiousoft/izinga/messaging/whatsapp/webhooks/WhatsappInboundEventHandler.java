@@ -3,6 +3,7 @@ package io.curiousoft.izinga.messaging.whatsapp.webhooks;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.messaging.aiAgent.AiCustomerServiceAgent;
 import io.curiousoft.izinga.messaging.firebase.FireStoreTextMessage;
 import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.messaging.firebase.FirestoreService;
@@ -36,12 +37,13 @@ public class WhatsappInboundEventHandler {
     private final WhatsappNotificationService whatsappNotificationService;
     private final WhatsappSessionRepo whatsappSessionRepo;
     private final VerificationConsentService verificationConsentService;
+    private final AiCustomerServiceAgent aiCustomerService;
 
     public WhatsappInboundEventHandler(ApplicationEventPublisher eventPublisher, FirestoreService firestoreService,
                                        FirebaseNotificationService firebaseNotificationService, UserProfileRepo userProfileRepo,
                                        FirebaseNotificationService firebaseNotificationService1, DeviceRepository deviceRepo,
                                        WhatsappNotificationService whatsappNotificationService, WhatsappSessionRepo whatsappSessionRepo,
-                                       VerificationConsentService verificationConsentService) {
+                                       VerificationConsentService verificationConsentService, AiCustomerServiceAgent aiCustomerService) {
         this.eventPublisher = eventPublisher;
         this.firestoreService = firestoreService;
         this.userProfileRepo = userProfileRepo;
@@ -50,6 +52,7 @@ public class WhatsappInboundEventHandler {
         this.whatsappNotificationService = whatsappNotificationService;
         this.whatsappSessionRepo = whatsappSessionRepo;
         this.verificationConsentService = verificationConsentService;
+        this.aiCustomerService = aiCustomerService;
     }
 
     @Async
@@ -81,6 +84,7 @@ public class WhatsappInboundEventHandler {
                             // Check for verification consent acceptance before processing new session
                             LOG.info("Checking if message from {} is a verification consent reply", from);
                             var isVerificationMessage = verificationConsentService.isVerificationMessage(message);
+                            boolean isAiCudtomerServiceEnable = aiCustomerService.isEnabled();
                             if (isVerificationMessage) {
                                 LOG.info("Received verification consent reply from {}", from);
                                 verificationConsentService.handleVerificationConsentReply(message, from);
@@ -89,6 +93,9 @@ public class WhatsappInboundEventHandler {
                                 LOG.info("New WhatsApp session started for {}", from);
                                 var user = userProfileRepo.findByMobileNumber(from);
                                 whatsappNotificationService.sendLandingOptions(from, value.getContacts().get(0).getProfile().getName(), user);
+                            }  else if (isAiCudtomerServiceEnable){
+                                var aiResponseToCustomer = aiCustomerService.handleWhatsappQuery(message, from);
+                                whatsappNotificationService.sendMessage(from, aiResponseToCustomer);
                             }
 
                             // delegate based on message type / content
