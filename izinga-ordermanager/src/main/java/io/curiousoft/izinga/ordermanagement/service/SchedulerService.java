@@ -181,12 +181,11 @@ import static java.lang.String.format;
                                 .filter(it -> it.getLabel().equals(profile.getDescription()))
                                 .flatMap(config -> {
                                     return Stream.of(config.getMandatoryFields().toArray(FieldSpec[]::new));
-                                }).allMatch(it -> profile.getTag().get(it.getLabel()) != null);
+                                }).allMatch(it -> profile.getTag().get(it.getName()) != null);
                         if (!allFieldsProvided && (profile.getMissingDocumentsReminderSent() == null || !profile.getMissingDocumentsReminderSent())) {
                             smsNotificationService.sendMissingDocumentReminder(profile.getMobileNumber(), profile.getName());
                             profile.setMissingDocumentsReminderSent(true);
                         }
-
                         userProfileRepo.save(profile);
                       } catch (Exception e) {
                         LOG.error("Failed to send welcome message to driver {}. ", profile.getName(), e);
