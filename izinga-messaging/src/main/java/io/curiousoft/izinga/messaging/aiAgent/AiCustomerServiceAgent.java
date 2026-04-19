@@ -27,6 +27,7 @@ public class AiCustomerServiceAgent {
     private final RestTemplate restTemplate;
     private final ConversationHistoryService conversationHistoryService;
     private final AiAgentConfigService agentConfigService;
+    private final String systemPrompt;
 
     public AiCustomerServiceAgent(
             @Value("${ai.agent.enabled:false}") boolean enabled,
@@ -41,6 +42,7 @@ public class AiCustomerServiceAgent {
         this.restTemplate = restTemplate;
         this.conversationHistoryService = conversationHistoryService;
         this.agentConfigService = agentConfigService;
+        this.systemPrompt = agentConfigService.getSystemPrompt(AGENT_NAME);
     }
 
     public boolean isEnabled() {
@@ -77,7 +79,6 @@ public class AiCustomerServiceAgent {
 
         try {
             // Load system prompt from database
-            String systemPrompt = agentConfigService.getSystemPrompt(AGENT_NAME);
             if (systemPrompt == null) {
                 LOG.error("No system prompt found for agent: {}", AGENT_NAME);
                 return null;
@@ -97,9 +98,7 @@ public class AiCustomerServiceAgent {
             // Add conversation context (last N messages)
             var contextMessages = conversationHistoryService.getContextMessages(conversation);
             for (var msg : contextMessages) {
-                if (!msg.getContent().equals(userText)) { // Don't duplicate the current message
                     messagesList.add(Map.of("role", msg.getRole(), "content", msg.getContent()));
-                }
             }
 
             HttpHeaders headers = new HttpHeaders();

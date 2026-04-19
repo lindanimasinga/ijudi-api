@@ -94,6 +94,7 @@ public class WhatsappInboundEventHandler {
                                 var user = userProfileRepo.findByMobileNumber(from);
                                 whatsappNotificationService.sendLandingOptions(from, value.getContacts().get(0).getProfile().getName(), user);
                             }  else if (isAiCudtomerServiceEnable){
+                                LOG.info("AI customer service enabled, processing message from {}", from);
                                 var aiResponseToCustomer = aiCustomerService.handleWhatsappQuery(message, from);
                                 whatsappNotificationService.sendMessage(from, aiResponseToCustomer);
                             }
