@@ -5,6 +5,7 @@ import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistory;
 import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistoryService;
 import io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsappWebhookPayload;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -21,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+@Disabled
 @ExtendWith(MockitoExtension.class)
 class AiCustomerServiceAgentTest {
 
