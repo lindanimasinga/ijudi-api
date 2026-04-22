@@ -55,7 +55,7 @@ public record CustomerOrderEventHandler(FirebaseNotificationService pushNotifica
     @Override
     public void handleOrderUpdatedEvent(OrderUpdatedEvent orderUpdatedEvent) {
         var order = orderUpdatedEvent.getOrder();
-
+        var store = orderUpdatedEvent.getReceivingStore();
         final String order_status_updated = "Order Status Updated";
         PushHeading title = null;
         PushMessage message = null;
@@ -64,7 +64,8 @@ public record CustomerOrderEventHandler(FirebaseNotificationService pushNotifica
                 return;
             case STAGE_2_STORE_PROCESSING:
                 //notify only customer
-                title = new PushHeading("The store has started processing your order " + order.getId(), order_status_updated, null, null);
+                var body = store.getStoreType() == StoreType.MOVERS ? "The driver is coming to your pickup location:" + order.getId() : "The store has started processing your order " + order.getId();
+                title = new PushHeading(body, order_status_updated, null, null);
                 message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
                 break;
             case STAGE_3_READY_FOR_COLLECTION:
@@ -90,9 +91,11 @@ public record CustomerOrderEventHandler(FirebaseNotificationService pushNotifica
         List<Device> customerDevices = deviceService.findByUserId(customer.getId());
         if (!customerDevices.isEmpty()) {
             pushNotificationService.sendNotifications(customerDevices, message);
-        } else {
-            //whatsappNotificationService.sendMessage(store, order, customer);
         }
+        if (title != null) {
+            whatsappNotificationService.sendMessage(customer.getMobileNumber(), title.getBody());
+        }
+
     }
 
     @Override

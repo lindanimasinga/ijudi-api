@@ -79,8 +79,7 @@ public class WhatsappInboundEventHandler {
                             String id = message.getId();
                             String type = message.getType();
                             LOG.info("Received message from={} id={} type={}", from, id, type);// upsert whatsapp session for this sender
-                            var isNewSession = upsertSession(from);
-
+                            var session = upsertSession(from);
                             // Check for verification consent acceptance before processing new session
                             LOG.info("Checking if message from {} is a verification consent reply", from);
                             var isVerificationMessage = verificationConsentService.isVerificationMessage(message);
@@ -89,11 +88,11 @@ public class WhatsappInboundEventHandler {
                                 LOG.info("Received verification consent reply from {}", from);
                                 verificationConsentService.handleVerificationConsentReply(message, from);
                                 whatsappNotificationService.sendMessage(from, "Thank you. Your application is being processed.");
-                            } else if(isNewSession) {
+                            } else if(session.isNewSession()) {
                                 LOG.info("New WhatsApp session started for {}", from);
                                 var user = userProfileRepo.findByMobileNumber(from);
                                 whatsappNotificationService.sendLandingOptions(from, value.getContacts().get(0).getProfile().getName(), user);
-                            }  else if (isAiCudtomerServiceEnable){
+                            }  else if (isAiCudtomerServiceEnable && session.isAIAgentActive()){
                                 LOG.info("AI customer service enabled, processing message from {}", from);
                                 var aiResponseToCustomer = aiCustomerService.handleWhatsappQuery(message, from);
                                 whatsappNotificationService.sendMessage(from, aiResponseToCustomer);
@@ -128,26 +127,17 @@ public class WhatsappInboundEventHandler {
         }
     }
 
-    private boolean upsertSession(String from) {
-        try {
-            if (from == null) return true;
-            var opt = whatsappSessionRepo.findByFrom(from);
-            var now = Instant.now();
-            if (opt.isPresent()) {
-                var session = opt.get();
-                var startNewSesion = session.getLastMessageDate() == null || now.minusSeconds(90 * 60).isAfter(session.getLastMessageDate());
-                session.setLastMessageDate(now);
-                whatsappSessionRepo.save(session);
-                return startNewSesion;
-            } else {
-                var session = new WhatsappSession(from, now);
-                whatsappSessionRepo.save(session);
-                return true;
-            }
-        } catch (Exception e) {
-            LOG.warn("Failed to upsert whatsapp session for {}", from, e);
+    private WhatsappSession upsertSession(String from) {
+        var opt = whatsappSessionRepo.findByFrom(from);
+        var now = Instant.now();
+        var session = new WhatsappSession(from, now);
+        if (opt.isPresent()) {
+            session = opt.get();
+            session.setLastMessageDate(now);
         }
-        return true;
+        whatsappSessionRepo.save(session);
+        session.setNewSession(session.getLastMessageDate() == null || now.minusSeconds(90 * 60).isAfter(session.getLastMessageDate()));
+        return session;
     }
 
     @NotNull

@@ -7,11 +7,11 @@ import java.time.Instant
 
 @Document(collection = "whatsapp_session")
 class WhatsappSession: BaseModel {
-
     @Indexed(unique = true)
     var from: String? = null
-
     var lastMessageDate: Instant? = null
+    var isAIAgentActive: Boolean = true
+    var isNewSession: Boolean = true
 
     constructor()
 
