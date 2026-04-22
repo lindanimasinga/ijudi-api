@@ -169,13 +169,20 @@ public record MessengerOrderEventHandler(FirebaseNotificationService pushNotific
     public void handleOrderUpdatedEvent(OrderUpdatedEvent event) {
         var order = event.getOrder();
         var store = event.getReceivingStore();
+        var messenger = Optional.ofNullable(event.getMessenger())
+                .map(userProfileService::find);
 
         if(event.getMessenger() == null) {
             return;
         }
 
         if (order.getStage() == OrderStage.STAGE_7_ALL_PAID) {
-            reconService.generatePayoutForMessengerAndOrder(order);
+            var payout  = reconService.generatePayoutForMessengerAndOrder(order);
+            if(payout != null && !payout.isPermEmployed()) {
+                var payoutTotal = payout.getTotal().setScale(2, RoundingMode.HALF_UP);
+                var messahe = "Hi " + messenger.get().getName() + ", thank you for delivering order. You got paid R" + order.getTotalAmount() + " for order " + order.getId() + ". Your total payout balance is now R" + payoutTotal + ". We will notify you when the payout is in your account. For more visit driver.izinga.co.za";
+                smsNotificationService.sendMessage(messenger.get().getMobileNumber(), "Your payout for order " + order.getId() + " is " + payoutTotal);
+            }
         }
     }
 
