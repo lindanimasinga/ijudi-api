@@ -17,6 +17,8 @@ public interface AdminOnlyNotificationService {
     // send welcome message to a newly registered driver (optional)
     void sendWelcomeMessageDriver(String mobileNumber, String driverName);
 
+    void sendDriverOrderCompletedMessage(UserProfile messenger, String orderNumber, BigDecimal orderAmount, BigDecimal payoutTotal) throws IOException;
+
     void sendTipReceivedMessageWithReward(String mobileNumber, BigDecimal tip, BigDecimal reward, BigDecimal payoutTotal) throws IOException;
 
     void notifyOrderPlaced(Order persistedOrder, Profile userProfile) throws IOException;

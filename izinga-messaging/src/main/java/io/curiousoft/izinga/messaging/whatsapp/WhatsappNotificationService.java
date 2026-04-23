@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateRequest;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTextRequest;
-import io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsappWebhookPayload;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -191,6 +190,41 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 """
                 .replaceAll("#tip", tip.setScale(2, RoundingMode.HALF_EVEN).toString())
                 .replaceAll("#balance", payoutTotal.setScale(2, RoundingMode.HALF_EVEN).toString());
+        var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
+        request.setTemplate(template);
+        whatsAppService.sendMessage(whatsappConfig.phoneId(), request)
+                .execute();
+    }
+
+    @Override
+    public void sendDriverOrderCompletedMessage(UserProfile messenger, String orderNumber, BigDecimal orderAmount, BigDecimal payoutTotal) throws IOException {
+        // Request
+        var mobileNumber = messenger.getMobileNumber();
+        WhatsappTemplateRequest request = new WhatsappTemplateRequest();
+        request.setTo(mobileNumber.startsWith("0")
+                ? mobileNumber.replaceFirst("0", "+27")
+                : mobileNumber);
+        var requestStr = """
+                {
+                  "name": "messenger_order_completed",
+                  "language": { "code": "en" },
+                  "components": [
+                    {
+                      "type": "BODY",
+                      "parameters": [
+                        { "type": "TEXT", "text": "#name" },
+                        { "type": "TEXT", "text": "#orderAmount" },
+                        { "type": "TEXT", "text": "#orderNumber" },
+                        { "type": "TEXT", "text": "#payoutTotal" }
+                      ]
+                    }
+                  ]
+                }
+                """
+                .replaceAll("#name", messenger.getName())
+                .replaceAll("#tip", orderAmount.setScale(2, RoundingMode.HALF_EVEN).toString())
+                .replaceAll("#orderNumber", orderNumber)
+                .replaceAll("#payoutTotal", payoutTotal.setScale(2, RoundingMode.HALF_EVEN).toString());
         var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
         request.setTemplate(template);
         whatsAppService.sendMessage(whatsappConfig.phoneId(), request)
