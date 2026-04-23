@@ -222,7 +222,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 }
                 """
                 .replaceAll("#name", messenger.getName())
-                .replaceAll("#tip", orderAmount.setScale(2, RoundingMode.HALF_EVEN).toString())
+                .replaceAll("#orderAmount", orderAmount.setScale(2, RoundingMode.HALF_EVEN).toString())
                 .replaceAll("#orderNumber", orderNumber)
                 .replaceAll("#payoutTotal", payoutTotal.setScale(2, RoundingMode.HALF_EVEN).toString());
         var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
