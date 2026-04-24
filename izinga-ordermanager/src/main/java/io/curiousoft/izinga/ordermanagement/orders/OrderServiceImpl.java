@@ -211,8 +211,7 @@ public class OrderServiceImpl implements OrderService {
                 var fromFloor = !fromHasElevator && order.getShippingData().getFromFloorLevel() != null ? order.getShippingData().getFromFloorLevel() : 0;
                 var toFloor = !toHasElevator && order.getShippingData().getFloorLevel() != null ? order.getShippingData().getFloorLevel() : 0;
 
-                var labourFee = deliveryFee
-                        + storeOptional.get().getRates().getLabourRatePerFloor() * fromFloor * order.getTotalWeight()
+                var labourFee = storeOptional.get().getRates().getLabourRatePerFloor() * fromFloor * order.getTotalWeight()
                         + storeOptional.get().getRates().getLabourRatePerFloor() * toFloor * order.getTotalWeight();
                 order.setLabourFee(labourFee);
             }
@@ -247,7 +246,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private boolean canChargeServiceFees(StoreProfile storeProfile) {
-        return storeProfile.getStoreType() == StoreType.FOOD || storeProfile.getStoreType() == StoreType.TIPS;
+        return true;
     }
 
     @Override
@@ -310,11 +309,10 @@ public class OrderServiceImpl implements OrderService {
         var orderCompleted = orderRepo.save(persistedOrder);
 
         //send order event
-        OrderEvent newOrderEvent = order.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY ?
-                new ScheduledOrderEvent(this, order, persistedOrder.getShippingData().getMessengerId(), store)
-        : new NewOrderEvent(this, order, persistedOrder.getShippingData().getMessengerId(), store);
+        OrderEvent newOrderEvent = orderCompleted.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY ?
+                new ScheduledOrderEvent(this, orderCompleted, persistedOrder.getShippingData().getMessengerId(), store)
+        : new NewOrderEvent(this, orderCompleted, persistedOrder.getShippingData().getMessengerId(), store);
         applicationEventPublisher.publishEvent(newOrderEvent);
-
         return orderCompleted;
     }
 
