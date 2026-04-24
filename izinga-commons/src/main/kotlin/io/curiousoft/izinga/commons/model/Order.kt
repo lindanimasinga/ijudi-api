@@ -40,14 +40,27 @@ class Order : BaseModel() {
     var minimumDepositAllowedPerc = 0.0
     var payoutCreated = false
     var documents: Set<DocumentAttachment>? = null
-    // per-order computed fees (set by business logic)
-    var weightFee: Double = 0.0
-    var volumeFee: Double = 0.0
-    var labourFee: Double = 0.0
+
+    var weightFee: Double
+        get() = shippingData?.weigthFee ?: 0.0
+        set(value) {
+            shippingData?.weigthFee = value
+        }
+    var volumeFee: Double
+        get() = shippingData?.volumeFee ?: 0.0
+        set(value) {
+            shippingData?.volumeFee = value
+        }
+
+    var labourFee: Double
+        get() = shippingData?.labourFee ?: 0.0
+        set(value) {
+            shippingData?.labourFee = value
+        }
 
     val totalAmount: Double
         get() = BigDecimal.valueOf(
-            labourFee + weightFee + volumeFee + serviceFee + basket.totalPrice + (!freeDelivery && shippingData != null).isTrue({shippingData?.fee!!}) { 0.00 }
+            serviceFee + basket.totalPrice + (!freeDelivery && shippingData != null).isTrue({shippingData?.fee!!}) { 0.00 }
         )
         .setScale(2, RoundingMode.HALF_EVEN)
         .toDouble()

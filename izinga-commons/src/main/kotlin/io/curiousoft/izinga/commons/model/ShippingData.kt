@@ -22,11 +22,17 @@ class ShippingData {
     var buildingHasElevator: Boolean? = null
     var additionalInstructions: String? = null
     var type: @NotNull(message = "shipping type not valid") ShippingType? = null
-    var fee: Double = 0.0
+    var deliveryFee: Double = 0.0
     var messengerId: String? = null
     var pickUpTime: @Future(message = "pickup date must be at least 15 minutes ahead") Date? = null
     var distance: Double = 0.0
     var shippingDataGeoData: ShipingGeoData? = null
+    var weigthFee: Double = 0.0
+    var volumeFee: Double = 0.0
+    var labourFee: Double = 0.0
+
+    val fee: Double get() = deliveryFee + weigthFee + volumeFee + labourFee
+
 
     constructor()
     constructor(

@@ -217,7 +217,7 @@ public class OrderServiceImpl implements OrderService {
                 order.setLabourFee(labourFee);
             }
 
-            order.getShippingData().setFee(deliveryFee);
+            order.getShippingData().setDeliveryFee(deliveryFee);
             order.getShippingData().setDistance(shipingGeoData.getDistance());
             order.getShippingData().setShippingDataGeoData(shipingGeoData);
             restrictedRegionService.validationRestrictedRegions(order);
@@ -227,7 +227,7 @@ public class OrderServiceImpl implements OrderService {
         order.setFreeDelivery(isEligibleForFreeDelivery);
 
         if (canChargeServiceFees(storeOptional.get())) {
-            order.setServiceFee(serviceFeePerc * (order.getBasketAmount() + (order.getFreeDelivery() ? 0 : deliveryFee)));
+            order.setServiceFee(serviceFeePerc * (order.getBasketAmount() + (order.getFreeDelivery() ? 0 : order.getShippingData().getFee())));
         }
 
         var isQuoteRequired = storeOptional.get().isQuoteRequired();

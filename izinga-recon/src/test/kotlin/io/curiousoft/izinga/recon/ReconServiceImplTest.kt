@@ -141,21 +141,21 @@ class ReconServiceTest {
             Order().also {
                 it.description = "order1"
                 it.messengerPaid = false
-                it.shippingData = ShippingData().apply { messengerId = messenger1; fee = 30.0 }
+                it.shippingData = ShippingData().apply { messengerId = messenger1; deliveryFee = 30.0 }
             }
         )
         val shop2Orders: MutableSet<Order> = mutableSetOf(
             Order().also {
                 it.description = "order2"
                 it.messengerPaid = false
-                it.shippingData = ShippingData().apply { messengerId = messenger2; fee = 40.0 }
+                it.shippingData = ShippingData().apply { messengerId = messenger2; deliveryFee = 40.0 }
             }
         )
         val shop3Orders: MutableSet<Order> = mutableSetOf(
             Order().also {
                 it.description = "order3"
                 it.messengerPaid = false
-                it.shippingData = ShippingData().apply { messengerId = messenger3; fee = 35.75 }
+                it.shippingData = ShippingData().apply { messengerId = messenger3; deliveryFee = 35.75 }
             }
         )
 
@@ -223,21 +223,21 @@ class ReconServiceTest {
             Order().also {
                 it.description = "order1"
                 it.messengerPaid = false
-                it.shippingData = ShippingData().apply { messengerId = messenger1; fee = 30.0 }
+                it.shippingData = ShippingData().apply { messengerId = messenger1; deliveryFee = 30.0 }
             }
         )
         val shop2Orders: MutableSet<Order> = mutableSetOf(
             Order().also {
                 it.description = "order2"
                 it.messengerPaid = false
-                it.shippingData = ShippingData().apply { messengerId = messenger2; fee = 40.0 }
+                it.shippingData = ShippingData().apply { messengerId = messenger2; deliveryFee = 40.0 }
             }
         )
         val shop3Orders: MutableSet<Order> = mutableSetOf(
             Order().also {
                 it.description = "order3"
                 it.messengerPaid = false
-                it.shippingData = ShippingData().apply { messengerId = messenger3; fee = 35.75 }
+                it.shippingData = ShippingData().apply { messengerId = messenger3; deliveryFee = 35.75 }
             }
         )
 
@@ -301,7 +301,7 @@ class ReconServiceTest {
         val a = 0..1
         val messengerOrders: MutableSet<Order> = mutableSetOf(
             mockk<Order>().also {
-                every { it.shippingData } returns ShippingData().apply { fee = 40.0; messengerId = "messenger1" }
+                every { it.shippingData } returns ShippingData().apply { deliveryFee = 40.0; messengerId = "messenger1" }
                 every { it.messengerPaid } returns false
                 every { it.basketAmount } returns 10.00
                 every { it.id } returns "10.00"
@@ -309,7 +309,7 @@ class ReconServiceTest {
                 every { it.messengerPaid = false } just runs
             },
             mockk<Order>().also {
-                every { it.shippingData } returns ShippingData().apply { fee = 40.0; messengerId = "messenger2" }
+                every { it.shippingData } returns ShippingData().apply { deliveryFee = 40.0; messengerId = "messenger2" }
                 every { it.messengerPaid } returns false
                 every { it.basketAmount } returns 30.00
                 every { it.id } returns "30.00"
@@ -317,7 +317,7 @@ class ReconServiceTest {
                 every { it.messengerPaid = false } just runs
             },
             mockk<Order>().also {
-                every { it.shippingData } returns ShippingData().apply { fee = 40.56; messengerId = "messenger3" }
+                every { it.shippingData } returns ShippingData().apply { deliveryFee = 40.56; messengerId = "messenger3" }
                 every { it.messengerPaid } returns false
                 every { it.basketAmount } returns 20.00
                 every { it.id } returns "20.00"
@@ -387,7 +387,7 @@ class ReconServiceTest {
         val a = 0..1
         val shop1Orders: MutableSet<Order> = mutableSetOf(
             mockk<Order>().also {
-                every { it.shippingData } returns ShippingData().apply { fee = 40.0; messengerId = "messenger1" }
+                every { it.shippingData } returns ShippingData().apply { deliveryFee = 40.0; messengerId = "messenger1" }
                 every { it.messengerPaid } returns false
                 every { it.basketAmount } returns 10.00
                 every { it.id } returns "10.00"
@@ -395,7 +395,7 @@ class ReconServiceTest {
                 every { it.messengerPaid = false } just runs
             },
             mockk<Order>().also {
-                every { it.shippingData } returns ShippingData().apply { fee = 40.0; messengerId = "messenger2" }
+                every { it.shippingData } returns ShippingData().apply { deliveryFee = 40.0; messengerId = "messenger2" }
                 every { it.messengerPaid } returns false
                 every { it.basketAmount } returns 30.00
                 every { it.id } returns "30.00"
@@ -403,7 +403,7 @@ class ReconServiceTest {
                 every { it.messengerPaid = false } just runs
             },
             mockk<Order>().also {
-                every { it.shippingData } returns ShippingData().apply { fee = 40.56; messengerId = "messenger3" }
+                every { it.shippingData } returns ShippingData().apply { deliveryFee = 40.56; messengerId = "messenger3" }
                 every { it.messengerPaid } returns false
                 every { it.basketAmount } returns 20.00
                 every { it.id } returns "20.00"

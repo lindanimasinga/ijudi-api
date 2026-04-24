@@ -24,7 +24,7 @@ public class OrderTest {
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
         shipping.setMessengerId("messagerID");
-        shipping.setFee(11.4933);
+        shipping.setDeliveryFee(11.4933);
         shipping.setBuildingType(BuildingType.HOUSE);
         order.setShippingData(shipping);
         order.setDescription("081281445");

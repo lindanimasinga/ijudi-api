@@ -149,7 +149,7 @@ public record MessengerOrderEventHandler(FirebaseNotificationService pushNotific
         incentiveOrder.setBasket(basket);
         incentiveOrder.setOrderType(OrderType.INSTORE);
         incentiveOrder.setServiceFee(0.00);
-        incentiveOrder.getShippingData().setFee(0.00);
+        incentiveOrder.getShippingData().setDeliveryFee(0.00);
         incentiveOrder.setTip(promoCode.amount());
         orderRepository.save(incentiveOrder);
     }
@@ -181,7 +181,7 @@ public record MessengerOrderEventHandler(FirebaseNotificationService pushNotific
             var payout  = reconService.generatePayoutForMessengerAndOrder(order);
             if(payout != null && !payout.isPermEmployed()) {
                 var payoutTotal = payout.getTotal().setScale(2, RoundingMode.HALF_UP);
-                smsNotificationService.sendDriverOrderCompletedMessage(messenger.get(), order.getId(), BigDecimal.valueOf(order.getTotalAmount()), payoutTotal);
+                smsNotificationService.sendDriverOrderCompletedMessage(messenger.get(), order.getId(), BigDecimal.valueOf(order.getShippingData().getFee()), payoutTotal);
             }
         }
     }
