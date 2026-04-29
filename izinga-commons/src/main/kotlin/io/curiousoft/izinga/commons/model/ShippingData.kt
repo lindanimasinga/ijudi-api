@@ -1,10 +1,10 @@
 package io.curiousoft.izinga.commons.model
 
 import java.util.*
-import javax.validation.Valid
-import javax.validation.constraints.Future
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.NotNull
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Future
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 
 class ShippingData {
     var id: String? = null

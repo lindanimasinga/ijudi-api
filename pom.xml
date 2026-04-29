@@ -3,13 +3,13 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <modules>
+        <module>store-menu-to-izinga-menu</module>
+        <module>izinga-commons</module>
         <module>izinga-recon</module>
         <module>izinga-usermanagement</module>
         <module>izinga-ordermanager</module>
-        <module>izinga-commons</module>
         <module>izinga-messaging</module>
         <module>izinga-yoco-pay</module>
-        <module>store-menu-to-izinga-menu</module>
         <module>izinga-qrcode-generator</module>
         <module>izinga-documentmanagement</module>
     </modules>
@@ -17,7 +17,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.7.17</version>
+        <version>3.3.6</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
@@ -34,7 +34,7 @@
         <aws-lambda-events.version>2.0.2</aws-lambda-events.version>
         <aws-lambda-java-core.version>1.1.0</aws-lambda-java-core.version>
         <kotlin.version>2.0.0</kotlin.version>
-        <spring-cloud.version>2021.0.8</spring-cloud.version>
+        <spring-cloud.version>2023.0.3</spring-cloud.version>
     </properties>
 
     <dependencyManagement>
@@ -49,7 +49,7 @@
             <dependency>
                 <groupId>io.awspring.cloud</groupId>
                 <artifactId>spring-cloud-aws-dependencies</artifactId>
-                <version>2.4.4</version>
+                <version>3.1.1</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -70,11 +70,6 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-inline</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
@@ -85,8 +80,7 @@
         </dependency>
         <dependency>
             <groupId>io.awspring.cloud</groupId>
-            <artifactId>spring-cloud-starter-aws-secrets-manager-config</artifactId>
-            <version>2.4.4</version>
+            <artifactId>spring-cloud-aws-starter-secrets-manager</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -95,7 +89,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
-            <version>2.7.17</version>
         </dependency>
 
         <dependency>

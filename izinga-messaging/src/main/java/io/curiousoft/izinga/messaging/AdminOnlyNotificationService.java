@@ -6,7 +6,7 @@ import io.curiousoft.izinga.commons.model.StoreProfile;
 import io.curiousoft.izinga.commons.model.UserProfile;
 import org.jetbrains.annotations.Nullable;
 
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 import java.io.IOException;
 import java.math.BigDecimal;
 

@@ -1,6 +1,6 @@
 package io.curiousoft.izinga.ordermanagement.shoppinglist;
 
-import com.amazonaws.services.secretsmanager.model.ResourceNotFoundException;
+import java.util.NoSuchElementException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -32,21 +32,21 @@ public class ShoppingListService {
             var nextRunDate = item.generateNextRunDate();
             item.setNextRunDate(nextRunDate);
             return shoppingListRepository.save(item);
-        }).orElseThrow(() -> new ResourceNotFoundException("Shopping List not found with id %d".formatted(id)));
+        }).orElseThrow(() -> new NoSuchElementException("Shopping List not found with id %d".formatted(id)));
     }
 
     public ShoppingList addItemToShoppingList(String id, ShoppingItem item) {
         return shoppingListRepository.findById(id).map(list -> {
             list.getItems().add(item);
             return shoppingListRepository.save(list);
-        }).orElseThrow(() -> new ResourceNotFoundException("Shopping List not found with id " + id));
+        }).orElseThrow(() -> new NoSuchElementException("Shopping List not found with id " + id));
     }
 
     public ShoppingList removeItemFromShoppingList(String id, String itemName) {
         return shoppingListRepository.findById(id).map(list -> {
             list.getItems().removeIf(item -> item.getName().equalsIgnoreCase(itemName));
             return shoppingListRepository.save(list);
-        }).orElseThrow(() -> new ResourceNotFoundException("Shopping List not found with id " + id));
+        }).orElseThrow(() -> new NoSuchElementException("Shopping List not found with id " + id));
     }
 
     public List<ShoppingList> getAllShoppingLists(String userId) {
@@ -55,7 +55,7 @@ public class ShoppingListService {
 
     public ShoppingList getShoppingListById(String id) {
         return shoppingListRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Shopping List not found with id " + id));
+                .orElseThrow(() -> new NoSuchElementException("Shopping List not found with id " + id));
     }
 
     public void deleteShoppingList(String id) {

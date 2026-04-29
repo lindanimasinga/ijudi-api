@@ -14,9 +14,12 @@ import io.curiousoft.izinga.qrcodegenerator.promocodes.model.RedeemedCode
 import io.curiousoft.izinga.qrcodegenerator.promocodes.model.UserPromoDetails
 import io.curiousoft.izinga.qrcodegenerator.promocodes.repo.PromoCodeRepository
 import io.curiousoft.izinga.qrcodegenerator.promocodes.repo.RedeemedCodeRepository
-import org.joda.time.LocalDateTime
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.util.Date
 
 @Service
 class PromoCodeService(val promoCodeRepository: PromoCodeRepository,
@@ -81,7 +84,7 @@ class PromoCodeService(val promoCodeRepository: PromoCodeRepository,
 
         val orderCount = orderRepository.findByCustomerIdAndModifiedDateAfter(
             order.customerId!!,
-            LocalDateTime.now().toLocalDate().toDate()
+            Date.from(LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant())
         ).count { it.shopId == tipShopId }
 
         if (orderCount < promoCode.minimumOrderRequired) return Failure(Exception("error.previousOrderMustMeetRequirements"))
@@ -125,7 +128,7 @@ class PromoCodeService(val promoCodeRepository: PromoCodeRepository,
             redeemedCodeRepository.save(RedeemedCode(
                 code = userPromoDetails.promo,
                 userId = userPromoDetails.userId,
-                date = java.time.LocalDateTime.now()))
+                date = LocalDateTime.now()))
         }
     }
 }

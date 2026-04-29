@@ -6,9 +6,9 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.*
 import java.util.function.Consumer
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.NotEmpty
-import javax.validation.constraints.NotNull
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotEmpty
+import jakarta.validation.constraints.NotNull
 import kotlin.collections.HashSet
 
 class StoreProfile(

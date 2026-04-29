@@ -9,8 +9,8 @@ import io.curiousoft.izinga.commons.repo.ProfileRepo
 import org.springframework.beans.BeanUtils
 import org.springframework.context.ApplicationEventPublisher
 import java.util.*
-import javax.validation.Validation
-import javax.validation.Validator
+import jakarta.validation.Validation
+import jakarta.validation.Validator
 
 abstract class ProfileServiceImpl<E : ProfileRepo<U>, U : Profile>(protected val profileRepo: E,
                                                                      private val eventPublisher: ApplicationEventPublisher) : ProfileService<U> {

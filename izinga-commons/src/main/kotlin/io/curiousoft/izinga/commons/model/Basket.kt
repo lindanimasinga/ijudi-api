@@ -1,6 +1,6 @@
 package io.curiousoft.izinga.commons.model
 
-import javax.validation.constraints.NotEmpty
+import jakarta.validation.constraints.NotEmpty
 
 class Basket {
     var id: String? = null

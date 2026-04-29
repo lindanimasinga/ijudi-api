@@ -1,7 +1,7 @@
 package io.curiousoft.izinga.commons.model
 
-import javax.validation.constraints.DecimalMin
-import javax.validation.constraints.NotEmpty
+import jakarta.validation.constraints.DecimalMin
+import jakarta.validation.constraints.NotEmpty
 
 class StoreMessenger(
     var name: @NotEmpty(message = "Messenger name not valid") String?,

@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 
 import io.curiousoft.izinga.messaging.AdminOnlyNotificationService;
 
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;

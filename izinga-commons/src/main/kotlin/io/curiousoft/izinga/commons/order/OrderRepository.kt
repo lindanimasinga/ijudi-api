@@ -6,7 +6,7 @@ import io.curiousoft.izinga.commons.model.ShippingData
 import org.springframework.data.mongodb.repository.MongoRepository
 import java.time.LocalDate
 import java.util.*
-import javax.validation.constraints.NotNull
+import jakarta.validation.constraints.NotNull
 
 interface OrderRepository : MongoRepository<Order?, String?> {
     fun findByCustomerId(customerId: String?): Optional<List<Order?>?>?
