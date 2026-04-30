@@ -60,7 +60,7 @@ class ReconServiceImpl(
     }
 
     override fun generatePayoutForMessengerAndOrder(order: Order): MessengerPayout? {
-        val messng = userProfileRepo.findByIdOrNull(order.shippingData?.messengerId)
+        val messng = order.shippingData?.messengerId?.let { userProfileRepo.findByIdOrNull(it) }
         if (messng?.isPermanentEmployed == true && order.tip?.let { it <= 0 } == true) {
             return null
         }

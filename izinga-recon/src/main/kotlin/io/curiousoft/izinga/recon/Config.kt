@@ -8,9 +8,6 @@ import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.databind.ser.std.DateSerializer
 import com.fasterxml.jackson.databind.type.TypeFactory
 import com.fasterxml.jackson.databind.util.Converter
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import com.fasterxml.jackson.datatype.jsr310.ser.OffsetDateTimeSerializer
-import com.fasterxml.jackson.datatype.jsr310.ser.ZonedDateTimeSerializer
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean

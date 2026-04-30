@@ -17,7 +17,7 @@
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
-        <kotlin.version>2.0.0</kotlin.version>
+        <kotlin.version>2.2.21</kotlin.version>
         <surefire.plugin.version>2.22.2</surefire.plugin.version>
         <!-- JUnit 5 (Jupiter) version for unit testing -->
         <junit.jupiter.version>5.9.3</junit.jupiter.version>
