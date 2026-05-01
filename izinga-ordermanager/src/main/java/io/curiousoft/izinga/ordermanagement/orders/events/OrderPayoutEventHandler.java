@@ -6,6 +6,7 @@ import io.curiousoft.izinga.commons.payout.events.PayoutBalanceUpdatedEvent;
 import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.commons.model.DeviceType;
 import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
@@ -16,9 +17,12 @@ import java.util.Optional;
 
 @Slf4j
 @Service
-public record OrderPayoutEventHandler(OrderRepository orderRepository,
-                                      ApplicationEventPublisher eventPublisher,
-                                      ReconService reconService) {
+@RequiredArgsConstructor
+public class OrderPayoutEventHandler {
+
+    private final OrderRepository orderRepository;
+    private final ApplicationEventPublisher eventPublisher;
+    private final ReconService reconService;
 
     @EventListener
     public void handleNewOrderEvent(OrderPayoutEvent event) {

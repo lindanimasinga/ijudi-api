@@ -17,11 +17,25 @@ import java.io.IOException;
 import java.util.List;
 
 @Service
-public record CustomerOrderEventHandler(FirebaseNotificationService pushNotificationService,
-                                        EmailNotificationService emailNotificationService,
-                                        WhatsappNotificationService whatsappNotificationService,
-                                        DeviceService deviceService,
-                                        UserProfileService userProfileService) implements OrderEventHandler {
+public class CustomerOrderEventHandler implements OrderEventHandler {
+
+    private final FirebaseNotificationService pushNotificationService;
+    private final EmailNotificationService emailNotificationService;
+    private final WhatsappNotificationService whatsappNotificationService;
+    private final DeviceService deviceService;
+    private final UserProfileService userProfileService;
+
+    CustomerOrderEventHandler(FirebaseNotificationService pushNotificationService,
+                              EmailNotificationService emailNotificationService,
+                              WhatsappNotificationService whatsappNotificationService,
+                              DeviceService deviceService,
+                              UserProfileService userProfileService) {
+            this.pushNotificationService = pushNotificationService;
+            this.emailNotificationService = emailNotificationService;
+            this.whatsappNotificationService = whatsappNotificationService;
+            this.deviceService = deviceService;
+            this.userProfileService = userProfileService;
+    }
 
     @Async
     @EventListener

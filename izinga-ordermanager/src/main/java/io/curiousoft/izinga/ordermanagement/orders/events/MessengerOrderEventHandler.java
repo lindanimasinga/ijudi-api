@@ -14,6 +14,7 @@ import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
 import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
@@ -29,15 +30,18 @@ import java.util.Optional;
 
 @Slf4j
 @Service
-public record MessengerOrderEventHandler(FirebaseNotificationService pushNotificationService,
-                                         AdminOnlyNotificationService smsNotificationService,
-                                         EmailNotificationService emailNotificationService,
-                                         DeviceService deviceService,
-                                         UserProfileService userProfileService,
-                                         ApplicationEventPublisher eventPublisher,
-                                         ReconService reconService,
-                                         PromoCodeClient promoCodeClient,
-                                         OrderRepository orderRepository) implements OrderEventHandler {
+@RequiredArgsConstructor
+public class MessengerOrderEventHandler implements OrderEventHandler {
+
+    private final FirebaseNotificationService pushNotificationService;
+    private final AdminOnlyNotificationService smsNotificationService;
+    private final EmailNotificationService emailNotificationService;
+    private final DeviceService deviceService;
+    private final UserProfileService userProfileService;
+    private final ApplicationEventPublisher eventPublisher;
+    private final ReconService reconService;
+    private final PromoCodeClient promoCodeClient;
+    private final OrderRepository orderRepository;
 
     @Async
     @EventListener

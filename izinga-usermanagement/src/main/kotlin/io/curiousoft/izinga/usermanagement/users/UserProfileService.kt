@@ -4,6 +4,7 @@ import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.StoreType
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
+import org.springframework.ai.tool.annotation.Tool
 import org.springframework.stereotype.Service
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.beans.factory.annotation.Autowired
@@ -12,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired
 class UserProfileService @Autowired constructor(userProfileRepo: UserProfileRepo, eventPublisher: ApplicationEventPublisher)
     : ProfileServiceImpl<UserProfileRepo, UserProfile>(userProfileRepo, eventPublisher) {
 
+     @Tool(name = "find_user_by_phone", description = "Finds a user profile by phone number. It will try to find the userby adding different country code prefixes to the phone number provided.")
     fun findUserByPhone(phone: String): UserProfile? {
         val last9Digits = phone.substring(phone.length - 9)
         return listOf("0", "+27", "27")
@@ -28,6 +30,7 @@ class UserProfileService @Autowired constructor(userProfileRepo: UserProfileRepo
         )
     }
 
+    @Tool(name = "create_user", description = "Creates a new user profile. It can be a normal customer or a driver or a store owner depending on the role specified in the profile object.")
     @Throws(Exception::class)
     override fun create(profile: UserProfile): UserProfile {
         //remove empty spaces and dashes from the mobile number
