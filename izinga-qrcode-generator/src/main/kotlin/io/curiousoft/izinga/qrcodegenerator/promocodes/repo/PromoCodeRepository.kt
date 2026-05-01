@@ -5,7 +5,7 @@ import io.curiousoft.izinga.qrcodegenerator.promocodes.model.PromoType
 import java.time.LocalDateTime
 import org.springframework.data.mongodb.repository.MongoRepository
 
-interface PromoCodeRepository : MongoRepository<PromoCode, String> {
+interface PromoCodeRepository : MongoRepository<PromoCode, String?> {
     fun findByCode(promoCode: String): PromoCode?
     fun findByExpiryDateAfter(now: LocalDateTime): List<PromoCode>
     fun findByExpiryDateAfterAndType(dateTime: LocalDateTime, type: PromoType): List<PromoCode>

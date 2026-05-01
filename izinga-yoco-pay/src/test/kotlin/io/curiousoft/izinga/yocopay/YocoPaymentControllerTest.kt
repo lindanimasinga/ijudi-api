@@ -53,7 +53,7 @@ class YocoPaymentControllerTest {
         val httpResponse = sut.verifyPaymentSuccess(successEvent = yocoEvent, yocoHash = "8AvKYTPMYVtjgiXM7KmaPMQLM+pVfmUOEVl6SalovSs=")
 
         //verify
-        Assertions.assertEquals(200, httpResponse.statusCode.value())
+        Assertions.assertEquals(200, httpResponse.statusCodeValue)
         Assertions.assertEquals("new order description:yoco-8AvKYTPMYVtjgiXM7KmaPMQLM+pVfmUOEVl6SalovSs=:", newOrder.description)
 
         verify {
@@ -75,7 +75,7 @@ class YocoPaymentControllerTest {
         val httpResponse = sut.initiatePayment(paymentRequest)
 
         //verify
-        Assertions.assertEquals(200, httpResponse.statusCode.value())
+        Assertions.assertEquals(200, httpResponse.statusCodeValue)
         Assertions.assertEquals("https:/yoco.redirect", (httpResponse.body as YocoPaymentInitiateResponse).redirectUrl)
         verify {
             yocoPaymentClient.checkout(paymentRequest)

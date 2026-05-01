@@ -54,7 +54,7 @@ class UserController(private val profileService: UserProfileService) {
         @RequestParam(required = false) latitude: Double,
         @RequestParam(required = false) longitude: Double,
         @RequestParam(required = false) range: Double,
-        @RequestParam(required = false, defaultValue = "FOOD") storeType: StoreType = StoreType.FOOD) : ResponseEntity<List<UserProfile>> {
+        @RequestParam(required = false, defaultValue = "FOOD") storeType: StoreType = StoreType.FOOD) : ResponseEntity<List<UserProfile?>?> {
         logger.info("Find users request role={} latitude={} longitude={} range={}", role, latitude, longitude, range)
         val users = if (role != null) profileService.findByLocation(
             role,
@@ -63,7 +63,7 @@ class UserController(private val profileService: UserProfileService) {
             range,
             storeType) else profileService.findAll()
         logger.info("Returning {} users", users?.size)
-        return ResponseEntity.ok(users?.filter { user -> includePendingUsers || (user.profileApproved && user.termsAccepted == true) } ?: emptyList())
+        return ResponseEntity.ok(users?.filter { user -> includePendingUsers || (user.profileApproved && user.termsAccepted == true) })
     }
 
     @GetMapping(value = ["/pending-approvals"], produces = ["application/json"])

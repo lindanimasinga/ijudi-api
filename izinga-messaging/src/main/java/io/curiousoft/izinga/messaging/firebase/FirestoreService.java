@@ -59,7 +59,7 @@ public class FirestoreService {
         try {
             ResponseEntity<String> resp = restTemplate.postForEntity(url, request, String.class);
             if (!resp.getStatusCode().is2xxSuccessful()) {
-                throw new RestClientException("Firestore responded with status " + resp.getStatusCode().value() + ": " + resp.getBody());
+                throw new RestClientException("Firestore responded with status " + resp.getStatusCodeValue() + ": " + resp.getBody());
             }
             // response contains 'name' like: projects/{project}/databases/(default)/documents/izinga/{docId}
             ObjectNode node = (ObjectNode) mapper.readTree(resp.getBody());
@@ -105,7 +105,7 @@ public class FirestoreService {
 
         ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
         if (!resp.getStatusCode().is2xxSuccessful()) {
-            throw new RestClientException("Firestore responded with status " + resp.getStatusCode().value());
+            throw new RestClientException("Firestore responded with status " + resp.getStatusCodeValue());
         }
         ObjectNode node = (ObjectNode) mapper.readTree(resp.getBody());
         if (!node.has("fields")) return Collections.emptyMap();
@@ -145,7 +145,7 @@ public class FirestoreService {
 
         ResponseEntity<String> resp = restTemplate.postForEntity(url, request, String.class);
         if (!resp.getStatusCode().is2xxSuccessful()) {
-            throw new RestClientException("Firestore responded with status " + resp.getStatusCode().value());
+            throw new RestClientException("Firestore responded with status " + resp.getStatusCodeValue());
         }
 
         var root = mapper.readTree(resp.getBody());
@@ -221,7 +221,7 @@ public class FirestoreService {
 
         ResponseEntity<String> resp = restTemplate.postForEntity(url, request, String.class);
         if (!resp.getStatusCode().is2xxSuccessful()) {
-            throw new RestClientException("Firestore responded with status " + resp.getStatusCode().value() + ": " + resp.getBody());
+            throw new RestClientException("Firestore responded with status " + resp.getStatusCodeValue() + ": " + resp.getBody());
         }
         ObjectNode node = (ObjectNode) mapper.readTree(resp.getBody());
         String name = node.has("name") ? node.get("name").asText() : null;
@@ -266,7 +266,7 @@ public class FirestoreService {
 
         ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
         if (!resp.getStatusCode().is2xxSuccessful()) {
-            throw new RestClientException("Firestore responded with status " + resp.getStatusCode().value());
+            throw new RestClientException("Firestore responded with status " + resp.getStatusCodeValue());
         }
 
         var root = mapper.readTree(resp.getBody());
@@ -337,7 +337,7 @@ public class FirestoreService {
 
         ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
         if (!resp.getStatusCode().is2xxSuccessful()) {
-            throw new RestClientException("Firestore responded with status " + resp.getStatusCode().value());
+            throw new RestClientException("Firestore responded with status " + resp.getStatusCodeValue());
         }
         ObjectNode node = (ObjectNode) mapper.readTree(resp.getBody());
         if (!node.has("fields")) return null;

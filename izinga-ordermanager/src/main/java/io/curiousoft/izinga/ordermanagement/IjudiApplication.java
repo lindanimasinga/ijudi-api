@@ -2,6 +2,7 @@ package io.curiousoft.izinga.ordermanagement;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.openfeign.EnableFeignClients;
@@ -19,6 +20,14 @@ import java.util.TimeZone;
 @EnableScheduling
 @EnableAsync
 @SpringBootApplication(scanBasePackages = {"io.curiousoft.izinga.ordermanagement",
+		"io.curiousoft.izinga.commons",
+		"io.curiousoft.izinga.recon",
+		"io.curiousoft.izinga.messaging",
+		"io.curiousoft.izinga.yocopay",
+		"io.curiousoft.izinga.usermanagement",
+		"io.curiousoft.izinga.qrcodegenerator",
+		"io.curiousoft.izinga.documentmanagement"})
+@EntityScan({"io.curiousoft.izinga.ordermanagement",
 		"io.curiousoft.izinga.commons",
 		"io.curiousoft.izinga.recon",
 		"io.curiousoft.izinga.messaging",

@@ -8,7 +8,7 @@ import java.time.LocalDate
 import java.util.*
 import jakarta.validation.constraints.NotNull
 
-interface OrderRepository : MongoRepository<Order, String> {
+interface OrderRepository : MongoRepository<Order?, String?> {
     fun findByCustomerId(customerId: String?): Optional<List<Order?>?>?
     fun findByShopId(id: String?): List<Order?>?
     fun findByShopIdAndStageNot(id: String?, stage: OrderStage?): List<Order?>?
