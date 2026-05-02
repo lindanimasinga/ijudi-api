@@ -6,14 +6,15 @@ import io.curiousoft.izinga.commons.profile.events.ProfileCreatedEvent
 import io.curiousoft.izinga.commons.profile.events.ProfileDeletedEvent
 import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent
 import io.curiousoft.izinga.commons.repo.ProfileRepo
-import org.springframework.beans.BeanUtils
-import org.springframework.context.ApplicationEventPublisher
-import java.util.*
+import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import jakarta.validation.Validation
 import jakarta.validation.Validator
+import org.springframework.beans.BeanUtils
+import org.springframework.context.ApplicationEventPublisher
+import java.util.UUID
 
 abstract class ProfileServiceImpl<E : ProfileRepo<U>, U : Profile>(protected val profileRepo: E,
-                                                                     private val eventPublisher: ApplicationEventPublisher) : ProfileService<U> {
+                                                                   private val eventPublisher: ApplicationEventPublisher) : ProfileService<U> {
 
     private val validator: Validator
 

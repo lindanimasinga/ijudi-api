@@ -7,11 +7,9 @@ import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import org.springframework.ai.tool.annotation.Tool
 import org.springframework.stereotype.Service
 import org.springframework.context.ApplicationEventPublisher
-import org.springframework.beans.factory.annotation.Autowired
 
 @Service
-class UserProfileService @Autowired constructor(userProfileRepo: UserProfileRepo, eventPublisher: ApplicationEventPublisher)
-    : ProfileServiceImpl<UserProfileRepo, UserProfile>(userProfileRepo, eventPublisher) {
+class UserProfileService(val userProfileRepo: UserProfileRepo, val eventPublisher: ApplicationEventPublisher) : ProfileServiceImpl<UserProfileRepo, UserProfile>(userProfileRepo, eventPublisher) {
 
      @Tool(name = "find_user_by_phone", description = "Finds a user profile by phone number. It will try to find the userby adding different country code prefixes to the phone number provided.")
     fun findUserByPhone(phone: String): UserProfile? {

@@ -71,6 +71,12 @@
             <artifactId>store-menu-to-izinga-menu</artifactId>
             <version>1.0.3</version>
             <scope>compile</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-databind</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>io.curiousoft.izinga</groupId>

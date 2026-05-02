@@ -49,14 +49,14 @@ class PromoCodeService(val promoCodeRepository: PromoCodeRepository,
             return Failure(Exception("error.maxRedemptionReached"))
         }
 
-        val order = orderRepository.findByIdOrNull(orderId) ?: return Failure(Exception("error.orderNotFound"))
+        val order = orderRepository.findById(orderId) ?: return Failure(Exception("error.orderNotFound"))
 
         return userProfileRepo.findByIdOrNull(userId)?.let {
             val codeType = promoCode.type
             when (codeType) {
-                PromoType.DISCOUNT -> userPromoDetailsForAll(it, promoCode, order)
-                PromoType.CASH -> userPromoForTips(it, promoCode, order)
-                PromoType.SIGNUP -> userPromoDetailsForNewUser(it, promoCode, order)
+                PromoType.DISCOUNT -> userPromoDetailsForAll(it, promoCode, order.get())
+                PromoType.CASH -> userPromoForTips(it, promoCode, order.get())
+                PromoType.SIGNUP -> userPromoDetailsForNewUser(it, promoCode, order.get())
             }
         } ?: Failure(Exception("error.userNotFound"))
     }
