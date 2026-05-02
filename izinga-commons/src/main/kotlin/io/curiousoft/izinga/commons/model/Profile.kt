@@ -3,8 +3,8 @@ package io.curiousoft.izinga.commons.model
 import com.fasterxml.jackson.annotation.JsonIgnore
 import io.curiousoft.izinga.commons.validator.ValidMobileNumber
 import org.springframework.data.mongodb.core.index.Indexed
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.NotNull
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 
 open class Profile(
     var name: @NotBlank(message = "profile name not valid") String?,

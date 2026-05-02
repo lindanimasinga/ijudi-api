@@ -2,7 +2,7 @@ package io.curiousoft.izinga.recon.bank
 
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import javax.annotation.PostConstruct
+import jakarta.annotation.PostConstruct
 
 @Service
 class BankConfigService(private val bankConfigRepository: BankConfigRepository) {

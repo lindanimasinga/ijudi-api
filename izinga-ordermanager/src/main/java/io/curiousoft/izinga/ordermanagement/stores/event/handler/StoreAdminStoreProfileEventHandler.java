@@ -12,18 +12,26 @@ import io.curiousoft.izinga.ordermanagement.stores.event.StoreCreatedEvent;
 import io.curiousoft.izinga.ordermanagement.stores.event.StoreDeletedEvent;
 import io.curiousoft.izinga.ordermanagement.stores.event.StoreUpdatedEvent;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 
-public record StoreAdminStoreProfileEventHandler(FirebaseNotificationService pushNotificationService,
-                                                 AdminOnlyNotificationService adminOnlyNotificationService,
-                                                 EmailNotificationService emailNotificationService,
-                                                 DeviceService deviceService,
-                                                 UserProfileService userProfileService,
-                                                 @Value("${admin.cellNumber}") List<String> adminCellNumbers) implements StoreProfileEventHandler {
+@Service
+@RequiredArgsConstructor
+public class StoreAdminStoreProfileEventHandler implements StoreProfileEventHandler {
+
+    private final FirebaseNotificationService pushNotificationService;
+    private final AdminOnlyNotificationService adminOnlyNotificationService;
+    private final EmailNotificationService emailNotificationService;
+    private final DeviceService deviceService;
+    private final UserProfileService userProfileService;
+
+    @Value("${admin.cellNumber}")
+    private List<String> adminCellNumbers;
 
     @EventListener
     @Override

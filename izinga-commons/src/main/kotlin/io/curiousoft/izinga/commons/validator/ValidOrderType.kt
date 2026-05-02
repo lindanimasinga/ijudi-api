@@ -1,7 +1,7 @@
 package io.curiousoft.izinga.commons.validator
 
 import java.lang.annotation.Documented
-import javax.validation.*
+import jakarta.validation.*
 import kotlin.reflect.KClass
 
 @Target(AnnotationTarget.FIELD, AnnotationTarget.ANNOTATION_CLASS, AnnotationTarget.CLASS)

@@ -2,7 +2,7 @@ package io.curiousoft.izinga.commons.model
 
 import org.springframework.data.mongodb.core.index.Indexed
 import java.util.*
-import javax.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotBlank
 
 class Device : BaseModel {
     @Indexed(unique = true)

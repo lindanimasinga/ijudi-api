@@ -80,6 +80,15 @@ spring:
             time: HH:mm:ss
     jackson:
         date-format: yyyy-MM-dd HH:mm:ss
+    ai:
+        mcp:
+            server:
+                name: izinga-mcp-server
+                version: 1.0.0
+                instructions: "Izinga marketplace API. Use the available tools to look up users and stores, create orders, and manage deliveries."
+                type: sync
+                sse-endpoint: /sse
+                sse-message-endpoint: /mcp/message
 ukheshe:
     apiUrl: https://ukheshe-sandbox.jini.rocks/ukheshe-conductor/rest/v1
     customerId: 534

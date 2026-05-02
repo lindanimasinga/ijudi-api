@@ -6,9 +6,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.context.properties.ConstructorBinding;
 
-@ConstructorBinding
 @ConfigurationProperties(prefix = "google.firebase-messaging.secrets")
 public record FirebaseAuthConfig(
     @JsonProperty("type")

@@ -7,7 +7,9 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.firewall.HttpFirewall;
 import org.springframework.security.web.firewall.StrictHttpFirewall;
@@ -27,39 +29,17 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http.cors().and().csrf().disable()
-                .authorizeHttpRequests()
-                .regexMatchers(GET, "(.*\\/v2\\/promotion.*) ", "(.*\\/v2\\/store.*)").permitAll()
-                .regexMatchers("^/v2/.*").authenticated()
-                .anyRequest().permitAll()
-                .and()
-                //.addFilterBefore(doubleSlashSanitizingFilter, DoubleSlashSanitizingFilter.class)
-                .oauth2ResourceServer().jwt();
-                //.addFilterAfter(apiVersionRewriteFilter, SecurityFilterChain.class);
+        http.cors(Customizer.withDefaults())
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/sse", "/mcp/message", "/mcp/**").permitAll()
+                        .requestMatchers(GET, "/v2/promotion/**", "/v2/store/**").permitAll()
+                        .requestMatchers("/v2/**").authenticated()
+                        .anyRequest().permitAll()
+                )
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
         return http.build();
     }
-
-/*    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(
-                "https://pingembo-barcode-scanner-app.web.app",
-                "https://login-474a9.web.app/",
-                "https://api.izinga.co.za",
-                "https://pay.izinga.co.za",
-                "https://shop.izinga.co.za",
-                "https://izinga.store",
-                "https://admin.izinga.co.za",
-                "https://onboard.izinga.co.za",
-                "http://localhost:4200"
-        ));
-        configuration.setAllowedMethods(List.of("*"));
-        configuration.setAllowedHeaders(List.of("*"));
-        configuration.setAllowCredentials(true);
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
-    }*/
 
     @Bean
     public WebMvcConfigurer corsConfigurer() {
@@ -80,15 +60,6 @@ public class SecurityConfig {
         firewall.setAllowUrlEncodedDoubleSlash(true);
         return firewall;
     }
-
-/*    @Bean
-    static RoleHierarchy roleHierarchy() {
-        return new RoleHierarchyImpl.builder()
-                .role("ADMIN").implies("STAFF")
-                .role("STAFF").implies("USER")
-                .role("USER").implies("GUEST")
-                .build();
-    }*/
 
     @Configuration
     public class OpenApiConfig {

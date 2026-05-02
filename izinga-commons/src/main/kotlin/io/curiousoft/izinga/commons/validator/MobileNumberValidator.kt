@@ -1,7 +1,7 @@
 package io.curiousoft.izinga.commons.validator
 
-import javax.validation.ConstraintValidator
-import javax.validation.ConstraintValidatorContext
+import jakarta.validation.ConstraintValidator
+import jakarta.validation.ConstraintValidatorContext
 
 class MobileNumberValidator : ConstraintValidator<ValidMobileNumber?, String> {
     override fun isValid(value: String, context: ConstraintValidatorContext): Boolean {

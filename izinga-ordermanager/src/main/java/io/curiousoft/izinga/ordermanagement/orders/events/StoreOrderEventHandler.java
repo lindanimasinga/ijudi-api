@@ -12,6 +12,7 @@ import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
 import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -21,12 +22,15 @@ import java.util.List;
 
 @Slf4j
 @Service
-public record StoreOrderEventHandler(FirebaseNotificationService pushNotificationService,
-                                     AdminOnlyNotificationService adminOnlyNotificationService,
-                                     EmailNotificationService emailNotificationService,
-                                     DeviceService deviceService,
-                                     UserProfileService userProfileService,
-                                     ReconService reconService) implements OrderEventHandler {
+@RequiredArgsConstructor
+public class StoreOrderEventHandler implements OrderEventHandler {
+
+    private final FirebaseNotificationService pushNotificationService;
+    private final AdminOnlyNotificationService adminOnlyNotificationService;
+    private final EmailNotificationService emailNotificationService;
+    private final DeviceService deviceService;
+    private final UserProfileService userProfileService;
+    private final ReconService reconService;
 
     @Async
     @Override
