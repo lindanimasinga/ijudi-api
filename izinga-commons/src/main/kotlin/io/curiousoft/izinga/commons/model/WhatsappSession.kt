@@ -15,9 +15,8 @@ class WhatsappSession: BaseModel {
 
     constructor()
 
-    constructor(from: String, lastMessageDate: Instant) {
+    constructor(from: String) {
         this.from = from
-        this.lastMessageDate = lastMessageDate
     }
 }
 

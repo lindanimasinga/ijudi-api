@@ -130,7 +130,7 @@ public class WhatsappInboundEventHandler {
     private WhatsappSession upsertSession(String from) {
         var opt = whatsappSessionRepo.findByFrom(from);
         var now = Instant.now();
-        var session = new WhatsappSession(from, now);
+        var session = new WhatsappSession(from);
         if (opt.isPresent()) {
             session = opt.get();
         }
