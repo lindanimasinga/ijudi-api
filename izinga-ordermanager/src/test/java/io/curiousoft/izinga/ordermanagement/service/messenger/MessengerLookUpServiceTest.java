@@ -108,5 +108,20 @@ public class MessengerLookUpServiceTest {
             // then
             assertEquals(1, result.size());
         }
+
+        @Test
+        void testFindNearbyMessengers_NullDescription_DoesNotThrowNPE() {
+            // given - messenger with null description should be excluded without NPE
+            messenger.setDescription(null);
+            when(userProfileRepo.findByRoleAndLatitudeBetweenAndLongitudeBetween(
+                    eq(ProfileRoles.MESSENGER), anyDouble(), anyDouble(), anyDouble(), anyDouble()))
+                    .thenReturn(List.of(messenger));
+
+            // when
+            List<UserProfile> result = sut.findNearbyMessengers(lat, lon, radius, order);
+
+            // then - messenger excluded due to null description, but no NPE thrown
+            assertEquals(0, result.size());
+        }
     }
 }
