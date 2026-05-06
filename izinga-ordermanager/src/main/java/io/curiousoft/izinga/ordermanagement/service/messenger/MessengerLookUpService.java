@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.ordermanagement.service.messenger;
 
+import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.model.ProfileAvailabilityStatus;
 import io.curiousoft.izinga.commons.model.ProfileRoles;
 import io.curiousoft.izinga.commons.model.UserProfile;
@@ -23,7 +24,7 @@ public class MessengerLookUpService {
         this.userProfileRepo = userProfileRepo;
     }
 
-    public List<UserProfile> findNearbyMessengers(double fromLat, double fromLong, double radiusKm) {
+    public List<UserProfile> findNearbyMessengers(double fromLat, double fromLong, double radiusKm, Order order) {
         try {
             // Step 1: Calculate bounding box for radius and query messengers within it
             double latDelta = radiusKm / 111.0;
@@ -56,6 +57,8 @@ public class MessengerLookUpService {
                     .filter(this::isProfileApproved)
                     // Step 4: availabilityStatus must be ONLINE or AWAY
                     .filter(this::isAvailable)
+                    // step 5: load capacity check - only include if load is below threshold (e.g., 0.8)
+                    .filter(messenger -> canCarryLoad(messenger, order))
                     .collect(Collectors.toList());
 
             if (eligibleMessengers.isEmpty()) {
@@ -75,6 +78,24 @@ public class MessengerLookUpService {
             LOG.error("Error finding nearby messengers for lat={}, lon={}, radius={}", fromLat, fromLong, radiusKm, e);
             return List.of();
         }
+    }
+
+    private boolean canCarryLoad(UserProfile messenger, Order order) {
+        if (order == null || order.getShippingData() == null) {
+            LOG.trace("Order or shipping data is null, cannot evaluate load capacity");
+            return false;
+        }
+
+        var vehicle = messenger.getVehicle();
+        var canCarryLoad = vehicle.getLoadCapacity() != null &&  vehicle.getLoadCapacity() >= order.getTotalWeight();
+        List<String> loadCategory = order.getShippingData().getCategory();
+
+        if (loadCategory == null || loadCategory.isEmpty()) {
+            LOG.trace("Load category is null or empty");
+            return false;
+        }
+
+        return loadCategory.contains(messenger.getDescription()) && canCarryLoad;
     }
 
     private boolean hasAcceptedTerms(UserProfile messenger) {

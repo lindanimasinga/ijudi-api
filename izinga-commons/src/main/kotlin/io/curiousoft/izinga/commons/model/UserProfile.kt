@@ -28,7 +28,18 @@ class UserProfile(
     enum class SignUpReason {
         DELIVERY_DRIVER, SELL, BUY, LICENSING
     }
+
+    val vehicle: Vehicle
+        get() = Vehicle().apply {
+            this.vehicleMake = tag["vehicleMake"]
+            this.vehicleModel = tag["vehicleModel"]
+            this.loadCapacity = (tag["loadCapacity"] ?: tag["cargoCapacity"])?.toDoubleOrNull()
+            this.ownerId = tag["ownerId"]
+            this.driverId = id
+            this.vehicleRegistration = tag["vehicleRegistration"]
+    }
 }
+
 
 class CriminalCheckData {
     var criminalRecordCheckAccepted: Boolean? = null

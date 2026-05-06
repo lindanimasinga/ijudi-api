@@ -46,13 +46,14 @@ public class OrderQuoteCreatedEventHandler {
             // Find messengers near the store location
             var lat = order.getShippingData().getShippingDataGeoData().getFromGeoPoint().getLatitude();
             var lng = order.getShippingData().getShippingDataGeoData().getFromGeoPoint().getLongitude();
-            List<UserProfile> nearbyMessengers = messengerLookUpService.findNearbyMessengers(lat, lng, SEARCH_RADIUS_KM);
+
+            List<UserProfile> nearbyMessengers = messengerLookUpService.findNearbyMessengers(lat, lng, SEARCH_RADIUS_KM, order);
             if(nearbyMessengers.isEmpty()) {
                 LOG.info("No nearby messengers found for order quote {} at lat {}, long {}", order.getId(), lat, lng);
                 LOG.info("Considering messengers from the drop off Location");
                 lat = order.getShippingData().getShippingDataGeoData().getToGeoPoint().getLatitude();
                 lng = order.getShippingData().getShippingDataGeoData().getToGeoPoint().getLongitude();
-                nearbyMessengers = messengerLookUpService.findNearbyMessengers(lat, lng, SEARCH_RADIUS_KM);
+                nearbyMessengers = messengerLookUpService.findNearbyMessengers(lat, lng, SEARCH_RADIUS_KM, order);
             }
 
             LOG.info("Found {} nearby messengers for order quote {} lat {}, long {} radius {}km",
