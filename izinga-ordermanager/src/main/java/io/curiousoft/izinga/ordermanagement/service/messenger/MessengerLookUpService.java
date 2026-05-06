@@ -95,7 +95,7 @@ public class MessengerLookUpService {
             return false;
         }
 
-        return loadCategory.contains(messenger.getDescription()) && canCarryLoad;
+        return messenger.getDescription() != null && loadCategory.contains(messenger.getDescription()) && canCarryLoad;
     }
 
     private boolean hasAcceptedTerms(UserProfile messenger) {
