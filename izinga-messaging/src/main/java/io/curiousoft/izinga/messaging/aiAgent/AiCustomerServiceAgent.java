@@ -91,9 +91,14 @@ public class AiCustomerServiceAgent {
             // Add user message to history
             conversationHistoryService.addUserMessage(conversation, userText);
 
+            var systemPromptWithContext = systemPrompt + " The driver's name is " + conversation.getDriverName() +
+                    ".Their phone number is " + conversation.getDriverPhoneNumber() + ". Use this information to assist with their queries. " +
+                            "Do not share information with anyone else and do not use a different phone number for responses. This is a security " +
+                            "measure to ensure you are assisting the correct driver and not sharing information with the wrong people.";
+
             // Build messages list: system prompt + context messages + current user message
             List<Map<String, Object>> messagesList = new ArrayList<>();
-            messagesList.add(Map.of("role", "system", "content", systemPrompt));
+            messagesList.add(Map.of("role", "system", "content", systemPromptWithContext));
 
             // Add conversation context (last N messages)
             var contextMessages = conversationHistoryService.getContextMessages(conversation);

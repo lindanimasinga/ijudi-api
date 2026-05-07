@@ -53,7 +53,6 @@ public class ConversationHistoryService {
             .lastAccessedAt(Instant.now())
             .archived(false)
             .build();
-
         return repository.save(history);
     }
 
