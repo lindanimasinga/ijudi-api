@@ -116,7 +116,7 @@ public class AiAgentConfigService {
     public List<McpServerConfig> getMcpToolsForAgent() {
         // For simplicity, returning hardcoded tools. In a real implementation, this could be loaded from the database as well.
         return List.of(
-                new McpServerConfig("mcp", "order-and-user-management-api", "API for managing orders and users", "https://api.izinga.com/mcp", "never")
+                new McpServerConfig("mcp", "order-and-user-management-api", "API for managing orders and users", "https://api.izinga.co.za/mcp", "never")
         );
     }
 }
