@@ -60,5 +60,10 @@ public class AiAgentConfig {
      * Version number for tracking changes
      */
     private Integer version = 1;
+
+    /**
+     * Whether the agent is allowed to use mcp tools (e.g., external APIs)
+     */
+    private boolean useTools = true;
 }
 

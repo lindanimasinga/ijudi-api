@@ -18,7 +18,7 @@ public class AiCustomerServiceAgent {
 
     private static final Logger LOG = LoggerFactory.getLogger(AiCustomerServiceAgent.class);
 
-    private static final String OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
+    private static final String OPENAI_CHAT_URL = "https://api.openai.com/v1/responses";
     private static final String AGENT_NAME = "driver_support";
 
     private final boolean enabled;
@@ -105,12 +105,16 @@ public class AiCustomerServiceAgent {
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setBearerAuth(openAiApiKey);
 
-            Map<String, Object> requestBody = Map.of(
+            var mcpServerToolsForAgent = agentConfigService.getMcpToolsForAgent();
+            Map<String, Object> requestBody = new HashMap<>(Map.of(
                     "model", model,
-                    "messages", messagesList,
-                    "max_tokens", 500,
-                    "temperature", 0.4
-            );
+                    "input", messagesList
+            ));
+
+            var agent = agentConfigService.getActiveAgentConfig(AGENT_NAME);
+            if (agent.isUseTools()) {
+                requestBody.put("tools", mcpServerToolsForAgent);
+            }
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
             ResponseEntity<Map> response = restTemplate.postForEntity(OPENAI_CHAT_URL, entity, Map.class);
@@ -146,14 +150,29 @@ public class AiCustomerServiceAgent {
     @SuppressWarnings("unchecked")
     private String extractReply(Map<?, ?> responseBody) {
         try {
-            var choices = (List<Map<String, Object>>) responseBody.get("choices");
-            if (choices == null || choices.isEmpty()) return null;
-            var messageMap = (Map<String, Object>) choices.get(0).get("message");
-            if (messageMap == null) return null;
-            return (String) messageMap.get("content");
+            var output = (List<Map<String, Object>>) responseBody.get("output");
+            if (output == null || output.isEmpty()) return null;
+            // Find the message object in the output array
+            Map<String, Object> messageObj = null;
+            for (Map<String, Object> item : output) {
+                if ("message".equals(item.get("type"))) {
+                    messageObj = item;
+                    break;
+                }
+            }
+            if (messageObj == null) return null;
+            var content = (List<Map<String, Object>>) messageObj.get("content");
+            if (content == null || content.isEmpty()) return null;
+            // Extract text from the first content item
+            for (Map<String, Object> contentItem : content) {
+                if ("output_text".equals(contentItem.get("type"))) {
+                    return (String) contentItem.get("text");
+                }
+            }
         } catch (Exception e) {
             LOG.error("Failed to extract AI reply from response body", e);
-            return null;
         }
+        return null;
     }
+
 }

@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -33,6 +34,18 @@ public class AiAgentConfigService {
         if (config.isPresent()) {
             LOG.info("Loaded system prompt for agent: {}", agentName);
             return config.get().getSystemPrompt();
+        } else {
+            LOG.warn("No active agent config found for: {}", agentName);
+            return null;
+        }
+    }
+
+    public AiAgentConfig getActiveAgentConfig(String agentName) {
+        Optional<AiAgentConfig> config = repository.findByAgentNameAndActiveTrue(agentName);
+
+        if (config.isPresent()) {
+            LOG.info("Loaded active agent config for: {}", agentName);
+            return config.get();
         } else {
             LOG.warn("No active agent config found for: {}", agentName);
             return null;
@@ -98,6 +111,13 @@ public class AiAgentConfigService {
             repository.save(config.get());
             LOG.info("Activated agent config: {}", agentName);
         }
+    }
+
+    public List<McpServerConfig> getMcpToolsForAgent() {
+        // For simplicity, returning hardcoded tools. In a real implementation, this could be loaded from the database as well.
+        return List.of(
+                new McpServerConfig("mcp", "order-and-user-management-api", "API for managing orders and users", "https://api.izinga.com/mcp", "never")
+        );
     }
 }
 

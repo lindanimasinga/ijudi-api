@@ -16,6 +16,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -316,6 +318,7 @@ public class OrderServiceImpl implements OrderService {
         return orderCompleted;
     }
 
+    @Tool(name = "Find order by id", description = "Find order by id and return the order details")
     @Override
     public Order findOrder(String orderId) {
         return orderRepo.findById(orderId).orElse(null);
@@ -355,11 +358,13 @@ public class OrderServiceImpl implements OrderService {
                 }).orElseThrow();
     }
 
+    @Tool(name = "Find orders by user id", description = "Find orders by user id and return the order details")
     @Override
     public List<Order> findOrderByUserId(String userId) {
         return orderRepo.findByCustomerId(userId).orElse(new ArrayList<>());
     }
 
+    @Tool(name = "Find orders by phone number", description = "Find orders by phone number and return the order details")
     @Override
     public List<Order> findOrderByPhone(String phone) {
         String last9Digits = phone.substring(phone.length() - 9);
@@ -379,8 +384,9 @@ public class OrderServiceImpl implements OrderService {
         return orderRepo.findByShopIdAndStageNot(store.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
     }
 
+    @Tool(name = "Find orders by messenger id", description = "Find orders by messenger id and return the order details")
     @Override
-    public List<Order> findOrderByMessengerId(String id, boolean allStages) {
+    public List<Order> findOrderByMessengerId(String id, @ToolParam(required = false) boolean allStages) {
         return allStages ? orderRepo.findByShippingDataMessengerId(id) : orderRepo.findByShippingDataMessengerIdAndStageNot(id, OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
     }
 
