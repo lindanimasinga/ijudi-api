@@ -30,6 +30,7 @@ class ShippingData {
     var weigthFee: Double = 0.0
     var volumeFee: Double = 0.0
     var labourFee: Double = 0.0
+    var category: List<String>? = null
 
     val fee: Double get() = deliveryFee + weigthFee + volumeFee + labourFee
 
