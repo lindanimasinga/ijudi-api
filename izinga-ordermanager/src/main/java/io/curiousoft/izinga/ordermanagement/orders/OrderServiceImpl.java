@@ -318,7 +318,7 @@ public class OrderServiceImpl implements OrderService {
         return orderCompleted;
     }
 
-    @Tool(name = "Find order by id", description = "Find order by id and return the order details")
+    @Tool(name = "find_order_by_id", description = "Find order by id and return the order details")
     @Override
     public Order findOrder(String orderId) {
         return orderRepo.findById(orderId).orElse(null);
@@ -358,13 +358,13 @@ public class OrderServiceImpl implements OrderService {
                 }).orElseThrow();
     }
 
-    @Tool(name = "Find orders by user id", description = "Find orders by user id and return the order details")
+    @Tool(name = "find_orders_by_user_id", description = "Find orders by user id and return the order details")
     @Override
     public List<Order> findOrderByUserId(String userId) {
         return orderRepo.findByCustomerId(userId).orElse(new ArrayList<>());
     }
 
-    @Tool(name = "Find orders by phone number", description = "Find orders by phone number and return the order details")
+    @Tool(name = "find_orders_by_phone_number", description = "Find orders by phone number and return the order details")
     @Override
     public List<Order> findOrderByPhone(String phone) {
         String last9Digits = phone.substring(phone.length() - 9);
@@ -384,7 +384,7 @@ public class OrderServiceImpl implements OrderService {
         return orderRepo.findByShopIdAndStageNot(store.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
     }
 
-    @Tool(name = "Find orders by messenger id", description = "Find orders by messenger id and return the order details")
+    @Tool(name = "find_orders_by_messenger_id", description = "Find orders by messenger id and return the order details")
     @Override
     public List<Order> findOrderByMessengerId(String id, @ToolParam(required = false) boolean allStages) {
         return allStages ? orderRepo.findByShippingDataMessengerId(id) : orderRepo.findByShippingDataMessengerIdAndStageNot(id, OrderStage.STAGE_0_CUSTOMER_NOT_PAID);

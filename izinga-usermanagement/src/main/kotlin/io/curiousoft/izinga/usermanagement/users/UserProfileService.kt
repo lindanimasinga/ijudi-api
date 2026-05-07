@@ -5,6 +5,7 @@ import io.curiousoft.izinga.commons.model.StoreType
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import org.springframework.ai.tool.annotation.Tool
+import org.springframework.ai.tool.annotation.ToolParam
 import org.springframework.stereotype.Service
 import org.springframework.context.ApplicationEventPublisher
 
@@ -18,7 +19,12 @@ class UserProfileService(val userProfileRepo: UserProfileRepo, val eventPublishe
             .firstNotNullOfOrNull { profileRepo.findByMobileNumber("$it$last9Digits") }
     }
 
-    fun findByLocation(role: ProfileRoles, latitude: Double, longitude: Double, range: Double, storeType: StoreType): List<UserProfile>? {
+    @Tool(name = "find_users", description = "finds users by role and location. It will return a list of user profiles that match the specified role and are within the specified range of the given latitude and longitude.")
+    fun findByLocation(@ToolParam(description = "This will always have a value MESSENGER because this serach is only allow to search drivers available") role: ProfileRoles,
+                       latitude: Double,
+                       longitude: Double,
+                       @ToolParam(description = "range is in degrees. 1 degree is approximately 111 km. So a range of 0.01 would be approximately 1.11 km") range: Double,
+                       storeType: StoreType): List<UserProfile>? {
         val maxLong = longitude + range
         val minLong = longitude - range
         val maxLat = latitude + range

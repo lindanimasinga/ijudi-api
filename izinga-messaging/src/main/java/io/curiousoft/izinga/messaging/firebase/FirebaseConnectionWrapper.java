@@ -57,10 +57,12 @@ public class FirebaseConnectionWrapper {
     }
 
     private <T> T processRequest(Call<T> requestCall) throws Exception {
-        LOGGER.info("FCM Request {}", requestCall.request().toString());
+        LOGGER.debug("FCM Request {}", requestCall.request().toString());
+        LOGGER.info("Executing FCM request to URL: {}", requestCall.request().url());
         Response<T> response = requestCall.execute();
         if (response.isSuccessful()) {
-            LOGGER.info("FCM Response success! code: {} body: {}",  response.code(), response.body());
+            LOGGER.debug("FCM Response success! code: {} body: {}",  response.code(), response.body());
+            LOGGER.info("FCM request successful with status code: {}", response.code());
             return response.body();
         }
         LOGGER.error("FCM response code: {} Body {}", response.code(), response.errorBody().string());
