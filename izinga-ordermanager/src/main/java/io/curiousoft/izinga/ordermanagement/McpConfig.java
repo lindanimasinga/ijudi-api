@@ -1,6 +1,8 @@
 package io.curiousoft.izinga.ordermanagement;
 
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
+import io.curiousoft.izinga.recon.ReconService;
+import io.curiousoft.izinga.recon.ReconServiceImpl;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
@@ -32,9 +34,9 @@ public class McpConfig {
      * </ul>
      */
     @Bean
-    public ToolCallbackProvider userProfileToolCallbackProvider(UserProfileService userProfileService, OrderServiceImpl orderService) {
+    public ToolCallbackProvider userProfileToolCallbackProvider(UserProfileService userProfileService, OrderServiceImpl orderService, ReconService reconService) {
         return MethodToolCallbackProvider.builder()
-                .toolObjects(userProfileService, orderService)
+                .toolObjects(userProfileService, orderService, reconService)
                 .build();
     }
 }
