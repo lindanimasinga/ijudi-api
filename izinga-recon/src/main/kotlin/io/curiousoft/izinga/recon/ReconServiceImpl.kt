@@ -157,7 +157,7 @@ class ReconServiceImpl(
         })
     }
 
-    @Tool(description = "Get all payouts for a given payout type, date range and toId. The default date range is past 7 days. " +
+    @Tool(name="get_payouts_for_user",  description = "Get all payouts for a given payout type, date range and toId. The default date range is past 7 days. " +
             "The Payout will have all orders for this payout and the total amount for the payout. " +
             "For driver the payoutType is MESSENGER and the toId is the driver id. " +
             "For shop the payoutType is SHOP and the toId is the shop id.")
