@@ -68,7 +68,7 @@ public class PaymentService {
             List<PaymentType> paymentsTypes = new ArrayList<>();
             paymentsTypes.add(PaymentType.YOCO);
             var pastOrders = orderRepo.findByCustomerId(customerId);
-            if (pastOrders == null || storeType == StoreType.TIPS) {
+            if (pastOrders == null || storeType == StoreType.TIPS || storeType == StoreType.MOVERS) {
                 return paymentsTypes;
             }
 
