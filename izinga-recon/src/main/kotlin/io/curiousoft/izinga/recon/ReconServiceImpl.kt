@@ -9,6 +9,8 @@ import io.curiousoft.izinga.recon.payout.*
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
 import org.slf4j.LoggerFactory
+import org.springframework.ai.tool.annotation.Tool
+import org.springframework.ai.tool.annotation.ToolParam
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.scheduling.annotation.Async
@@ -155,7 +157,14 @@ class ReconServiceImpl(
         })
     }
 
-    override fun getAllPayouts(payoutType: PayoutType, from: Date, toDate: Date, toId: String): List<Payout> {
+    @Tool(description = "Get all payouts for a given payout type, date range and toId. The default date range is past 7 days. " +
+            "The Payout will have all orders for this payout and the total amount for the payout. " +
+            "For driver the payoutType is MESSENGER and the toId is the driver id. " +
+            "For shop the payoutType is SHOP and the toId is the shop id.")
+    override fun getAllPayouts(@ToolParam(description = "For driver the payoutType is MESSENGER") payoutType: PayoutType,
+                               from: Date,
+                               toDate: Date,
+                               @ToolParam(description = "This is the Driver/Messenger id to use for lookup") toId: String): List<Payout> {
         return when (payoutType) {
             PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetweenAndToId(from, toDate, toId)
             PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateBetweenAndToId(from, toDate, toId)
