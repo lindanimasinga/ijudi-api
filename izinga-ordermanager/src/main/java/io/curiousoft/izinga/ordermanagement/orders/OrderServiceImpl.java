@@ -9,6 +9,8 @@ import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
+import io.curiousoft.izinga.ordermanagement.orders.quote.OrderQuote;
+import io.curiousoft.izinga.ordermanagement.orders.quote.OrderQuoteRepository;
 import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
 import io.curiousoft.izinga.messaging.AdminOnlyNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
@@ -57,6 +59,7 @@ public class OrderServiceImpl implements OrderService {
     private final PromoCodeClient promoCodeClient;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final RestrictedRegionService restrictedRegionService;
+    private final OrderQuoteRepository quoteRepository;
 
     @Autowired
     public OrderServiceImpl(@Value("${service.delivery.standardFee}") double starndardDeliveryFee,
@@ -75,7 +78,7 @@ public class OrderServiceImpl implements OrderService {
                             EmailNotificationService emailNotificationService,
                             PromoCodeClient promoCodeClient,
                             ApplicationEventPublisher applicationEventPublisher,
-                            RestrictedRegionService restrictedRegionService) {
+                            RestrictedRegionService restrictedRegionService, OrderQuoteRepository quoteRepository) {
         this.starndardDeliveryFee = starndardDeliveryFee;
         this.starndardDeliveryKm = starndardDeliveryKm;
         this.ratePerKm = ratePerKm;
@@ -90,6 +93,7 @@ public class OrderServiceImpl implements OrderService {
         this.promoCodeClient = promoCodeClient;
         this.applicationEventPublisher = applicationEventPublisher;
         this.restrictedRegionService = restrictedRegionService;
+        this.quoteRepository = quoteRepository;
         ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
         validator = factory.getValidator();
 
@@ -387,7 +391,25 @@ public class OrderServiceImpl implements OrderService {
     @Tool(name = "find_orders_by_messenger_id", description = "Find orders by messenger id and return the order details")
     @Override
     public List<Order> findOrderByMessengerId(String id, @ToolParam(required = false) boolean allStages) {
-        return allStages ? orderRepo.findByShippingDataMessengerId(id) : orderRepo.findByShippingDataMessengerIdAndStageNot(id, OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        var ordersAssigned = allStages ? orderRepo.findByShippingDataMessengerId(id) : orderRepo.findByShippingDataMessengerIdAndStageNot(id, OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+
+        var ordersQuoteRequested = quoteRepository.findBySentToMessengerIds(id)
+                .stream()
+                .filter(it -> it.getAccpetedByMessengerId() == null)
+                .map(OrderQuote::getOrderId)
+                .toList();
+
+        if(ordersQuoteRequested.isEmpty()) {
+            return ordersAssigned != null ? ordersAssigned : new ArrayList<>();
+        }
+
+        var ordersFromQuotes = orderRepo.findAllById(ordersQuoteRequested);
+        if (ordersAssigned != null) {
+            ordersAssigned.addAll(ordersFromQuotes);
+            return ordersAssigned;
+        } else {
+            return ordersFromQuotes;
+        }
     }
 
     @Override
@@ -448,6 +470,10 @@ public class OrderServiceImpl implements OrderService {
         if (quoteApproval.getApproved()) {
             order.getShippingData().setMessengerId(quoteApproval.getMessengerId());
             order.getTag().put("quoteAcceptedBy", quoteApproval.getMessengerId());
+            quoteRepository.findById(orderId).ifPresent(it -> {
+                it.setAccpetedByMessengerId(quoteApproval.getMessengerId());
+                quoteRepository.save(it);
+            });
         } else {
             // record rejection reason and messenger that rejected
             order.getTag().put("quoteRejectedBy", quoteApproval.getMessengerId());

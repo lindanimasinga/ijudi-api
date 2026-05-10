@@ -8,8 +8,11 @@ import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
+import io.curiousoft.izinga.ordermanagement.orders.RestrictedRegionService;
 import io.curiousoft.izinga.messaging.AdminOnlyNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
+import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
+import io.curiousoft.izinga.ordermanagement.orders.quote.OrderQuoteRepository;
 import org.assertj.core.util.Lists;
 import org.junit.Assert;
 import org.junit.Before;
@@ -49,6 +52,12 @@ public class OrderServiceTest {
     private DeviceRepository deviceRepo;
     @Mock
     private ApplicationEventPublisher applicationEventPublisher;
+    @Mock
+    private PromoCodeClient promoCodeClient;
+    @Mock
+    private RestrictedRegionService restrictedRegionService;
+    @Mock
+    private OrderQuoteRepository orderQuoteRepository;
 
     List<String> phoneNumbers = Lists.list("08128155660", "0812815707");
 
@@ -76,10 +85,12 @@ public class OrderServiceTest {
                 paymentService,
                 deviceRepo,
                 pushNotificationService,
-                smsNotifcation, emailNotificationService,
-                null,
+                smsNotifcation,
+                emailNotificationService,
+                promoCodeClient,
                 applicationEventPublisher,
-                null
+                restrictedRegionService,
+                orderQuoteRepository
                 );
     }
 

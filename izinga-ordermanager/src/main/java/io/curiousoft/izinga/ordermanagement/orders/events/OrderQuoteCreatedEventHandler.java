@@ -4,6 +4,8 @@ import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.order.events.OrderQuoteCreatedEvent;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsappNotificationService;
+import io.curiousoft.izinga.ordermanagement.orders.quote.OrderQuote;
+import io.curiousoft.izinga.ordermanagement.orders.quote.OrderQuoteRepository;
 import io.curiousoft.izinga.ordermanagement.service.messenger.MessengerLookUpService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,14 +23,16 @@ public class OrderQuoteCreatedEventHandler {
     UserProfileRepo userProfileRepo;
     WhatsappNotificationService whatsappNotificationService;
     private final MessengerLookUpService messengerLookUpService;
+    private final OrderQuoteRepository orderQuoteRepo;
 
     OrderQuoteCreatedEventHandler(
             UserProfileRepo userProfileRepo,
             WhatsappNotificationService whatsappNotificationService,
-            io.curiousoft.izinga.ordermanagement.service.messenger.MessengerLookUpService messengerLookUpService) {
+            io.curiousoft.izinga.ordermanagement.service.messenger.MessengerLookUpService messengerLookUpService, OrderQuoteRepository orderQuoteRepo) {
         this.userProfileRepo = userProfileRepo;
         this.whatsappNotificationService = whatsappNotificationService;
         this.messengerLookUpService = messengerLookUpService;
+        this.orderQuoteRepo = orderQuoteRepo;
     }
 
     @Async
@@ -58,7 +62,8 @@ public class OrderQuoteCreatedEventHandler {
 
             LOG.info("Found {} nearby messengers for order quote {} lat {}, long {} radius {}km",
                     nearbyMessengers.size(), order.getId(), lat, lng, SEARCH_RADIUS_KM);
-
+            var orderQuote = new OrderQuote(order.getId(), store.getId());
+            orderQuote.setSentToMessengerIds(nearbyMessengers.stream().map(UserProfile::getId).toList());
             // Send WhatsApp notification to each messenger
             for (UserProfile messenger : nearbyMessengers) {
                 try {
@@ -68,6 +73,7 @@ public class OrderQuoteCreatedEventHandler {
                     LOG.error("Failed to send quote notification to messenger {}", messenger.getId(), e);
                 }
             }
+            orderQuoteRepo.save(orderQuote);
         } catch (Exception e) {
             LOG.error("Error handling OrderQuoteCreatedEvent for order {}", event.getNewOrder().getId(), e);
         }

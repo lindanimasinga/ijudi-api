@@ -162,8 +162,8 @@ class ReconServiceImpl(
             "For driver the payoutType is MESSENGER and the toId is the driver id. " +
             "For shop the payoutType is SHOP and the toId is the shop id.")
     override fun getAllPayouts(@ToolParam(description = "For driver the payoutType is MESSENGER") payoutType: PayoutType,
-                               from: Date,
-                               toDate: Date,
+                               @ToolParam(description = "Date time format is like 2026-04-09T00:00:00.000+00:00") from: Date,
+                               @ToolParam(description = "Date time format is like 2026-04-09T00:00:00.000+00:00") toDate: Date,
                                @ToolParam(description = "This is the Driver/Messenger id to use for lookup") toId: String): List<Payout> {
         return when (payoutType) {
             PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetweenAndToId(from, toDate, toId)
