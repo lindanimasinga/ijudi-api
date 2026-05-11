@@ -64,12 +64,14 @@ public class AiCustomerServiceAgent {
             return null;
         }
 
-        if (message == null || message.getText() == null || message.getText().getBody() == null || message.getButton() == null) {
+        if ((message == null || message.getText() == null || message.getText().getBody() == null) && message.getButton() == null) {
             LOG.warn("Received null or empty message from {}", from);
             return null;
         }
 
-        String userText = message.getText().getBody().trim();
+        String userText = Optional.ofNullable(message.getText())
+                .map(it -> it.getBody().trim())
+                .orElse("");
         if (userText.isBlank()) {
             userText = message.getButton().getText().trim();
         }

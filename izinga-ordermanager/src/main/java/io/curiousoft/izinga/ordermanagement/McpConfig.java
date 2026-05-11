@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.ordermanagement;
 
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
+import io.curiousoft.izinga.ordermanagement.stores.StoreService;
 import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.recon.ReconServiceImpl;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
@@ -34,9 +35,10 @@ public class McpConfig {
      * </ul>
      */
     @Bean
-    public ToolCallbackProvider userProfileToolCallbackProvider(UserProfileService userProfileService, OrderServiceImpl orderService, ReconService reconService) {
+    public ToolCallbackProvider userProfileToolCallbackProvider(UserProfileService userProfileService, OrderServiceImpl orderService,
+                                                                ReconService reconService, StoreService storeService) {
         return MethodToolCallbackProvider.builder()
-                .toolObjects(userProfileService, orderService, reconService)
+                .toolObjects(userProfileService, orderService, reconService, storeService)
                 .build();
     }
 }

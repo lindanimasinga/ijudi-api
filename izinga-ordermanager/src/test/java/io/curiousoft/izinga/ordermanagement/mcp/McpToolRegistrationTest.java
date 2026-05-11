@@ -5,6 +5,7 @@ import io.curiousoft.izinga.commons.model.UserProfile;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.ordermanagement.McpConfig;
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
+import io.curiousoft.izinga.ordermanagement.stores.StoreService;
 import io.curiousoft.izinga.recon.ReconServiceImpl;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,6 +64,8 @@ class McpToolRegistrationTest {
     @Mock
     ReconServiceImpl reconService;
     @Mock
+    StoreService storeService;
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     private McpConfig mcpConfig;
@@ -76,13 +79,13 @@ class McpToolRegistrationTest {
 
     @Test
     void userProfileToolCallbackProvider_isCreated() {
-        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(userProfileService, orderService, reconService);
+        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(userProfileService, orderService, reconService, storeService);
         assertNotNull(provider, "ToolCallbackProvider must not be null");
     }
 
     @Test
     void userProfileTools_allExpectedToolsAreRegistered() {
-        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(userProfileService, orderService, reconService);
+        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(userProfileService, orderService, reconService, storeService);
         ToolCallback[] tools = provider.getToolCallbacks();
 
         assertNotNull(tools, "Tool callbacks array must not be null");
@@ -99,7 +102,7 @@ class McpToolRegistrationTest {
 
     @Test
     void findUserByPhone_toolHasDescription() {
-        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(userProfileService, orderService, reconService);
+        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(userProfileService, orderService, reconService, storeService);
         ToolCallback findUserTool = Arrays.stream(provider.getToolCallbacks())
                 .filter(t -> "find_user_by_phone".equals(t.getToolDefinition().name()))
                 .findFirst()
@@ -112,7 +115,7 @@ class McpToolRegistrationTest {
 
     @Test
     void createUser_toolHasDescription() {
-        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(userProfileService, orderService, reconService);
+        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(userProfileService, orderService, reconService, storeService);
         ToolCallback createUserTool = Arrays.stream(provider.getToolCallbacks())
                 .filter(t -> "create_user".equals(t.getToolDefinition().name()))
                 .findFirst()
