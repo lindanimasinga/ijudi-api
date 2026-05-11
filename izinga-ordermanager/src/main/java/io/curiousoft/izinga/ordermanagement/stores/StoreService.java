@@ -4,6 +4,7 @@ import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.ordermanagement.service.ProfileServiceImpl;
+import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -64,6 +65,7 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
                 .collect(Collectors.toList());
     }
 
+    @Tool(name = "find_store_or_shops_by_id", description = "Find a store profile by its ID. If the store has no business hours set, default hours will be added.")
     @Override
     public StoreProfile find(String id) {
         StoreProfile store = profileRepo.findById(id).orElse(null);
@@ -84,6 +86,7 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
     }
 
 
+    @Tool(name = "find_stores_by_owner", description = "Find all store profiles owned by a specific user ID.")
     public List<StoreProfile> findByOwner(String ownerId) {
         return profileRepo.findByOwnerId(ownerId);
     }
