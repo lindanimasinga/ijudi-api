@@ -16,6 +16,7 @@ class UserConfigService(private val userConfigRepo: UserConfigRepo) {
         persisted.mandatoryFields = config.mandatoryFields
         persisted.optionalFields = config.optionalFields
         persisted.label = config.label
+        persisted.userRole = config.userRole
         return userConfigRepo.save(persisted)
     }
 
