@@ -2037,6 +2037,71 @@ public class OrderServiceTest {
         Assert.assertEquals(patchProfileRequest.getId(),  finalOrder.get(0).getShippingData().getMessengerId());
         verify(repo).findByShippingDataMessengerIdAndStageNot(patchProfileRequest.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
     }
+
+    @Test
+    public void findOrdersByMessengerAdminId_returnsTeamOrders() {
+        String adminId = "messenger-admin-1";
+        UserProfile admin = new UserProfile(
+                "admin",
+                UserProfile.SignUpReason.BUY,
+                "address",
+                "https://image.url",
+                "0812815707",
+                ProfileRoles.MESSENGER_ADMIN
+        );
+        admin.setId(adminId);
+
+        UserProfile messenger = new UserProfile(
+                "messenger",
+                UserProfile.SignUpReason.DELIVERY_DRIVER,
+                "address",
+                "https://image.url",
+                "0812815708",
+                ProfileRoles.MESSENGER
+        );
+        messenger.setId("messenger-1");
+
+        Order order = new Order();
+        order.setId("order-1");
+        order.setBasket(new Basket());
+        ShippingData shippingData = new ShippingData("from", "to", ShippingData.ShippingType.DELIVERY);
+        shippingData.setMessengerId("messenger-1");
+        order.setShippingData(shippingData);
+        order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+
+        when(customerRepo.findById(adminId)).thenReturn(Optional.of(admin));
+        when(customerRepo.findByRoleAndMessengerAdminId(ProfileRoles.MESSENGER, adminId)).thenReturn(List.of(messenger));
+        when(repo.findByShippingDataMessengerIdInAndStageNot(List.of("messenger-1"), OrderStage.STAGE_0_CUSTOMER_NOT_PAID)).thenReturn(new ArrayList<>(List.of(order)));
+        when(orderQuoteRepository.findBySentToMessengerIds("messenger-1")).thenReturn(Collections.emptyList());
+
+        List<Order> orders = sut.findOrdersByMessengerAdminId(adminId, false);
+
+        Assert.assertEquals(1, orders.size());
+        verify(repo).findByShippingDataMessengerIdInAndStageNot(List.of("messenger-1"), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+    }
+
+    @Test
+    public void findOrdersByMessengerAdminId_rejectsNonAdminRole() {
+        String profileId = "profile-1";
+        UserProfile profile = new UserProfile(
+                "messenger",
+                UserProfile.SignUpReason.DELIVERY_DRIVER,
+                "address",
+                "https://image.url",
+                "0812815708",
+                ProfileRoles.MESSENGER
+        );
+        profile.setId(profileId);
+        when(customerRepo.findById(profileId)).thenReturn(Optional.of(profile));
+
+        try {
+            sut.findOrdersByMessengerAdminId(profileId, true);
+            fail();
+        } catch (IllegalArgumentException e) {
+            Assert.assertEquals("Profile profile-1 is not a messenger admin", e.getMessage());
+        }
+    }
+
     @Test
     public void findOrderByStoreIdNoUpdaidOrdersRetuned() throws Exception {
         //order 1

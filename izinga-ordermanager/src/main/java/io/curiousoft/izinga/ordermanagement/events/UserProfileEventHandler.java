@@ -5,7 +5,9 @@ import io.curiousoft.izinga.commons.model.UserProfile;
 import io.curiousoft.izinga.commons.profile.events.ProfileCreatedEvent;
 import io.curiousoft.izinga.commons.profile.events.ProfileDeletedEvent;
 import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent;
+import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsappNotificationService;
+import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
@@ -17,9 +19,11 @@ public class UserProfileEventHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(UserProfileEventHandler.class);
     private final WhatsappNotificationService whatsappNotificationService;
+    private final UserProfileRepo userProfileService;
 
-    public UserProfileEventHandler(WhatsappNotificationService whatsappNotificationService) {
+    public UserProfileEventHandler(WhatsappNotificationService whatsappNotificationService, UserProfileRepo userProfileService) {
         this.whatsappNotificationService = whatsappNotificationService;
+        this.userProfileService = userProfileService;
     }
 
     @Async
@@ -29,7 +33,7 @@ public class UserProfileEventHandler {
 
         UserProfile p = (UserProfile) event.getProfile();
         LOG.info("[user-profile-event] created: id={} name={} mobile={}", p.getId(), p.getName(), p.getMobileNumber());
-        if (p.getRole() == ProfileRoles.MESSENGER) {
+        if (p.getRole() == ProfileRoles.MESSENGER || p.getRole() == ProfileRoles.MESSENGER_ADMIN) {
             whatsappNotificationService.sendWelcomeMessageDriver(p.getMobileNumber(), p.getName());
             p.setWelcomeMessageSent(true);
         }
@@ -44,6 +48,7 @@ public class UserProfileEventHandler {
         LOG.info("[user-profile-event] updated: id={} name={} mobile={}", p.getId(), p.getName(), p.getMobileNumber());
         if (p.getRole() == ProfileRoles.MESSENGER) {
             p.setProfileApproved(false);
+            userProfileService.save(p);
         }
 
     }

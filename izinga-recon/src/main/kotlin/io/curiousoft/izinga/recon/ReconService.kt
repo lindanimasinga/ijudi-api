@@ -20,6 +20,8 @@ interface ReconService {
 
     fun getAllPayouts(payoutType: PayoutType, from: Date, toDate: Date, toId: String): List<Payout>
 
+    fun getAllPayoutsForMessengerAdmin(from: Date, toDate: Date, messengerAdminId: String, messengerId: String? = null): List<Payout>
+
     fun findPayout(bundleId: String, payoutId: String): Payout?
     fun updateBundle(bundle: PayoutBundle)
 }

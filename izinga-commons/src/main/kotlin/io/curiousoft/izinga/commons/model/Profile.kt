@@ -15,7 +15,6 @@ open class Profile(
     @param:ValidMobileNumber(message = "profile mobile number not valid") var mobileNumber: @NotBlank(message = "profile mobile not format is not valid. Please put like +27812815577 or 27812815577") String?,
     var role: @NotNull(message = "profile role not valid") ProfileRoles?
 ) : BaseModel() {
-    var surname: String? = null
     var description: String? = null
     var yearsInService = 0
     var likes = 0

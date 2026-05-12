@@ -107,9 +107,10 @@ progressNextStage:
 - Persists updated stage.
 
 find methods and MCP tools:
-- find_order_by_id, find_orders_by_user_id, find_orders_by_phone_number, find_orders_by_messenger_id.
+- find_order_by_id, find_orders_by_user_id, find_orders_by_phone_number, find_orders_by_messenger_id, findOrdersByMessengerAdminId.
 - Phone lookup uses SA prefixes 0, +27, 27.
 - Messenger lookup merges assigned orders plus unaccepted quote-requested orders.
+- Messenger admin lookup resolves team members from user profile ownership mapping and merges team assigned plus quote-requested orders.
 
 cancelOrder:
 - Blocks cancellation at late stages.
@@ -192,6 +193,7 @@ UserProfileService review checkpoints:
 - Normalization consistency with order phone search.
 - Duplicate policy and race conditions for exists-plus-save flow.
 - Location range units and expected caller semantics.
+- Team lookup correctness for `findMessengersByAdminId` and ownership mapping (`tag.messengerAdminId`).
 
 ## High-Risk Patterns To Check First
 - Substring operations without input-length guards.
@@ -199,6 +201,8 @@ UserProfileService review checkpoints:
 - Stage transition index arithmetic without terminal guards.
 - Side effects that depend on request payload instead of persisted state.
 - Event publication paths that may run on partially updated data.
+- Team-scope data leakage where non-admin or wrong admin can query another messenger team's orders/payouts.
+- Query branches that accidentally change legacy single-user behavior (`messengerId` or `toId` paths).
 
 ## Safe Change Playbook
 
@@ -214,6 +218,7 @@ UserProfileService review checkpoints:
 2. Keep API and enum contracts backward compatible.
 3. Preserve order and user normalization conventions.
 4. Add tests for success and rejection paths.
+5. For messenger admin features, add ownership authorization tests (valid admin, wrong admin, non-admin).
 
 ## Validation Matrix
 Use targeted module checks:
@@ -225,6 +230,8 @@ Minimum scenario checks:
 - Order start, finish, next stage, cancel, quote accept/reject.
 - WhatsApp text, interactive accept, missing contact payload.
 - User create with formatted/unformatted phone and duplicate numbers.
+- Messenger admin team order query returns only managed messenger orders.
+- Messenger admin payout query returns only managed messenger payouts and blocks unrelated messengerId filters.
 
 ## Completion Criteria
 - Reviewed all relevant branches in all three target classes.

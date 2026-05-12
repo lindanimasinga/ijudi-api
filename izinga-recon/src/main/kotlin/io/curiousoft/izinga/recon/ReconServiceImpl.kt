@@ -2,6 +2,7 @@ package io.curiousoft.izinga.recon
 
 import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.commons.model.OrderStage
+import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
@@ -169,6 +170,31 @@ class ReconServiceImpl(
             PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetweenAndToId(from, toDate, toId)
             PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateBetweenAndToId(from, toDate, toId)
         }
+    }
+
+    override fun getAllPayoutsForMessengerAdmin(from: Date, toDate: Date, messengerAdminId: String, messengerId: String?): List<Payout> {
+        val messengerAdmin = userProfileRepo.findByIdOrNull(messengerAdminId)
+            ?: throw IllegalArgumentException("Messenger admin not found")
+
+        if (messengerAdmin.role != ProfileRoles.MESSENGER_ADMIN) {
+            throw IllegalArgumentException("Profile is not a messenger admin")
+        }
+
+        val managedMessengerIds = userProfileRepo.findByRoleAndMessengerAdminId(ProfileRoles.MESSENGER, messengerAdminId)
+            .mapNotNull { it.id }
+
+        if (managedMessengerIds.isEmpty()) {
+            return emptyList()
+        }
+
+        val filteredMessengerIds = if (!messengerId.isNullOrBlank()) {
+            if (!managedMessengerIds.contains(messengerId)) {
+                throw IllegalArgumentException("Messenger does not belong to this admin")
+            }
+            listOf(messengerId)
+        } else managedMessengerIds
+
+        return messengerPayoutRepository.findByModifiedDateBetweenAndToIdIn(from, toDate, filteredMessengerIds)
     }
 
     override fun getAllPayoutBundles(payoutType: PayoutType, from: Date, toDate: Date): List<Payout> {

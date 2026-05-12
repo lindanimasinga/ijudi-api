@@ -32,7 +32,18 @@ class ReconController(val reconService: ReconService) {
     fun getAllPayouts(@RequestParam payoutType: PayoutType,
                       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) fromDate: Date,
                       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) toDate: Date,
-                      @RequestParam toId: String): List<Payout> = reconService.getAllPayouts(payoutType, fromDate, toDate, toId)
+                      @RequestParam(required = false) toId: String?,
+                      @RequestParam(required = false) messengerAdminId: String?,
+                      @RequestParam(required = false) messengerId: String?): List<Payout> {
+        return if (payoutType == PayoutType.MESSENGER && !messengerAdminId.isNullOrBlank()) {
+            reconService.getAllPayoutsForMessengerAdmin(fromDate, toDate, messengerAdminId, messengerId)
+        } else {
+            if (toId.isNullOrBlank()) {
+                throw IllegalArgumentException("toId is required when messengerAdminId is not provided")
+            }
+            reconService.getAllPayouts(payoutType, fromDate, toDate, toId)
+        }
+    }
 
     @GetMapping("/payoutBundle/{bundleId}/payout/{payoutId}")
     fun getPayouts(@PathVariable bundleId: String, @PathVariable payoutId: String): Payout? = reconService.findPayout(bundleId, payoutId)

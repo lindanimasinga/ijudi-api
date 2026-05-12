@@ -12,5 +12,6 @@ interface MessengerPayoutRepository : MongoRepository<MessengerPayout, String> {
     fun findByCreatedDateBetweenAndToId(fromDate: Date, toDate: Date, toId: String): List<MessengerPayout>
     fun findByCreatedDateBetween(fromDate: Date, toDate: Date): List<MessengerPayout>
     fun findByModifiedDateBetweenAndToId(fromDate: Date, toDate: Date, toId: String): List<MessengerPayout>
+    fun findByModifiedDateBetweenAndToIdIn(fromDate: Date, toDate: Date, toId: List<String>): List<MessengerPayout>
     fun findByModifiedDateBetween(fromDate: Date, toDate: Date): List<MessengerPayout>
 }

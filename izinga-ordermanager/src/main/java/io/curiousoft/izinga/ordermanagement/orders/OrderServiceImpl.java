@@ -413,6 +413,49 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public List<Order> findOrdersByMessengerAdminId(String adminId, boolean allStages) {
+        UserProfile admin = userProfileRepo.findById(adminId)
+                .orElseThrow(() -> new IllegalArgumentException("Messenger admin with id " + adminId + " not found"));
+
+        if (admin.getRole() != ProfileRoles.MESSENGER_ADMIN) {
+            throw new IllegalArgumentException("Profile " + adminId + " is not a messenger admin");
+        }
+
+        List<String> messengerIds = userProfileRepo.findByRoleAndMessengerAdminId(ProfileRoles.MESSENGER, adminId)
+                .stream()
+                .map(UserProfile::getId)
+                .filter(Objects::nonNull)
+                .toList();
+
+        if (messengerIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        var ordersAssigned = allStages
+                ? orderRepo.findByShippingDataMessengerIdIn(messengerIds)
+                : orderRepo.findByShippingDataMessengerIdInAndStageNot(messengerIds, OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+
+        var quoteOrderIds = messengerIds.stream()
+                .flatMap(messengerId -> quoteRepository.findBySentToMessengerIds(messengerId).stream())
+                .filter(it -> it.getAccpetedByMessengerId() == null)
+                .map(OrderQuote::getOrderId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        if (quoteOrderIds.isEmpty()) {
+            return ordersAssigned != null ? ordersAssigned : new ArrayList<>();
+        }
+
+        var ordersFromQuotes = orderRepo.findAllById(quoteOrderIds);
+        if (ordersAssigned != null) {
+            ordersAssigned.addAll(ordersFromQuotes);
+            return ordersAssigned;
+        }
+        return ordersFromQuotes;
+    }
+
+    @Override
     public List<Order> findAll() {
         return orderRepo.findAll();
     }

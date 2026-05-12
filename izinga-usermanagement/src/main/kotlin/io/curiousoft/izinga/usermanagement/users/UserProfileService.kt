@@ -47,6 +47,10 @@ class UserProfileService(val userProfileRepo: UserProfileRepo, val eventPublishe
         return profileRepo.findByProfileApproved(false)
     }
 
+    fun findMessengersByAdminId(messengerAdminId: String): List<UserProfile> {
+        return profileRepo.findByRoleAndMessengerAdminId(ProfileRoles.MESSENGER, messengerAdminId)
+    }
+
     private fun fomatMobileNumber(mobileNumber: String): String {
         val last9Digits = mobileNumber.substring(mobileNumber.length - 9)
         var mobileNumberFormmatted = last9Digits.replace("\\s".toRegex(), "")

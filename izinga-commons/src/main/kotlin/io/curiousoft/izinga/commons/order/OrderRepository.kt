@@ -37,4 +37,6 @@ interface OrderRepository : MongoRepository<Order?, String?> {
     fun findAllByCreatedDateAfter(ninetyDaysAgo: LocalDate): List<Order>
     fun findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(paid: Boolean, stage7AllPaid: @NotNull OrderStage, payoutCreated: Boolean, date: Date): List<Order>
     fun findByShippingDataMessengerId(id: String): List<Order>
+    fun findByShippingDataMessengerIdIn(ids: List<String>): List<Order>
+    fun findByShippingDataMessengerIdInAndStageNot(ids: List<String>, customerNotPaid: OrderStage): List<Order>
 }

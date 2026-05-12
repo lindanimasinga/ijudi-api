@@ -466,6 +466,90 @@ class ReconServiceTest {
         }
     }
 
+    @Test
+    fun `get payouts for messenger admin returns team payouts`() {
+        val adminId = "admin-1"
+        val managedMessenger = UserProfile(
+            "messenger-name",
+            UserProfile.SignUpReason.DELIVERY_DRIVER,
+            "address",
+            "https://image.url",
+            "0810000001",
+            ProfileRoles.MESSENGER
+        ).apply { id = "messenger-1" }
+
+        val admin = UserProfile(
+            "admin-name",
+            UserProfile.SignUpReason.BUY,
+            "address",
+            "https://image.url",
+            "0810000002",
+            ProfileRoles.MESSENGER_ADMIN
+        ).apply { id = adminId }
+
+        val payout = MessengerPayout(
+            toId = "messenger-1",
+            toName = "Messenger 1",
+            toBankName = "Bank",
+            toType = BankAccType.CHEQUE,
+            toAccountNumber = "123",
+            orders = mutableSetOf(),
+            toBranchCode = "250655",
+            fromReference = "from",
+            toReference = "to",
+            emailNotify = "",
+            emailAddress = "m@x.com",
+            emailSubject = "subject"
+        )
+
+        val from = Date(System.currentTimeMillis() - 10000)
+        val to = Date()
+
+        every { messengerRepo.findById(adminId) } returns Optional.of(admin)
+        every { messengerRepo.findByRoleAndMessengerAdminId(ProfileRoles.MESSENGER, adminId) } returns listOf(managedMessenger)
+        every { messengerPayoutRepository.findByModifiedDateBetweenAndToIdIn(from, to, listOf("messenger-1")) } returns listOf(payout)
+
+        val payouts = sut.getAllPayoutsForMessengerAdmin(from, to, adminId, null)
+
+        assertEquals(1, payouts.size)
+        assertEquals("messenger-1", payouts.first().toId)
+    }
+
+    @Test
+    fun `get payouts for messenger admin rejects messenger not in team`() {
+        val adminId = "admin-1"
+        val managedMessenger = UserProfile(
+            "messenger-name",
+            UserProfile.SignUpReason.DELIVERY_DRIVER,
+            "address",
+            "https://image.url",
+            "0810000001",
+            ProfileRoles.MESSENGER
+        ).apply { id = "messenger-1" }
+
+        val admin = UserProfile(
+            "admin-name",
+            UserProfile.SignUpReason.BUY,
+            "address",
+            "https://image.url",
+            "0810000002",
+            ProfileRoles.MESSENGER_ADMIN
+        ).apply { id = adminId }
+
+        val from = Date(System.currentTimeMillis() - 10000)
+        val to = Date()
+
+        every { messengerRepo.findById(adminId) } returns Optional.of(admin)
+        every { messengerRepo.findByRoleAndMessengerAdminId(ProfileRoles.MESSENGER, adminId) } returns listOf(managedMessenger)
+
+        try {
+            sut.getAllPayoutsForMessengerAdmin(from, to, adminId, "messenger-999")
+            fail("Expected IllegalArgumentException")
+        } catch (e: IllegalArgumentException) {
+            assertEquals("Messenger does not belong to this admin", e.message)
+        }
+    }
+
     private fun createStoreProfile(food: StoreType, openHour: Int, closeHour: Int): StoreProfile {
         val businessHours = ArrayList<BusinessHours>()
         val dateTimeOpen = LocalDateTime.now().withHour(openHour).withMinute(0)

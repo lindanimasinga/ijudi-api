@@ -60,12 +60,21 @@ Core modules and responsibilities:
 
 ## Key Domain Contracts
 Shared enums and models are in izinga-commons and must be treated as stable contracts:
-- Profile roles: CUSTOMER, STORE_ADMIN, STORE, MESSENGER, ADMIN.
+- Profile roles: CUSTOMER, STORE_ADMIN, STORE, MESSENGER, MESSENGER_ADMIN, ADMIN.
 - Store type: FOOD, CLOTHING, SALON, CAR_WASH, MOVERS, TIPS, LICENSING, PARTS.
 - Order stages: STAGE_0_CUSTOMER_NOT_PAID through STAGE_7_ALL_PAID, CANCELLED.
 
+Messenger admin ownership contract:
+- Messenger assignment is resolved via `UserProfile.tag["messengerAdminId"]`.
+- Team-scoped reads must only return messengers/orders/payouts that map to the authenticated messenger admin.
+
 Primary API surfaces:
 - /order, /store, /user, /user-config, /recon, /document, /yoco/payment, /whatsapp/webhook.
+
+Recent additive query surfaces:
+- `/user?role=MESSENGER&messengerAdminId=<id>` for messenger admin team lookup.
+- `/order?messengerAdminId=<id>&allStages=<bool>` for team orders.
+- `/recon/payout?payoutType=MESSENGER&messengerAdminId=<id>&fromDate=<iso>&toDate=<iso>&messengerId=<optional>` for team payouts and drill-down.
 
 ## Standard Workflow
 
@@ -100,6 +109,7 @@ If yes, apply backward-compatible change where possible:
 User management:
 - If lookup is by phone, normalize SA numbers consistently (0, +27, 27 patterns).
 - If create/update user, preserve role-based behavior and profile approval flow.
+- For messenger admin features, use additive filters and resolve team members by `tag.messengerAdminId`.
 
 Store management:
 - Keep owner role/store linkage and markup behavior intact.
@@ -109,10 +119,12 @@ Order management:
 - Preserve stage transition rules and cancellation constraints.
 - Keep payment reversal and notification side effects intact.
 - Handle quote acceptance without bypassing sanity checks.
+- Preserve existing `messengerId` query behavior while adding `messengerAdminId` team scope.
 
 Payments and recon:
 - Yoco webhook signature validation must stay strict.
 - Recon payouts should remain separated by payout type (SHOP or MESSENGER).
+- For `MESSENGER` payouts with `messengerAdminId`, aggregate only managed messenger payout rows.
 
 Messaging:
 - WhatsApp webhook verification and payload handling must preserve event publishing behavior.
@@ -126,12 +138,16 @@ MCP server:
 ### 6. Validation Checklist
 Run focused validation before completion:
 - Compile affected module and dependencies:
-  - mvn -pl <module> -am test
+  - ./mvnw -pl <module> -am test
 - For API changes, check controller mappings and serialization.
 - For security changes, confirm protected vs public endpoint behavior.
 - For MCP changes:
   - confirm /sse and /mcp/message reachability
   - verify new tool appears and executes.
+- For messenger admin scope:
+  - confirm cross-admin access is denied.
+  - confirm non-admin role cannot query team endpoints.
+  - confirm existing single-user query paths remain unchanged.
 
 ### 7. Completion Criteria
 Task is complete only when:
@@ -162,20 +178,23 @@ Task is complete only when:
 - Avoid putting infrastructure logic in controllers.
 - Do not bypass security config for v2 protected APIs.
 - Do not hardcode secrets in code.
+- Never return team-scoped data without ownership checks (`messengerAdminId` must map to caller's scope).
 
 ## Recommended Prompt Patterns
 - "Fix order stage transition bug in ordermanager without changing response schema."
 - "Add an additive field to user profile and update user endpoints safely."
 - "Expose store lookup as MCP tool and wire it through McpConfig."
 - "Add recon payout filter by date and keep SHOP or MESSENGER behavior intact."
+- "Add messenger admin team order query without breaking existing messengerId endpoint behavior."
+- "Implement messengerAdminId scoped payouts with ownership validation and tests."
 
 ## Quick Start Commands
 - Full build:
-  - mvn clean install -DskipTests
+  - ./mvnw clean install -DskipTests
 - Targeted module build with dependencies:
-  - mvn -pl izinga-ordermanager -am test
-  - mvn -pl izinga-usermanagement -am test
-  - mvn -pl izinga-recon -am test
+  - ./mvnw -pl izinga-ordermanager -am test
+  - ./mvnw -pl izinga-usermanagement -am test
+  - ./mvnw -pl izinga-recon -am test
 
 ## File Structure Landmarks
 - Parent modules list: pom.xml

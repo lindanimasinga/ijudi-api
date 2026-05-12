@@ -51,17 +51,23 @@ class UserController(private val profileService: UserProfileService) {
     fun findUsers(
         @RequestParam(required = false, defaultValue = "false") includePendingUsers: Boolean,
         @RequestParam(required = false) role: ProfileRoles?,
-        @RequestParam(required = false) latitude: Double,
-        @RequestParam(required = false) longitude: Double,
-        @RequestParam(required = false) range: Double,
+        @RequestParam(required = false) messengerAdminId: String?,
+        @RequestParam(required = false) latitude: Double?,
+        @RequestParam(required = false) longitude: Double?,
+        @RequestParam(required = false) range: Double?,
         @RequestParam(required = false, defaultValue = "FOOD") storeType: StoreType = StoreType.FOOD) : ResponseEntity<List<UserProfile?>?> {
-        logger.info("Find users request role={} latitude={} longitude={} range={}", role, latitude, longitude, range)
-        val users = if (role != null) profileService.findByLocation(
-            role,
-            latitude,
-            longitude,
-            range,
-            storeType) else profileService.findAll()
+        logger.info("Find users request role={} messengerAdminId={} latitude={} longitude={} range={}", role, messengerAdminId, latitude, longitude, range)
+        val users = when {
+            role == ProfileRoles.MESSENGER && !messengerAdminId.isNullOrBlank() -> profileService.findMessengersByAdminId(messengerAdminId)
+            role != null -> profileService.findByLocation(
+                role,
+                latitude!!,
+                longitude!!,
+                range!!,
+                storeType
+            )
+            else -> profileService.findAll()
+        }
         logger.info("Returning {} users", users?.size)
         return ResponseEntity.ok(users?.filter { user -> includePendingUsers || (user.profileApproved && user.termsAccepted == true) })
     }

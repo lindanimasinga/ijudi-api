@@ -85,11 +85,13 @@ public class OrderController {
     public ResponseEntity<List<Order>> getAllOrders(@RequestParam(required = false) String userId,
                                                     @RequestParam(required = false) String phone,
                                                     @RequestParam(required = false) String messengerId,
+                                                    @RequestParam(required = false) String messengerAdminId,
                                                     @RequestParam(defaultValue = "false") boolean allStages,
                                                     @RequestParam(required = false) String storeId) throws Exception {
         List<Order> order = !isEmpty(userId) ? orderService.findOrderByUserId(userId) :
                 !isEmpty(phone) ? orderService.findOrderByPhone(phone) :
                 !isEmpty(storeId) ? orderService.findOrderByStoreId(storeId) :
+                !isEmpty(messengerAdminId) ? orderService.findOrdersByMessengerAdminId(messengerAdminId, allStages) :
                 !isEmpty(messengerId) ? orderService.findOrderByMessengerId(messengerId, allStages) :
                         orderService.findAll();
         return order != null ? ResponseEntity.ok(order) : ResponseEntity.notFound().build();
