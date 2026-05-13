@@ -50,7 +50,7 @@ public class UserProfileEventHandler {
         if (p.getRole() == ProfileRoles.MESSENGER) {
             var alreadySent = "true".equalsIgnoreCase(p.getTag().get(DRIVER_APPROVAL_WHATSAPP_SENT_TAG));
             if (p.getProfileApproved() && !alreadySent) {
-                whatsappNotificationService.sendWelcomeMessageDriver(p.getMobileNumber(), p.getName());
+                whatsappNotificationService.sendDriverApprovedMessage(p.getMobileNumber(), p.getName());
                 p.getTag().put(DRIVER_APPROVAL_WHATSAPP_SENT_TAG, "true");
                 userProfileService.save(p);
             } else if (!p.getProfileApproved() && alreadySent) {

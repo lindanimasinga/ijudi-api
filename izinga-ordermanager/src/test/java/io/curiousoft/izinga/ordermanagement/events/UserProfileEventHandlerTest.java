@@ -23,7 +23,7 @@ public class UserProfileEventHandlerTest {
 
         handler.handleProfileUpdated(new ProfileUpdatedEvent(this, profile));
 
-        verify(whatsappNotificationService).sendWelcomeMessageDriver(profile.getMobileNumber(), profile.getName());
+        verify(whatsappNotificationService).sendDriverApprovedMessage(profile.getMobileNumber(), profile.getName());
         verify(userProfileRepo).save(profile);
         assertEquals("true", profile.getTag().get("driverApprovalWhatsappSent"));
     }
@@ -35,7 +35,7 @@ public class UserProfileEventHandlerTest {
 
         handler.handleProfileUpdated(new ProfileUpdatedEvent(this, profile));
 
-        verify(whatsappNotificationService, never()).sendWelcomeMessageDriver(anyString(), anyString());
+        verify(whatsappNotificationService, never()).sendDriverApprovedMessage(anyString(), anyString());
         verify(userProfileRepo, never()).save(profile);
     }
 
@@ -46,7 +46,7 @@ public class UserProfileEventHandlerTest {
 
         handler.handleProfileUpdated(new ProfileUpdatedEvent(this, profile));
 
-        verify(whatsappNotificationService, never()).sendWelcomeMessageDriver(anyString(), anyString());
+        verify(whatsappNotificationService, never()).sendDriverApprovedMessage(anyString(), anyString());
         verify(userProfileRepo).save(profile);
         assertFalse(profile.getTag().containsKey("driverApprovalWhatsappSent"));
     }

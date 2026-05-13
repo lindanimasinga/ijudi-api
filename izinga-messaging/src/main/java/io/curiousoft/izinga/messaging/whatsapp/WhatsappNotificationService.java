@@ -105,6 +105,41 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
     }
 
     @Override
+    public void sendDriverApprovedMessage(String mobileNumber, String driverName) {
+        try {
+            WhatsappTemplateRequest request = new WhatsappTemplateRequest();
+            String to = mobileNumber != null && mobileNumber.startsWith("0") ? mobileNumber.replaceFirst("0", "+27") : mobileNumber;
+            request.setTo(to);
+
+            String displayName = driverName != null && !driverName.isBlank() ? driverName : "Driver";
+
+            var requestStr = """
+                    {
+                      "name": "driver_approved_template",
+                      "language": { "code": "en_US" },
+                      "components": [
+                        {
+                          "type": "BODY",
+                          "parameters": [
+                            { "type": "TEXT", "text": "#name" }
+                          ]
+                        }
+                      ]
+                    }
+                    """;
+
+            requestStr = requestStr.replace("#name", displayName);
+
+            var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
+            request.setTemplate(template);
+            whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+            LOGGER.info("Sent driver approved message to {}", to);
+        } catch (IOException e) {
+            LOGGER.error("Failed to send driver approved message to {}", mobileNumber, e);
+        }
+    }
+
+    @Override
     public void notifyShopOrderPlaced(@NotNull Order order, StoreProfile store) throws IOException {
         // Request
         WhatsappTemplateRequest request = new WhatsappTemplateRequest();
