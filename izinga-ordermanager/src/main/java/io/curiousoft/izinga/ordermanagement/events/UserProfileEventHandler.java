@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 public class UserProfileEventHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(UserProfileEventHandler.class);
+    private static final String DRIVER_APPROVAL_WHATSAPP_SENT_TAG = "driverApprovalWhatsappSent";
     private final WhatsappNotificationService whatsappNotificationService;
     private final UserProfileRepo userProfileService;
 
@@ -47,8 +48,15 @@ public class UserProfileEventHandler {
         UserProfile p = (UserProfile) event.getProfile();
         LOG.info("[user-profile-event] updated: id={} name={} mobile={}", p.getId(), p.getName(), p.getMobileNumber());
         if (p.getRole() == ProfileRoles.MESSENGER) {
-            p.setProfileApproved(false);
-            userProfileService.save(p);
+            var alreadySent = "true".equalsIgnoreCase(p.getTag().get(DRIVER_APPROVAL_WHATSAPP_SENT_TAG));
+            if (p.getProfileApproved() && !alreadySent) {
+                whatsappNotificationService.sendWelcomeMessageDriver(p.getMobileNumber(), p.getName());
+                p.getTag().put(DRIVER_APPROVAL_WHATSAPP_SENT_TAG, "true");
+                userProfileService.save(p);
+            } else if (!p.getProfileApproved() && alreadySent) {
+                p.getTag().remove(DRIVER_APPROVAL_WHATSAPP_SENT_TAG);
+                userProfileService.save(p);
+            }
         }
 
     }
