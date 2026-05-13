@@ -20,6 +20,8 @@ Primary classes:
 
 Supporting inheritance and contracts:
 - izinga-usermanagement/src/main/kotlin/io/curiousoft/izinga/usermanagement/users/ProfileServiceImpl.kt
+- izinga-usermanagement/src/main/kotlin/io/curiousoft/izinga/usermanagement/userconfig/UserConfig.kt
+- izinga-usermanagement/src/main/kotlin/io/curiousoft/izinga/usermanagement/userconfig/UserConfigService.kt
 - izinga-commons/src/main/kotlin/io/curiousoft/izinga/commons/model/OrderStage.kt
 - izinga-commons/src/main/kotlin/io/curiousoft/izinga/commons/model/ProfileRoles.kt
 - izinga-commons/src/main/kotlin/io/curiousoft/izinga/commons/model/StoreType.kt
@@ -188,12 +190,17 @@ Inherited create behavior from ProfileServiceImpl:
 - Saves profile.
 - Publishes ProfileCreatedEvent.
 
+User config linkage:
+- `UserConfig` in `/user-config` now carries optional `userRole: ProfileRoles`.
+- `UserConfigService.update` preserves persisted key (`name`) and updates `label`, `mandatoryFields`, `optionalFields`, and `userRole`.
+
 UserProfileService review checkpoints:
 - Short phone number handling before substring.
 - Normalization consistency with order phone search.
 - Duplicate policy and race conditions for exists-plus-save flow.
 - Location range units and expected caller semantics.
 - Team lookup correctness for `findMessengersByAdminId` and ownership mapping (`tag.messengerAdminId`).
+- If roles are added/changed, validate that `userTypeConfig.userRole` mappings remain consistent with `ProfileRoles`.
 
 ## High-Risk Patterns To Check First
 - Substring operations without input-length guards.

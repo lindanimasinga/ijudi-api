@@ -43,6 +43,7 @@ Core modules and responsibilities:
   - MongoDB shared entities and reusable data contracts.
 - izinga-usermanagement:
   - User profile CRUD, pending approvals, user config, wallet pass.
+  - User config templates are stored in `userTypeConfig` and now support role mapping via `UserConfig.userRole`.
   - MCP tools for user lookup/create/location-based search.
 - izinga-recon:
   - Payout and payout bundles (shop and messenger), CSV exports, bank config.
@@ -70,6 +71,11 @@ Messenger admin ownership contract:
 
 Primary API surfaces:
 - /order, /store, /user, /user-config, /recon, /document, /yoco/payment, /whatsapp/webhook.
+
+User config contract:
+- `UserConfig` documents are keyed by `name` and patched via `/user-config/{userType}`.
+- `UserConfig.userRole` is an additive optional `ProfileRoles` mapping and must be preserved on update paths.
+- `UserConfigService.update` keeps the persisted key (`name`) and updates label/mandatoryFields/optionalFields/userRole.
 
 Recent additive query surfaces:
 - `/user?role=MESSENGER&messengerAdminId=<id>` for messenger admin team lookup.
@@ -110,6 +116,7 @@ User management:
 - If lookup is by phone, normalize SA numbers consistently (0, +27, 27 patterns).
 - If create/update user, preserve role-based behavior and profile approval flow.
 - For messenger admin features, use additive filters and resolve team members by `tag.messengerAdminId`.
+- For `/user-config`, keep `name` as the stable id and treat `userRole` as additive role metadata (do not rename/remove existing user types).
 
 Store management:
 - Keep owner role/store linkage and markup behavior intact.
