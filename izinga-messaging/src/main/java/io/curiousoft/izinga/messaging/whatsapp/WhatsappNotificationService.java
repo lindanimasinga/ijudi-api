@@ -647,7 +647,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
 
     /**
      * Builds a WhatsApp template with a BODY component containing two TEXT parameters: name and orderId.
-     * Using programmatic construction avoids JSON-injection when customer name contains special characters.
+     * Using programmatic construction avoids JSON injection when customer name contains special characters.
      */
     private WhatsappTemplateRequest.Template buildNameOrderIdTemplate(String templateName, String name, String orderId) {
         var nameParam = new WhatsappTemplateRequest.Parameter();
