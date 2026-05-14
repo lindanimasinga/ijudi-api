@@ -7,6 +7,7 @@ import java.util.*
 
 interface ShopPayoutRepository : MongoRepository<ShopPayout, String> {
     fun findByToId(toId: String): List<ShopPayout>
+    fun findAllByToIdAndPayoutStage(toId: String, payoutStage: PayoutStage): List<ShopPayout>
     fun findByToIdAndPayoutStage(shopId: String, payoutStage: PayoutStage): ShopPayout?
     fun findByPaid(paid: Boolean = false): List<ShopPayout>
     fun findByPayoutStage(payoutStage: PayoutStage = PayoutStage.PENDING): List<ShopPayout>
