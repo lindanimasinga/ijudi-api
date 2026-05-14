@@ -3,6 +3,7 @@ package io.curiousoft.izinga.recon
 import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.commons.model.OrderStage
 import io.curiousoft.izinga.commons.model.ProfileRoles
+import io.curiousoft.izinga.commons.model.StoreProfile
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
 import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent
@@ -102,26 +103,44 @@ class ReconServiceImpl(
     @Async
     @EventListener
     fun handleProfileUpdated(event: ProfileUpdatedEvent) {
-        val profile = event.profile as? UserProfile ?: return
-        val profileId = profile.id ?: return
-        val bank = profile.bank ?: return
+        when (val profile = event.profile) {
+            is UserProfile -> refreshPendingPayoutBankDetails(
+                payouts = messengerPayoutRepository.findAllByToIdAndPayoutStage(profile.id ?: return, PayoutStage.PENDING),
+                bank = profile.bank
+            )
+            is StoreProfile -> refreshPendingPayoutBankDetails(
+                payouts = shopPayoutRepo.findAllByToIdAndPayoutStage(profile.id ?: return, PayoutStage.PENDING),
+                bank = profile.bank
+            )
+        }
+    }
+
+    private fun refreshPendingPayoutBankDetails(payouts: List<Payout>, bank: io.curiousoft.izinga.commons.model.Bank?) {
+        if (payouts.isEmpty()) {
+            return
+        }
+
+        bank ?: return
         val bankName = bank.name ?: return
         val bankType = bank.type ?: return
         val accountId = normalizeBankAccountId(bank.accountId) ?: return
         val branchCode = bank.branchCode ?: return
 
-        val pendingPayouts = messengerPayoutRepository.findAllByToIdAndPayoutStage(profileId, PayoutStage.PENDING)
-        if (pendingPayouts.isEmpty()) {
-            return
-        }
-
-        pendingPayouts.forEach {
+        payouts.forEach {
             it.toBankName = bankName
             it.toType = bankType
             it.toAccountNumber = accountId
             it.toBranchCode = branchCode
         }
-        messengerPayoutRepository.saveAll(pendingPayouts)
+        val shopPayouts = payouts.filterIsInstance<ShopPayout>()
+        if (shopPayouts.isNotEmpty()) {
+            shopPayoutRepo.saveAll(shopPayouts)
+        }
+
+        val messengerPayouts = payouts.filterIsInstance<MessengerPayout>()
+        if (messengerPayouts.isNotEmpty()) {
+            messengerPayoutRepository.saveAll(messengerPayouts)
+        }
     }
 
     override fun updatePayoutStatus(bundleResponse: PayoutBundleResults) {
