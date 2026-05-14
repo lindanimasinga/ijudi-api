@@ -619,5 +619,65 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
         }
     }
 
+    @Override
+    public void notifyDriverArrivedForPickup(Order order, Profile customer) throws IOException {
+        WhatsappTemplateRequest request = new WhatsappTemplateRequest();
+        String mobileNumber = customer.getMobileNumber();
+        request.setTo(mobileNumber != null && mobileNumber.startsWith("0")
+                ? mobileNumber.replaceFirst("0", "+27")
+                : mobileNumber);
+        var requestStr = """
+                {
+                  "name": "driver_arrived_pickup",
+                  "language": { "code": "en_US" },
+                  "components": [
+                    {
+                      "type": "BODY",
+                      "parameters": [
+                        { "type": "TEXT", "text": "#name" },
+                        { "type": "TEXT", "text": "#orderId" }
+                      ]
+                    }
+                  ]
+                }
+                """
+                .replace("#name", customer.getName() != null ? customer.getName() : "Customer")
+                .replace("#orderId", order.getId());
+        var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
+        request.setTemplate(template);
+        whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+        LOGGER.info("Sent driver arrived for pickup notification to {}", mobileNumber);
+    }
+
+    @Override
+    public void notifyDriverArrivedForDropOff(Order order, Profile customer) throws IOException {
+        WhatsappTemplateRequest request = new WhatsappTemplateRequest();
+        String mobileNumber = customer.getMobileNumber();
+        request.setTo(mobileNumber != null && mobileNumber.startsWith("0")
+                ? mobileNumber.replaceFirst("0", "+27")
+                : mobileNumber);
+        var requestStr = """
+                {
+                  "name": "driver_arrived_dropoff",
+                  "language": { "code": "en_US" },
+                  "components": [
+                    {
+                      "type": "BODY",
+                      "parameters": [
+                        { "type": "TEXT", "text": "#name" },
+                        { "type": "TEXT", "text": "#orderId" }
+                      ]
+                    }
+                  ]
+                }
+                """
+                .replace("#name", customer.getName() != null ? customer.getName() : "Customer")
+                .replace("#orderId", order.getId());
+        var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
+        request.setTemplate(template);
+        whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+        LOGGER.info("Sent driver arrived for drop-off notification to {}", mobileNumber);
+    }
+
 
 }

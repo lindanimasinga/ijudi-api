@@ -9,6 +9,8 @@ import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
 import io.curiousoft.izinga.ordermanagement.service.DeviceService;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsappNotificationService;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,8 @@ import java.util.List;
 
 @Service
 public class CustomerOrderEventHandler implements OrderEventHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(CustomerOrderEventHandler.class);
 
     private final FirebaseNotificationService pushNotificationService;
     private final EmailNotificationService emailNotificationService;
@@ -71,9 +75,10 @@ public class CustomerOrderEventHandler implements OrderEventHandler {
         var order = orderUpdatedEvent.getOrder();
         var store = orderUpdatedEvent.getReceivingStore();
         final String order_status_updated = "Order Status Updated";
+        var originalStage = order.getStage();
         PushHeading title = null;
         PushMessage message = null;
-        switch (order.getStage()) {
+        switch (originalStage) {
             case STAGE_0_CUSTOMER_NOT_PAID, STAGE_1_WAITING_STORE_CONFIRM:
                 return;
             case STAGE_2_STORE_PROCESSING:
@@ -93,6 +98,8 @@ public class CustomerOrderEventHandler implements OrderEventHandler {
                 message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
                 break;
             case STAGE_6_WITH_CUSTOMER:
+                title = new PushHeading("Your order has been delivered", order_status_updated, null, null);
+                message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
                 order.setStage(OrderStage.STAGE_7_ALL_PAID);
                 break;
             case STAGE_7_ALL_PAID:
@@ -106,8 +113,16 @@ public class CustomerOrderEventHandler implements OrderEventHandler {
         if (!customerDevices.isEmpty()) {
             pushNotificationService.sendNotifications(customerDevices, message);
         }
-        if (title != null) {
-            whatsappNotificationService.sendMessage(customer.getMobileNumber(), title.getBody());
+        try {
+            if (originalStage == OrderStage.STAGE_5_ARRIVED) {
+                whatsappNotificationService.notifyDriverArrivedForPickup(order, customer);
+            } else if (originalStage == OrderStage.STAGE_6_WITH_CUSTOMER) {
+                whatsappNotificationService.notifyDriverArrivedForDropOff(order, customer);
+            } else if (title != null) {
+                whatsappNotificationService.sendMessage(customer.getMobileNumber(), title.getBody());
+            }
+        } catch (Exception e) {
+            LOGGER.warn("Failed to send WhatsApp delivery update notification for order {}", order.getId(), e);
         }
 
     }
