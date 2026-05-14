@@ -3,7 +3,10 @@ package io.curiousoft.izinga.recon
 import io.curiousoft.izinga.commons.model.Bank
 import io.curiousoft.izinga.commons.model.BankAccType
 import io.curiousoft.izinga.commons.model.BusinessHours
+import io.curiousoft.izinga.commons.model.Order
+import io.curiousoft.izinga.commons.model.OrderStage
 import io.curiousoft.izinga.commons.model.ProfileRoles
+import io.curiousoft.izinga.commons.model.ShippingData
 import io.curiousoft.izinga.commons.model.StoreProfile
 import io.curiousoft.izinga.commons.model.StoreType
 import io.curiousoft.izinga.commons.model.UserProfile
@@ -47,7 +50,7 @@ class ReconServiceImplProfileUpdateTest {
     }
 
     @Test
-    fun `profile update refreshes pending messenger payout banking details`() {
+    fun `profile update refreshes pending messenger payout banking details for ewallet`() {
         val messenger = UserProfile(
             "messenger-name",
             UserProfile.SignUpReason.DELIVERY_DRIVER,
@@ -60,7 +63,7 @@ class ReconServiceImplProfileUpdateTest {
             bank = Bank().apply {
                 name = "New Bank"
                 accountId = "+2782000111"
-                type = BankAccType.SAVINGS
+                type = BankAccType.EWALLET
                 phone = "0810000001"
                 branchCode = "250655"
             }
@@ -107,14 +110,14 @@ class ReconServiceImplProfileUpdateTest {
         assertEquals(2, savedPayouts.size)
         savedPayouts.forEach {
             assertEquals("New Bank", it.toBankName)
-            assertEquals(BankAccType.SAVINGS, it.toType)
+            assertEquals(BankAccType.EWALLET, it.toType)
             assertEquals("082000111", it.toAccountNumber)
             assertEquals("250655", it.toBranchCode)
         }
     }
 
     @Test
-    fun `profile update refreshes pending shop payout banking details`() {
+    fun `profile update refreshes pending shop payout banking details without changing non ewallet account numbers`() {
         val store = StoreProfile(
             StoreType.FOOD,
             "store-name",
@@ -176,11 +179,89 @@ class ReconServiceImplProfileUpdateTest {
 
         val savedPayouts = updatedPayouts.captured.toList()
         assertEquals(2, savedPayouts.size)
-        savedPayouts.forEach {
-            assertEquals("Shop Bank", it.toBankName)
-            assertEquals(BankAccType.CHEQUE, it.toType)
-            assertEquals("082333444", it.toAccountNumber)
-            assertEquals("632005", it.toBranchCode)
+        assertEquals("Shop Bank", savedPayouts[0].toBankName)
+        assertEquals(BankAccType.CHEQUE, savedPayouts[0].toType)
+        assertEquals("0111111111", savedPayouts[0].toAccountNumber)
+        assertEquals("632005", savedPayouts[0].toBranchCode)
+        assertEquals("Shop Bank", savedPayouts[1].toBankName)
+        assertEquals(BankAccType.CHEQUE, savedPayouts[1].toType)
+        assertEquals("0222222222", savedPayouts[1].toAccountNumber)
+        assertEquals("632005", savedPayouts[1].toBranchCode)
+    }
+
+    @Test
+    fun `shop payout creation keeps non ewallet account number unchanged`() {
+        val order = Order().apply {
+            id = "order-1"
+            stage = OrderStage.STAGE_7_ALL_PAID
+            shopId = "shop-1"
         }
+        val store = StoreProfile(
+            StoreType.FOOD,
+            "store-name",
+            "store-short-name",
+            "address",
+            "https://image.url",
+            "0810000001",
+            mutableListOf("food"),
+            mutableListOf(BusinessHours(DayOfWeek.MONDAY, Date(), Date())),
+            "owner-1",
+            Bank().apply {
+                name = "Shop Bank"
+                accountId = "+2782333444"
+                type = BankAccType.CHEQUE
+                phone = "0810000001"
+                branchCode = "632005"
+            }
+        ).apply {
+            id = "shop-1"
+            emailAddress = "shop@x.com"
+            hasPaymentAgreement = true
+        }
+
+        every { storeRepo.findById("shop-1") } returns java.util.Optional.of(store)
+        every { shopPayoutRepository.findByToIdAndPayoutStage("shop-1", PayoutStage.PENDING) } returns null
+        every { shopPayoutRepository.save(any()) } answers { firstArg() }
+
+        val payout = sut.generatePayoutForShopAndOrder(order)
+
+        assertEquals("+2782333444", payout?.toAccountNumber)
+        assertEquals(BankAccType.CHEQUE, payout?.toType)
+    }
+
+    @Test
+    fun `messenger payout creation keeps non ewallet account number unchanged`() {
+        val order = Order().apply {
+            id = "order-2"
+            shippingData = ShippingData().apply { messengerId = "messenger-1" }
+            tip = 10.0
+        }
+        val messenger = UserProfile(
+            "messenger-name",
+            UserProfile.SignUpReason.DELIVERY_DRIVER,
+            "address",
+            "https://image.url",
+            "0810000001",
+            ProfileRoles.MESSENGER
+        ).apply {
+            id = "messenger-1"
+            emailAddress = "m1@x.com"
+            bank = Bank().apply {
+                name = "New Bank"
+                accountId = "+2782000111"
+                type = BankAccType.SAVINGS
+                phone = "0810000001"
+                branchCode = "250655"
+            }
+        }
+
+        every { userProfileRepo.findById("messenger-1") } returns java.util.Optional.of(messenger)
+        every { messengerPayoutRepository.findByToIdAndPayoutStage("messenger-1", PayoutStage.PENDING) } returns null
+        every { messengerPayoutRepository.save(any()) } answers { firstArg() }
+
+        val payout = sut.generatePayoutForMessengerAndOrder(order)
+
+        assertEquals("+2782000111", payout?.toAccountNumber)
+        assertEquals(BankAccType.SAVINGS, payout?.toType)
     }
 }

@@ -3,6 +3,8 @@ package io.curiousoft.izinga.recon
 import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.commons.model.OrderStage
 import io.curiousoft.izinga.commons.model.ProfileRoles
+import io.curiousoft.izinga.commons.model.Bank
+import io.curiousoft.izinga.commons.model.BankAccType
 import io.curiousoft.izinga.commons.model.StoreProfile
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
@@ -51,7 +53,7 @@ class ReconServiceImpl(
             toName = store.name!!,
             toBankName = store.bank?.name!!,
             toType = store.bank?.type!!,
-            toAccountNumber = normalizeBankAccountId(store.bank?.accountId)!!,
+            toAccountNumber = getPayoutAccountNumber(store.bank?.accountId, store.bank?.type)!!,
             orders = mutableSetOf(),
             toBranchCode = store.bank?.branchCode!!,
             fromReference = "Payment to ${store.name}",
@@ -78,7 +80,7 @@ class ReconServiceImpl(
             toName = messng.name!!,
             toBankName = messng.bank?.name!!,
             toType = messng.bank?.type!!,
-            toAccountNumber = normalizeBankAccountId(messng.bank?.accountId)!!,
+            toAccountNumber = getPayoutAccountNumber(messng.bank?.accountId, messng.bank?.type)!!,
             orders = mutableSetOf(),
             toBranchCode = messng.bank!!.branchCode!!,
             toReference = "iZinga pay",
@@ -115,7 +117,7 @@ class ReconServiceImpl(
         }
     }
 
-    private fun refreshPendingPayoutBankDetails(payouts: List<Payout>, bank: io.curiousoft.izinga.commons.model.Bank?) {
+    private fun refreshPendingPayoutBankDetails(payouts: List<Payout>, bank: Bank?) {
         if (payouts.isEmpty()) {
             return
         }
@@ -123,13 +125,17 @@ class ReconServiceImpl(
         bank ?: return
         val bankName = bank.name ?: return
         val bankType = bank.type ?: return
-        val accountId = normalizeBankAccountId(bank.accountId) ?: return
         val branchCode = bank.branchCode ?: return
+        val accountId = if (bankType == BankAccType.EWALLET) {
+            normalizeBankAccountId(bank.accountId) ?: return
+        } else null
 
         payouts.forEach {
             it.toBankName = bankName
             it.toType = bankType
-            it.toAccountNumber = accountId
+            if (accountId != null) {
+                it.toAccountNumber = accountId
+            }
             it.toBranchCode = branchCode
         }
         val shopPayouts = payouts.filterIsInstance<ShopPayout>()
@@ -267,5 +273,8 @@ class ReconServiceImpl(
         ?: messengerPayoutRepository.findByIdOrNull(payoutId)
 
     private fun normalizeBankAccountId(accountId: String?): String? = accountId?.replace("+27", "0")
+
+    private fun getPayoutAccountNumber(accountId: String?, bankType: BankAccType?): String? =
+        if (bankType == BankAccType.EWALLET) normalizeBankAccountId(accountId) else accountId
 
 }
