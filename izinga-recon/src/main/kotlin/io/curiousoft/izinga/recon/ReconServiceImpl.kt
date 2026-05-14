@@ -3,7 +3,9 @@ package io.curiousoft.izinga.recon
 import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.commons.model.OrderStage
 import io.curiousoft.izinga.commons.model.ProfileRoles
+import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
+import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.payout.*
@@ -13,6 +15,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.ai.tool.annotation.Tool
 import org.springframework.ai.tool.annotation.ToolParam
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.context.event.EventListener
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Service
@@ -47,7 +50,7 @@ class ReconServiceImpl(
             toName = store.name!!,
             toBankName = store.bank?.name!!,
             toType = store.bank?.type!!,
-            toAccountNumber = store.bank?.accountId?.replace("+27", "0")!!,
+            toAccountNumber = normalizeBankAccountId(store.bank?.accountId)!!,
             orders = mutableSetOf(),
             toBranchCode = store.bank?.branchCode!!,
             fromReference = "Payment to ${store.name}",
@@ -74,7 +77,7 @@ class ReconServiceImpl(
             toName = messng.name!!,
             toBankName = messng.bank?.name!!,
             toType = messng.bank?.type!!,
-            toAccountNumber = messng.bank?.accountId?.replace("+27", "0")!!,
+            toAccountNumber = normalizeBankAccountId(messng.bank?.accountId)!!,
             orders = mutableSetOf(),
             toBranchCode = messng.bank!!.branchCode!!,
             toReference = "iZinga pay",
@@ -94,6 +97,31 @@ class ReconServiceImpl(
                 payout.emailSent = false
             }
         return messengerPayoutRepository.save(payout)
+    }
+
+    @Async
+    @EventListener
+    fun handleProfileUpdated(event: ProfileUpdatedEvent) {
+        val profile = event.profile as? UserProfile ?: return
+        val profileId = profile.id ?: return
+        val bank = profile.bank ?: return
+        val bankName = bank.name ?: return
+        val bankType = bank.type ?: return
+        val accountId = normalizeBankAccountId(bank.accountId) ?: return
+        val branchCode = bank.branchCode ?: return
+
+        val pendingPayouts = messengerPayoutRepository.findAllByToIdAndPayoutStage(profileId, PayoutStage.PENDING)
+        if (pendingPayouts.isEmpty()) {
+            return
+        }
+
+        pendingPayouts.forEach {
+            it.toBankName = bankName
+            it.toType = bankType
+            it.toAccountNumber = accountId
+            it.toBranchCode = branchCode
+        }
+        messengerPayoutRepository.saveAll(pendingPayouts)
     }
 
     override fun updatePayoutStatus(bundleResponse: PayoutBundleResults) {
@@ -218,5 +246,7 @@ class ReconServiceImpl(
 
     override fun findPayout(bundleId: String, payoutId: String): Payout? = shopPayoutRepo.findByIdOrNull(payoutId)
         ?: messengerPayoutRepository.findByIdOrNull(payoutId)
+
+    private fun normalizeBankAccountId(accountId: String?): String? = accountId?.replace("+27", "0")
 
 }

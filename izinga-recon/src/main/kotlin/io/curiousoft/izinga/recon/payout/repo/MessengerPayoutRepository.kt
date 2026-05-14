@@ -7,6 +7,7 @@ import java.util.*
 
 interface MessengerPayoutRepository : MongoRepository<MessengerPayout, String> {
     fun findByToId(toId: String): List<MessengerPayout>
+    fun findAllByToIdAndPayoutStage(toId: String, payoutStage: PayoutStage): List<MessengerPayout>
     fun findByToIdAndPayoutStage(shopId: String, payoutStage: PayoutStage): MessengerPayout?
     fun findByPayoutStage(payoutStage: PayoutStage = PayoutStage.PENDING): List<MessengerPayout>
     fun findByCreatedDateBetweenAndToId(fromDate: Date, toDate: Date, toId: String): List<MessengerPayout>
