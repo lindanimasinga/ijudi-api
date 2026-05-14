@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.recon
 
 import io.curiousoft.izinga.commons.model.Order
+import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent
 import io.curiousoft.izinga.recon.payout.*
 import java.util.*
 
@@ -24,4 +25,6 @@ interface ReconService {
 
     fun findPayout(bundleId: String, payoutId: String): Payout?
     fun updateBundle(bundle: PayoutBundle)
+
+    fun handleProfileUpdated(event: ProfileUpdatedEvent)
 }

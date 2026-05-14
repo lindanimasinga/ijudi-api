@@ -104,7 +104,7 @@ class ReconServiceImpl(
 
     @Async
     @EventListener
-    fun handleProfileUpdated(event: ProfileUpdatedEvent) {
+    override fun handleProfileUpdated(event: ProfileUpdatedEvent) {
         when (val profile = event.profile) {
             is UserProfile -> refreshPendingPayoutBankDetails(
                 payouts = messengerPayoutRepository.findAllByToIdAndPayoutStage(profile.id ?: return, PayoutStage.PENDING),
