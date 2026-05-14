@@ -8,6 +8,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.stream.Collectors;
 
@@ -28,11 +29,15 @@ public class IjudiErrorHandler {
                     getFieldErrors()
                     .stream()
                     .map(FieldError::getDefaultMessage).collect(Collectors.toList()));
+        } else if (e instanceof NoResourceFoundException ) {
+            errorResponse.setMessage(e.getMessage());
+            errorResponse.setStatus(HttpStatus.NOT_FOUND);
+            LOGGER.warn(e.getMessage());
         } else {
             errorResponse.setMessage(e.getMessage());
             errorResponse.setStatus(HttpStatus.INTERNAL_SERVER_ERROR);
+            LOGGER.error(e.getMessage(), e);
         }
-        LOGGER.error(e.getMessage(), e);
         return new ResponseEntity<>(errorResponse, errorResponse.getStatus());
     }
 
