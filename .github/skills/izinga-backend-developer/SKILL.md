@@ -37,7 +37,8 @@ Core modules and responsibilities:
   - Entry point: src/main/java/io/curiousoft/izinga/ordermanagement/IjudiApplication.java
   - Domain APIs: order, store, device, promotion, restricted regions, shopping-list.
   - Security and JWT/OAuth2 resource server config.
-  - MCP server wiring via McpConfig.
+  - MCP server wiring via McpConfig using `MethodToolCallbackProvider.builder().toolObjects(...)`.
+  - MCP transport endpoints exposed by Spring AI: `GET /sse` and `POST /mcp/message`.
 - izinga-commons:
   - Shared models, enums, repositories, and validators.
   - MongoDB shared entities and reusable data contracts.
@@ -58,6 +59,7 @@ Core modules and responsibilities:
   - Tip QR and promo code management.
 - store-menu-to-izinga-menu:
   - Store menu ingestion/update utility (AWS/serverless style integration module).
+  - In sandbox clones this submodule is often not initialized; local reactor builds may require a temporary `store-menu-to-izinga-menu/pom.xml` stub.
 
 ## Key Domain Contracts
 Shared enums and models are in izinga-commons and must be treated as stable contracts:
@@ -196,6 +198,7 @@ Task is complete only when:
 - "Implement messengerAdminId scoped payouts with ownership validation and tests."
 
 ## Quick Start Commands
+- If `store-menu-to-izinga-menu/pom.xml` is missing in a sandbox clone, add a temporary stub `pom.xml` in that folder before running multi-module Maven commands.
 - Full build:
   - ./mvnw clean install -DskipTests
 - Targeted module build with dependencies:

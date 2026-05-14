@@ -161,7 +161,7 @@ Firestore text persistence:
 
 WhatsApp handler review checkpoints:
 - Constructor injection correctness and parameter duplication.
-- Null-safety of contacts list for landing options path.
+- Null-safety of contacts list for landing options path (never call `value.getContacts().get(0)` without null/empty checks).
 - Notification fan-out behavior for every text message.
 - Verification flow interaction with subsequent text processing in same cycle.
 - Accept detection robustness against localization and non-English replies.
@@ -228,10 +228,12 @@ UserProfileService review checkpoints:
 5. For messenger admin features, add ownership authorization tests (valid admin, wrong admin, non-admin).
 
 ## Validation Matrix
+If `store-menu-to-izinga-menu/pom.xml` is missing in a sandbox clone, create a temporary stub `pom.xml` so Maven reactor commands can run.
+
 Use targeted module checks:
-- mvn -pl izinga-ordermanager -am test
-- mvn -pl izinga-messaging -am test
-- mvn -pl izinga-usermanagement -am test
+- ./mvnw -pl izinga-ordermanager -am test
+- ./mvnw -pl izinga-messaging -am test
+- ./mvnw -pl izinga-usermanagement -am test
 
 Minimum scenario checks:
 - Order start, finish, next stage, cancel, quote accept/reject.
