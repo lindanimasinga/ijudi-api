@@ -70,6 +70,8 @@ public class CustomerOrderEventHandler implements OrderEventHandler {
         whatsappNotificationService.notifyOrderPlaced(order, customer);
     }
 
+    @Async
+    @EventListener
     @Override
     public void handleOrderUpdatedEvent(OrderUpdatedEvent orderUpdatedEvent) {
         var order = orderUpdatedEvent.getOrder();

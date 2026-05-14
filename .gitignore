@@ -36,3 +36,4 @@ izinga-ordermanager/src/main/resources/application-secrets.yml
 izinga-usermanagement/src/test/kotlin/io/curiousoft/izinga/usermanagement/walletpass/google/GooglePassGeneratorTest.kt
 izinga-usermanagement/mypass1.pkpass
 izinga-usermanagement/src/test/kotlin/io/curiousoft/izinga/usermanagement/walletpass/google/GooglePassGeneratorTest.kt
+store-menu-to-izinga-menu/pom.xml
