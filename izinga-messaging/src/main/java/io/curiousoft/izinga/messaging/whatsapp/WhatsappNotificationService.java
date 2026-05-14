@@ -619,5 +619,58 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
         }
     }
 
+    @Override
+    public void notifyDriverArrivedForPickup(Order order, Profile customer) throws IOException {
+        WhatsappTemplateRequest request = new WhatsappTemplateRequest();
+        String mobileNumber = customer.getMobileNumber();
+        request.setTo(mobileNumber != null && mobileNumber.startsWith("0")
+                ? mobileNumber.replaceFirst("0", "+27")
+                : mobileNumber);
+        String displayName = customer.getName() != null ? customer.getName() : "Customer";
+        request.setTemplate(buildNameOrderIdTemplate("driver_arrived_pickup", displayName, order.getId()));
+        whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+        LOGGER.info("Sent driver arrived for pickup notification to {}", mobileNumber);
+    }
+
+    @Override
+    public void notifyDriverArrivedForDropOff(Order order, Profile customer) throws IOException {
+        WhatsappTemplateRequest request = new WhatsappTemplateRequest();
+        String mobileNumber = customer.getMobileNumber();
+        request.setTo(mobileNumber != null && mobileNumber.startsWith("0")
+                ? mobileNumber.replaceFirst("0", "+27")
+                : mobileNumber);
+        String displayName = customer.getName() != null ? customer.getName() : "Customer";
+        request.setTemplate(buildNameOrderIdTemplate("driver_arrived_dropoff", displayName, order.getId()));
+        whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+        LOGGER.info("Sent driver arrived for drop-off notification to {}", mobileNumber);
+    }
+
+    /**
+     * Builds a WhatsApp template with a BODY component containing two TEXT parameters: name and orderId.
+     * Using programmatic construction avoids JSON injection when customer name contains special characters.
+     */
+    private WhatsappTemplateRequest.Template buildNameOrderIdTemplate(String templateName, String name, String orderId) {
+        var nameParam = new WhatsappTemplateRequest.Parameter();
+        nameParam.setType(WhatsappTemplateRequest.ParameterType.TEXT);
+        nameParam.setText(name);
+
+        var orderIdParam = new WhatsappTemplateRequest.Parameter();
+        orderIdParam.setType(WhatsappTemplateRequest.ParameterType.TEXT);
+        orderIdParam.setText(orderId);
+
+        var bodyComponent = new WhatsappTemplateRequest.Component();
+        bodyComponent.setType(WhatsappTemplateRequest.ComponentType.BODY);
+        bodyComponent.setParameters(List.of(nameParam, orderIdParam));
+
+        var language = new WhatsappTemplateRequest.Language();
+        language.setCode("en_US");
+
+        var template = new WhatsappTemplateRequest.Template();
+        template.setName(templateName);
+        template.setLanguage(language);
+        template.setComponents(List.of(bodyComponent));
+        return template;
+    }
+
 
 }
