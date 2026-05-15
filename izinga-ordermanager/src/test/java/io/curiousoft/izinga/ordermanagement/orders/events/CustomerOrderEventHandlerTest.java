@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 
@@ -77,10 +78,14 @@ class CustomerOrderEventHandlerTest {
         return new OrderUpdatedEvent(this, order, "messengerId", storeProfile());
     }
 
+    private OrderUpdatedEvent event(Order order, StoreProfile store) {
+        return new OrderUpdatedEvent(this, order, "messengerId", store);
+    }
+
     // ─── STAGE_5_ARRIVED ─────────────────────────────────────────────────────
 
     @Test
-    void handleOrderUpdatedEvent_stage5Arrived_sendsPickupTemplateAndPushNotification() throws Exception {
+    void handleOrderUpdatedEvent_stage5Arrived_sendsDropOffTemplateAndPushNotification() throws Exception {
         Order order = orderWithStage(OrderStage.STAGE_5_ARRIVED);
         UserProfile customer = customer();
         List<Device> devices = List.of(new Device("token123"));
@@ -91,8 +96,8 @@ class CustomerOrderEventHandlerTest {
         handler.handleOrderUpdatedEvent(event(order));
 
         verify(pushNotificationService).sendNotifications(eq(devices), any(PushMessage.class));
-        verify(whatsappNotificationService).notifyDriverArrivedForPickup(order, customer);
-        verify(whatsappNotificationService, never()).notifyDriverArrivedForDropOff(any(), any());
+        verify(whatsappNotificationService).notifyDriverArrivedForDropOff(order, customer);
+        verify(whatsappNotificationService, never()).notifyDriverArrivedForPickup(any(), any());
         verify(whatsappNotificationService, never()).sendMessage(anyString(), anyString());
     }
 
@@ -107,13 +112,13 @@ class CustomerOrderEventHandlerTest {
         handler.handleOrderUpdatedEvent(event(order));
 
         verify(pushNotificationService, never()).sendNotifications(any(), any());
-        verify(whatsappNotificationService).notifyDriverArrivedForPickup(order, customer);
+        verify(whatsappNotificationService).notifyDriverArrivedForDropOff(order, customer);
     }
 
     // ─── STAGE_6_WITH_CUSTOMER ───────────────────────────────────────────────
 
     @Test
-    void handleOrderUpdatedEvent_stage6WithCustomer_sendsDropOffTemplateAndAdvancesStage() throws Exception {
+    void handleOrderUpdatedEvent_stage6WithCustomer_sendsPushAndAdvancesStage() throws Exception {
         Order order = orderWithStage(OrderStage.STAGE_6_WITH_CUSTOMER);
         UserProfile customer = customer();
         List<Device> devices = List.of(new Device("token456"));
@@ -124,8 +129,8 @@ class CustomerOrderEventHandlerTest {
         handler.handleOrderUpdatedEvent(event(order));
 
         verify(pushNotificationService).sendNotifications(eq(devices), any(PushMessage.class));
-        verify(whatsappNotificationService).notifyDriverArrivedForDropOff(order, customer);
         verify(whatsappNotificationService, never()).notifyDriverArrivedForPickup(any(), any());
+        verify(whatsappNotificationService, never()).notifyDriverArrivedForDropOff(any(), any());
         verify(whatsappNotificationService, never()).sendMessage(anyString(), anyString());
         assertEquals(OrderStage.STAGE_7_ALL_PAID, order.getStage());
     }
@@ -133,7 +138,7 @@ class CustomerOrderEventHandlerTest {
     // ─── STAGE_2_STORE_PROCESSING ────────────────────────────────────────────
 
     @Test
-    void handleOrderUpdatedEvent_stage2Processing_sendsPushAndWhatsAppText() throws Exception {
+    void handleOrderUpdatedEvent_stage2Processing_sendsPushOnly() throws Exception {
         Order order = orderWithStage(OrderStage.STAGE_2_STORE_PROCESSING);
         UserProfile customer = customer();
         List<Device> devices = List.of(new Device("token789"));
@@ -144,15 +149,15 @@ class CustomerOrderEventHandlerTest {
         handler.handleOrderUpdatedEvent(event(order));
 
         verify(pushNotificationService).sendNotifications(eq(devices), any(PushMessage.class));
-        verify(whatsappNotificationService).sendMessage(anyString(), contains("order123"));
         verify(whatsappNotificationService, never()).notifyDriverArrivedForPickup(any(), any());
         verify(whatsappNotificationService, never()).notifyDriverArrivedForDropOff(any(), any());
+        verify(whatsappNotificationService, never()).sendMessage(anyString(), anyString());
     }
 
     // ─── STAGE_4_ON_THE_ROAD ─────────────────────────────────────────────────
 
     @Test
-    void handleOrderUpdatedEvent_stage4OnTheRoad_sendsPushAndWhatsAppText() throws Exception {
+    void handleOrderUpdatedEvent_stage4OnTheRoad_sendsPushOnly() throws Exception {
         Order order = orderWithStage(OrderStage.STAGE_4_ON_THE_ROAD);
         UserProfile customer = customer();
         List<Device> devices = List.of(new Device("token101"));
@@ -163,9 +168,9 @@ class CustomerOrderEventHandlerTest {
         handler.handleOrderUpdatedEvent(event(order));
 
         verify(pushNotificationService).sendNotifications(eq(devices), any(PushMessage.class));
-        verify(whatsappNotificationService).sendMessage(anyString(), contains("way"));
         verify(whatsappNotificationService, never()).notifyDriverArrivedForPickup(any(), any());
         verify(whatsappNotificationService, never()).notifyDriverArrivedForDropOff(any(), any());
+        verify(whatsappNotificationService, never()).sendMessage(anyString(), anyString());
     }
 
     // ─── Early-return stages ─────────────────────────────────────────────────
@@ -173,49 +178,53 @@ class CustomerOrderEventHandlerTest {
     @Test
     void handleOrderUpdatedEvent_stage0NotPaid_returnsEarlyWithoutAnyNotification() {
         Order order = orderWithStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        UserProfile customer = customer();
+        when(userProfileService.find("customerId")).thenReturn(customer);
+        when(deviceService.findByUserId("customerId")).thenReturn(Collections.emptyList());
 
         handler.handleOrderUpdatedEvent(event(order));
 
-        verifyNoInteractions(pushNotificationService, whatsappNotificationService, userProfileService, deviceService);
+        verifyNoInteractions(pushNotificationService, whatsappNotificationService);
     }
 
     @Test
     void handleOrderUpdatedEvent_stage1WaitingConfirm_returnsEarlyWithoutAnyNotification() {
         Order order = orderWithStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        UserProfile customer = customer();
+        when(userProfileService.find("customerId")).thenReturn(customer);
+        when(deviceService.findByUserId("customerId")).thenReturn(Collections.emptyList());
 
         handler.handleOrderUpdatedEvent(event(order));
 
-        verifyNoInteractions(pushNotificationService, whatsappNotificationService, userProfileService, deviceService);
+        verifyNoInteractions(pushNotificationService, whatsappNotificationService);
     }
 
     // ─── WhatsApp failure resilience ─────────────────────────────────────────
 
     @Test
-    void handleOrderUpdatedEvent_whatsAppFailureForPickup_doesNotSuppressPushNotification() throws Exception {
-        Order order = orderWithStage(OrderStage.STAGE_5_ARRIVED);
+    void handleOrderUpdatedEvent_whatsAppFailureForPickup_doesNotBreakFlow() throws Exception {
+        Order order = orderWithStage(OrderStage.STAGE_3_READY_FOR_COLLECTION);
         UserProfile customer = customer();
-        List<Device> devices = List.of(new Device("tokenErr"));
 
         when(userProfileService.find("customerId")).thenReturn(customer);
-        when(deviceService.findByUserId("customerId")).thenReturn(devices);
-        doThrow(new RuntimeException("WhatsApp service unavailable"))
+        when(deviceService.findByUserId("customerId")).thenReturn(Collections.emptyList());
+        doThrow(new IOException("WhatsApp service unavailable"))
                 .when(whatsappNotificationService).notifyDriverArrivedForPickup(any(), any());
 
-        // Should complete without throwing; push must still be sent
-        handler.handleOrderUpdatedEvent(event(order));
+        handler.handleOrderUpdatedEvent(event(order, moversStoreProfile()));
 
-        verify(pushNotificationService).sendNotifications(eq(devices), any(PushMessage.class));
+        verify(pushNotificationService, never()).sendNotifications(any(), any());
     }
 
     @Test
     void handleOrderUpdatedEvent_whatsAppFailureForDropOff_doesNotSuppressPushNotification() throws Exception {
-        Order order = orderWithStage(OrderStage.STAGE_6_WITH_CUSTOMER);
+        Order order = orderWithStage(OrderStage.STAGE_5_ARRIVED);
         UserProfile customer = customer();
         List<Device> devices = List.of(new Device("tokenErr2"));
 
         when(userProfileService.find("customerId")).thenReturn(customer);
         when(deviceService.findByUserId("customerId")).thenReturn(devices);
-        doThrow(new RuntimeException("WhatsApp service unavailable"))
+        doThrow(new IOException("WhatsApp service unavailable"))
                 .when(whatsappNotificationService).notifyDriverArrivedForDropOff(any(), any());
 
         handler.handleOrderUpdatedEvent(event(order));
