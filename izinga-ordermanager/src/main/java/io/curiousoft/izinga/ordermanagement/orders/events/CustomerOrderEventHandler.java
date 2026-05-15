@@ -76,6 +76,8 @@ public class CustomerOrderEventHandler implements OrderEventHandler {
     public void handleOrderUpdatedEvent(OrderUpdatedEvent orderUpdatedEvent) {
         var order = orderUpdatedEvent.getOrder();
         var store = orderUpdatedEvent.getReceivingStore();
+        var customer = userProfileService.find(order.getCustomerId());
+        List<Device> customerDevices = deviceService.findByUserId(customer.getId());
         final String order_status_updated = "Order Status Updated";
         var originalStage = order.getStage();
         PushHeading title = null;
@@ -90,6 +92,13 @@ public class CustomerOrderEventHandler implements OrderEventHandler {
                 message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
                 break;
             case STAGE_3_READY_FOR_COLLECTION:
+                if (StoreType.MOVERS == store.getStoreType()) {
+                    try {
+                        whatsappNotificationService.notifyDriverArrivedForPickup(order, customer);
+                    } catch (IOException e) {
+                        LOGGER.warn("Failed to send WhatsApp pickup notification for order {}", order.getId(), e);
+                    }
+                }
                 break;
             case STAGE_4_ON_THE_ROAD:
                 title = new PushHeading("The driver is on the way", order_status_updated, null, null);
@@ -98,6 +107,11 @@ public class CustomerOrderEventHandler implements OrderEventHandler {
             case STAGE_5_ARRIVED:
                 title = new PushHeading("The driver has arrived", order_status_updated, null, null);
                 message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
+                try {
+                    whatsappNotificationService.notifyDriverArrivedForDropOff(order, customer);
+                } catch (IOException e) {
+                    LOGGER.warn("Failed to send WhatsApp delivery notification for order {}", order.getId(), e);
+                }
                 break;
             case STAGE_6_WITH_CUSTOMER:
                 title = new PushHeading("Your order has been delivered", order_status_updated, null, null);
@@ -110,21 +124,8 @@ public class CustomerOrderEventHandler implements OrderEventHandler {
                 break;
         }
 
-        var customer = userProfileService.find(order.getCustomerId());
-        List<Device> customerDevices = deviceService.findByUserId(customer.getId());
         if (!customerDevices.isEmpty()) {
             pushNotificationService.sendNotifications(customerDevices, message);
-        }
-        try {
-            if (originalStage == OrderStage.STAGE_5_ARRIVED) {
-                whatsappNotificationService.notifyDriverArrivedForPickup(order, customer);
-            } else if (originalStage == OrderStage.STAGE_6_WITH_CUSTOMER) {
-                whatsappNotificationService.notifyDriverArrivedForDropOff(order, customer);
-            } else if (title != null) {
-                whatsappNotificationService.sendMessage(customer.getMobileNumber(), title.getBody());
-            }
-        } catch (Exception e) {
-            LOGGER.warn("Failed to send WhatsApp delivery update notification for order {}", order.getId(), e);
         }
 
     }
