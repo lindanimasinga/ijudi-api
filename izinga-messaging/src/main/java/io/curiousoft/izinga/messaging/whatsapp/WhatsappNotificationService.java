@@ -627,7 +627,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 ? mobileNumber.replaceFirst("0", "+27")
                 : mobileNumber);
         String displayName = customer.getName() != null ? customer.getName() : "Customer";
-      request.setTemplate(buildNameOrderIdTemplate("driver_arrived_pickup", displayName, order.getId(), true));
+      request.setTemplate(buildNameOrderIdTemplate("driver_arrived_pickup", displayName, order.getId(), true, "en_US"));
         whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
         LOGGER.info("Sent driver arrived for pickup notification to {}", mobileNumber);
     }
@@ -640,7 +640,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 ? mobileNumber.replaceFirst("0", "+27")
                 : mobileNumber);
         String displayName = customer.getName() != null ? customer.getName() : "Customer";
-      request.setTemplate(buildNameOrderIdTemplate("driver_arrived_dropoff", displayName, order.getId(), false));
+      request.setTemplate(buildNameOrderIdTemplate("driver_arrived_dropoff", displayName, order.getId(), false, "en"));
         whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
         LOGGER.info("Sent driver arrived for drop-off notification to {}", mobileNumber);
     }
@@ -649,7 +649,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
      * Builds a WhatsApp template with a BODY component containing two TEXT parameters: name and orderId.
      * Using programmatic construction avoids JSON injection when customer name contains special characters.
      */
-    private WhatsappTemplateRequest.Template buildNameOrderIdTemplate(String templateName, String name, String orderId, boolean includeUrlButtonParam) {
+    private WhatsappTemplateRequest.Template buildNameOrderIdTemplate(String templateName, String name, String orderId, boolean includeUrlButtonParam, String lang) {
       var safeOrderId = orderId != null ? orderId : "";
 
         var nameParam = new WhatsappTemplateRequest.Parameter();
@@ -665,7 +665,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
         bodyComponent.setParameters(List.of(nameParam, orderIdParam));
 
         var language = new WhatsappTemplateRequest.Language();
-        language.setCode("en_US");
+        language.setCode(lang);
 
         var template = new WhatsappTemplateRequest.Template();
         template.setName(templateName);
