@@ -71,6 +71,12 @@ class WhatsappNotificationServiceTest {
         assertEquals(WhatsappTemplateRequest.ComponentType.BODY, bodyComp.getType());
         assertEquals("John Doe", bodyComp.getParameters().get(0).getText());
         assertEquals("order123", bodyComp.getParameters().get(1).getText());
+
+        var buttonComp = request.getTemplate().getComponents().get(1);
+        assertEquals(WhatsappTemplateRequest.ComponentType.BUTTON, buttonComp.getType());
+        assertEquals(WhatsappTemplateRequest.ButtonSubType.URL, buttonComp.getSub_type());
+        assertEquals(0, buttonComp.getIndex());
+        assertEquals("order123", buttonComp.getParameters().get(0).getText());
     }
 
     @Test

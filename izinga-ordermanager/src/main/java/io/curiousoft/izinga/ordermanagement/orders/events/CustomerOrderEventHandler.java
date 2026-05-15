@@ -124,7 +124,7 @@ public class CustomerOrderEventHandler implements OrderEventHandler {
                 break;
         }
 
-        if (!customerDevices.isEmpty()) {
+        if (!customerDevices.isEmpty() && message != null) {
             pushNotificationService.sendNotifications(customerDevices, message);
         }
 

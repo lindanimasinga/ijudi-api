@@ -173,6 +173,21 @@ class CustomerOrderEventHandlerTest {
         verify(whatsappNotificationService, never()).sendMessage(anyString(), anyString());
     }
 
+    @Test
+    void handleOrderUpdatedEvent_stage3ReadyForCollection_nonMoversWithDevices_doesNotSendPushOrWhatsapp() {
+        Order order = orderWithStage(OrderStage.STAGE_3_READY_FOR_COLLECTION);
+        UserProfile customer = customer();
+        List<Device> devices = List.of(new Device("token102"));
+
+        when(userProfileService.find("customerId")).thenReturn(customer);
+        when(deviceService.findByUserId("customerId")).thenReturn(devices);
+
+        handler.handleOrderUpdatedEvent(event(order));
+
+        verify(pushNotificationService, never()).sendNotifications(any(), any());
+        verifyNoInteractions(whatsappNotificationService);
+    }
+
     // ─── Early-return stages ─────────────────────────────────────────────────
 
     @Test

@@ -35,7 +35,6 @@ class ReconServiceImpl(
 
     private val logger = LoggerFactory.getLogger(ReconServiceImpl::class.java)
 
-    @Async
     override fun generatePayoutForShopAndOrder(order: Order): ShopPayout? {
         if (order.stage != OrderStage.STAGE_7_ALL_PAID) {
             logger.info("no payout generated for order {} at stage STAGE_7_ALL_PAID", order.id)
