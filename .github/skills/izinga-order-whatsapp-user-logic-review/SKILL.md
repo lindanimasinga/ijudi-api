@@ -105,8 +105,11 @@ finishOder:
 progressNextStage:
 - Loads order and forbids cancelled progression.
 - Computes next stage from onlineDeliveryStages list.
+- **Appends `OrderStatusHistory` entry with stage and optional lat/lng coordinates.**
 - Publishes order-updated event.
 - Persists updated stage.
+- Overloads: `progressNextStage(orderId)` delegates to `progressNextStage(orderId, null, null)`. The coordinate-aware overload is the canonical implementation.
+- REST endpoint: `GET /order/{orderId}/nextstage?latitude=<double>&longitude=<double>` — params are `required = false`; backward compatible.
 
 find methods and MCP tools:
 - find_order_by_id, find_orders_by_user_id, find_orders_by_phone_number, find_orders_by_messenger_id, findOrdersByMessengerAdminId.
@@ -134,6 +137,8 @@ OrderServiceImpl review checkpoints:
 - Negative stock and concurrency safety around stock decrement.
 - Consistency of quote state updates for approve and reject paths.
 - Phone substring safety for invalid short numbers.
+- **`addStatusHistory()` must be called at every `setStage()` site — there are 7 total (startOrder, finishOder×2, progressNextStage, cancelOrder, CustomerOrderEventHandler, MessengerOrderEventHandler).**
+- **When calling `addStatusHistory` from Java, use the single-arg bridge overload `addStatusHistory(stage)` — Kotlin default params do NOT generate Java-compatible overloads without `@JvmOverloads`.**
 
 ### WhatsappInboundEventHandler: Detailed Behavior
 
@@ -210,6 +215,8 @@ UserProfileService review checkpoints:
 - Event publication paths that may run on partially updated data.
 - Team-scope data leakage where non-admin or wrong admin can query another messenger team's orders/payouts.
 - Query branches that accidentally change legacy single-user behavior (`messengerId` or `toId` paths).
+- **Missing `addStatusHistory()` call after any new `setStage()` site — keeps location history in sync with all stage transitions.**
+- **Calling Kotlin default-parameter methods from Java without explicit bridge overload — always add a Java-callable single-arg overload alongside the Kotlin multi-arg function.**
 
 ## Safe Change Playbook
 
@@ -236,7 +243,8 @@ Use targeted module checks:
 - ./mvnw -pl izinga-usermanagement -am test
 
 Minimum scenario checks:
-- Order start, finish, next stage, cancel, quote accept/reject.
+- Order start, finish, next stage (with and without coordinates), cancel, quote accept/reject.
+- Verify `statusHistory` grows with each stage change and last entry matches current stage.
 - WhatsApp text, interactive accept, missing contact payload.
 - User create with formatted/unformatted phone and duplicate numbers.
 - Messenger admin team order query returns only managed messenger orders.

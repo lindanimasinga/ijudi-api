@@ -83,6 +83,55 @@ Recent additive query surfaces:
 - `/user?role=MESSENGER&messengerAdminId=<id>` for messenger admin team lookup.
 - `/order?messengerAdminId=<id>&allStages=<bool>` for team orders.
 - `/recon/payout?payoutType=MESSENGER&messengerAdminId=<id>&fromDate=<iso>&toDate=<iso>&messengerId=<optional>` for team payouts and drill-down.
+- `/order/{orderId}/nextstage?latitude=<double>&longitude=<double>` — optional location params appended to every stage advance. Params are `required = false`; omit for backward-compatible no-location calls.
+
+## Order Location History Feature
+
+### Model Changes (izinga-commons)
+`Order.kt` now carries:
+```kotlin
+var statusHistory: MutableList<OrderStatusHistory>? = mutableListOf()
+
+fun addStatusHistory(stage: OrderStage?, lati: Double? = null, longi: Double? = null) {
+    // appends OrderStatusHistory(stage, OrderStatusLocation(lati, longi)) if lati/longi non-null else location=null
+}
+fun addStatusHistory(stage: OrderStage?) { addStatusHistory(stage, null, null) }  // Java-callable bridge overload
+```
+Data classes at end of Order.kt:
+```kotlin
+data class OrderStatusHistory(var stage: OrderStage? = null, var location: OrderStatusLocation? = null)
+data class OrderStatusLocation(var lati: Double? = null, var longi: Double? = null)
+```
+Stored as an embedded MongoDB subdocument array. Last item in the list is the most recent stage.
+
+### Stage-Change Coverage
+`addStatusHistory()` is called at every stage-change site:
+| Location | Stage Recorded |
+|---|---|
+| `OrderServiceImpl.startOrder()` | `STAGE_0_CUSTOMER_NOT_PAID` |
+| `OrderServiceImpl.finishOder()` — online-paid branch | `STAGE_1_WAITING_STORE_CONFIRM` |
+| `OrderServiceImpl.finishOder()` — already-paid branch | `STAGE_7_ALL_PAID` |
+| `OrderServiceImpl.progressNextStage()` | computed next stage (with optional lat/lng) |
+| `OrderServiceImpl.cancelOrder()` | `CANCELLED` |
+| `CustomerOrderEventHandler` | `STAGE_7_ALL_PAID` on STAGE_6 auto-complete |
+| `MessengerOrderEventHandler` | `STAGE_7_ALL_PAID` on incentive order creation |
+
+### Interface Contract
+`OrderService.kt` carries both overloads:
+```kotlin
+fun progressNextStage(orderId: String?): Order?
+fun progressNextStage(orderId: String?, latitude: Double?, longitude: Double?): Order?
+```
+
+### Kotlin ↔ Java Interop Rule
+**Kotlin default parameters do NOT generate Java-callable overloads automatically.** When a Kotlin method with default parameters is called from Java, always add an explicit bridge overload:
+```kotlin
+// Primary (Kotlin and Java callers passing all args)
+fun addStatusHistory(stage: OrderStage?, lati: Double? = null, longi: Double? = null) { ... }
+// Bridge (Java callers omitting lat/lng)
+fun addStatusHistory(stage: OrderStage?) { addStatusHistory(stage, null, null) }
+```
+Without `@JvmOverloads` or explicit bridge, Java callers get compile errors.
 
 ## Standard Workflow
 
