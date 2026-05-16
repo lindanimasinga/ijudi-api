@@ -40,6 +40,29 @@ class Order : BaseModel() {
     var minimumDepositAllowedPerc = 0.0
     var payoutCreated = false
     var documents: Set<DocumentAttachment>? = null
+    var statusHistory: MutableList<OrderStatusHistory>? = mutableListOf()
+
+    fun addStatusHistory(stage: OrderStage?, lati: Double? = null, longi: Double? = null) {
+        if (stage == null) {
+            return
+        }
+
+        if (statusHistory == null) {
+            statusHistory = mutableListOf()
+        }
+
+        val location = if (lati != null && longi != null) {
+            OrderStatusLocation(lati, longi)
+        } else {
+            null
+        }
+
+        statusHistory!!.add(OrderStatusHistory(stage, location))
+    }
+
+    fun addStatusHistory(stage: OrderStage?) {
+        addStatusHistory(stage, null, null)
+    }
 
     var weightFee: Double
         get() = shippingData?.weigthFee ?: 0.0
@@ -104,3 +127,13 @@ fun generateId(): String {
     }
     return sb.substring(0, 5).uppercase(Locale.getDefault())
 }
+
+data class OrderStatusHistory(
+    var stage: OrderStage? = null,
+    var location: OrderStatusLocation? = null
+)
+
+data class OrderStatusLocation(
+    var lati: Double? = null,
+    var longi: Double? = null
+)

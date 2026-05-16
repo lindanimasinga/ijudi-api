@@ -117,6 +117,7 @@ public class CustomerOrderEventHandler implements OrderEventHandler {
                 title = new PushHeading("Your order has been delivered", order_status_updated, null, null);
                 message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
                 order.setStage(OrderStage.STAGE_7_ALL_PAID);
+                order.addStatusHistory(OrderStage.STAGE_7_ALL_PAID);
                 break;
             case STAGE_7_ALL_PAID:
                 break;

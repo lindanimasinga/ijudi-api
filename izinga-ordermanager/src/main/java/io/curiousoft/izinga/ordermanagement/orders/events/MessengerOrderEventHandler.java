@@ -150,6 +150,7 @@ public class MessengerOrderEventHandler implements OrderEventHandler {
         basket.setItems(List.of(new BasketItem(promoCode.promo(), 1, promoCode.amount(), 0)));
         incentiveOrder.setId(null);
         incentiveOrder.setStage(OrderStage.STAGE_7_ALL_PAID);
+        incentiveOrder.addStatusHistory(OrderStage.STAGE_7_ALL_PAID);
         incentiveOrder.setBasket(basket);
         incentiveOrder.setOrderType(OrderType.INSTORE);
         incentiveOrder.setServiceFee(0.00);

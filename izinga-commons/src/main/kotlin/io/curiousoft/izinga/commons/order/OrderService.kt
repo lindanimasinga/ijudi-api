@@ -12,6 +12,8 @@ interface OrderService {
 
     fun progressNextStage(orderId: String?): Order?
 
+    fun progressNextStage(orderId: String?, latitude: Double?, longitude: Double?): Order?
+
     fun applyPromoCode(promoCode: String?, order: Order?): Order?
 
     fun findOrderByUserId(userId: String?): MutableList<Order?>?

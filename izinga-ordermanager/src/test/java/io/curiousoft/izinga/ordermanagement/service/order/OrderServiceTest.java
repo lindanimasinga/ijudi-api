@@ -1593,9 +1593,15 @@ public class OrderServiceTest {
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
         when(repo.save(order)).thenReturn(order);
         when(deviceRepo.findByUserId(order.getCustomerId())).thenReturn(Collections.singletonList(device));
-        Order finalOrder = sut.progressNextStage(order.getId());
+        Order finalOrder = sut.progressNextStage(order.getId(), 12.3123, 32.345);
         //verify
         Assert.assertEquals(OrderStage.STAGE_2_STORE_PROCESSING, finalOrder.getStage());
+        Assert.assertNotNull(finalOrder.getStatusHistory());
+        Assert.assertEquals(1, finalOrder.getStatusHistory().size());
+        Assert.assertEquals(OrderStage.STAGE_2_STORE_PROCESSING, finalOrder.getStatusHistory().get(0).getStage());
+        Assert.assertNotNull(finalOrder.getStatusHistory().get(0).getLocation());
+        Assert.assertEquals(12.3123, finalOrder.getStatusHistory().get(0).getLocation().getLati(), 0.0001);
+        Assert.assertEquals(32.345, finalOrder.getStatusHistory().get(0).getLocation().getLongi(), 0.0001);
         verify(deviceRepo).findByUserId(order.getCustomerId());
         verify(pushNotificationService).sendNotification(device, message);
         verify(repo).findById(order.getId());

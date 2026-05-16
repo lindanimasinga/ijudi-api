@@ -66,8 +66,11 @@ public class OrderController {
     }
 
     @GetMapping(value = "/{orderId}/nextstage", produces = "application/json")
-    public ResponseEntity<Order> progressNextStage(@PathVariable String orderId) throws Exception {
-        return ResponseEntity.ok(orderService.progressNextStage(orderId));
+    public ResponseEntity<Order> progressNextStage(@PathVariable String orderId,
+                                                   @RequestParam(required = false) Double latitude,
+                                                   @RequestParam(required = false) Double longitude) throws Exception {
+        return ResponseEntity.ok(latitude != null || longitude != null ?
+                orderService.progressNextStage(orderId, latitude, longitude) : orderService.progressNextStage(orderId));
     }
 
     @GetMapping(value = "/{id}", produces = "application/json")

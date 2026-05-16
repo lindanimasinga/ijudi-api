@@ -156,6 +156,7 @@ public class OrderServiceImpl implements OrderService {
         String orderId = generateId();
         order.setId(orderId);
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.addStatusHistory(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setMinimumDepositAllowedPerc(storeOptional.get().getMinimumDepositAllowedPerc());
 
         //add a store discount
@@ -273,10 +274,12 @@ public class OrderServiceImpl implements OrderService {
 
         if (persistedOrder.getOrderType() != INSTORE) {
             persistedOrder.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+            persistedOrder.addStatusHistory(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         } else if (persistedOrder.getShopPaid()) {
             return order;
         } else {
             persistedOrder.setStage(OrderStage.STAGE_7_ALL_PAID);
+            persistedOrder.addStatusHistory(OrderStage.STAGE_7_ALL_PAID);
         }
 
         var promoCode = order.getTag().get("promoCode");
@@ -328,8 +331,12 @@ public class OrderServiceImpl implements OrderService {
         return orderRepo.findById(orderId).orElse(null);
     }
 
-    @Override
     public Order progressNextStage(String orderId) {
+        return progressNextStage(orderId, null, null);
+    }
+
+    @Override
+    public Order progressNextStage(String orderId, Double latitude, Double longitude) {
         Order order = orderRepo.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order with id " + orderId + " not found."));
         int index = onlineDeliveryStages.indexOf(order.getStage());
@@ -338,6 +345,7 @@ public class OrderServiceImpl implements OrderService {
 
         OrderStage stage = onlineDeliveryStages.get(index + 1);
         order.setStage(stage);
+        order.addStatusHistory(stage, latitude, longitude);
         var store = storeRepository.findById(order.getShopId()).get();
         OrderUpdatedEvent orderUpdatedEvent = new OrderUpdatedEvent(this, order, order.getShippingData().getMessengerId(), store);
         applicationEventPublisher.publishEvent(orderUpdatedEvent);
@@ -472,6 +480,7 @@ public class OrderServiceImpl implements OrderService {
         if(!successful) throw  new IllegalArgumentException("Unable to reserve payment. Please reverse manually.");
 
         order.setStage(OrderStage.CANCELLED);
+        order.addStatusHistory(OrderStage.CANCELLED);
         order = orderRepo.save(order);
         List<Device> customerDevices = deviceRepo.findByUserId(order.getCustomerId());
         PushHeading pushMessage = new PushHeading(
