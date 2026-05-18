@@ -231,29 +231,18 @@ Task is complete only when:
 6. Validate with module tests and focused endpoint checks.
 
 ## Known Architectural Guardrails
-- Keep shared domain models in izinga-commons authoritative.
-- Avoid duplicating business rules across modules.
-- Avoid putting infrastructure logic in controllers.
-- Do not bypass security config for v2 protected APIs.
-- Do not hardcode secrets in code.
-- Never return team-scoped data without ownership checks (`messengerAdminId` must map to caller's scope).
 
 ## Recommended Prompt Patterns
-- "Fix order stage transition bug in ordermanager without changing response schema."
-- "Add an additive field to user profile and update user endpoints safely."
-- "Expose store lookup as MCP tool and wire it through McpConfig."
-- "Add recon payout filter by date and keep SHOP or MESSENGER behavior intact."
-- "Add messenger admin team order query without breaking existing messengerId endpoint behavior."
-- "Implement messengerAdminId scoped payouts with ownership validation and tests."
 
 ## Quick Start Commands
-- If `store-menu-to-izinga-menu/pom.xml` is missing in a sandbox clone, add a temporary stub `pom.xml` in that folder before running multi-module Maven commands.
-- Full build:
   - ./mvnw clean install -DskipTests
-- Targeted module build with dependencies:
   - ./mvnw -pl izinga-ordermanager -am test
   - ./mvnw -pl izinga-usermanagement -am test
   - ./mvnw -pl izinga-recon -am test
+
+## Related Skills
+
+- [meta-templates-developer](meta-templates-developer/SKILL.md): Use for WhatsApp Business template creation, update, listing, and sending via Meta Graph API and curl. Reference this skill for all template management workflows and troubleshooting.
 
 ## File Structure Landmarks
 - Parent modules list: pom.xml

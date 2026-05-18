@@ -192,10 +192,10 @@ import static java.lang.String.format;
                             .atZone(ZoneId.systemDefault())
                             .toInstant());
 
-                    boolean sendNewOrderNotification = order.getShippingData() != null &&
-                            order.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY
-                            && order.getShippingData().getPickUpTime() != null &&
-                            order.getShippingData().getPickUpTime().before(checkDate)
+                    boolean sendNewOrderNotification = order.getShippingData() != null
+                            && order.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY
+                            && order.getShippingData().getPickUpTime() != null
+                            && order.getShippingData().getPickUpTime().before(checkDate)
                             && !order.getScheduledNotified();
 
                     if (sendNewOrderNotification) {
@@ -203,9 +203,9 @@ import static java.lang.String.format;
                         var store = storeRepository.findById(order.getShopId());
                         if (store.isPresent()) {
                             NewOrderEvent newOrderEvent = new NewOrderEvent(this, order, order.getShippingData().getMessengerId(), store.get());
-                            applicationEventPublisher.publishEvent(newOrderEvent);
                             order.setScheduledNotified(true);
                             orderRepo.save(order);
+                            applicationEventPublisher.publishEvent(newOrderEvent);
                             LOG.info("NewOrderEvent successfully published for order: {}", order.getId());
                             counters[0]++;
                         } else {

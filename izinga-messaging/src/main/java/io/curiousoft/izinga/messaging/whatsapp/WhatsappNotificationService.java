@@ -182,11 +182,31 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                   "language": { "code": "en_US" },
                   "components": [
                     {
+                      "type": "HEADER",
+                      "format": "TEXT",
+                      "text": "Order confirmed"
+                    },
+                    {
                       "type": "BODY",
+                      "text": "Hi {{1}},\n\nA delivery has been confirmed from {{2}}\n\nThe order number is {{3}}.\n\nPlease view and process the delivery",
                       "parameters": [
                         { "type": "TEXT", "text": "#messenger" },
                         { "type": "TEXT", "text": "#shop" },
                         { "type": "TEXT", "text": "#orderId" }
+                      ]
+                    },
+                    {
+                      "type": "FOOTER",
+                      "text": "iZinga"
+                    },
+                    {
+                      "type": "BUTTONS",
+                      "buttons": [
+                        {
+                          "type": "URL",
+                          "text": "View Delivery",
+                          "url": "https://driver.izinga.co.za/indivisuals/quote-approval/#orderId"
+                        }
                       ]
                     }
                   ]
