@@ -36,6 +36,7 @@ class Order : BaseModel() {
     var messengerPaidDate: Date? = null
     var smsSentToShop = false
     var smsSentToAdmin = false
+    var scheduledNotified = false
     var freeDelivery = false
     var minimumDepositAllowedPerc = 0.0
     var payoutCreated = false

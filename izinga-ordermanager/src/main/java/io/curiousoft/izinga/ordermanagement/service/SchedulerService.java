@@ -195,7 +195,8 @@ import static java.lang.String.format;
                     boolean sendNewOrderNotification = order.getShippingData() != null &&
                             order.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY
                             && order.getShippingData().getPickUpTime() != null &&
-                            order.getShippingData().getPickUpTime().before(checkDate);
+                            order.getShippingData().getPickUpTime().before(checkDate)
+                            && !order.getScheduledNotified();
 
                     if (sendNewOrderNotification) {
                         LOG.info("Publishing NewOrderEvent for scheduled order: {}", order.getId());
@@ -203,11 +204,15 @@ import static java.lang.String.format;
                         if (store.isPresent()) {
                             NewOrderEvent newOrderEvent = new NewOrderEvent(this, order, order.getShippingData().getMessengerId(), store.get());
                             applicationEventPublisher.publishEvent(newOrderEvent);
+                            order.setScheduledNotified(true);
+                            orderRepo.save(order);
                             LOG.info("NewOrderEvent successfully published for order: {}", order.getId());
                             counters[0]++;
+                        } else {
+                            LOG.warn("Store not found for scheduled order: {}, skipping notification", order.getId());
                         }
                     } else {
-                        LOG.debug("Order {} pickup time not yet within 60 minute window, skipping", order.getId());
+                        LOG.debug("Order {} pickup time not yet within 60 minute window or already notified, skipping", order.getId());
                     }
                 } catch (Exception e) {
                     counters[1]++;
