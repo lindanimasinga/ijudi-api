@@ -53,6 +53,7 @@ public class OrderServiceImpl implements OrderService {
     private final FirebaseNotificationService pushNotificationService;
     private final double starndardDeliveryFee;
     private final double serviceFeePerc;
+    private final double izingaCommissionPerc;
     private final String googleMapsApiKey;
     private final double starndardDeliveryKm;
     private final double ratePerKm;
@@ -66,6 +67,7 @@ public class OrderServiceImpl implements OrderService {
                             @Value("${service.delivery.standardKm}") double starndardDeliveryKm,
                             @Value("${service.delivery.ratePerKm}") double ratePerKm,
                             @Value("${service.fee.perc}") double serviceFeePerc,
+                            @Value("${service.commission.perc}") double izingaCommissionPerc,
                             @Value("${order.cleanup.unpaid.minutes}") long cleanUpMinutes,
                             @Value("${admin.cellNumber}") List<String> adminCellNumbers,
                             @Value("${google.maps.api.key}") String googleMapsApiKey,
@@ -94,6 +96,7 @@ public class OrderServiceImpl implements OrderService {
         this.applicationEventPublisher = applicationEventPublisher;
         this.restrictedRegionService = restrictedRegionService;
         this.quoteRepository = quoteRepository;
+        this.izingaCommissionPerc = izingaCommissionPerc;
         ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
         validator = factory.getValidator();
 
@@ -226,6 +229,9 @@ public class OrderServiceImpl implements OrderService {
             order.getShippingData().setDeliveryFee(deliveryFee);
             order.getShippingData().setDistance(shipingGeoData.getDistance());
             order.getShippingData().setShippingDataGeoData(shipingGeoData);
+            // Calculate and set izinga commission
+            double commission = deliveryFee * izingaCommissionPerc;
+            order.getShippingData().setIzingaCommission(commission);
             restrictedRegionService.validationRestrictedRegions(order);
         }
 

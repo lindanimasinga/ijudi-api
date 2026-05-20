@@ -31,6 +31,7 @@ class ShippingData {
     var volumeFee: Double = 0.0
     var labourFee: Double = 0.0
     var category: List<String>? = null
+    var izingaCommission: Double? = null
 
     val fee: Double get() = deliveryFee + weigthFee + volumeFee + labourFee
 

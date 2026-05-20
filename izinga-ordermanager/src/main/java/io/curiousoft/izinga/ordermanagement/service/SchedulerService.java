@@ -293,6 +293,18 @@ import static java.lang.String.format;
             });
 
             LOG.info("Welcome message processing completed for new drivers");
+
+            List<UserProfile> driverList = userProfileRepo.findByRole(ProfileRoles.MESSENGER);
+            for (UserProfile drv : driverList) {
+                boolean missingDescription = drv.getDescription() == null || drv.getDescription().isBlank();
+                boolean missingAddress = drv.getAddress() == null || drv.getAddress().isBlank();
+                boolean missingLocation = (drv.getLatitude() == 0 && drv.getLongitude() == 0);
+                if (missingDescription || missingAddress || missingLocation) {
+                    LOG.info("Sending missing documents reminder to driver: {}", drv.getName());
+                    smsNotificationService.sendMissingDocumentReminder(drv.getMobileNumber(), drv.getName());
+                    LOG.info("Missing documents reminder sent to driver: {}", drv.getName());
+                }
+            }
         } catch (Exception e) {
             counters[1]++;
             LOG.error("Fatal error in newDrivers job", e);
@@ -691,8 +703,4 @@ import static java.lang.String.format;
     }
 
 }
-
-
-
-
 

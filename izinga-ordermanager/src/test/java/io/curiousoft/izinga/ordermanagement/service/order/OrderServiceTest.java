@@ -76,6 +76,7 @@ public class OrderServiceTest {
                 standardDeliveryKm,
                 ratePerKm,
                 serviceFee,
+                0.10,
                 cleanInMinutes,
                 phoneNumbers,
                 "AIzaSyAZbvE4NBcJIplfzmy8cSEdSpbocBggylc",
