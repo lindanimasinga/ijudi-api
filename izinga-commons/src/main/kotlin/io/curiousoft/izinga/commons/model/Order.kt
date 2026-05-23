@@ -17,7 +17,7 @@ import jakarta.validation.constraints.NotNull
 @ValidOrderType
 @ValidDeliveryInfo
 @Document
-class Order : BaseModel() {
+open class Order : BaseModel() {
     var paymentTypesAllowed: MutableList<PaymentType>? = null
     var stage: @NotNull(message = "order stage is not valid") OrderStage? = null
     var shippingData: ShippingData? = null

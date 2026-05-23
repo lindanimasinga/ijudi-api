@@ -327,8 +327,14 @@ import static java.lang.String.format;
                     .toInstant());
             LOG.info("Cleaning up all unpaid orders before: {}", pastDate);
             LOG.info("Cleanup threshold: {} minutes", cleanUpMinutes);
-
-            orderRepo.deleteByShopPaidAndStageAndModifiedDateBefore(false, OrderStage.STAGE_0_CUSTOMER_NOT_PAID, pastDate);
+            var ordersToDelete = orderRepo.findAllByShopPaidAndStageAndModifiedDateBefore(false, OrderStage.STAGE_0_CUSTOMER_NOT_PAID, pastDate);
+            if (ordersToDelete != null && !ordersToDelete.isEmpty()) {
+                LOG.info("Found {} unpaid orders to clean up", ordersToDelete.size());
+                ordersToDelete.stream()
+                        .filter(it -> !"15bc1ce9-3a0b-42f7-a1d8-34ffbb9a7d22".equals(it.shopId))
+                        .forEach(order -> LOG.debug("Unpaid order to delete: {}", order.getId()));
+                orderRepo.deleteAll(ordersToDelete);
+            }
             LOG.info("Successfully cleaned up unpaid orders");
         } catch (Exception e) {
             LOG.error("Fatal error in cleanUnpaidOrders job", e);

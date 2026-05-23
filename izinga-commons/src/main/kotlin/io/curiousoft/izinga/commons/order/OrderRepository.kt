@@ -12,7 +12,7 @@ interface OrderRepository : MongoRepository<Order?, String?> {
     fun findByCustomerId(customerId: String?): Optional<List<Order?>?>?
     fun findByShopId(id: String?): List<Order?>?
     fun findByShopIdAndStageNot(id: String?, stage: OrderStage?): List<Order?>?
-    fun deleteByShopPaidAndStageAndModifiedDateBefore(shopPaid: Boolean, stage: OrderStage?, date: Date?)
+    fun findAllByShopPaidAndStageAndModifiedDateBefore(shopPaid: Boolean, stage: OrderStage?, date: Date?): List<Order?>?
     fun findByShippingDataMessengerIdAndStageNot(id: String?, customerNotPaid: OrderStage?): List<Order?>?
     fun findByStage(eq: OrderStage?): List<Order?>?
     fun findByShopPaidAndStageAndModifiedDateBefore(

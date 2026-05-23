@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Future
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 
-class ShippingData {
+open class ShippingData {
     var id: String? = null
     var fromAddress: @NotBlank(message = "shipping address not valid") String? = null
     var fromBuildingType: BuildingType? = null
@@ -33,8 +33,8 @@ class ShippingData {
     var category: List<String>? = null
     var izingaCommission: Double? = null
 
-    val fee: Double get() = deliveryFee + weigthFee + volumeFee + labourFee
-
+    open val fee: Double get() = deliveryFee + weigthFee + volumeFee + labourFee
+    var feeForDriver = fee - (izingaCommission ?: 0.0)
 
     constructor()
     constructor(

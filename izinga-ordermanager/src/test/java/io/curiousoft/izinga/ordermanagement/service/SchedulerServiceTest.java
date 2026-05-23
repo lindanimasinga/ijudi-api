@@ -139,7 +139,7 @@ public class SchedulerServiceTest {
         //when
         sut.cleanUnpaidOrders();
         //verify
-        verify(repo).deleteByShopPaidAndStageAndModifiedDateBefore(eq(false), eq(OrderStage.STAGE_0_CUSTOMER_NOT_PAID),
+        verify(repo).findAllByShopPaidAndStageAndModifiedDateBefore(eq(false), eq(OrderStage.STAGE_0_CUSTOMER_NOT_PAID),
                 any(Date.class));
     }
 

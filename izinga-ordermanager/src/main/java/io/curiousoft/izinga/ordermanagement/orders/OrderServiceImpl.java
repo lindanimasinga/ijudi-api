@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.ordermanagement.orders;
 
 import io.curiousoft.izinga.commons.model.*;
+import io.curiousoft.izinga.commons.order.MessengerOrderDto;
 import io.curiousoft.izinga.commons.order.OrderService;
 import io.curiousoft.izinga.commons.order.events.*;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
@@ -402,7 +403,7 @@ public class OrderServiceImpl implements OrderService {
         return orderRepo.findByShopIdAndStageNot(store.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
     }
 
-    @Tool(name = "find_orders_by_messenger_id", description = "Find orders by messenger id and return the order details")
+    @Tool(name = "find_orders_by_messenger_id", description = "Find orders by messenger id and return the order details as MessengerOrderDto")
     @Override
     public List<Order> findOrderByMessengerId(String id, @ToolParam(required = false) boolean allStages) {
         var ordersAssigned = allStages ? orderRepo.findByShippingDataMessengerId(id) : orderRepo.findByShippingDataMessengerIdAndStageNot(id, OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
@@ -413,17 +414,19 @@ public class OrderServiceImpl implements OrderService {
                 .map(OrderQuote::getOrderId)
                 .toList();
 
+        List<Order> resultOrders;
         if(ordersQuoteRequested.isEmpty()) {
-            return ordersAssigned != null ? ordersAssigned : new ArrayList<>();
-        }
-
-        var ordersFromQuotes = orderRepo.findAllById(ordersQuoteRequested);
-        if (ordersAssigned != null) {
-            ordersAssigned.addAll(ordersFromQuotes);
-            return ordersAssigned;
+            resultOrders = ordersAssigned != null ? ordersAssigned : new ArrayList<>();
         } else {
-            return ordersFromQuotes;
+            var ordersFromQuotes = orderRepo.findAllById(ordersQuoteRequested);
+            if (ordersAssigned != null) {
+                ordersAssigned.addAll(ordersFromQuotes);
+                resultOrders = ordersAssigned;
+            } else {
+                resultOrders = ordersFromQuotes;
+            }
         }
+        return resultOrders.stream().map(it -> (Order) new MessengerOrderDto(it, izingaCommissionPerc)).toList();
     }
 
     @Override
