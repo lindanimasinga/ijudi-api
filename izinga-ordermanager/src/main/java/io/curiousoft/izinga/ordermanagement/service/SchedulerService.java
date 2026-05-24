@@ -16,8 +16,11 @@ import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.recon.payout.PayoutStage;
 import io.curiousoft.izinga.recon.payout.PayoutType;
 import io.curiousoft.izinga.usermanagement.userconfig.FieldSpec;
+import io.curiousoft.izinga.usermanagement.userconfig.UserConfig;
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigRepo;
+import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,6 +29,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import javax.swing.*;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -57,7 +61,7 @@ import static java.lang.String.format;
     private final ShoppingListService shoppingListService;
     private final DocumentInfoService documentInfoService;
     private final CloudBucketService cloudBucketService;
-    private final UserConfigRepo userConfigRepo;
+    private final UserProfileService profileService;
 
     public SchedulerService(OrderRepository orderRepo, StoreRepository storeRepository,
                             DeviceRepository deviceRepo, FirebaseNotificationService pushNotificationService,
@@ -70,7 +74,7 @@ import static java.lang.String.format;
                             ReconService reconService,
                             ShoppingListService shoppingListService,
                             DocumentInfoService documentInfoService,
-                            CloudBucketService cloudBucketService, UserConfigRepo userConfigRepo) {
+                            CloudBucketService cloudBucketService, UserConfigRepo userConfigRepo, UserProfileService profileService) {
         this.orderRepo = orderRepo;
         this.storeRepository = storeRepository;
         this.deviceRepo = deviceRepo;
@@ -85,7 +89,7 @@ import static java.lang.String.format;
         this.shoppingListService = shoppingListService;
         this.documentInfoService = documentInfoService;
         this.cloudBucketService = cloudBucketService;
-        this.userConfigRepo = userConfigRepo;
+        this.profileService = profileService;
     }
 
     @Scheduled(fixedDelay = 600000, initialDelay = 10000)// 10 minutes
@@ -237,10 +241,6 @@ import static java.lang.String.format;
         int[] counters = {0, 0}; // [successCount, errorCount]
 
         try {
-            LOG.info("Finding new drivers to send welcome message..");
-            var userConfig = userConfigRepo.findAll();
-            LOG.info("Found {} user configurations", userConfig.size());
-
             var driver = userProfileRepo.findByProfileApproved(false);
             LOG.info("Found {} unapproved driver profiles", driver.size());
 
@@ -267,11 +267,8 @@ import static java.lang.String.format;
                     }
 
                     //check missing required documents and send reminder if any
-                    var allFieldsProvided = userConfig.stream()
-                            .filter(it -> it.getLabel().equals(profile.getDescription()))
-                            .flatMap(config -> Stream.of(config.getMandatoryFields().toArray(FieldSpec[]::new)))
-                            .allMatch(it -> profile.getTag().get(it.getName()) != null);
-
+                    var missingFields = profileService.getAllMissingFields(profile);
+                    boolean allFieldsProvided = missingFields.isEmpty();
                     if (!allFieldsProvided && (profile.getMissingDocumentsReminderSent() == null || !profile.getMissingDocumentsReminderSent())) {
                         LOG.info("Sending missing documents reminder to driver: {}", profile.getName());
                         smsNotificationService.sendMissingDocumentReminder(profile.getMobileNumber(), profile.getName());

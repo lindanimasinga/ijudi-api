@@ -4,15 +4,27 @@ import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.StoreType
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
+import io.curiousoft.izinga.usermanagement.userconfig.FieldSpec
+import io.curiousoft.izinga.usermanagement.userconfig.UserConfig
+import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService
+import lombok.extern.slf4j.Slf4j
 import org.springframework.ai.tool.annotation.Tool
 import org.springframework.ai.tool.annotation.ToolParam
-import org.springframework.stereotype.Service
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.stereotype.Service
+import java.util.stream.Collectors
+import java.util.stream.Stream
 
 @Service
-class UserProfileService(val userProfileRepo: UserProfileRepo, val eventPublisher: ApplicationEventPublisher) : ProfileServiceImpl<UserProfileRepo, UserProfile>(userProfileRepo, eventPublisher) {
+class UserProfileService(val userProfileRepo: UserProfileRepo, val eventPublisher: ApplicationEventPublisher, userConfigService: UserConfigService) : ProfileServiceImpl<UserProfileRepo, UserProfile>(userProfileRepo, eventPublisher) {
 
-     @Tool(name = "find_user_by_phone", description = "Finds a user profile by phone number. It will try to find the userby adding different country code prefixes to the phone number provided.")
+    private lateinit var userConfig: MutableList<UserConfig?>
+
+    init {
+        userConfig = userConfigService.findAll().toMutableList()
+    }
+
+    @Tool(name = "find_user_by_phone", description = "Finds a user profile by phone number. It will try to find the userby adding different country code prefixes to the phone number provided.")
     fun findUserByPhone(phone: String): UserProfile? {
         val last9Digits = phone.substring(phone.length - 9)
         return listOf("0", "+27", "27")
@@ -57,4 +69,50 @@ class UserProfileService(val userProfileRepo: UserProfileRepo, val eventPublishe
         mobileNumberFormmatted = mobileNumberFormmatted.replace("-", "")
         return "+27$mobileNumberFormmatted"
     }
+
+    fun getAllMissingFields(profile: UserProfile): List<String> {
+        val missingAddress = getMissingFields(profile)
+        val missingFields = getMissingMandatoryFields(profile, userConfig)
+        missingFields.addAll(missingAddress)
+        return missingFields
+    }
+
+    @Tool(name = "get_missing_fields_by_phone", description = "Returns a list of missing mandatory field names for the user profile associated with the given mobile number.")
+    fun getAllMissingFields(mobileNumber: String): List<String> {
+        return findUserByPhone(mobileNumber)?.let {
+            getAllMissingFields(it)
+        } ?: emptyList()
+    }
+
+    /**
+     * Returns a list of missing mandatory field names for the given profile and userConfig.
+     */
+    private fun getMissingMandatoryFields(
+        profile: UserProfile?,
+        userConfig: MutableList<UserConfig?>?
+    ): MutableList<String> {
+        if (profile == null || userConfig == null) return mutableListOf<String>()
+        return userConfig.stream()
+            .filter { it: UserConfig? -> it!!.label == profile.description }
+            .flatMap<FieldSpec?> { config: UserConfig? -> Stream.of<FieldSpec?>(*config!!.mandatoryFields.toTypedArray<FieldSpec?>()) }
+            .filter { it: FieldSpec? -> profile.tag == null || profile.tag.get(it!!.name) == null }
+            .map<String>(FieldSpec::name)
+            .collect(Collectors.toList())
+    }
+
+    private fun getMissingFields(userProfile: UserProfile): MutableList<String> {
+        val missingFields: MutableList<String> = ArrayList<String>()
+        if (userProfile.description == null || userProfile.description!!.isBlank()) {
+            missingFields.add("description")
+        }
+        if (userProfile.address == null || userProfile.address!!.isBlank()) {
+            missingFields.add("address")
+        }
+        if (userProfile.latitude == 0.0 || userProfile.longitude == 0.0) {
+            missingFields.add("geo coordinates")
+        }
+        // ...add other checks as needed...
+        return missingFields
+    }
+
 }
