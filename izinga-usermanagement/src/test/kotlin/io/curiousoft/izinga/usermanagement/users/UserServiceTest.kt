@@ -5,6 +5,7 @@ import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.StoreType
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
+import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService
 import org.junit.Assert
 import org.junit.Before
 import org.junit.Test
@@ -19,6 +20,10 @@ import java.util.*
 @Disabled
 @RunWith(MockitoJUnitRunner::class)
 class UserServiceTest {
+
+    @Mock
+    lateinit var userConfigService: UserConfigService
+
     //system under test
     lateinit var profileService: UserProfileService
     @Mock
@@ -28,7 +33,7 @@ class UserServiceTest {
     
     @Before
     fun setUp() {
-        profileService = UserProfileService(profileRepo, profileUpdatedEventPublisher)
+        profileService = UserProfileService(profileRepo, profileUpdatedEventPublisher, userConfigService)
     }
 
     @Test

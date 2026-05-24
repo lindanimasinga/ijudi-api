@@ -7,7 +7,9 @@ import io.curiousoft.izinga.ordermanagement.McpConfig;
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
 import io.curiousoft.izinga.ordermanagement.stores.StoreService;
 import io.curiousoft.izinga.recon.ReconServiceImpl;
+import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -70,10 +72,12 @@ class McpToolRegistrationTest {
 
     private McpConfig mcpConfig;
     private UserProfileService userProfileService;
+    @Mock
+    private UserConfigService userConfig;
 
     @BeforeEach
     void setUp() {
-        userProfileService = new UserProfileService(userProfileRepo, eventPublisher);
+        userProfileService = new UserProfileService(userProfileRepo, eventPublisher, userConfig);
         mcpConfig = new McpConfig();
     }
 

@@ -74,7 +74,8 @@ import static java.lang.String.format;
                             ReconService reconService,
                             ShoppingListService shoppingListService,
                             DocumentInfoService documentInfoService,
-                            CloudBucketService cloudBucketService, UserConfigRepo userConfigRepo, UserProfileService profileService) {
+                            CloudBucketService cloudBucketService,
+                            UserProfileService profileService) {
         this.orderRepo = orderRepo;
         this.storeRepository = storeRepository;
         this.deviceRepo = deviceRepo;
