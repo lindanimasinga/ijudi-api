@@ -63,6 +63,16 @@ class UserProfileService(val userProfileRepo: UserProfileRepo, val eventPublishe
         return profileRepo.findByRoleAndMessengerAdminId(ProfileRoles.MESSENGER, messengerAdminId)
     }
 
+    fun findMessengersByLocation(latitude: Double, longitude: Double, range: Double): List<UserProfile>? {
+        val maxLat = latitude + range
+        val minLat = latitude - range
+        val maxLng = longitude + range
+        val minLng = longitude - range
+        return profileRepo.findByRoleAndLatitudeBetweenAndLongitudeBetween(
+            ProfileRoles.MESSENGER, minLat, maxLat, minLng, maxLng
+        )
+    }
+
     private fun fomatMobileNumber(mobileNumber: String): String {
         val last9Digits = mobileNumber.substring(mobileNumber.length - 9)
         var mobileNumberFormmatted = last9Digits.replace("\\s".toRegex(), "")

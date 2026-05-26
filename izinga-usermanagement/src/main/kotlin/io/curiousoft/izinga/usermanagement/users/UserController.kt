@@ -59,6 +59,7 @@ class UserController(private val profileService: UserProfileService) {
         logger.info("Find users request role={} messengerAdminId={} latitude={} longitude={} range={}", role, messengerAdminId, latitude, longitude, range)
         val users = when {
             role == ProfileRoles.MESSENGER && !messengerAdminId.isNullOrBlank() -> profileService.findMessengersByAdminId(messengerAdminId)
+            role == ProfileRoles.MESSENGER && latitude != null && longitude != null && range != null -> profileService.findMessengersByLocation(latitude, longitude, range)
             role != null -> profileService.findByLocation(
                 role,
                 latitude!!,
