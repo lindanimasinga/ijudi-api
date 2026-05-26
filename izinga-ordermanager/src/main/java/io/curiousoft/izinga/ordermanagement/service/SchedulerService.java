@@ -328,10 +328,11 @@ import static java.lang.String.format;
             var ordersToDelete = orderRepo.findAllByShopPaidAndStageAndModifiedDateBefore(false, OrderStage.STAGE_0_CUSTOMER_NOT_PAID, pastDate);
             if (ordersToDelete != null && !ordersToDelete.isEmpty()) {
                 LOG.info("Found {} unpaid orders to clean up", ordersToDelete.size());
-                ordersToDelete.stream()
+                var ordersToDeleteExcludeMovers = ordersToDelete.stream()
                         .filter(it -> !"15bc1ce9-3a0b-42f7-a1d8-34ffbb9a7d22".equals(it.shopId))
-                        .forEach(order -> LOG.debug("Unpaid order to delete: {}", order.getId()));
-                orderRepo.deleteAll(ordersToDelete);
+                        .peek(order -> LOG.debug("Unpaid order to delete: {}", order.getId()))
+                        .toList();
+                orderRepo.deleteAll(ordersToDeleteExcludeMovers);
             }
             LOG.info("Successfully cleaned up unpaid orders");
         } catch (Exception e) {
