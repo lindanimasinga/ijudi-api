@@ -111,6 +111,13 @@ class UserProfileService(val userProfileRepo: UserProfileRepo, val eventPublishe
         if (userProfile.latitude == 0.0 || userProfile.longitude == 0.0) {
             missingFields.add("geo coordinates")
         }
+        if (userProfile.name == null || userProfile.name!!.isBlank()) {
+            missingFields.add("name")
+        }
+        if (userProfile.imageUrl == null || userProfile.imageUrl!!.isBlank()) {
+            missingFields.add("Profile Picture")
+        }
+
         // ...add other checks as needed...
         return missingFields
     }

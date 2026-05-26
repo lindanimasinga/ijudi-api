@@ -372,8 +372,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                       "type": "BODY",
                       "parameters": [
                         { "type": "TEXT", "text": "#customerName" },
-                        { "type": "TEXT", "text": "#orderId" },
-                        { "type": "TEXT", "text": "#amount" }
+                        { "type": "TEXT", "text": "#orderId" }
                       ]
                     },
                     {
@@ -389,8 +388,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 """
                 .replaceAll("#customerName", customer.getName() != null ? customer.getName() : "Customer")
                 .replaceAll("#orderId", order.getId())
-                .replaceAll("#amount", String.format("%.2f", order.getTotalAmount()))
-                .replaceAll("#paymentLink", "https://pay.izinga.co.za/order/" + order.getId());
+                .replaceAll("#paymentLink", order.getId());
 
         var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
         request.setTemplate(template);
