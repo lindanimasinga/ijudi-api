@@ -13,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
+
+import java.util.Collection;
 import java.util.List;
 
 import static io.curiousoft.izinga.commons.model.PaymentType.PAYFAST;
@@ -85,13 +87,13 @@ public class OrderController {
     }
 
     @GetMapping(produces = "application/json")
-    public ResponseEntity<List<Order>> getAllOrders(@RequestParam(required = false) String userId,
-                                                    @RequestParam(required = false) String phone,
-                                                    @RequestParam(required = false) String messengerId,
-                                                    @RequestParam(required = false) String messengerAdminId,
-                                                    @RequestParam(defaultValue = "false") boolean allStages,
-                                                    @RequestParam(required = false) String storeId) throws Exception {
-        List<Order> order = !isEmpty(userId) ? orderService.findOrderByUserId(userId) :
+    public ResponseEntity<Collection<Order>> getAllOrders(@RequestParam(required = false) String userId,
+                                                          @RequestParam(required = false) String phone,
+                                                          @RequestParam(required = false) String messengerId,
+                                                          @RequestParam(required = false) String messengerAdminId,
+                                                          @RequestParam(defaultValue = "false") boolean allStages,
+                                                          @RequestParam(required = false) String storeId) throws Exception {
+        Collection<Order> order = !isEmpty(userId) ? orderService.findOrderByUserId(userId) :
                 !isEmpty(phone) ? orderService.findOrderByPhone(phone) :
                 !isEmpty(storeId) ? orderService.findOrderByStoreId(storeId) :
                 !isEmpty(messengerAdminId) ? orderService.findOrdersByMessengerAdminId(messengerAdminId, allStages) :

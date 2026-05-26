@@ -20,6 +20,9 @@ import java.util.stream.Collectors
 
 class MessengerOrderDto(order: Order, izingaCommissionPerc: Double = 0.0): Order() {
     init {
+        this.id = order.id
+        this.createdDate = order.createdDate
+        this.modifiedDate = order.modifiedDate
         this.paymentTypesAllowed = order.paymentTypesAllowed
         this.stage = order.stage
         this.shippingData = ShippingDataDto(order.shippingData ?: ShippingData(), izingaCommissionPerc)
@@ -51,6 +54,13 @@ class MessengerOrderDto(order: Order, izingaCommissionPerc: Double = 0.0): Order
             this.statusHistory = ArrayList(order.statusHistory!!)
         }
     }
+
+    override fun equals(obj: Any?): Boolean {
+        if (this === obj) return true
+        if (obj == null || this::class != obj::class) return false
+        if (this.id == null || (obj as MessengerOrderDto).id == null) return false
+        return this.id.equals(obj.id)
+    }
 }
 
 open class ShippingDataDto(shippingData: ShippingData, commissionPerc: Double? = null): ShippingData() {
@@ -77,10 +87,10 @@ open class ShippingDataDto(shippingData: ShippingData, commissionPerc: Double? =
         this.category = shippingData.category
         this.izingaCommission = shippingData.izingaCommission
 
-        val deliveryFee: Double = shippingData.deliveryFee * (1 - (commissionPerc ?: 0.0))
-        val weigthFee: Double = shippingData.weigthFee * (1 - (commissionPerc ?: 0.0))
-        val volumeFee: Double = shippingData.volumeFee * (1 - (commissionPerc ?: 0.0))
-        val labourFee: Double = shippingData.labourFee * (1 - (commissionPerc ?: 0.0))
+        this.deliveryFee = shippingData.deliveryFee * (1 - (commissionPerc ?: 0.0))
+        this.weigthFee = shippingData.weigthFee * (1 - (commissionPerc ?: 0.0))
+        this.volumeFee = shippingData.volumeFee * (1 - (commissionPerc ?: 0.0))
+        this.labourFee = shippingData.labourFee * (1 - (commissionPerc ?: 0.0))
     }
 
     override val fee: Double get() = deliveryFee + weigthFee + volumeFee + labourFee

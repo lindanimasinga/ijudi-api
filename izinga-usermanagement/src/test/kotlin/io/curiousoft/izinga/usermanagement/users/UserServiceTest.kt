@@ -146,7 +146,7 @@ class UserServiceTest {
     @Test
     fun findUserByPhone() {
         //given
-        val phone = "myID"
+        val phone = "08128155778"
         //when
         val profile: Profile? = profileService.findUserByPhone(phone)
 

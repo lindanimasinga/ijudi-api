@@ -31,6 +31,7 @@ import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static io.curiousoft.izinga.commons.model.OrderKt.generateId;
 import static io.curiousoft.izinga.commons.model.OrderType.INSTORE;
@@ -405,7 +406,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Tool(name = "find_orders_by_messenger_id", description = "Find orders by messenger id and return the order details as MessengerOrderDto")
     @Override
-    public List<Order> findOrderByMessengerId(String id, @ToolParam(required = false) boolean allStages) {
+    public Set<Order> findOrderByMessengerId(String id, @ToolParam(required = false) boolean allStages) {
         var ordersAssigned = allStages ? orderRepo.findByShippingDataMessengerId(id) : orderRepo.findByShippingDataMessengerIdAndStageNot(id, OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
 
         var ordersQuoteRequested = quoteRepository.findBySentToMessengerIds(id)
@@ -426,7 +427,9 @@ public class OrderServiceImpl implements OrderService {
                 resultOrders = ordersFromQuotes;
             }
         }
-        return resultOrders.stream().map(it -> (Order) new MessengerOrderDto(it, izingaCommissionPerc)).toList();
+        return resultOrders.stream()
+                .map(it -> (Order) new MessengerOrderDto(it, izingaCommissionPerc))
+                .collect(Collectors.toSet());
     }
 
     @Override
