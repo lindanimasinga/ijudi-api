@@ -75,11 +75,20 @@ public class FirestoreService {
 
     /**
      * Set (create/replace) a document with the provided id under collection 'izinga'.
+     * Uses PATCH with updateMask to allow partial updates on existing docs.
+     * Logs a warning if document doesn't exist (404) since metadata updates are optional.
      */
     public void setDocument(String docId, Map<String, Object> data) throws Exception {
         Objects.requireNonNull(docId, "docId must not be null");
         Objects.requireNonNull(data, "data must not be null");
-        String url = String.format("%s/projects/%s/databases/%s/documents/%s/%s", FIRESTORE_BASE, projectId, DATABASE, COLLECTION, docId);
+
+        // Build updateMask with all field names to update
+        String updateMask = data.keySet().stream()
+                .map(key -> "updateMask.fieldPaths=" + key)
+                .collect(java.util.stream.Collectors.joining("&"));
+
+        String url = String.format("%s/projects/%s/databases/%s/documents/%s/%s?%s",
+                FIRESTORE_BASE, projectId, DATABASE, COLLECTION, docId, updateMask);
 
         Map<String, Object> body = Map.of("fields", toFirestoreFields(data));
         String token = getAccessToken();
@@ -88,7 +97,16 @@ public class FirestoreService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Object> request = new HttpEntity<>(body, headers);
 
-        restTemplate.put(url, request);
+        try {
+            restTemplate.patchForObject(url, request, String.class);
+        } catch (RestClientException e) {
+            if (e.getMessage() != null && e.getMessage().contains("404")) {
+                LOG.warn("Firestore document {} not found when updating, skipping metadata update: {}", docId, e.getMessage());
+            } else {
+                LOG.error("Error updating firestore document {}: {}", docId, e.getMessage());
+                throw e;
+            }
+        }
     }
 
     /**
