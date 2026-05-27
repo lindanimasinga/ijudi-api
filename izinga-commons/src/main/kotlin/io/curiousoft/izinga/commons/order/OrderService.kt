@@ -24,6 +24,8 @@ interface OrderService {
 
     fun findOrderByMessengerId(id: String?, allStages: Boolean): Set<Order?>?
 
+    fun findOrderForMessenger(orderId: String): Order?
+
     fun findOrdersByMessengerAdminId(adminId: String?, allStages: Boolean): MutableList<Order?>?
 
     fun findAll(): MutableList<Order?>?

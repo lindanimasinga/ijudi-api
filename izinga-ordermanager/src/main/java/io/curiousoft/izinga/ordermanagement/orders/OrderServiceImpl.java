@@ -384,6 +384,14 @@ public class OrderServiceImpl implements OrderService {
         return orderRepo.findByCustomerId(userId).orElse(new ArrayList<>());
     }
 
+    @Tool(name = "find_order_for_messenger", description = "Find order by id and return the order details as MessengerOrderDto")
+    @Override
+    public Order findOrderForMessenger(String orderId) {
+        return orderRepo.findById(orderId)
+                .map(ir -> new MessengerOrderDto(ir, izingaCommissionPerc))
+                .orElseThrow(() -> new IllegalArgumentException("Order with id " + orderId + " not found."));
+    }
+
     @Tool(name = "find_orders_by_phone_number", description = "Find orders by phone number and return the order details")
     @Override
     public List<Order> findOrderByPhone(String phone) {

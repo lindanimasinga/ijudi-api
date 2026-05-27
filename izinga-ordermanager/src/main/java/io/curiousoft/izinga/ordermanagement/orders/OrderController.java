@@ -76,8 +76,9 @@ public class OrderController {
     }
 
     @GetMapping(value = "/{id}", produces = "application/json")
-    public ResponseEntity<Order> getOrder(@PathVariable String id) {
-        Order order = orderService.findOrder(id);
+    public ResponseEntity<Order> getOrder(@PathVariable String id,
+                                          @RequestParam(required = false) boolean isMessenger) {
+        Order order = isMessenger ? orderService.findOrderForMessenger(id) : orderService.findOrder(id);
         return order != null ? ResponseEntity.ok(order) : ResponseEntity.notFound().build();
     }
 
