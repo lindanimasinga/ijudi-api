@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.ordermanagement.service;
 
 import io.curiousoft.izinga.commons.model.*;
+import io.curiousoft.izinga.commons.order.MessengerOrderDto;
 import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.order.OrderRepository;
@@ -62,6 +63,7 @@ import static java.lang.String.format;
     private final DocumentInfoService documentInfoService;
     private final CloudBucketService cloudBucketService;
     private final UserProfileService profileService;
+    private final double izingaCommissionPercentage;
 
     public SchedulerService(OrderRepository orderRepo, StoreRepository storeRepository,
                             DeviceRepository deviceRepo, FirebaseNotificationService pushNotificationService,
@@ -75,7 +77,8 @@ import static java.lang.String.format;
                             ShoppingListService shoppingListService,
                             DocumentInfoService documentInfoService,
                             CloudBucketService cloudBucketService,
-                            UserProfileService profileService) {
+                            UserProfileService profileService,
+                            @Value("${service.commission.perc}") double izingaCommissionPercentage) {
         this.orderRepo = orderRepo;
         this.storeRepository = storeRepository;
         this.deviceRepo = deviceRepo;
@@ -91,6 +94,7 @@ import static java.lang.String.format;
         this.documentInfoService = documentInfoService;
         this.cloudBucketService = cloudBucketService;
         this.profileService = profileService;
+        this.izingaCommissionPercentage = izingaCommissionPercentage;
     }
 
     @Scheduled(fixedDelay = 600000, initialDelay = 10000)// 10 minutes
@@ -439,7 +443,8 @@ import static java.lang.String.format;
 
                             if (!payoutCreatedForMessenger) {
                                 LOG.info("Generating missing messenger payout for order: {}", order.getId());
-                                reconService.generatePayoutForMessengerAndOrder(order);
+                                var messengerOrderDto = new MessengerOrderDto(order, izingaCommissionPercentage);
+                                reconService.generatePayoutForMessengerAndOrder(messengerOrderDto);
                                 LOG.info("Messenger payout generated for order: {}", order.getId());
                                 counters[1]++;
                             } else {

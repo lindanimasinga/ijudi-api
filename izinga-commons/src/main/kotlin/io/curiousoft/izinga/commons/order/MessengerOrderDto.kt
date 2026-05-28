@@ -1,25 +1,11 @@
 package io.curiousoft.izinga.commons.order
 
-import io.curiousoft.izinga.commons.model.Basket
-import io.curiousoft.izinga.commons.model.BuildingType
-import io.curiousoft.izinga.commons.model.DocumentAttachment
 import io.curiousoft.izinga.commons.model.Order
-import io.curiousoft.izinga.commons.model.OrderStage
-import io.curiousoft.izinga.commons.model.OrderStatusHistory
-import io.curiousoft.izinga.commons.model.OrderType
-import io.curiousoft.izinga.commons.model.PaymentType
-import io.curiousoft.izinga.commons.model.ShipingGeoData
 import io.curiousoft.izinga.commons.model.ShippingData
-import io.curiousoft.izinga.commons.model.ShippingData.ShippingType
-import jakarta.validation.Valid
-import jakarta.validation.constraints.Future
-import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.NotNull
-import java.util.Date
-import java.util.stream.Collectors
 
-class MessengerOrderDto(order: Order, izingaCommissionPerc: Double = 0.0): Order() {
-    init {
+class MessengerOrderDto: Order {
+    constructor()
+    constructor(order: Order, izingaCommissionPerc: Double = 0.0) {
         this.id = order.id
         this.createdDate = order.createdDate
         this.modifiedDate = order.modifiedDate
@@ -63,8 +49,9 @@ class MessengerOrderDto(order: Order, izingaCommissionPerc: Double = 0.0): Order
     }
 }
 
-open class ShippingDataDto(shippingData: ShippingData, commissionPerc: Double? = null): ShippingData() {
-    init {
+open class ShippingDataDto: ShippingData {
+     constructor()
+     constructor(shippingData: ShippingData, commissionPerc: Double? = null) {
         this.id = shippingData.id
         this.fromAddress = shippingData.fromAddress
         this.fromBuildingType = shippingData.fromBuildingType

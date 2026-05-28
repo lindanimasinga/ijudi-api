@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.ordermanagement.orders.events;
 
 import io.curiousoft.izinga.commons.model.*;
+import io.curiousoft.izinga.commons.order.MessengerOrderDto;
 import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.order.events.OrderCancelledEvent;
 import io.curiousoft.izinga.commons.order.events.OrderUpdatedEvent;
@@ -16,6 +17,7 @@ import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
@@ -30,7 +32,6 @@ import java.util.Optional;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class MessengerOrderEventHandler implements OrderEventHandler {
 
     private final FirebaseNotificationService pushNotificationService;
@@ -42,6 +43,29 @@ public class MessengerOrderEventHandler implements OrderEventHandler {
     private final ReconService reconService;
     private final PromoCodeClient promoCodeClient;
     private final OrderRepository orderRepository;
+    private final double izingaCommissionPerc;
+
+    public MessengerOrderEventHandler(FirebaseNotificationService pushNotificationService,
+                                      AdminOnlyNotificationService smsNotificationService,
+                                      EmailNotificationService emailNotificationService,
+                                      DeviceService deviceService,
+                                      UserProfileService userProfileService,
+                                      ApplicationEventPublisher eventPublisher,
+                                      ReconService reconService,
+                                      PromoCodeClient promoCodeClient,
+                                      OrderRepository orderRepository,
+                                      @Value("${service.commission.perc}") double izingaCommissionPerc) {
+        this.pushNotificationService = pushNotificationService;
+        this.smsNotificationService = smsNotificationService;
+        this.emailNotificationService = emailNotificationService;
+        this.deviceService = deviceService;
+        this.userProfileService = userProfileService;
+        this.eventPublisher = eventPublisher;
+        this.reconService = reconService;
+        this.promoCodeClient = promoCodeClient;
+        this.orderRepository = orderRepository;
+        this.izingaCommissionPerc = izingaCommissionPerc;
+    }
 
     @Async
     @EventListener
@@ -95,7 +119,8 @@ public class MessengerOrderEventHandler implements OrderEventHandler {
 
         boolean isDelivery = order.getShippingData() != null
                 && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
-                && store.getStoreType() != StoreType.TIPS && store.getStoreType() != StoreType.CAR_WASH;
+                && store.getStoreType() != StoreType.TIPS
+                && store.getStoreType() != StoreType.CAR_WASH;
 
         // notify messenger
         if (isDelivery) {
@@ -183,7 +208,8 @@ public class MessengerOrderEventHandler implements OrderEventHandler {
         }
 
         if (order.getStage() == OrderStage.STAGE_7_ALL_PAID) {
-            var payout  = reconService.generatePayoutForMessengerAndOrder(order);
+            var messengerOrder = new MessengerOrderDto(order, izingaCommissionPerc);
+            var payout  = reconService.generatePayoutForMessengerAndOrder(messengerOrder);
             if(payout != null && !payout.isPermEmployed()) {
                 var payoutTotal = payout.getTotal().setScale(2, RoundingMode.HALF_UP);
                 smsNotificationService.sendDriverOrderCompletedMessage(messenger.get(), order.getId(), BigDecimal.valueOf(order.getShippingData().getFee()), payoutTotal);

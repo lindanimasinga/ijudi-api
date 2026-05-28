@@ -57,11 +57,7 @@ class MessengerPayout(
     var isPermEmployed: Boolean = false
 
     override val total: BigDecimal get() = if (isPermEmployed) orders.sumOf { (it.tip ?: 0.00) }.toBigDecimal()
-        else orders.sumOf {
-            val fee = it.shippingData?.fee ?: 0.0
-            val commission = it.shippingData?.izingaCommission ?: 0.0
-            (fee - commission) + (it.tip ?: 0.0)
-        }.toBigDecimal()
+                                        else orders.sumOf { it.shippingData?.fee!! + (it.tip ?: 0.00) }.toBigDecimal()
 }
 
 class ShopPayout(
