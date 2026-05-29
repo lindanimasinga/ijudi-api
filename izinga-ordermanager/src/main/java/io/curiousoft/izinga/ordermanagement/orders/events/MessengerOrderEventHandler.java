@@ -212,7 +212,7 @@ public class MessengerOrderEventHandler implements OrderEventHandler {
             var payout  = reconService.generatePayoutForMessengerAndOrder(messengerOrder);
             if(payout != null && !payout.isPermEmployed()) {
                 var payoutTotal = payout.getTotal().setScale(2, RoundingMode.HALF_UP);
-                smsNotificationService.sendDriverOrderCompletedMessage(messenger.get(), order.getId(), BigDecimal.valueOf(order.getShippingData().getFee()), payoutTotal);
+                smsNotificationService.sendDriverOrderCompletedMessage(messenger.get(), messengerOrder.getId(), BigDecimal.valueOf(messengerOrder.getShippingData().getFee()), payoutTotal);
             }
         }
     }
