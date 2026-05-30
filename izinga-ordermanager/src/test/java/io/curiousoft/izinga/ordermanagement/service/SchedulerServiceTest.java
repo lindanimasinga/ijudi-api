@@ -8,6 +8,7 @@ import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
+import io.curiousoft.izinga.messaging.repo.WhatsappSessionRepo;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
 import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingListService;
@@ -24,6 +25,8 @@ import org.mockito.Spy;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
@@ -66,6 +69,8 @@ public class SchedulerServiceTest {
     private ReconService reconService;
     @Mock
     private ShoppingListService shoppingListService;
+    @Mock
+    private WhatsappSessionRepo whatsappSessionRepo;
 
     //system under test
     private SchedulerService sut;
@@ -92,7 +97,8 @@ public class SchedulerServiceTest {
                 shoppingListService,
                 null,
                 null, null,
-                0.1
+                0.1,
+                whatsappSessionRepo
         );
     }
 
@@ -1452,4 +1458,65 @@ public class SchedulerServiceTest {
               "minimumDepositAllowedPerc": 1
             }]
             """;
+
+    @Test
+    public void notifyUnregisteredWhatsappUsers_sendsLandingOptions_whenNoProfile() {
+        // given
+        WhatsappSession session = mock(WhatsappSession.class);
+        when(session.getFrom()).thenReturn("27812815770");
+        when(whatsappSessionRepo.findByLastMessageDateBetween(any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(Collections.singletonList(session));
+        when(userRepo.findByMobileNumber("27812815770")).thenReturn(null);
+
+        // when
+        sut.notifyUnregisteredWhatsappUsers();
+
+        // then
+        verify(adminOnlyNotificationService, times(1)).sendLandingOptions("27812815770", null, null);
+    }
+
+    @Test
+    public void notifyUnregisteredWhatsappUsers_skipsRegisteredUsers() {
+        // given
+        WhatsappSession session = mock(WhatsappSession.class);
+        when(session.getFrom()).thenReturn("27812815770");
+        when(whatsappSessionRepo.findByLastMessageDateBetween(any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(Collections.singletonList(session));
+        UserProfile existingUser = mock(UserProfile.class);
+        when(userRepo.findByMobileNumber("27812815770")).thenReturn(existingUser);
+
+        // when
+        sut.notifyUnregisteredWhatsappUsers();
+
+        // then
+        verify(adminOnlyNotificationService, never()).sendLandingOptions(any(), any(), any());
+    }
+
+    @Test
+    public void notifyUnregisteredWhatsappUsers_skipsSessionsWithNullFrom() {
+        // given
+        WhatsappSession session = mock(WhatsappSession.class);
+        when(session.getFrom()).thenReturn(null);
+        when(whatsappSessionRepo.findByLastMessageDateBetween(any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(Collections.singletonList(session));
+
+        // when
+        sut.notifyUnregisteredWhatsappUsers();
+
+        // then
+        verify(adminOnlyNotificationService, never()).sendLandingOptions(any(), any(), any());
+    }
+
+    @Test
+    public void notifyUnregisteredWhatsappUsers_noSessionsFromYesterday_doesNothing() {
+        // given
+        when(whatsappSessionRepo.findByLastMessageDateBetween(any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(Collections.emptyList());
+
+        // when
+        sut.notifyUnregisteredWhatsappUsers();
+
+        // then
+        verify(adminOnlyNotificationService, never()).sendLandingOptions(any(), any(), any());
+    }
 }

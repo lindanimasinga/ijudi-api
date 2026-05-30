@@ -10,6 +10,7 @@ import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.documentmanagement.CloudBucketService;
 import io.curiousoft.izinga.documentmanagement.DocumentInfoService;
 import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
+import io.curiousoft.izinga.messaging.repo.WhatsappSessionRepo;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingListRunEvent;
 import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingListService;
@@ -32,6 +33,7 @@ import org.springframework.util.StringUtils;
 
 import javax.swing.*;
 import java.io.IOException;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -64,6 +66,7 @@ import static java.lang.String.format;
     private final CloudBucketService cloudBucketService;
     private final UserProfileService profileService;
     private final double izingaCommissionPercentage;
+    private final WhatsappSessionRepo whatsappSessionRepo;
 
     public SchedulerService(OrderRepository orderRepo, StoreRepository storeRepository,
                             DeviceRepository deviceRepo, FirebaseNotificationService pushNotificationService,
@@ -78,7 +81,8 @@ import static java.lang.String.format;
                             DocumentInfoService documentInfoService,
                             CloudBucketService cloudBucketService,
                             UserProfileService profileService,
-                            @Value("${service.commission.perc}") double izingaCommissionPercentage) {
+                            @Value("${service.commission.perc}") double izingaCommissionPercentage,
+                            WhatsappSessionRepo whatsappSessionRepo) {
         this.orderRepo = orderRepo;
         this.storeRepository = storeRepository;
         this.deviceRepo = deviceRepo;
@@ -95,6 +99,7 @@ import static java.lang.String.format;
         this.cloudBucketService = cloudBucketService;
         this.profileService = profileService;
         this.izingaCommissionPercentage = izingaCommissionPercentage;
+        this.whatsappSessionRepo = whatsappSessionRepo;
     }
 
     @Scheduled(fixedDelay = 600000, initialDelay = 10000)// 10 minutes
@@ -710,6 +715,43 @@ import static java.lang.String.format;
         connection.setRequestMethod("GET");
         connection.connect();
         return connection.getInputStream().readAllBytes();
+    }
+
+    //@Scheduled(cron = "* 0 8 * * *")// every day at 8am
+    public void notifyUnregisteredWhatsappUsers() {
+        LOG.info("=============== [START] Scheduled Job: notifyUnregisteredWhatsappUsers ===============");
+        long startTime = System.currentTimeMillis();
+        int[] counters = {0, 0};
+
+        try {
+            LocalDate previous = LocalDate.now(ZoneId.of("UTC")).minusDays(1);
+            LocalDate now = LocalDate.now(ZoneId.of("UTC"));
+
+            List<WhatsappSession> sessions = whatsappSessionRepo.findByLastMessageDateBetween(previous, now);
+            LOG.info("Found {} WhatsApp sessions from yesterday to check", sessions.size());
+
+            for (WhatsappSession session : sessions) {
+                String from = "+" + session.getFrom();
+                try {
+                    UserProfile user = userProfileRepo.findByMobileNumber(from);
+                    if (user == null) {
+                        smsNotificationService.sendLandingOptions(from, null, null);
+                        counters[0]++;
+                        LOG.info("Sent landing options to unregistered number: {}", from);
+                    }
+                } catch (Exception e) {
+                    counters[1]++;
+                    LOG.error("Failed to send landing options to {}", from, e);
+                }
+            }
+        } catch (Exception e) {
+            counters[1]++;
+            LOG.error("Fatal error in notifyUnregisteredWhatsappUsers job", e);
+        } finally {
+            long duration = System.currentTimeMillis() - startTime;
+            LOG.info("=============== [FINISH] Scheduled Job: notifyUnregisteredWhatsappUsers ===============");
+            LOG.info("Job Statistics - Sent: {}, Errors: {}, Duration: {}ms", counters[0], counters[1], duration);
+        }
     }
 
 }
