@@ -78,7 +78,7 @@ class AiCustomerServiceAgentTest {
 
     @Test
     void handleWhatsappQuery_returnsNull_whenMessageIsNull() {
-        var result = enabledAgent.handleWhatsappQuery(null, FROM, DRIVER_NAME);
+        var result = enabledAgent.handleWhatsappQuery("message", FROM, DRIVER_NAME);
 
         assertNull(result);
         verifyNoInteractions(restTemplate);

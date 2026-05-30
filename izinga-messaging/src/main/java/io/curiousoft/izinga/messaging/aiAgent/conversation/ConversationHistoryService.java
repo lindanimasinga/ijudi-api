@@ -77,6 +77,17 @@ public class ConversationHistoryService {
     }
 
     /**
+     * Atomically record a human-written correction in the conversation history.
+     * Gets or creates the conversation and adds the correction as an assistant message.
+     */
+    @Transactional
+    public void recordHumanCorrection(String phone, String name, String messageText) {
+        ConversationHistory history = getOrCreateConversation(phone, name);
+        addAssistantMessage(history, "[HUMAN CORRECTION] " + messageText);
+        LOG.info("Recorded human correction in conversation history for {}", phone);
+    }
+
+    /**
      * Get messages for context (last N messages)
      */
     public List<ConversationMessage> getContextMessages(ConversationHistory history) {

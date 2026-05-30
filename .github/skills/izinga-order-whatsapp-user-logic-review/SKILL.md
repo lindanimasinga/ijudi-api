@@ -15,8 +15,13 @@ Use this skill to perform a detailed, repeatable logic review and safe implement
 ## Target Files
 Primary classes:
 - izinga-ordermanager/src/main/java/io/curiousoft/izinga/ordermanagement/orders/OrderServiceImpl.java
+- izinga-ordermanager/src/main/java/io/curiousoft/izinga/ordermanagement/service/SchedulerService.java
 - izinga-messaging/src/main/java/io/curiousoft/izinga/messaging/whatsapp/webhooks/WhatsappInboundEventHandler.java
+- izinga-messaging/src/main/java/io/curiousoft/izinga/messaging/whatsapp/FirestoreToWhatsappController.java
 - izinga-usermanagement/src/main/kotlin/io/curiousoft/izinga/usermanagement/users/UserProfileService.kt
+
+Supporting repositories and contracts:
+- izinga-messaging/src/main/java/io/curiousoft/izinga/messaging/repo/WhatsappSessionRepo.java
 
 Supporting inheritance and contracts:
 - izinga-usermanagement/src/main/kotlin/io/curiousoft/izinga/usermanagement/users/ProfileServiceImpl.kt
@@ -207,6 +212,91 @@ UserProfileService review checkpoints:
 - Team lookup correctness for `findMessengersByAdminId` and ownership mapping (`tag.messengerAdminId`).
 - If roles are added/changed, validate that `userTypeConfig.userRole` mappings remain consistent with `ProfileRoles`.
 
+### SchedulerService.notifyUnregisteredWhatsappUsers: Detailed Behavior
+
+**Status**: implemented, currently **disabled** — `@Scheduled` annotation is commented out.
+
+Logic flow:
+1. Computes `yesterday = LocalDate.now(UTC).minusDays(1)` and `today = LocalDate.now(UTC)`.
+2. Calls `whatsappSessionRepo.findByLastMessageDateBetween(yesterday, today)` to get sessions active the previous day.
+3. For each session: prepends `+` to `session.getFrom()` and calls `userProfileRepo.findByMobileNumber(from)`.
+4. If no user found (unregistered): calls `smsNotificationService.sendLandingOptions(from, null, null)`.
+5. Tracks `counters[0]` (sent) and `counters[1]` (errors). Logs summary in `finally`.
+
+Review checkpoints:
+- `session.getFrom()` may be `null` — guard before prepending `+` to avoid NullPointerException.
+- `findByLastMessageDateBetween` uses `LocalDate` params; `WhatsappSession.lastMessageDate` is `Instant` — verify Spring Data conversion correctness at scale.
+- `sendLandingOptions` is an external call — failure is caught per session; total job failure is also caught.
+- Enabling the job: remove the comment prefix from `@Scheduled(cron = "* 0 8 * * *")`.
+
+### WhatsappSessionRepo: Additive Query Methods
+
+File: `izinga-messaging/.../repo/WhatsappSessionRepo.java`
+
+Current methods:
+- `Optional<WhatsappSession> findByFrom(String from)` — session lookup by sender phone.
+- `List<WhatsappSession> findByLastMessageDateBetween(LocalDate start, LocalDate end)` — sessions active within date range. Added to support the scheduler re-engagement job. Uses Spring Data derived query naming; verify MongoDB index on `lastMessageDate` if session volume grows.
+
+### FirestoreToWhatsappController.forwardMessageToWhatsapp: Detailed Behavior
+
+Endpoint: `GET /forward/chatSession/{cSId}/message/{msgId}`
+
+**Injected services (current)**: `FirestoreService`, `WhatsAppService`, `WhatsappConfig`, `ConversationHistoryService`, `AiAgentConfigService`. `AiCustomerServiceAgent` is intentionally NOT injected.
+
+Purpose: A human agent writes a correction into the Firestore chat session and calls this endpoint. The endpoint:
+1. Loads `ChatSession` and `FireStoreMessage` from Firestore. Returns 404 if either is missing.
+2. Guards non-TEXT message type — returns 400 if `messageType != null && messageType != TEXT`.
+3. Normalizes `customerMobileNumber` (`0` prefix → `+27`) via private static `normalizePhone()`.
+4. Sends `msg.getMessage()` (the human-written correction text, not an AI response) to the customer via `WhatsAppService.sendTextMessage`. Returns 500 if the Retrofit call returns a non-successful response.
+5. **On success — Correction Step A (non-blocking)**: calls `ConversationHistoryService.recordHumanCorrection(normalizedPhone, customerName, messageText)`. This is an atomic `@Transactional` method — internally calls `getOrCreateConversation` then `addAssistantMessage` with `[HUMAN CORRECTION] <text>`. Failure is caught and logged.
+6. **On success — Correction Step B (non-blocking)**: calls `AiAgentConfigService.appendHumanCorrection("driver_support", normalizedPhone, messageText)`. This encapsulates: load active config → null-safe prompt guard → create `## Human Correction Log` section if absent or append if present → `saveAgentConfig` (version incremented). Returns early if no active config. Failure is caught and logged.
+7. Returns `ResponseEntity.ok(Map.of("status", "sent", "response", resp.body()))`.
+
+**Key refactoring**: correction steps A and B were previously implemented as inline logic in the controller. They were moved to `ConversationHistoryService.recordHumanCorrection()` and `AiAgentConfigService.appendHumanCorrection()` respectively. The controller is now ~40 lines with linear flow.
+
+Review checkpoints:
+- Both correction steps must remain non-blocking — each inside an independent try/catch AFTER the WhatsApp send succeeds.
+- `ConversationHistoryService.recordHumanCorrection` uses `@Transactional` — do not call it inside a broader catch block that would suppress rollback.
+- `AiAgentConfigService.appendHumanCorrection` null-guards `getSystemPrompt()` internally using `config.getSystemPrompt() != null ? ... : ""` — no NPE risk in the controller.
+- Correction log grows unbounded — consider pruning or summarizing entries if the system prompt size becomes a concern with OpenAI token limits.
+- Phone normalization in this controller only handles `0` prefix; numbers already in `+27` format pass through unchanged.
+
+### ConversationHistoryService.recordHumanCorrection: New Method
+
+File: `izinga-messaging/.../aiAgent/conversation/ConversationHistoryService.java`
+
+```java
+@Transactional
+public void recordHumanCorrection(String phone, String name, String messageText) {
+    ConversationHistory history = getOrCreateConversation(phone, name);
+    addAssistantMessage(history, "[HUMAN CORRECTION] " + messageText);
+}
+```
+
+Purpose: Atomic correction entry — callers need one call instead of two.
+Storage: `ai_conversation_histories` MongoDB collection.
+Note: `@Transactional` scope covers both the get-or-create and the save inside `addAssistantMessage`.
+
+### AiAgentConfigService.appendHumanCorrection: New Method
+
+File: `izinga-messaging/.../aiAgent/config/AiAgentConfigService.java`
+
+```java
+public void appendHumanCorrection(String agentName, String phone, String messageText) {
+    AiAgentConfig config = getActiveAgentConfig(agentName);
+    if (config == null) { LOG.warn(...); return; }
+    String currentPrompt = config.getSystemPrompt() != null ? config.getSystemPrompt() : "";
+    String entry = "\n- [" + Instant.now() + "] Customer " + phone + ": " + messageText;
+    String updatedPrompt = currentPrompt.contains("## Human Correction Log")
+            ? currentPrompt + entry
+            : currentPrompt + "\n\n## Human Correction Log\n..." + entry;
+    saveAgentConfig(agentName, updatedPrompt, config.getDescription());
+}
+```
+
+Purpose: Encapsulates the full load → null-safe guard → create/append section → save flow. No caller needs to handle `getSystemPrompt()` nullability.
+Storage: `ai_agent_configs` MongoDB collection; `version` is incremented by `saveAgentConfig` on every call.
+
 ## High-Risk Patterns To Check First
 - Substring operations without input-length guards.
 - List index operations where list can be empty.
@@ -217,6 +307,9 @@ UserProfileService review checkpoints:
 - Query branches that accidentally change legacy single-user behavior (`messengerId` or `toId` paths).
 - **Missing `addStatusHistory()` call after any new `setStage()` site — keeps location history in sync with all stage transitions.**
 - **Calling Kotlin default-parameter methods from Java without explicit bridge overload — always add a Java-callable single-arg overload alongside the Kotlin multi-arg function.**
+- **`session.getFrom()` null-check in `notifyUnregisteredWhatsappUsers` — prepending `+` to a null value throws NPE; guard before string concatenation.**
+- **`AiAgentConfigService.appendHumanCorrection` null-guards `getSystemPrompt()` internally — do NOT call `agentConfig.getSystemPrompt().contains(...)` from controller code; always delegate to `appendHumanCorrection` instead.**
+- **AI agent system prompt unbounded growth** — each human correction appends to the system prompt. Monitor size against OpenAI token limits; plan a pruning strategy if volume grows.
 
 ## Safe Change Playbook
 

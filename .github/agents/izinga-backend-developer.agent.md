@@ -74,8 +74,14 @@ Load and follow these skills before making changes:
 4. Read the full method(s) being changed — never edit from partial context.
 5. Implement the minimal safe change: follow language style of the target module (Java vs Kotlin).
 6. Apply all high-risk pattern checks: substring guards, index bounds, null-safety, side-effect ordering, duplicate processing guards.
-7. Validate with: `mvn -pl <module> -am test` for affected module(s).
-8. Return a concise summary of the change, invariants preserved, and any residual risks.
+7. **Write tests for every new or changed method with 100% branch coverage — tests are mandatory, not optional.**
+   - Use JUnit 4 + Mockito: `@RunWith(MockitoJUnitRunner.class)`, `@Mock`, `@InjectMocks`.
+   - Cover happy path AND every error/null/boundary branch.
+   - Verify collaborator interactions with `verify(mock).method(...)`.
+   - Use `mock(Class)` when no-arg constructor is absent.
+   - Test file: `src/test/java/<same-package>/<ClassName>Test.java`
+8. Validate with: `./mvnw -pl <module> -am test` — all tests must pass before the task is done.
+9. Return a concise summary of the change, invariants preserved, tests written, and any residual risks.
 
 ## Known High-Risk Patterns (Always Verify First)
 - `list.get(index + 1)` in stage progression — verify terminal stage is handled.
@@ -89,5 +95,6 @@ Load and follow these skills before making changes:
 - **Problem or feature summary** — what is being changed and why.
 - **Contract impact** — what existing behavior is preserved or extended.
 - **Changes made** — files, methods, and behavioral delta.
-- **Validation performed** — build/test commands run and results.
+- **Tests written** — test class, method names, branches covered.
+- **Validation performed** — `./mvnw -pl <module> -am test` result.
 - **Remaining risks or follow-up** — edge cases not covered, tests to add, or dependencies to monitor.

@@ -84,6 +84,7 @@ public class WhatsappInboundEventHandler {
                             LOG.info("Checking if message from {} is a verification consent reply", from);
                             var isVerificationMessage = verificationConsentService.isVerificationMessage(message);
                             boolean isAiCudtomerServiceEnable = aiCustomerService.isEnabled();
+                            String aiResponseToCustomer = null;
                             if (isVerificationMessage) {
                                 LOG.info("Received verification consent reply from {}", from);
                                 verificationConsentService.handleVerificationConsentReply(message, from);
@@ -94,13 +95,13 @@ public class WhatsappInboundEventHandler {
                                 whatsappNotificationService.sendLandingOptions(from, value.getContacts().get(0).getProfile().getName(), user);
                             }  else if (isAiCudtomerServiceEnable && session.isAIAgentActive()){
                                 LOG.info("AI customer service enabled, processing message from {}", from);
-                                var aiResponseToCustomer = aiCustomerService.handleWhatsappQuery(message, from);
+                                aiResponseToCustomer = aiCustomerService.handleWhatsappQuery(message, from);
                                 whatsappNotificationService.sendMessage(from, aiResponseToCustomer);
                             }
 
                             // delegate based on message type / content
                             if ("text".equals(type) || message.getText() != null) {
-                                handleTextMessage(message, value.getContacts());
+                                handleTextMessage(message, value.getContacts(), aiResponseToCustomer);
                                 List<String> adminIds = userProfileRepo.findByRole(ProfileRoles.ADMIN)
                                         .stream().map(BaseModel::getId).toList();
                                 List<Device> devices = deviceRepo.findByUserIdIn(adminIds);
@@ -156,7 +157,8 @@ public class WhatsappInboundEventHandler {
         return pushMessage;
     }
 
-    private void handleTextMessage(WhatsappWebhookPayload.Value.Message message, List<WhatsappWebhookPayload.Value.Contact> contacts) {
+    private void handleTextMessage(WhatsappWebhookPayload.Value.Message message,
+                                   List<WhatsappWebhookPayload.Value.Contact> contacts, String aiResponseToCustomer) {
         try {
             String from = message.getFrom();
             if (message.getText() != null) {
@@ -164,7 +166,7 @@ public class WhatsappInboundEventHandler {
                 LOG.info("Text message from {}: {}", from, body);
 
                 // prepare Firestore message
-                FireStoreTextMessage msg = FireStoreTextMessage.builder()
+                FireStoreTextMessage customerMessage = FireStoreTextMessage.builder()
                         .createdAt(Instant.now())
                         .isRead(false)
                         .message(body)
@@ -191,17 +193,28 @@ public class WhatsappInboundEventHandler {
                         LOG.debug("Failed to extract contact info", ex);
                     }
                 }
-                if (!meta.isEmpty()) msg.setMeta(meta);
+                if (!meta.isEmpty()) customerMessage.setMeta(meta);
 
                 // Use the phone number as the customer identifier (per requirements)
                 try {
-                    String createdMsgId;
-                    if (contactName != null) {
-                        createdMsgId = firestoreService.writeMessageForCustomer(from, contactName, msg);
-                    } else {
-                        createdMsgId = firestoreService.writeMessageForCustomer(from, "Customer " + from, msg);
-                    }
+                    String createdMsgId = contactName != null ? firestoreService.writeMessageForCustomer(from, contactName, customerMessage)
+                            : firestoreService.writeMessageForCustomer(from, "Customer " + from, customerMessage);
                     LOG.info("Written text message to firestore for customer {} messageId={}", from, createdMsgId);
+
+                    if(aiResponseToCustomer != null && !aiResponseToCustomer.isBlank()) {
+                        FireStoreTextMessage aiMessage = FireStoreTextMessage.builder()
+                                .createdAt(Instant.now())
+                                .isRead(false)
+                                .message(aiResponseToCustomer)
+                                .messageType(FireStoreTextMessage.MessageType.TEXT)
+                                .senderId("AI_AGENT")
+                                .senderType(FireStoreTextMessage.SenderType.STORE)
+                                .timestamp(Instant.now())
+                                .build();
+                        String aiMsgId = firestoreService.writeMessageForCustomer(from, "AI Agent", aiMessage);
+                        LOG.info("Written AI response message to firestore for customer {} messageId={}", from, aiMsgId);
+
+                    }
                 } catch (Exception e) {
                     LOG.error("Failed to write text message to firestore for from={}", from, e);
                 }

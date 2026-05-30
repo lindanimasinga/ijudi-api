@@ -27,7 +27,6 @@ public class AiCustomerServiceAgent {
     private final RestTemplate restTemplate;
     private final ConversationHistoryService conversationHistoryService;
     private final AiAgentConfigService agentConfigService;
-    private final String systemPrompt;
 
     public AiCustomerServiceAgent(
             @Value("${ai.agent.enabled:false}") boolean enabled,
@@ -42,7 +41,6 @@ public class AiCustomerServiceAgent {
         this.restTemplate = restTemplate;
         this.conversationHistoryService = conversationHistoryService;
         this.agentConfigService = agentConfigService;
-        this.systemPrompt = agentConfigService.getSystemPrompt(AGENT_NAME);
     }
 
     public boolean isEnabled() {
@@ -59,11 +57,6 @@ public class AiCustomerServiceAgent {
      * @return AI-generated reply string, or null if disabled or an error occurs
      */
     public String handleWhatsappQuery(WhatsappWebhookPayload.Value.Message message, String from, String driverName) {
-        if (!enabled) {
-            LOG.debug("AI agent is disabled, skipping query from {}", from);
-            return null;
-        }
-
         if ((message == null || message.getText() == null || message.getText().getBody() == null) && message.getButton() == null) {
             LOG.warn("Received null or empty message from {}", from);
             return null;
@@ -75,14 +68,17 @@ public class AiCustomerServiceAgent {
         if (userText.isBlank()) {
             userText = message.getButton().getText().trim();
         }
+        return handleWhatsappQuery(userText, from, driverName);
+    }
 
-        if (userText.isBlank()) {
-            LOG.warn("Received blank message body from {}", from);
+    public String handleWhatsappQuery(String userText, String from, String driverName) {
+        if (!enabled) {
+            LOG.debug("AI agent is disabled, skipping query from {}", from);
             return null;
         }
 
         LOG.info("AI agent handling query from {}: {}", from, userText);
-
+        var systemPrompt = agentConfigService.getSystemPrompt(AGENT_NAME);
         try {
             // Load system prompt from database
             if (systemPrompt == null) {

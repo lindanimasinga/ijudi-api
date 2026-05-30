@@ -85,6 +85,76 @@ Recent additive query surfaces:
 - `/recon/payout?payoutType=MESSENGER&messengerAdminId=<id>&fromDate=<iso>&toDate=<iso>&messengerId=<optional>` for team payouts and drill-down.
 - `/order/{orderId}/nextstage?latitude=<double>&longitude=<double>` — optional location params appended to every stage advance. Params are `required = false`; omit for backward-compatible no-location calls.
 
+## Messenger Order API
+
+Controller: `izinga-ordermanager/.../orders/MessengerOrderController.java`
+Base path: `/messenger/order`
+
+All responses are wrapped in `MessengerOrderDto` so fees reflect the actual messenger payout after iZinga commission deduction.
+
+Endpoints:
+- `GET /messenger/order?messengerId=<id>&allStages=<bool>` — list orders for an assigned messenger.
+- `GET /messenger/order?messengerAdminId=<id>&allStages=<bool>` — list orders for all messengers in a team. Uses `findOrdersByMessengerAdminId` (returns raw `Order`) and wraps each in `new MessengerOrderDto(order, izingaCommissionPerc)`.
+- `GET /messenger/order/{id}` — single order with commission deducted. Calls `findOrderForMessenger`.
+- `GET /messenger/order/{orderId}/nextstage?latitude=<double>&longitude=<double>` — advance stage, optionally with GPS coordinates.
+- `PATCH /messenger/order/{orderId}/quote` — accept or reject a delivery quote.
+
+Key design notes:
+- `findOrderByMessengerId` already returns `MessengerOrderDto` instances internally; cast directly.
+- `findOrdersByMessengerAdminId` returns raw `Order`; wrap explicitly with `new MessengerOrderDto(o, izingaCommissionPerc)`.
+- Do NOT return raw `Order` from this controller — always wrap so commission is applied.
+
+## Scheduled Jobs
+
+Class: `izinga-ordermanager/.../service/SchedulerService.java`
+
+### `notifyUnregisteredWhatsappUsers`
+- **Status**: implemented but currently **disabled** — the `@Scheduled` annotation is commented out.
+- **Intended schedule**: daily at 08:00 UTC (`cron = "* 0 8 * * *"`).
+- **Logic**:
+  1. Queries `WhatsappSessionRepo.findByLastMessageDateBetween(yesterday, today)` for sessions active the previous day.
+  2. For each session, prepends `+` to `session.getFrom()` and calls `userProfileRepo.findByMobileNumber(from)`.
+  3. If no registered user is found, sends re-engagement landing options via `smsNotificationService.sendLandingOptions(from, null, null)`.
+  4. Tracks `[sentCount, errorCount]` and logs a summary in the finally block.
+- **Enabling**: remove the comment prefix from `@Scheduled(cron = "* 0 8 * * *")` on the method.
+- **Dependency**: requires `WhatsappSessionRepo` injected into `SchedulerService` (already wired).
+
+### `WhatsappSessionRepo` — additive query method
+File: `izinga-messaging/.../repo/WhatsappSessionRepo.java`
+- `List<WhatsappSession> findByLastMessageDateBetween(LocalDate start, LocalDate end)` — finds sessions whose `lastMessageDate` falls within the given date range. Used by the scheduler job above.
+- Note: `WhatsappSession.lastMessageDate` is stored as `Instant` in the model but this derived query uses Spring Data's between semantics — verify index if session volume grows.
+
+## AI Correction Feedback Loop
+
+Controller: `izinga-messaging/.../whatsapp/FirestoreToWhatsappController.java`
+Endpoint: `GET /forward/chatSession/{cSId}/message/{msgId}`
+
+**Purpose**: When a human agent writes a correction message in a Firestore chat session and calls this endpoint, it:
+1. Loads `ChatSession` and `FireStoreMessage` from Firestore (404 if either missing). Guards non-TEXT message type with 400.
+2. Normalizes `customerMobileNumber` (`0` prefix → `+27`).
+3. Sends the human-written correction text (`msg.getMessage()`) directly to the customer via WhatsApp. `AiCustomerServiceAgent` is NOT involved — the human text is forwarded as-is.
+4. **On success — Correction Step A**: calls `ConversationHistoryService.recordHumanCorrection(normalizedPhone, customerName, messageText)` — atomic `@Transactional` method that gets-or-creates the conversation and appends `[HUMAN CORRECTION] <text>` as an assistant message.
+5. **On success — Correction Step B**: calls `AiAgentConfigService.appendHumanCorrection("driver_support", normalizedPhone, messageText)` — null-safe method that loads the active config, creates the `## Human Correction Log` section if absent, appends the entry, and saves (version incremented).
+6. Returns 200 with `{status: sent, response: <WhatsApp body>}`.
+
+**Injected services**: `FirestoreService`, `WhatsAppService`, `WhatsappConfig`, `ConversationHistoryService`, `AiAgentConfigService`. `AiCustomerServiceAgent` is intentionally NOT injected.
+
+**Refactored service methods (current)**:
+- `ConversationHistoryService.recordHumanCorrection(String phone, String name, String messageText)` — atomic `@Transactional`: calls `getOrCreateConversation` then `addAssistantMessage`.
+- `AiAgentConfigService.appendHumanCorrection(String agentName, String phone, String messageText)` — null-safe load → prompt guard → section create/append → `saveAgentConfig`. Returns early if no active config found.
+
+**Safety**: Both correction steps run AFTER the successful WhatsApp send and are wrapped in independent try/catch blocks. A failure in either does NOT affect the WhatsApp delivery response.
+
+**Agent name constant**: `AGENT_NAME = "driver_support"`.
+
+**Correction log format** in system prompt:
+```
+## Human Correction Log
+The following corrections were made by human agents. Apply these as guidance when similar questions arise:
+- [<Instant>] Customer <normalizedTo>: <message text>
+- [<Instant>] Customer <normalizedTo>: <message text>
+```
+
 ## Order Location History Feature
 
 ### Model Changes (izinga-commons)
@@ -207,19 +277,44 @@ Run focused validation before completion:
   - confirm non-admin role cannot query team endpoints.
   - confirm existing single-user query paths remain unchanged.
 
-### 7. Completion Criteria
+### 7. Write Tests With 100% Coverage (Mandatory)
+Every implementation task MUST include tests. Task is not complete until tests are written and pass.
+
+**Coverage requirements:**
+- Every new public method in a service or controller must have a corresponding test.
+- Cover the happy path AND all error/null/boundary branches in the same method.
+- For service methods: mock all collaborators; test the service logic in isolation.
+- For controller methods: use `@WebMvcTest` or direct method call; assert HTTP status and body shape.
+- For scheduled jobs: test each branch (no sessions, registered user skip, null-from skip, error handling).
+
+**Test conventions in ijudi-api:**
+- `izinga-messaging` uses **JUnit 5** with Mockito: `@ExtendWith(MockitoExtension.class)`, `@Mock`, constructor injection in `@BeforeEach`.
+- Other modules may use **JUnit 4**: `@RunWith(MockitoJUnitRunner.class)`, `@Mock`, `@InjectMocks` or constructor injection in `@Before`. Match the convention already used in that module's test directory.
+- Use `mock(ClassName.class)` when the class has no no-arg constructor.
+- Place tests under `src/test/java/` mirroring the main package path.
+- Name the test class `<ClassName>Test.java` in the same package as the class under test.
+- Verify behaviour with `verify(mock).method(...)`, not just that no exception is thrown.
+- Use `when(...).thenReturn(...)` for all collaborator stubs, never rely on default mock behaviour.
+
+**Coverage verification:**
+- After writing tests, run: `./mvnw -pl <module> -am test`
+- All tests must pass before marking the task done.
+- If a test cannot be written for a branch (e.g., private method reached only via integration), note it explicitly in the output.
+
+### 8. Completion Criteria
 Task is complete only when:
 - Correct module and layers were updated.
 - No accidental contract breaks on shared JSON or enums.
-- Tests or compile checks pass for affected modules.
+- **Tests written for every new or changed method with 100% branch coverage.**
+- All module tests pass: `./mvnw -pl <module> -am test`
 - Any new endpoint/tool is documented in code comments or module docs.
 
 ## Bug Fix Playbook
 1. Reproduce from controller input to service output.
 2. Locate failing branch and domain invariant violated.
 3. Patch smallest change in service/repo/model layer.
-4. Add or update targeted test.
-5. Re-run module checks.
+4. Write or update tests covering the fixed branch AND any adjacent untested branches.
+5. Re-run module checks: `./mvnw -pl <module> -am test`
 6. Verify no cross-module regression in shared contracts.
 
 ## Feature Playbook
@@ -228,7 +323,8 @@ Task is complete only when:
 3. Keep persistence and validation aligned.
 4. Add role/security checks if needed.
 5. Add MCP tool exposure only if feature is intended for AI tools.
-6. Validate with module tests and focused endpoint checks.
+6. **Write tests: happy path + all error branches + null/boundary cases.**
+7. Validate: `./mvnw -pl <module> -am test` — all tests must pass.
 
 ## Known Architectural Guardrails
 

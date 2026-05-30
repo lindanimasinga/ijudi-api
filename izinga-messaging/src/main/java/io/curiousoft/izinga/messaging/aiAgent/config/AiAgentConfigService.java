@@ -18,6 +18,7 @@ public class AiAgentConfigService {
     private static final Logger LOG = LoggerFactory.getLogger(AiAgentConfigService.class);
 
     private final AiAgentConfigRepository repository;
+    Optional<AiAgentConfig> config;
 
     public AiAgentConfigService(AiAgentConfigRepository repository) {
         this.repository = repository;
@@ -29,42 +30,28 @@ public class AiAgentConfigService {
      * @return The system prompt, or null if not found
      */
     public String getSystemPrompt(String agentName) {
-        Optional<AiAgentConfig> config = repository.findByAgentNameAndActiveTrue(agentName);
-
-        if (config.isPresent()) {
-            LOG.info("Loaded system prompt for agent: {}", agentName);
-            return config.get().getSystemPrompt();
-        } else {
-            LOG.warn("No active agent config found for: {}", agentName);
-            return null;
-        }
+        return getAgentConfig(agentName).map(AiAgentConfig::getSystemPrompt).orElse(null);
     }
 
     public AiAgentConfig getActiveAgentConfig(String agentName) {
-        Optional<AiAgentConfig> config = repository.findByAgentNameAndActiveTrue(agentName);
-
-        if (config.isPresent()) {
-            LOG.info("Loaded active agent config for: {}", agentName);
-            return config.get();
-        } else {
-            LOG.warn("No active agent config found for: {}", agentName);
-            return null;
-        }
+         return getAgentConfig(agentName).orElse(null);
     }
 
     /**
      * Get full agent config by name
      */
     public Optional<AiAgentConfig> getAgentConfig(String agentName) {
-        return repository.findByAgentNameAndActiveTrue(agentName);
+        if (config == null || config.isEmpty() || !config.get().getAgentName().equals(agentName)) {
+            config = repository.findByAgentName(agentName);
+        }
+        return config;
     }
 
     /**
      * Create or update an agent configuration
      */
     public AiAgentConfig saveAgentConfig(String agentName, String systemPrompt, String description) {
-        Optional<AiAgentConfig> existing = repository.findByAgentName(agentName);
-
+        var existing  = getAgentConfig(agentName);
         AiAgentConfig config;
         if (existing.isPresent()) {
             config = existing.get();
@@ -85,8 +72,8 @@ public class AiAgentConfigService {
                 .build();
             LOG.info("Created new agent config: {}", agentName);
         }
-
-        return repository.save(config);
+        this.config  = Optional.of(repository.save(config));
+        return config;
     }
 
     /**
@@ -118,6 +105,29 @@ public class AiAgentConfigService {
         return List.of(
                 new McpServerConfig("mcp", "order-and-user-management-api", "API for managing orders and users", "https://api.izinga.co.za/mcp", "never")
         );
+    }
+
+    /**
+     * Append a human-correction entry to the agent's system prompt.
+     * Creates the "## Human Correction Log" section if not already present.
+     * Safe to call even when no active config exists for the agent.
+     */
+    public void appendHumanCorrection(String agentName, String phone, String messageText) {
+        AiAgentConfig agentConfig = getActiveAgentConfig(agentName);
+        if (agentConfig == null) {
+            LOG.warn("No active agent config for {} — skipping correction append", agentName);
+            return;
+        }
+        String currentPrompt = agentConfig.getSystemPrompt() != null ? agentConfig.getSystemPrompt() : "";
+        String entry = "\n- [" + Instant.now() + "] Customer " + phone + ": " + messageText;
+        String updatedPrompt = currentPrompt.contains("## Human Correction Log")
+                ? currentPrompt + entry
+                : currentPrompt
+                        + "\n\n## Human Correction Log"
+                        + "\nThe following corrections were made by human agents. Apply these as guidance when similar questions arise:"
+                        + entry;
+        saveAgentConfig(agentName, updatedPrompt, agentConfig.getDescription());
+        LOG.info("Appended human correction to agent config: {}", agentName);
     }
 }
 
