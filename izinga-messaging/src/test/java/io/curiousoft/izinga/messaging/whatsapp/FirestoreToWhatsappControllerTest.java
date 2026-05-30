@@ -1,6 +1,5 @@
 package io.curiousoft.izinga.messaging.whatsapp;
 
-import io.curiousoft.izinga.messaging.aiAgent.config.AiAgentConfigService;
 import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistoryService;
 import io.curiousoft.izinga.messaging.firebase.FirestoreService;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTextRequest;
@@ -29,7 +28,6 @@ class FirestoreToWhatsappControllerTest {
     @Mock private WhatsAppService whatsAppService;
     @Mock private WhatsappConfig whatsappConfig;
     @Mock private ConversationHistoryService conversationHistoryService;
-    @Mock private AiAgentConfigService aiAgentConfigService;
 
     @SuppressWarnings("unchecked")
     private final Call<WhatsappTextResponse> callMock = mock(Call.class);
@@ -47,8 +45,7 @@ class FirestoreToWhatsappControllerTest {
     @BeforeEach
     void setUp() {
         controller = new FirestoreToWhatsappController(
-                firestoreService, whatsAppService, whatsappConfig,
-                conversationHistoryService, aiAgentConfigService);
+                firestoreService, whatsAppService, whatsappConfig, conversationHistoryService);
     }
 
     // ─── guard: session not found ────────────────────────────────────────────
@@ -60,7 +57,7 @@ class FirestoreToWhatsappControllerTest {
         ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        verifyNoInteractions(whatsAppService, conversationHistoryService, aiAgentConfigService);
+        verifyNoInteractions(whatsAppService, conversationHistoryService);
     }
 
     // ─── guard: message not found ────────────────────────────────────────────
@@ -74,7 +71,7 @@ class FirestoreToWhatsappControllerTest {
         ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        verifyNoInteractions(whatsAppService, conversationHistoryService, aiAgentConfigService);
+        verifyNoInteractions(whatsAppService, conversationHistoryService);
     }
 
     // ─── guard: non-TEXT message type ────────────────────────────────────────
@@ -89,7 +86,7 @@ class FirestoreToWhatsappControllerTest {
         ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        verifyNoInteractions(whatsAppService, conversationHistoryService, aiAgentConfigService);
+        verifyNoInteractions(whatsAppService, conversationHistoryService);
     }
 
     // ─── WhatsApp send fails ──────────────────────────────────────────────────
@@ -108,7 +105,7 @@ class FirestoreToWhatsappControllerTest {
         ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
-        verifyNoInteractions(conversationHistoryService, aiAgentConfigService);
+        verifyNoInteractions(conversationHistoryService);
     }
 
     // ─── happy path: success ─────────────────────────────────────────────────
@@ -126,12 +123,8 @@ class FirestoreToWhatsappControllerTest {
         ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-
-        // Phone must be normalized before reaching both services
         verify(conversationHistoryService).recordHumanCorrection(NORM_PHONE, CUST_NAME, MSG_TEXT);
-        verify(aiAgentConfigService).appendHumanCorrection("driver_support", NORM_PHONE, MSG_TEXT);
 
-        // WhatsApp must receive the human-written message text, not an AI response
         ArgumentCaptor<WhatsappTextRequest> reqCaptor = ArgumentCaptor.forClass(WhatsappTextRequest.class);
         verify(whatsAppService).sendTextMessage(eq(PHONE_ID), reqCaptor.capture());
         assertEquals(NORM_PHONE, reqCaptor.getValue().getTo());
@@ -159,7 +152,7 @@ class FirestoreToWhatsappControllerTest {
     // ─── post-send non-blocking: history service throws ──────────────────────
 
     @Test
-    void forwardMessageToWhatsapp_historyServiceThrows_stillReturns200_andCallsAgentConfig() throws Exception {
+    void forwardMessageToWhatsapp_historyServiceThrows_stillReturns200() throws Exception {
         ChatSession session = chatSession(RAW_PHONE, CUST_NAME);
         FireStoreMessage msg = message(FireStoreMessage.MessageType.TEXT, MSG_TEXT);
         when(firestoreService.getChatSessionById(SESSION_ID)).thenReturn(session);
@@ -170,26 +163,6 @@ class FirestoreToWhatsappControllerTest {
         doThrow(new RuntimeException("DB error")).when(conversationHistoryService)
                 .recordHumanCorrection(anyString(), anyString(), anyString());
 
-        ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        // agent config must still be called despite history failure
-        verify(aiAgentConfigService).appendHumanCorrection(anyString(), anyString(), anyString());
-    }
-
-    // ─── post-send non-blocking: agent config service throws ─────────────────
-
-    @Test
-    void forwardMessageToWhatsapp_agentConfigThrows_stillReturns200() throws Exception {
-        ChatSession session = chatSession(RAW_PHONE, CUST_NAME);
-        FireStoreMessage msg = message(FireStoreMessage.MessageType.TEXT, MSG_TEXT);
-        when(firestoreService.getChatSessionById(SESSION_ID)).thenReturn(session);
-        when(firestoreService.getMessageForSession(SESSION_ID, MSG_ID)).thenReturn(msg);
-        when(whatsappConfig.phoneId()).thenReturn(PHONE_ID);
-        when(whatsAppService.sendTextMessage(eq(PHONE_ID), any())).thenReturn(callMock);
-        when(callMock.execute()).thenReturn(Response.success(new WhatsappTextResponse()));
-        doThrow(new RuntimeException("Config error")).when(aiAgentConfigService)
-                .appendHumanCorrection(anyString(), anyString(), anyString());
 
         ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
 

@@ -1,6 +1,5 @@
 package io.curiousoft.izinga.messaging.whatsapp;
 
-import io.curiousoft.izinga.messaging.aiAgent.config.AiAgentConfigService;
 import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistoryService;
 import io.curiousoft.izinga.messaging.firebase.FirestoreService;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTextRequest;
@@ -18,23 +17,19 @@ import java.util.Map;
 public class FirestoreToWhatsappController {
 
     private static final Logger LOG = LoggerFactory.getLogger(FirestoreToWhatsappController.class);
-    private static final String AGENT_NAME = "driver_support";
 
     private final FirestoreService firestoreService;
     private final WhatsAppService whatsAppService;
     private final WhatsappConfig whatsappConfig;
     private final ConversationHistoryService conversationHistoryService;
-    private final AiAgentConfigService aiAgentConfigService;
 
     public FirestoreToWhatsappController(FirestoreService firestoreService, WhatsAppService whatsAppService,
                                          WhatsappConfig whatsappConfig,
-                                         ConversationHistoryService conversationHistoryService,
-                                         AiAgentConfigService aiAgentConfigService) {
+                                         ConversationHistoryService conversationHistoryService) {
         this.firestoreService = firestoreService;
         this.whatsAppService = whatsAppService;
         this.whatsappConfig = whatsappConfig;
         this.conversationHistoryService = conversationHistoryService;
-        this.aiAgentConfigService = aiAgentConfigService;
     }
 
     /**
@@ -88,13 +83,6 @@ public class FirestoreToWhatsappController {
                 conversationHistoryService.recordHumanCorrection(normalizedTo, session.getCustomerName(), msg.getMessage());
             } catch (Exception ex) {
                 LOG.warn("Could not update conversation history with correction: {}", ex.getMessage());
-            }
-
-            // Post-send: append correction to agent system prompt (non-blocking)
-            try {
-                aiAgentConfigService.appendHumanCorrection(AGENT_NAME, normalizedTo, msg.getMessage());
-            } catch (Exception ex) {
-                LOG.warn("Could not update AI agent config with correction: {}", ex.getMessage());
             }
 
             return ResponseEntity.ok(Map.of("status", "sent", "response", resp.body()));
