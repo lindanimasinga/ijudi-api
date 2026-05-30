@@ -42,7 +42,7 @@ public class AiAgentConfigService {
      */
     public Optional<AiAgentConfig> getAgentConfig(String agentName) {
         if (config == null || config.isEmpty() || !config.get().getAgentName().equals(agentName)) {
-            config = repository.findByAgentName(agentName);
+            config = repository.findByAgentNameAndActiveTrue(agentName);
         }
         return config;
     }
@@ -51,7 +51,7 @@ public class AiAgentConfigService {
      * Create or update an agent configuration
      */
     public AiAgentConfig saveAgentConfig(String agentName, String systemPrompt, String description) {
-        var existing  = getAgentConfig(agentName);
+        var existing = repository.findByAgentName(agentName);
         AiAgentConfig config;
         if (existing.isPresent()) {
             config = existing.get();
