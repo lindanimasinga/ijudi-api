@@ -93,8 +93,10 @@ public class OrderController {
                                                           @RequestParam(required = false) String messengerId,
                                                           @RequestParam(required = false) String messengerAdminId,
                                                           @RequestParam(defaultValue = "false") boolean allStages,
+                                                          @RequestParam(defaultValue = "false") boolean inProgress,
                                                           @RequestParam(required = false) String storeId) throws Exception {
-        Collection<Order> order = !isEmpty(userId) ? orderService.findOrderByUserId(userId) :
+        Collection<Order> order = inProgress ? orderService.findOrdersInProgress() :
+                !isEmpty(userId) ? orderService.findOrderByUserId(userId) :
                 !isEmpty(phone) ? orderService.findOrderByPhone(phone) :
                 !isEmpty(storeId) ? orderService.findOrderByStoreId(storeId) :
                 !isEmpty(messengerAdminId) ? orderService.findOrdersByMessengerAdminId(messengerAdminId, allStages) :

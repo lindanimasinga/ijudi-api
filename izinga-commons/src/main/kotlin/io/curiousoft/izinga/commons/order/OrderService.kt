@@ -30,6 +30,8 @@ interface OrderService {
 
     fun findAll(): MutableList<Order?>?
 
+    fun findOrdersInProgress(): List<Order>
+
     fun cancelOrder(id: String?): Order?
     fun acceptQuote(orderId: String, quoteApproval: QouteApproval): Order?
 }

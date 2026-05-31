@@ -489,6 +489,11 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public List<Order> findOrdersInProgress() {
+        return orderRepo.findByStageNotIn(List.of(OrderStage.STAGE_7_ALL_PAID, OrderStage.CANCELLED));
+    }
+
+    @Override
     public Order cancelOrder(String id) {
         Order order = orderRepo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Order with id " + id + " not found."));
