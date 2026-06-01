@@ -57,11 +57,10 @@ public class PaymentService {
     }
 
     public boolean reversePayment(Order order) {
-        PaymentProvider paymentProvider = paymentProviders.stream()
+        return paymentProviders.stream()
                 .filter(service -> order.getPaymentType() == service.getPaymentType())
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Your order has no ukheshe type set or the ukheshe provider for " + order.getPaymentType() + " not configured on the server"));
-        return paymentProvider.reversePayment(order);
+                .findFirst().map(paymentProvider -> paymentProvider.reversePayment(order))
+                .orElse(true);
     }
 
     public List<PaymentType> getAllowedPaymentTypes(String customerId, StoreType storeType) {

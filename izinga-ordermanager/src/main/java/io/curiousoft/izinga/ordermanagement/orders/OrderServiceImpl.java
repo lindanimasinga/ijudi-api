@@ -264,11 +264,11 @@ public class OrderServiceImpl implements OrderService {
         }
 
         String requestedVehicleType = resolveRequestedVehicleType(order);
-        Double vehicleStandardFee = switch (requestedVehicleType) {
-            case "BIKE" -> rates.getStandardDeliveryPriceBike();
-            case "CAR" -> rates.getStandardDeliveryPriceCar();
-            case "BAKKIE" -> rates.getStandardDeliveryPriceBakkie();
-            case "TRUCK" -> rates.getStandardDeliveryPriceTruck();
+        Double vehicleStandardFee = switch (requestedVehicleType.toUpperCase()) {
+            case "BIKE DELIVERY DRIVER" -> rates.getStandardDeliveryPriceBike();
+            case "SMALL/MEDIUM VEHICLE DRIVER" -> rates.getStandardDeliveryPriceCar();
+            case "BAKKIE DELIVERY DRIVER" -> rates.getStandardDeliveryPriceBakkie();
+            case "TRUCK DELIVERY DRIVER" -> rates.getStandardDeliveryPriceTruck();
             default -> null;
         };
 
@@ -300,9 +300,11 @@ public class OrderServiceImpl implements OrderService {
         var shippingData = order.getShippingData();
         if (shippingData != null && shippingData.getCategory() != null) {
             Optional<String> matchedVehicleType = shippingData.getCategory().stream()
-                    .filter(StringUtils::hasText)
-                    .map(it -> it.trim().toUpperCase(Locale.ROOT))
-                    .filter(it -> it.equals("Bakkie Delivery Driver") || it.equals("Truck Delivery Driver") || it.equals("Small/Medium Vehicle Driver") || it.equals("Bike Delivery Driver"))
+                    .map(String::trim)
+                    .filter(it -> it.equalsIgnoreCase("Bakkie Delivery Driver") ||
+                            it.equalsIgnoreCase("Truck Delivery Driver") ||
+                            it.equalsIgnoreCase("Small/Medium Vehicle Driver") ||
+                            it.equalsIgnoreCase("Bike Delivery Driver"))
                     .findFirst();
             if (matchedVehicleType.isPresent()) {
                 return matchedVehicleType.get();
