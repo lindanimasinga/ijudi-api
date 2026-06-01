@@ -183,10 +183,7 @@ public class OrderServiceImpl implements OrderService {
             // if there are current orders for this user and its same messenger than don't charge a delivery fee.
             var shipingGeoData = calculateDrivingDirectionKM(googleMapsApiKey, order, storeOptional.get());
             if(allOrdersCurrentForCustomer.isEmpty()) {
-                double standardFee = storeOptional.map(StoreProfile::getRates)
-                                .map(Rates::getStandardDeliveryPrice)
-                                .filter(it -> it > 0)
-                                .orElse(this.starndardDeliveryFee);
+                double standardFee = resolveStandardDeliveryFee(order, storeOptional.get());
 
                 double standardDistance = storeOptional.map(StoreProfile::getRates)
                                 .map(Rates::getStandardDeliveryKm)
@@ -258,6 +255,61 @@ public class OrderServiceImpl implements OrderService {
 
     private List<Order> findAllOrdersWithStateForCustomer(String customerId, String messengerId, OrderStage... stages) {
         return orderRepo.findByCustomerIdAndShippingDataMessengerIdAndStageIn(customerId, messengerId,  stages);
+    }
+
+    private double resolveStandardDeliveryFee(Order order, StoreProfile storeProfile) {
+        Rates rates = storeProfile.getRates();
+        if (rates == null) {
+            return this.starndardDeliveryFee;
+        }
+
+        String requestedVehicleType = resolveRequestedVehicleType(order);
+        Double vehicleStandardFee = switch (requestedVehicleType) {
+            case "BIKE" -> rates.getStandardDeliveryPriceBike();
+            case "CAR" -> rates.getStandardDeliveryPriceCar();
+            case "BAKKIE" -> rates.getStandardDeliveryPriceBakkie();
+            case "TRUCK" -> rates.getStandardDeliveryPriceTruck();
+            default -> null;
+        };
+
+        if (vehicleStandardFee != null && vehicleStandardFee > 0) {
+            return vehicleStandardFee;
+        }
+
+        Double defaultStoreFee = rates.getStandardDeliveryPrice();
+        if (defaultStoreFee != null && defaultStoreFee > 0) {
+            return defaultStoreFee;
+        }
+
+        return this.starndardDeliveryFee;
+    }
+
+    private String resolveRequestedVehicleType(Order order) {
+        if (order == null) {
+            return "";
+        }
+
+        var tag = order.getTag();
+        if (tag != null) {
+            String vehicleType = tag.get("vehicleType");
+            if (StringUtils.hasText(vehicleType)) {
+                return vehicleType.trim().toUpperCase(Locale.ROOT);
+            }
+        }
+
+        var shippingData = order.getShippingData();
+        if (shippingData != null && shippingData.getCategory() != null) {
+            Optional<String> matchedVehicleType = shippingData.getCategory().stream()
+                    .filter(StringUtils::hasText)
+                    .map(it -> it.trim().toUpperCase(Locale.ROOT))
+                    .filter(it -> it.equals("BIKE") || it.equals("CAR") || it.equals("BAKKIE") || it.equals("TRUCK"))
+                    .findFirst();
+            if (matchedVehicleType.isPresent()) {
+                return matchedVehicleType.get();
+            }
+        }
+
+        return "";
     }
 
     private boolean canChargeServiceFees(StoreProfile storeProfile) {

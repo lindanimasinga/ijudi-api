@@ -181,6 +181,10 @@ class StoreProfile(
 class Rates() {
     var labourRatePerFloor: Double? = null
     var standardDeliveryPrice: Double? = null
+    var standardDeliveryPriceBike: Double? = null
+    var standardDeliveryPriceCar: Double? = null
+    var standardDeliveryPriceBakkie: Double? = null
+    var standardDeliveryPriceTruck: Double? = null
     var standardDeliveryKm: Double? = null
     var ratePerKm: Double? = null
     var ratePerVolumeCM2: Double? = null

@@ -448,6 +448,149 @@ public class OrderServiceTest {
     }
 
     @Test
+    public void startOrder_store_own_delivery_uses_vehicle_specific_rate_from_order_tag() throws Exception {
+        StoreProfile storeProfile = createStoreProfile(StoreType.CLOTHING);
+        storeProfile.getRates().setStandardDeliveryPrice(20.00);
+        storeProfile.getRates().setStandardDeliveryPriceCar(40.00);
+        storeProfile.getRates().setStandardDeliveryKm(3.00);
+        storeProfile.getRates().setRatePerKm(5.00);
+
+        HashSet<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("skirt", 2, 10, 0, Collections.emptyList()));
+        stockItems.add(new Stock("shirt", 1, 20, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("skirt", 2, 10, 0));
+        items.add(new BasketItem("shirt", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+        ShippingData shipping = new ShippingData("shopAddress",
+                "50 Ududu Rd, Emlandweni, KwaMashu, 4051",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messagerID");
+        shipping.setBuildingType(BuildingType.HOUSE);
+        order.setShippingData(shipping);
+        order.getTag().put("vehicleType", "CAR");
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+        when(repo.save(order)).thenReturn(order);
+
+        Order newOrder = sut.startOrder(order);
+
+        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        Assert.assertNotNull(order.getId());
+        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
+        Assert.assertEquals(55, order.getShippingData().getFee(), 0);
+        verify(repo).save(order);
+        verify(customerRepo).existsById(order.getCustomerId());
+        verify(storeRepo).findById(order.getShopId());
+    }
+
+    @Test
+    public void startOrder_store_own_delivery_uses_vehicle_specific_rate_from_shipping_category() throws Exception {
+        StoreProfile storeProfile = createStoreProfile(StoreType.CLOTHING);
+        storeProfile.getRates().setStandardDeliveryPrice(20.00);
+        storeProfile.getRates().setStandardDeliveryPriceTruck(70.00);
+        storeProfile.getRates().setStandardDeliveryKm(3.00);
+        storeProfile.getRates().setRatePerKm(5.00);
+
+        HashSet<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("table", 1, 10, 0, Collections.emptyList()));
+        stockItems.add(new Stock("chair", 1, 20, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("table", 1, 10, 0));
+        items.add(new BasketItem("chair", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+        ShippingData shipping = new ShippingData("shopAddress",
+                "50 Ududu Rd, Emlandweni, KwaMashu, 4051",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messagerID");
+        shipping.setBuildingType(BuildingType.HOUSE);
+        shipping.setCategory(List.of("truck", "fragile"));
+        order.setShippingData(shipping);
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+        when(repo.save(order)).thenReturn(order);
+
+        Order newOrder = sut.startOrder(order);
+
+        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        Assert.assertNotNull(order.getId());
+        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
+        Assert.assertEquals(85, order.getShippingData().getFee(), 0);
+        verify(repo).save(order);
+        verify(customerRepo).existsById(order.getCustomerId());
+        verify(storeRepo).findById(order.getShopId());
+    }
+
+    @Test
+    public void startOrder_store_own_delivery_falls_back_to_default_standard_fee_when_vehicle_rate_missing() throws Exception {
+        StoreProfile storeProfile = createStoreProfile(StoreType.CLOTHING);
+        storeProfile.getRates().setStandardDeliveryPrice(20.00);
+        storeProfile.getRates().setStandardDeliveryKm(3.00);
+        storeProfile.getRates().setRatePerKm(5.00);
+
+        HashSet<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("box", 1, 10, 0, Collections.emptyList()));
+        stockItems.add(new Stock("lamp", 1, 20, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("box", 1, 10, 0));
+        items.add(new BasketItem("lamp", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+        ShippingData shipping = new ShippingData("shopAddress",
+                "50 Ududu Rd, Emlandweni, KwaMashu, 4051",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messagerID");
+        shipping.setBuildingType(BuildingType.HOUSE);
+        order.setShippingData(shipping);
+        order.getTag().put("vehicleType", "BIKE");
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+        when(repo.save(order)).thenReturn(order);
+
+        Order newOrder = sut.startOrder(order);
+
+        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        Assert.assertNotNull(order.getId());
+        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
+        Assert.assertEquals(35, order.getShippingData().getFee(), 0);
+        verify(repo).save(order);
+        verify(customerRepo).existsById(order.getCustomerId());
+        verify(storeRepo).findById(order.getShopId());
+    }
+
+    @Test
     public void startOrderOnlineDeliveryNoBuildingType() throws Exception {
         //given
         StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
