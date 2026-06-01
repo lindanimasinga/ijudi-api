@@ -20,6 +20,7 @@ import java.text.SimpleDateFormat;
 import java.util.List;
 
 import static java.util.Optional.ofNullable;
+import static java.util.TimeZone.getTimeZone;
 
 @Service
 public class WhatsappNotificationService implements AdminOnlyNotificationService {
@@ -458,11 +459,11 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
         request.setTo(to);
 
         // scheduled date (fix year token and use 24h hour)
-        String scheduledDate = new SimpleDateFormat("yyyy-MM-dd 'at' HH:mm")
-                .format(ofNullable(order.getShippingData())
+        var dateFormatter = new SimpleDateFormat("yyyy-MM-dd 'at' HH:mm");
+        dateFormatter.setTimeZone(getTimeZone("Africa/Johannesburg"));
+        String scheduledDate = dateFormatter.format(ofNullable(order.getShippingData())
                         .map(ShippingData::getPickUpTime)
-                        .orElse(order.getCreatedDate())
-                );
+                        .orElse(order.getCreatedDate()));
 
         // Build Template programmatically to ensure types match (HEADER expects LOCATION)
         WhatsappTemplateRequest.Template template = new WhatsappTemplateRequest.Template();
