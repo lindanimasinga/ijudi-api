@@ -302,7 +302,7 @@ public class OrderServiceImpl implements OrderService {
             Optional<String> matchedVehicleType = shippingData.getCategory().stream()
                     .filter(StringUtils::hasText)
                     .map(it -> it.trim().toUpperCase(Locale.ROOT))
-                    .filter(it -> it.equals("BIKE") || it.equals("CAR") || it.equals("BAKKIE") || it.equals("TRUCK"))
+                    .filter(it -> it.equals("Bakkie Delivery Driver") || it.equals("Truck Delivery Driver") || it.equals("Small/Medium Vehicle Driver") || it.equals("Bike Delivery Driver"))
                     .findFirst();
             if (matchedVehicleType.isPresent()) {
                 return matchedVehicleType.get();
