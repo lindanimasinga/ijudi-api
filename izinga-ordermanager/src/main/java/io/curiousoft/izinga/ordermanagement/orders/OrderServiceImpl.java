@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.ordermanagement.orders;
 
 import io.curiousoft.izinga.commons.model.*;
+import io.curiousoft.izinga.commons.order.DeliveryPriceEstimateDto;
 import io.curiousoft.izinga.commons.order.MessengerOrderDto;
 import io.curiousoft.izinga.commons.order.OrderService;
 import io.curiousoft.izinga.commons.order.events.*;
@@ -391,6 +392,78 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Order findOrder(String orderId) {
         return orderRepo.findById(orderId).orElse(null);
+    }
+
+    @Override
+    public DeliveryPriceEstimateDto getDeliveryPriceEstimate(String category, String fromAddress, String toAddress, String shopId) {
+        if (!StringUtils.hasText(category)) {
+            throw new IllegalArgumentException("category is required");
+        }
+
+        if (!StringUtils.hasText(fromAddress)) {
+            throw new IllegalArgumentException("fromAddress is required");
+        }
+
+        if (!StringUtils.hasText(toAddress)) {
+            throw new IllegalArgumentException("toAddress is required");
+        }
+
+        StoreProfile pricingContextStore = createPricingContextStore(shopId);
+
+        ShippingData shippingData = new ShippingData(fromAddress.trim(), toAddress.trim(), ShippingData.ShippingType.DELIVERY);
+        shippingData.setCategory(List.of(category.trim()));
+
+        Order pricingOrder = new Order();
+        pricingOrder.setShippingData(shippingData);
+
+        ShipingGeoData shipingGeoData = calculateDrivingDirectionKM(googleMapsApiKey, pricingOrder, pricingContextStore);
+
+        double standardFee = resolveStandardDeliveryFee(pricingOrder, pricingContextStore);
+        double standardDistance = Optional.ofNullable(pricingContextStore.getRates())
+                .map(Rates::getStandardDeliveryKm)
+                .filter(it -> it > 0)
+                .orElse(this.starndardDeliveryKm);
+        double ratePerKM = Optional.ofNullable(pricingContextStore.getRates())
+                .map(Rates::getRatePerKm)
+                .filter(it -> it > 0)
+                .orElse(this.ratePerKm);
+        double estimatedDeliveryFee = calculateDeliveryDistanceFee(standardFee, standardDistance, ratePerKM, shipingGeoData.getDistance());
+
+        return new DeliveryPriceEstimateDto(
+            category.trim(),
+            fromAddress.trim(),
+            toAddress.trim(),
+            shipingGeoData.getDistance(),
+            standardFee,
+            standardDistance,
+            ratePerKM,
+            estimatedDeliveryFee
+        );
+    }
+
+    private StoreProfile createPricingContextStore(String shopId) {
+        Rates rates = null;
+        if (StringUtils.hasText(shopId)) {
+            StoreProfile selectedStore = storeRepository.findById(shopId)
+                    .orElseThrow(() -> new IllegalArgumentException("shop with id " + shopId + " does not exist"));
+            rates = selectedStore.getRates();
+        }
+
+        StoreProfile pricingContextStore = new StoreProfile(
+                StoreType.MOVERS,
+                "delivery-pricing",
+                "delivery-pricing",
+                "delivery-pricing",
+                "delivery-pricing",
+                "0000000000",
+                new ArrayList<>(List.of("delivery-pricing")),
+                new ArrayList<>(),
+                "delivery-pricing-owner",
+                new Bank()
+        );
+        pricingContextStore.setDeliversFromMultipleAddresses(true);
+        pricingContextStore.setRates(rates);
+        return pricingContextStore;
     }
 
     public Order progressNextStage(String orderId) {

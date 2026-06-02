@@ -2,6 +2,7 @@ package io.curiousoft.izinga.ordermanagement.orders;
 
 import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.model.QouteApproval;
+import io.curiousoft.izinga.commons.order.DeliveryPriceEstimateDto;
 import io.curiousoft.izinga.commons.order.OrderService;
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.servers.Server;
@@ -16,6 +17,7 @@ import jakarta.validation.Valid;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 import static io.curiousoft.izinga.commons.model.PaymentType.PAYFAST;
 import static org.springframework.util.StringUtils.isEmpty;
@@ -85,6 +87,20 @@ public class OrderController {
     @DeleteMapping(value = "/{id}", produces = "application/json")
     public ResponseEntity<Order> cancelOrder(@PathVariable String id) throws Exception {
         return ResponseEntity.ok(orderService.cancelOrder(id));
+    }
+
+    @GetMapping(value = "/delivery-price", produces = "application/json")
+    public ResponseEntity<?> getDeliveryPrice(@RequestParam String category,
+                                              @RequestParam String fromAddress,
+                                              @RequestParam String toAddress,
+                                              @RequestParam(required = false) String shopId) {
+        try {
+            DeliveryPriceEstimateDto estimate = orderService.getDeliveryPriceEstimate(category, fromAddress, toAddress, shopId);
+            return ResponseEntity.ok(estimate);
+        } catch (IllegalArgumentException ex) {
+            LOGGER.warn("Invalid delivery price request: {}", ex.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
     }
 
     @GetMapping(produces = "application/json")

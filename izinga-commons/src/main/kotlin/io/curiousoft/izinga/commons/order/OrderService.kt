@@ -32,6 +32,8 @@ interface OrderService {
 
     fun findOrdersInProgress(): List<Order>
 
+    fun getDeliveryPriceEstimate(category: String?, fromAddress: String?, toAddress: String?, shopId: String?): DeliveryPriceEstimateDto
+
     fun cancelOrder(id: String?): Order?
     fun acceptQuote(orderId: String, quoteApproval: QouteApproval): Order?
 }
