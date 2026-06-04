@@ -88,6 +88,7 @@ startOrder:
 - Initializes order id, stage, VAT, deposit settings.
 - Adds discount basket item when basket total discount exists.
 - Computes delivery and geo data for ONLINE delivery.
+- Resolves distance rate-per-km using vehicle-first fallback (`ratePerKmBike|Car|Bakkie|Truck` -> `ratePerKm` -> global default).
 - Applies weight, volume, and labor fees from store rates.
 - Validates restricted regions.
 - Determines free delivery and service fee.
@@ -116,6 +117,13 @@ progressNextStage:
 - Overloads: `progressNextStage(orderId)` delegates to `progressNextStage(orderId, null, null)`. The coordinate-aware overload is the canonical implementation.
 - REST endpoint: `GET /order/{orderId}/nextstage?latitude=<double>&longitude=<double>` — params are `required = false`; backward compatible.
 
+getDeliveryPriceEstimate:
+- Validates required inputs: `category`, `fromAddress`, `toAddress`.
+- Uses `DeliveryPriceEstimateDto` as stable response contract.
+- Resolves standard fee by category-specific standard price first, then generic default.
+- Resolves distance rate-per-km by category-specific `ratePerKm*` first, then generic store `ratePerKm`, then global default.
+- Preserves existing category-label matching contract for vehicle resolution.
+
 find methods and MCP tools:
 - find_order_by_id, find_orders_by_user_id, find_orders_by_phone_number, find_orders_by_messenger_id, findOrdersByMessengerAdminId.
 - Phone lookup uses SA prefixes 0, +27, 27.
@@ -142,6 +150,7 @@ OrderServiceImpl review checkpoints:
 - Negative stock and concurrency safety around stock decrement.
 - Consistency of quote state updates for approve and reject paths.
 - Phone substring safety for invalid short numbers.
+- Vehicle/category label drift can silently bypass category-specific pricing; keep label matching synchronized with frontend category values.
 - **`addStatusHistory()` must be called at every `setStage()` site — there are 7 total (startOrder, finishOder×2, progressNextStage, cancelOrder, CustomerOrderEventHandler, MessengerOrderEventHandler).**
 - **When calling `addStatusHistory` from Java, use the single-arg bridge overload `addStatusHistory(stage)` — Kotlin default params do NOT generate Java-compatible overloads without `@JvmOverloads`.**
 

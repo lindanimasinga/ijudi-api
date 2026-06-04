@@ -74,6 +74,12 @@ Messenger admin ownership contract:
 Primary API surfaces:
 - /order, /store, /user, /user-config, /recon, /document, /yoco/payment, /whatsapp/webhook.
 
+Delivery pricing contract:
+- `GET /order/delivery-price` remains stable and returns `DeliveryPriceEstimateDto`.
+- `Rates` now supports additive per-vehicle distance pricing fields: `ratePerKmBike`, `ratePerKmCar`, `ratePerKmBakkie`, `ratePerKmTruck`.
+- Per-vehicle fallback order for distance rate is: vehicle-specific `ratePerKm*` -> store-level `ratePerKm` -> global default `ratePerKm`.
+- Vehicle resolution is based on existing category labels (`Bike Delivery Driver`, `Small/Medium Vehicle Driver`, `Bakkie Delivery Driver`, `Truck Delivery Driver`). Preserve these labels for compatibility unless a coordinated contract change is requested.
+
 User config contract:
 - `UserConfig` documents are keyed by `name` and patched via `/user-config/{userType}`.
 - `UserConfig.userRole` is an additive optional `ProfileRoles` mapping and must be preserved on update paths.
@@ -248,6 +254,7 @@ Order management:
 - Keep payment reversal and notification side effects intact.
 - Handle quote acceptance without bypassing sanity checks.
 - Preserve existing `messengerId` query behavior while adding `messengerAdminId` team scope.
+- For delivery pricing, keep per-vehicle rate-per-km behavior additive: resolve vehicle-specific rates first, then generic fallback, without changing endpoint contracts.
 
 Payments and recon:
 - Yoco webhook signature validation must stay strict.

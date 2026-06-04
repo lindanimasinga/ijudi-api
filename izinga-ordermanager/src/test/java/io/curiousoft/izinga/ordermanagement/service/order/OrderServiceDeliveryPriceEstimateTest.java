@@ -174,4 +174,63 @@ public class OrderServiceDeliveryPriceEstimateTest {
             verify(storeRepository).findById("shop-1");
         }
     }
+
+    @Test
+    public void getDeliveryPriceEstimate_usesVehicleSpecificRatePerKm_whenConfigured() {
+        StoreProfile storeProfile = OrderServiceTest.createStoreProfile(StoreType.MOVERS);
+        Rates rates = new Rates();
+        rates.setStandardDeliveryPriceTruck(100.0);
+        rates.setStandardDeliveryKm(2.0);
+        rates.setRatePerKm(10.0);
+        rates.setRatePerKmTruck(20.0);
+        storeProfile.setRates(rates);
+
+        when(storeRepository.findById("shop-1")).thenReturn(Optional.of(storeProfile));
+
+        ShipingGeoData geoData = new ShipingGeoData(
+                new GeoPointImpl(-29.0, 31.0),
+                new GeoPointImpl(-29.1, 31.1),
+                5.0
+        );
+
+        try (MockedStatic<IjudiUtils> ijudiUtils = mockStatic(IjudiUtils.class, CALLS_REAL_METHODS)) {
+            ijudiUtils.when(() -> IjudiUtils.calculateDrivingDirectionKM(anyString(), any(Order.class), any(StoreProfile.class)))
+                    .thenReturn(geoData);
+
+            DeliveryPriceEstimateDto result = sut.getDeliveryPriceEstimate("Truck Delivery Driver", "From A", "To B", "shop-1");
+
+            assertNotNull(result);
+            assertEquals(20.0, result.getRatePerKm(), 0.0);
+            assertEquals(160.0, result.getEstimatedDeliveryFee(), 0.0);
+        }
+    }
+
+    @Test
+    public void getDeliveryPriceEstimate_fallsBackToGeneralRatePerKm_whenVehicleSpecificRateMissing() {
+        StoreProfile storeProfile = OrderServiceTest.createStoreProfile(StoreType.MOVERS);
+        Rates rates = new Rates();
+        rates.setStandardDeliveryPriceTruck(100.0);
+        rates.setStandardDeliveryKm(2.0);
+        rates.setRatePerKm(10.0);
+        storeProfile.setRates(rates);
+
+        when(storeRepository.findById("shop-1")).thenReturn(Optional.of(storeProfile));
+
+        ShipingGeoData geoData = new ShipingGeoData(
+                new GeoPointImpl(-29.0, 31.0),
+                new GeoPointImpl(-29.1, 31.1),
+                5.0
+        );
+
+        try (MockedStatic<IjudiUtils> ijudiUtils = mockStatic(IjudiUtils.class, CALLS_REAL_METHODS)) {
+            ijudiUtils.when(() -> IjudiUtils.calculateDrivingDirectionKM(anyString(), any(Order.class), any(StoreProfile.class)))
+                    .thenReturn(geoData);
+
+            DeliveryPriceEstimateDto result = sut.getDeliveryPriceEstimate("Truck Delivery Driver", "From A", "To B", "shop-1");
+
+            assertNotNull(result);
+            assertEquals(10.0, result.getRatePerKm(), 0.0);
+            assertEquals(130.0, result.getEstimatedDeliveryFee(), 0.0);
+        }
+    }
 }

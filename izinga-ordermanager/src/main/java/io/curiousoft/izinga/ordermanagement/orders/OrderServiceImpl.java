@@ -191,10 +191,7 @@ public class OrderServiceImpl implements OrderService {
                                 .filter(it -> it > 0)
                                 .orElse(this.starndardDeliveryKm);
 
-                double ratePerKM = storeOptional.map(StoreProfile::getRates)
-                                .map(Rates::getRatePerKm)
-                                .filter(it -> it > 0)
-                                .orElse(this.ratePerKm);
+                double ratePerKM = resolveRatePerKm(order, storeOptional.get());
 
                 deliveryFee = calculateDeliveryDistanceFee(standardFee, standardDistance, ratePerKM, shipingGeoData.getDistance());
                 //if the customer has already paid delivery in the previous orders going the same direction, then
@@ -283,6 +280,33 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return this.starndardDeliveryFee;
+    }
+
+    private double resolveRatePerKm(Order order, StoreProfile storeProfile) {
+        Rates rates = storeProfile.getRates();
+        if (rates == null) {
+            return this.ratePerKm;
+        }
+
+        String requestedVehicleType = resolveRequestedVehicleType(order);
+        Double vehicleRatePerKm = switch (requestedVehicleType.toUpperCase()) {
+            case "BIKE DELIVERY DRIVER" -> rates.getRatePerKmBike();
+            case "SMALL/MEDIUM VEHICLE DRIVER" -> rates.getRatePerKmCar();
+            case "BAKKIE DELIVERY DRIVER" -> rates.getRatePerKmBakkie();
+            case "TRUCK DELIVERY DRIVER" -> rates.getRatePerKmTruck();
+            default -> null;
+        };
+
+        if (vehicleRatePerKm != null && vehicleRatePerKm > 0) {
+            return vehicleRatePerKm;
+        }
+
+        Double defaultStoreRate = rates.getRatePerKm();
+        if (defaultStoreRate != null && defaultStoreRate > 0) {
+            return defaultStoreRate;
+        }
+
+        return this.ratePerKm;
     }
 
     private String resolveRequestedVehicleType(Order order) {
@@ -423,10 +447,7 @@ public class OrderServiceImpl implements OrderService {
                 .map(Rates::getStandardDeliveryKm)
                 .filter(it -> it > 0)
                 .orElse(this.starndardDeliveryKm);
-        double ratePerKM = Optional.ofNullable(pricingContextStore.getRates())
-                .map(Rates::getRatePerKm)
-                .filter(it -> it > 0)
-                .orElse(this.ratePerKm);
+        double ratePerKM = resolveRatePerKm(pricingOrder, pricingContextStore);
         double estimatedDeliveryFee = calculateDeliveryDistanceFee(standardFee, standardDistance, ratePerKM, shipingGeoData.getDistance());
 
         return new DeliveryPriceEstimateDto(

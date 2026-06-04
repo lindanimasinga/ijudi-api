@@ -186,6 +186,10 @@ class Rates() {
     var standardDeliveryPriceBakkie: Double? = null
     var standardDeliveryPriceTruck: Double? = null
     var standardDeliveryKm: Double? = null
+    var ratePerKmBike: Double? = null
+    var ratePerKmCar: Double? = null
+    var ratePerKmBakkie: Double? = null
+    var ratePerKmTruck: Double? = null
     var ratePerKm: Double? = null
     var ratePerVolumeCM2: Double? = null
     var ratePerWeightKg: Double? = null
