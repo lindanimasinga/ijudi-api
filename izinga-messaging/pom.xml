@@ -27,6 +27,18 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
+            <groupId>io.curiousoft.izinga</groupId>
+            <artifactId>izinga-documentmanagement</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.curiousoft.izinga</groupId>
+            <artifactId>izinga-usermanagement</artifactId>
+            <version>1.0.0</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>

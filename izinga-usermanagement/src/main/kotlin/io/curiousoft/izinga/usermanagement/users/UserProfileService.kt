@@ -26,6 +26,9 @@ class UserProfileService(val userProfileRepo: UserProfileRepo, val eventPublishe
 
     @Tool(name = "find_user_by_phone", description = "Finds a user profile by phone number. It will try to find the userby adding different country code prefixes to the phone number provided.")
     fun findUserByPhone(phone: String): UserProfile? {
+        if (phone.length < 9) {
+            return null
+        }
         val last9Digits = phone.substring(phone.length - 9)
         return listOf("0", "+27", "27")
             .firstNotNullOfOrNull { profileRepo.findByMobileNumber("$it$last9Digits") }
@@ -74,6 +77,7 @@ class UserProfileService(val userProfileRepo: UserProfileRepo, val eventPublishe
     }
 
     private fun fomatMobileNumber(mobileNumber: String): String {
+        require(mobileNumber.length >= 9) { "Invalid mobile number" }
         val last9Digits = mobileNumber.substring(mobileNumber.length - 9)
         var mobileNumberFormmatted = last9Digits.replace("\\s".toRegex(), "")
         mobileNumberFormmatted = mobileNumberFormmatted.replace("-", "")

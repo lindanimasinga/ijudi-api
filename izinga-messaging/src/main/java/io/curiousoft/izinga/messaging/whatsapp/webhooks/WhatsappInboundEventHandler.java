@@ -38,21 +38,24 @@ public class WhatsappInboundEventHandler {
     private final WhatsappSessionRepo whatsappSessionRepo;
     private final VerificationConsentService verificationConsentService;
     private final AiCustomerServiceAgent aiCustomerService;
+    private final WhatsappImageDocumentService whatsappImageDocumentService;
 
     public WhatsappInboundEventHandler(ApplicationEventPublisher eventPublisher, FirestoreService firestoreService,
                                        FirebaseNotificationService firebaseNotificationService, UserProfileRepo userProfileRepo,
-                                       FirebaseNotificationService firebaseNotificationService1, DeviceRepository deviceRepo,
+                                       DeviceRepository deviceRepo,
                                        WhatsappNotificationService whatsappNotificationService, WhatsappSessionRepo whatsappSessionRepo,
-                                       VerificationConsentService verificationConsentService, AiCustomerServiceAgent aiCustomerService) {
+                                       VerificationConsentService verificationConsentService, AiCustomerServiceAgent aiCustomerService,
+                                       WhatsappImageDocumentService whatsappImageDocumentService) {
         this.eventPublisher = eventPublisher;
         this.firestoreService = firestoreService;
         this.userProfileRepo = userProfileRepo;
-        this.firebaseNotificationService = firebaseNotificationService1;
+        this.firebaseNotificationService = firebaseNotificationService;
         this.deviceRepo = deviceRepo;
         this.whatsappNotificationService = whatsappNotificationService;
         this.whatsappSessionRepo = whatsappSessionRepo;
         this.verificationConsentService = verificationConsentService;
         this.aiCustomerService = aiCustomerService;
+        this.whatsappImageDocumentService = whatsappImageDocumentService;
     }
 
     @Async
@@ -75,47 +78,7 @@ public class WhatsappInboundEventHandler {
                     List<WhatsappWebhookPayload.Value.Message> messages = value.getMessages();
                     if (messages != null) {
                         for (WhatsappWebhookPayload.Value.Message message : messages) {
-                            String from = message.getFrom();
-                            String id = message.getId();
-                            String type = message.getType();
-                            LOG.info("Received message from={} id={} type={}", from, id, type);// upsert whatsapp session for this sender
-                            var session = upsertSession(from);
-                            // Check for verification consent acceptance before processing new session
-                            LOG.info("Checking if message from {} is a verification consent reply", from);
-                            var isVerificationMessage = verificationConsentService.isVerificationMessage(message);
-                            boolean isAiCudtomerServiceEnable = aiCustomerService.isEnabled();
-                            String aiResponseToCustomer = null;
-                            if (isVerificationMessage) {
-                                LOG.info("Received verification consent reply from {}", from);
-                                verificationConsentService.handleVerificationConsentReply(message, from);
-                                whatsappNotificationService.sendMessage(from, "Thank you. Your application is being processed.");
-                            } else if(session.isNewSession()) {
-                                LOG.info("New WhatsApp session started for {}", from);
-                                var user = userProfileRepo.findByMobileNumber(from);
-                                whatsappNotificationService.sendLandingOptions(from, value.getContacts().get(0).getProfile().getName(), user);
-                            }  else if (isAiCudtomerServiceEnable && session.isAIAgentActive()){
-                                LOG.info("AI customer service enabled, processing message from {}", from);
-                                aiResponseToCustomer = aiCustomerService.handleWhatsappQuery(message, from);
-                                whatsappNotificationService.sendMessage(from, aiResponseToCustomer);
-                            }
-
-                            // delegate based on message type / content
-                            if ("text".equals(type) || message.getText() != null) {
-                                handleTextMessage(message, value.getContacts(), aiResponseToCustomer);
-                                List<String> adminIds = userProfileRepo.findByRole(ProfileRoles.ADMIN)
-                                        .stream().map(BaseModel::getId).toList();
-                                List<Device> devices = deviceRepo.findByUserIdIn(adminIds);
-                                PushMessage pushMessage = getPushMessage(from);
-                                firebaseNotificationService.sendNotifications(devices, pushMessage);
-                            } else if (message.getInteractive() != null) {
-                                handleInteractiveMessage(message);
-                            } else if ("location".equals(type) || message.getLocation() != null) {
-                                handleLocationMessage(message);
-                            } else if ("image".equals(type) || message.getImage() != null) {
-                                handleImageMessage(message);
-                            } else {
-                                LOG.info("Unhandled message type={} from={}", type, from);
-                            }
+                            processInboundMessage(message, value.getContacts());
                         }
                     }
 
@@ -126,6 +89,84 @@ public class WhatsappInboundEventHandler {
         } catch (Exception e) {
             LOG.error("Error handling inbound WhatsApp event", e);
         }
+    }
+
+    private void processInboundMessage(WhatsappWebhookPayload.Value.Message message,
+                                       List<WhatsappWebhookPayload.Value.Contact> contacts) {
+        String from = message.getFrom();
+        String id = message.getId();
+        String type = message.getType();
+        LOG.info("Received message from={} id={} type={}", from, id, type);
+
+        var session = upsertSession(from);
+        String aiResponseToCustomer = handlePreDispatchFlows(message, contacts, session);
+        dispatchMessageByType(message, contacts, aiResponseToCustomer);
+    }
+
+    private String handlePreDispatchFlows(WhatsappWebhookPayload.Value.Message message,
+                                          List<WhatsappWebhookPayload.Value.Contact> contacts,
+                                          WhatsappSession session) {
+        String from = message.getFrom();
+        LOG.info("Checking if message from {} is a verification consent reply", from);
+        var isVerificationMessage = verificationConsentService.isVerificationMessage(message);
+        boolean isAiCustomerServiceEnabled = aiCustomerService.isEnabled();
+        String aiResponseToCustomer = null;
+
+        if (isVerificationMessage) {
+            LOG.info("Received verification consent reply from {}", from);
+            verificationConsentService.handleVerificationConsentReply(message, from);
+            whatsappNotificationService.sendMessage(from, "Thank you. Your application is being processed.");
+            return null;
+        }
+
+        if (session.isNewSession()) {
+            LOG.info("New WhatsApp session started for {}", from);
+            var user = userProfileRepo.findByMobileNumber(from);
+            whatsappNotificationService.sendLandingOptions(from, extractContactName(contacts), user);
+            return null;
+        }
+
+        if (isAiCustomerServiceEnabled && session.isAIAgentActive()) {
+            LOG.info("AI customer service enabled, processing message from {}", from);
+            aiResponseToCustomer = aiCustomerService.handleWhatsappQuery(message, from);
+            whatsappNotificationService.sendMessage(from, aiResponseToCustomer);
+        }
+        return aiResponseToCustomer;
+    }
+
+    private void dispatchMessageByType(WhatsappWebhookPayload.Value.Message message,
+                                       List<WhatsappWebhookPayload.Value.Contact> contacts,
+                                       String aiResponseToCustomer) {
+        String type = message.getType();
+        String from = message.getFrom();
+
+        if ("text".equals(type) || message.getText() != null) {
+            handleTextMessage(message, contacts, aiResponseToCustomer);
+            notifyAdminsForInboundText(from);
+            return;
+        }
+        if (message.getInteractive() != null) {
+            handleInteractiveMessage(message);
+            return;
+        }
+        if ("location".equals(type) || message.getLocation() != null) {
+            handleLocationMessage(message);
+            return;
+        }
+        if ("image".equals(type) || message.getImage() != null) {
+            handleImageMessage(message, contacts);
+            return;
+        }
+
+        LOG.info("Unhandled message type={} from={}", type, from);
+    }
+
+    private void notifyAdminsForInboundText(String from) {
+        List<String> adminIds = userProfileRepo.findByRole(ProfileRoles.ADMIN)
+                .stream().map(BaseModel::getId).toList();
+        List<Device> devices = deviceRepo.findByUserIdIn(adminIds);
+        PushMessage pushMessage = getPushMessage(from);
+        firebaseNotificationService.sendNotifications(devices, pushMessage);
     }
 
     private WhatsappSession upsertSession(String from) {
@@ -290,34 +331,87 @@ public class WhatsappInboundEventHandler {
         }
     }
 
-    private void handleImageMessage(WhatsappWebhookPayload.Value.Message message) {
+    private String extractContactName(List<WhatsappWebhookPayload.Value.Contact> contacts) {
+        if (contacts == null || contacts.isEmpty()) {
+            return null;
+        }
+        var contact = contacts.get(0);
+        if (contact == null || contact.getProfile() == null) {
+            return null;
+        }
+        return contact.getProfile().getName();
+    }
+
+    private void handleImageMessage(WhatsappWebhookPayload.Value.Message message,
+                                    List<WhatsappWebhookPayload.Value.Contact> contacts) {
+        String from = message.getFrom();
         try {
-            String from = message.getFrom();
             var img = message.getImage();
             if (img != null) {
                 LOG.info("Image message from {}: id={} url={} caption={}", from, img.getId(), img.getUrl(), img.getCaption());
 
+                WhatsappImageProcessResult processResult = whatsappImageDocumentService.processImageAndTagUser(from, img);
+
                 FireStoreTextMessage imgMsg = FireStoreTextMessage.builder()
                         .createdAt(Instant.now())
                         .isRead(false)
-                        .message(img.getCaption())
+                        .message(img.getCaption() != null ? img.getCaption() : "Image uploaded")
                         .messageType(FireStoreTextMessage.MessageType.IMAGE)
                         .senderId(from)
                         .senderType(FireStoreTextMessage.SenderType.CUSTOMER)
                         .timestamp(Instant.now())
                         .build();
                 Map<String, Object> meta = new HashMap<>();
-                if (img.getUrl() != null) meta.put("url", img.getUrl());
-                if (img.getId() != null) meta.put("mediaId", img.getId());
+                meta.put("uploadedUrl", processResult.uploadedUrl());
+                meta.put("tagField", processResult.tagField());
+                if (processResult.mediaId() != null) meta.put("mediaId", processResult.mediaId());
+                if (processResult.mimeType() != null) meta.put("mimeType", processResult.mimeType());
                 if (!meta.isEmpty()) imgMsg.setMeta(meta);
                 try {
-                   // firestoreService.writeMessageForCustomer(from, imgMsg);
+                    String contactName = extractContactName(contacts);
+                    firestoreService.writeMessageForCustomer(
+                            from,
+                            contactName != null ? contactName : "Customer " + from,
+                            imgMsg
+                    );
                 } catch (Exception e) {
                     LOG.warn("Failed to persist image message for {}", from, e);
                 }
+
+                String customerName = extractContactName(contacts);
+                String aiReply = null;
+                if (aiCustomerService.isEnabled()) {
+                    String aiEventMessage = String.format(
+                            "Customer uploaded document successfully. Field: %s, MediaId: %s, FileType: %s. " +
+                                    "Please confirm upload success and guide the user on next required step.",
+                            processResult.tagField(),
+                            processResult.mediaId(),
+                            processResult.mimeType()
+                    );
+                    aiReply = aiCustomerService.handleWhatsappQuery(aiEventMessage, from, customerName);
+                }
+
+                whatsappNotificationService.sendMessage(
+                        from,
+                        aiReply != null && !aiReply.isBlank()
+                                ? aiReply
+                                : "Thanks. Your document image was received and linked to your profile."
+                );
             }
         } catch (Exception e) {
             LOG.error("Error handling image message", e);
+            sendImageProcessingFallback(from);
+        }
+    }
+
+    private void sendImageProcessingFallback(String from) {
+        try {
+            whatsappNotificationService.sendMessage(
+                    from,
+                    "We could not process your image just now. Please send it again, or reply HELP for assistance."
+            );
+        } catch (Exception ex) {
+            LOG.warn("Failed to send image-processing fallback message to {}", from, ex);
         }
     }
 

@@ -8,6 +8,7 @@ import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
 import io.curiousoft.izinga.ordermanagement.stores.StoreService;
 import io.curiousoft.izinga.recon.ReconServiceImpl;
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService;
+import io.curiousoft.izinga.usermanagement.users.DocumentUploadMcpService;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,6 +75,8 @@ class McpToolRegistrationTest {
     private UserProfileService userProfileService;
     @Mock
     private UserConfigService userConfig;
+    @Mock
+    private DocumentUploadMcpService documentUploadMcpService;
 
     @BeforeEach
     void setUp() {
@@ -83,18 +86,30 @@ class McpToolRegistrationTest {
 
     @Test
     void userProfileToolCallbackProvider_isCreated() {
-        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(userProfileService, orderService, reconService, storeService);
+        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
+                userProfileService,
+                orderService,
+                reconService,
+                storeService,
+                documentUploadMcpService
+        );
         assertNotNull(provider, "ToolCallbackProvider must not be null");
     }
 
     @Test
     void userProfileTools_allExpectedToolsAreRegistered() {
-        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(userProfileService, orderService, reconService, storeService);
+        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
+            userProfileService,
+            orderService,
+            reconService,
+            storeService,
+            documentUploadMcpService
+        );
         ToolCallback[] tools = provider.getToolCallbacks();
 
         assertNotNull(tools, "Tool callbacks array must not be null");
-        assertTrue(tools.length >= 2,
-                "At least two tools should be registered (find_user_by_phone, create_user), got: " + tools.length);
+        assertTrue(tools.length >= 6,
+            "At least six tools should be registered including document upload tools, got: " + tools.length);
 
         List<String> toolNames = Arrays.stream(tools)
                 .map(t -> t.getToolDefinition().name())
@@ -102,11 +117,21 @@ class McpToolRegistrationTest {
 
         assertTrue(toolNames.contains("find_user_by_phone"), "Tool 'find_user_by_phone' must be registered");
         assertTrue(toolNames.contains("create_user"), "Tool 'create_user' must be registered");
+        assertTrue(toolNames.contains("get_required_documents_for_user"), "Tool 'get_required_documents_for_user' must be registered");
+        assertTrue(toolNames.contains("create_document_upload_session"), "Tool 'create_document_upload_session' must be registered");
+        assertTrue(toolNames.contains("attach_uploaded_document_to_user_tag"), "Tool 'attach_uploaded_document_to_user_tag' must be registered");
+        assertTrue(toolNames.contains("recheck_required_documents"), "Tool 'recheck_required_documents' must be registered");
     }
 
     @Test
     void findUserByPhone_toolHasDescription() {
-        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(userProfileService, orderService, reconService, storeService);
+        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
+            userProfileService,
+            orderService,
+            reconService,
+            storeService,
+            documentUploadMcpService
+        );
         ToolCallback findUserTool = Arrays.stream(provider.getToolCallbacks())
                 .filter(t -> "find_user_by_phone".equals(t.getToolDefinition().name()))
                 .findFirst()
@@ -119,7 +144,13 @@ class McpToolRegistrationTest {
 
     @Test
     void createUser_toolHasDescription() {
-        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(userProfileService, orderService, reconService, storeService);
+        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
+            userProfileService,
+            orderService,
+            reconService,
+            storeService,
+            documentUploadMcpService
+        );
         ToolCallback createUserTool = Arrays.stream(provider.getToolCallbacks())
                 .filter(t -> "create_user".equals(t.getToolDefinition().name()))
                 .findFirst()
