@@ -265,8 +265,43 @@ public class OrderControllerTest {
     }
 
     @Test
-    public void getOrderByCustomer() {
+    public void getOrderByCustomer() throws URISyntaxException, JsonProcessingException {
+        // Create an order first
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+        ShippingData shipping = new ShippingData(store.getAddress(),
+                user.getAddress(),
+                ShippingData.ShippingType.DELIVERY);
+        order.setShippingData(shipping);
+        order.setCustomerId(user.getId());
+        order.setShopId(store.getId());
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("test order");
 
+        ResponseEntity<String> createResult = this.rest.exchange(
+                RequestEntity.post(new URI("/order"))
+                        .headers(headers)
+                        .body(order), String.class);
+        Order createdOrder = new Gson().fromJson(createResult.getBody(), Order.class);
+
+        // Get orders by customer ID
+        ResponseEntity<String> result = this.rest.exchange(
+                RequestEntity.get(new URI("/order?userId=" + user.getId()))
+                        .headers(headers)
+                        .build(), String.class);
+
+        System.out.println(new ObjectMapper().writeValueAsString(result.getBody()));
+        Assert.assertTrue(result.getStatusCode().is2xxSuccessful());
+
+        // Parse the response as an array of orders
+        Order[] orders = new Gson().fromJson(result.getBody(), Order[].class);
+        Assert.assertTrue(orders.length > 0);
+        Assert.assertEquals(user.getId(), orders[0].getCustomerId());
     }
 
     @After

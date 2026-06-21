@@ -69,10 +69,71 @@ public class StoreControlerTest {
     }
 
     @Test
-    public void update() {
+    public void update() throws JsonProcessingException, URISyntaxException {
+        // First create a store
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        BusinessHours hours = new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date());
+        businessHours.add(hours);
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile store = new StoreProfile(
+                StoreType.FOOD,
+                "name",
+                "shortname",
+                "myaddress",
+                "path to image",
+                "9111111707",
+                tags,
+                businessHours,
+                "ffd4c856-644f-4453-a5ed-84689801a747",
+                new Bank());
+
+        ResponseEntity<String> createResult = this.rest.exchange(
+                RequestEntity.post(new URI("/store")).body(store), String.class);
+        StoreProfile createdStore = new Gson().fromJson(createResult.getBody(), StoreProfile.class);
+
+        // Update the store
+        createdStore.setName("updated name");
+        createdStore.setAddress("updated address");
+
+        ResponseEntity<String> updateResult = this.rest.exchange(
+                RequestEntity.patch(new URI("/store/" + createdStore.getId())).body(createdStore), String.class);
+
+        System.out.println(new ObjectMapper().writeValueAsString(updateResult.getBody()));
+        Assert.assertTrue(updateResult.getStatusCode().is2xxSuccessful());
+
+        StoreProfile updatedStore = new Gson().fromJson(updateResult.getBody(), StoreProfile.class);
+        Assert.assertEquals("updated name", updatedStore.getName());
+        Assert.assertEquals("updated address", updatedStore.getAddress());
     }
 
     @Test
-    public void findStock() {
+    public void findStock() throws JsonProcessingException, URISyntaxException {
+        // First create a store with stock
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        BusinessHours hours = new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date());
+        businessHours.add(hours);
+        List<String> tags = Collections.singletonList("Pizza");
+        StoreProfile store = new StoreProfile(
+                StoreType.FOOD,
+                "name",
+                "shortname",
+                "myaddress",
+                "path to image",
+                "9111111707",
+                tags,
+                businessHours,
+                "ffd4c856-644f-4453-a5ed-84689801a747",
+                new Bank());
+
+        ResponseEntity<String> createResult = this.rest.exchange(
+                RequestEntity.post(new URI("/store")).body(store), String.class);
+        StoreProfile createdStore = new Gson().fromJson(createResult.getBody(), StoreProfile.class);
+
+        // Find stock for the store
+        ResponseEntity<String> stockResult = this.rest.exchange(
+                RequestEntity.get(new URI("/store/" + createdStore.getId() + "/stock")).build(), String.class);
+
+        System.out.println(new ObjectMapper().writeValueAsString(stockResult.getBody()));
+        Assert.assertTrue(stockResult.getStatusCode().is2xxSuccessful());
     }
 }
