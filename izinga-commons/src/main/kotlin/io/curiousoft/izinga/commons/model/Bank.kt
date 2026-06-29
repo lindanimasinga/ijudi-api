@@ -1,6 +1,6 @@
 package io.curiousoft.izinga.commons.model
 
-import javax.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotBlank
 
 class Bank {
     var branchCode: @NotBlank(message = "Bank Branch code not valid") String? = null

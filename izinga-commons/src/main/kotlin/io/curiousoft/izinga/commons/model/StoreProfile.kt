@@ -6,9 +6,9 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.*
 import java.util.function.Consumer
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.NotEmpty
-import javax.validation.constraints.NotNull
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotEmpty
+import jakarta.validation.constraints.NotNull
 import kotlin.collections.HashSet
 
 /**
@@ -42,23 +42,24 @@ class StoreProfile(
 ) : Profile(name, address, imageUrl, mobileNumber, ProfileRoles.STORE), GeoPoint {
     @Indexed(unique = true)
     var regNumber: String? = null
-
     var stockList: HashSet<Stock> = HashSet()
     var hasVat = false
+    var hasPaymentAgreement = false
     var featured = false
     var featuredExpiry: Date? = null
-    var storeMessenger: HashSet<Messager>? = HashSet()
+    var storeMessenger: HashSet<StoreMessenger>? = HashSet()
     var storeWebsiteUrl: String? = null
     var izingaTakesCommission = false
     var scheduledDeliveryAllowed = false
-    var availability = AVAILABILITY.SPECIFIC_HOURS
+    var availability = AVAILABILITY.OFFLINE
     var freeDeliveryMinAmount = 0.0
     var markUpPrice = true
     var minimumDepositAllowedPerc = 1.0
-    var standardDeliveryPrice = 0.0
-    var standardDeliveryKm = 0.0
-    var ratePerKm = 0.0
     var franchiseName: String? = null
+    var deliversFromMultipleAddresses: Boolean? = null;
+    var generateMissingImages: Boolean = false;
+    var rates: Rates? = null
+    var isQuoteRequired: Boolean = false
     /** Delivery/product categories for this store. Never null — defaults to empty list. */
     var categories: List<Category> = emptyList()
     /** Whether the store has an active payment agreement with iZinga. */
@@ -155,6 +156,14 @@ class StoreProfile(
     //should not accept orders 15 minutes before store closes
     val isDeliverNowAllowed: Boolean
         get() {
+            if (availability == AVAILABILITY.ONLINE24_7) {
+                return true
+            }
+
+            if (availability == AVAILABILITY.OFFLINE) {
+                return false
+            }
+
             if (businessHours == null || businessHours!!.isEmpty()) {
                 return false
             }
@@ -200,4 +209,21 @@ class StoreProfile(
     enum class AVAILABILITY {
         OFFLINE, SPECIFIC_HOURS, ONLINE24_7
     }
+}
+
+class Rates() {
+    var labourRatePerFloor: Double? = null
+    var standardDeliveryPrice: Double? = null
+    var standardDeliveryPriceBike: Double? = null
+    var standardDeliveryPriceCar: Double? = null
+    var standardDeliveryPriceBakkie: Double? = null
+    var standardDeliveryPriceTruck: Double? = null
+    var standardDeliveryKm: Double? = null
+    var ratePerKmBike: Double? = null
+    var ratePerKmCar: Double? = null
+    var ratePerKmBakkie: Double? = null
+    var ratePerKmTruck: Double? = null
+    var ratePerKm: Double? = null
+    var ratePerVolumeCM2: Double? = null
+    var ratePerWeightKg: Double? = null
 }

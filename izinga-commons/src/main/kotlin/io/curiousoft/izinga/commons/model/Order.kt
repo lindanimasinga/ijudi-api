@@ -3,19 +3,21 @@ package io.curiousoft.izinga.commons.model
 import io.curiousoft.izinga.commons.validator.ValidDeliveryInfo
 import io.curiousoft.izinga.commons.validator.ValidOrderType
 import org.springframework.data.mongodb.core.mapping.Document
+import java.lang.StringBuilder
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.security.SecureRandom
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.*
-import javax.validation.Valid
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.NotNull
+import jakarta.validation.Valid
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 
 @ValidOrderType
 @ValidDeliveryInfo
 @Document
-class Order : BaseModel() {
+open class Order : BaseModel() {
     var paymentTypesAllowed: MutableList<PaymentType>? = null
     var stage: @NotNull(message = "order stage is not valid") OrderStage? = null
     var shippingData: ShippingData? = null
@@ -34,19 +36,72 @@ class Order : BaseModel() {
     var messengerPaidDate: Date? = null
     var smsSentToShop = false
     var smsSentToAdmin = false
+    var scheduledNotified = false
     var freeDelivery = false
     var minimumDepositAllowedPerc = 0.0
+    var payoutCreated = false
+    var documents: Set<DocumentAttachment>? = null
+    var statusHistory: MutableList<OrderStatusHistory>? = mutableListOf()
+
+    fun addStatusHistory(stage: OrderStage?, lati: Double? = null, longi: Double? = null) {
+        if (stage == null) {
+            return
+        }
+
+        if (statusHistory == null) {
+            statusHistory = mutableListOf()
+        }
+
+        val location = if (lati != null && longi != null) {
+            OrderStatusLocation(lati, longi)
+        } else {
+            null
+        }
+
+        statusHistory!!.add(OrderStatusHistory(stage, location))
+    }
+
+    fun addStatusHistory(stage: OrderStage?) {
+        addStatusHistory(stage, null, null)
+    }
+
+    var weightFee: Double
+        get() = shippingData?.weigthFee ?: 0.0
+        set(value) {
+            shippingData?.weigthFee = value
+        }
+    var volumeFee: Double
+        get() = shippingData?.volumeFee ?: 0.0
+        set(value) {
+            shippingData?.volumeFee = value
+        }
+
+    var labourFee: Double
+        get() = shippingData?.labourFee ?: 0.0
+        set(value) {
+            shippingData?.labourFee = value
+        }
+
     val totalAmount: Double
         get() = BigDecimal.valueOf(
-            serviceFee + basket.items.stream()
-                .mapToDouble { obj: BasketItem -> obj.totalPrice }
-                .sum() + (!freeDelivery && shippingData != null).isTrue({shippingData?.fee!!}) { 0.00 }
+            serviceFee + basket.totalPrice + (!freeDelivery && shippingData != null).isTrue({shippingData?.fee!!}) { 0.00 }
         )
         .setScale(2, RoundingMode.HALF_EVEN)
         .toDouble()
 
+    // total weight (kg) across all items in the basket
+    val totalWeight: Double
+        get() = basket.totalWeight
+
+    // total volumetric measure across all items in the basket
+    val totalVolume: Double
+        get() = basket.totalVolume
+
+    val totalArea: Double
+        get() = basket.totalArea
+
     override fun equals(obj: Any?): Boolean {
-        return obj is Order && id == obj.id
+        return obj is Order && id.equals(obj.id)
     }
 
     val basketAmount: Double
@@ -56,12 +111,30 @@ class Order : BaseModel() {
             .setScale(2, RoundingMode.HALF_EVEN)
             .toDouble()
     val depositAmount: Double
-        get() = BigDecimal.valueOf(serviceFee
-                + basket.items.sumOf { obj: BasketItem -> obj.totalPrice } * minimumDepositAllowedPerc + (!freeDelivery && shippingData != null).isTrue({ shippingData?.fee!! }) { 0.00 }
-        )
+        get() = BigDecimal.valueOf(serviceFee +
+                basket.items.sumOf { obj: BasketItem -> obj.totalPrice } * minimumDepositAllowedPerc + (!freeDelivery && shippingData != null).isTrue({ shippingData?.fee!! }) { 0.00 })
             .setScale(2, RoundingMode.HALF_EVEN)
             .toDouble()
 }
 
 fun <R> Boolean.isTrue(isTrue: () -> R, isFalse : () -> R): R = if (this) isTrue.invoke() else isFalse.invoke()
-fun generateId() = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC).toString() + ""
+
+fun generateId(): String {
+    val random = SecureRandom()
+    val characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    val sb = StringBuilder()
+    while (sb.length < 5) {
+        sb.append(characters[random.nextInt(characters.length)])
+    }
+    return sb.substring(0, 5).uppercase(Locale.getDefault())
+}
+
+data class OrderStatusHistory(
+    var stage: OrderStage? = null,
+    var location: OrderStatusLocation? = null
+)
+
+data class OrderStatusLocation(
+    var lati: Double? = null,
+    var longi: Double? = null
+)

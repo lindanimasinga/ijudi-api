@@ -9,6 +9,6 @@ interface ProfileService<U : Profile> {
     @Throws(Exception::class)
     fun update(profileId: String, profile: U): U
     fun delete(id: String)
-    fun find(profileId: String): U
+    fun find(profileId: String): U?
     fun findAll(): List<U>
 }

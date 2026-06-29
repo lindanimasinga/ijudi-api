@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.usermanagement.walletpass
 
+import io.curiousoft.izinga.commons.model.DeviceType
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.usermanagement.users.UserProfileService
 import org.springframework.core.io.ByteArrayResource
@@ -10,7 +11,6 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import java.net.URI
-import java.util.Objects
 
 @RestController
 @RequestMapping("/walletpass")

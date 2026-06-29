@@ -35,7 +35,7 @@ class YocoPaymentControllerTest {
 
         val yocoEvent = YocoEvent(id = "evt_rLQQMyMj2j1iynQUQJGCPmAL", type = "payment.succeeded",
             payload = PaymentData(amount = 100.toBigDecimal(), createdDate = "Date()", status = "", id = "", type = "", currency = "ZAR",
-                metadata =  PaymentMetadata(orderId = "new-order-id", checkoutId = "")), createdDate = "202311221")
+                metadata =  PaymentMetadata(externalId = "new-order-id", checkoutId = "")), createdDate = "202311221")
 
         val newOrder = Order().apply {
             id = "new-order-id"
@@ -67,7 +67,7 @@ class YocoPaymentControllerTest {
 
         //given
         val paymentRequest = YocoPaymentInitiate(amount = 100.toBigDecimal(), currency = "ZAR", successUrl = "https://successUrl",
-            metadata = PaymentMetadata(orderId = "new-order-id", checkoutId = ""))
+            metadata = PaymentMetadata(externalId = "new-order-id", checkoutId = ""))
         every { yocoPaymentClient.checkout(paymentRequest) } returns YocoPaymentInitiateResponse(id =  "id",
             redirectUrl = "https:/yoco.redirect", status = "created")
 

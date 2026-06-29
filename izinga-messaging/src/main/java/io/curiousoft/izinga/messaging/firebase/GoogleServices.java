@@ -29,9 +29,9 @@ public final class GoogleServices {
     }
 
     public interface FirebaseMessageService {
-        @POST("/fcm/send")
+        @POST("/v1/projects/{project}/messages:send")
         @Headers({"Content-Type: application/json"})
-        Call<Map> sendMessage(@Header("Authorization") String apiKey, @Body FCMMessage message);
+        Call<Map> sendMessage(@Header("Authorization") String apiKey, @Path("project") String project, @Body FCMMessage message);
     }
 
     public interface FirebaseInstanceIdHttpService {

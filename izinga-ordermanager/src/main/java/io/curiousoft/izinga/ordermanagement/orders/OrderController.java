@@ -1,0 +1,123 @@
+package io.curiousoft.izinga.ordermanagement.orders;
+
+import io.curiousoft.izinga.commons.model.Order;
+import io.curiousoft.izinga.commons.model.QouteApproval;
+import io.curiousoft.izinga.commons.order.DeliveryPriceEstimateDto;
+import io.curiousoft.izinga.commons.order.OrderService;
+import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.servers.Server;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import jakarta.validation.Valid;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+
+import static io.curiousoft.izinga.commons.model.PaymentType.PAYFAST;
+import static org.springframework.util.StringUtils.isEmpty;
+
+@RestController
+@RequestMapping({"/order", "//order"})
+@OpenAPIDefinition(servers = {
+        @Server(url = "/v2", description = "v2 Server URL")
+})
+public class OrderController {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(OrderController.class);
+
+    private final List<String> allowedOrigins;
+    private final OrderService orderService;
+
+    public OrderController(OrderService orderService, @Value("${allowed.origins}") List<String> origins) {
+        this.orderService = orderService;
+        this.allowedOrigins = origins;
+    }
+
+    @PostMapping(consumes = "application/json", produces = "application/json")
+    public ResponseEntity<Order> startOrder(@RequestBody @Valid Order order) throws Exception {
+        return ResponseEntity.ok(orderService.startOrder(order));
+    }
+
+    @PatchMapping(value = "/{id}", consumes = "application/json", produces = "application/json")
+    public ResponseEntity<Order> finishOrder(@PathVariable String id,
+                                             @RequestBody @Valid Order order,
+                                             @RequestHeader(value = "Origin", required = false) String origin) throws Exception {
+        if(order.getPaymentType() == PAYFAST && (origin == null || !allowedOrigins.contains(origin.toLowerCase()))) {
+            LOGGER.error("Unknown origin " + origin + ". Request not allowed");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return !order.getId().equals(id)? ResponseEntity.badRequest().build() : ResponseEntity.ok(orderService.finishOder(order));
+    }
+
+    @PatchMapping(value = "/{orderId}/promocode/{promocode}")
+    public ResponseEntity<Order> applyPromoCode(@PathVariable String orderId, @PathVariable String promocode) throws Exception {
+        var order = orderService.findOrder(orderId);
+        order = orderService.applyPromoCode(promocode, order);
+        return ResponseEntity.ok(order);
+    }
+
+    @PatchMapping(value = "/{orderId}/quote")
+    public ResponseEntity<Order> acceptQuote(@PathVariable String orderId,
+                                             @RequestBody QouteApproval quoteApproval) throws Exception {
+        var order = orderService.acceptQuote(orderId, quoteApproval);
+        return ResponseEntity.ok(order);
+    }
+
+    @GetMapping(value = "/{orderId}/nextstage", produces = "application/json")
+    public ResponseEntity<Order> progressNextStage(@PathVariable String orderId,
+                                                   @RequestParam(required = false) Double latitude,
+                                                   @RequestParam(required = false) Double longitude) throws Exception {
+        return ResponseEntity.ok(latitude != null || longitude != null ?
+                orderService.progressNextStage(orderId, latitude, longitude) : orderService.progressNextStage(orderId));
+    }
+
+    @GetMapping(value = "/{id}", produces = "application/json")
+    public ResponseEntity<Order> getOrder(@PathVariable String id,
+                                          @RequestParam(required = false) boolean isMessenger) {
+        Order order = isMessenger ? orderService.findOrderForMessenger(id) : orderService.findOrder(id);
+        return order != null ? ResponseEntity.ok(order) : ResponseEntity.notFound().build();
+    }
+
+    @DeleteMapping(value = "/{id}", produces = "application/json")
+    public ResponseEntity<Order> cancelOrder(@PathVariable String id) throws Exception {
+        return ResponseEntity.ok(orderService.cancelOrder(id));
+    }
+
+    @GetMapping(value = "/delivery-price", produces = "application/json")
+    public ResponseEntity<?> getDeliveryPrice(@RequestParam String category,
+                                              @RequestParam String fromAddress,
+                                              @RequestParam String toAddress,
+                                              @RequestParam(required = false) String shopId) {
+        try {
+            DeliveryPriceEstimateDto estimate = orderService.getDeliveryPriceEstimate(category, fromAddress, toAddress, shopId);
+            return ResponseEntity.ok(estimate);
+        } catch (IllegalArgumentException ex) {
+            LOGGER.warn("Invalid delivery price request: {}", ex.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
+
+    @GetMapping(produces = "application/json")
+    public ResponseEntity<Collection<Order>> getAllOrders(@RequestParam(required = false) String userId,
+                                                          @RequestParam(required = false) String phone,
+                                                          @RequestParam(required = false) String messengerId,
+                                                          @RequestParam(required = false) String messengerAdminId,
+                                                          @RequestParam(defaultValue = "false") boolean allStages,
+                                                          @RequestParam(defaultValue = "false") boolean inProgress,
+                                                          @RequestParam(required = false) String storeId) throws Exception {
+        Collection<Order> order = inProgress ? orderService.findOrdersInProgress() :
+                !isEmpty(userId) ? orderService.findOrderByUserId(userId) :
+                !isEmpty(phone) ? orderService.findOrderByPhone(phone) :
+                !isEmpty(storeId) ? orderService.findOrderByStoreId(storeId) :
+                !isEmpty(messengerAdminId) ? orderService.findOrdersByMessengerAdminId(messengerAdminId, allStages) :
+                !isEmpty(messengerId) ? orderService.findOrderByMessengerId(messengerId, allStages) :
+                        orderService.findAll();
+        return order != null ? ResponseEntity.ok(order) : ResponseEntity.notFound().build();
+    }
+}

@@ -4,10 +4,11 @@ import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.model.PaymentType;
 import io.curiousoft.izinga.commons.model.StoreType;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
-import io.curiousoft.izinga.commons.repo.OrderRepository;
+import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
-import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
+import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
+import io.curiousoft.izinga.messaging.firebase.PushNotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,13 +25,13 @@ public class PaymentService {
     private final List<PaymentProvider> paymentProviders;
     private final OrderRepository orderRepo;
     private final long processPaymentIntervalMinutes;
-    private final PushNotificationService pushNotificationService;
+    private final FirebaseNotificationService pushNotificationService;
     private final DeviceRepository deviceRepo;
     private final StoreRepository storeRepository;
     private final UserProfileRepo userProfileRepo;
     private final double izingaCommissionPerc;
 
-    public PaymentService(PushNotificationService pushNotificationService,
+    public PaymentService(FirebaseNotificationService pushNotificationService,
                           List<PaymentProvider> paymentProviders, OrderRepository orderRepo,
                           DeviceRepository deviceRepo,
                           StoreRepository storeRepository,
@@ -47,27 +48,26 @@ public class PaymentService {
         this.izingaCommissionPerc = izingaCommissionPerc;
     }
 
-    public boolean paymentReceived(Order order) throws Exception {
+    public boolean paymentReceived(Order order) {
         PaymentProvider paymentProvider = paymentProviders.stream()
                 .filter(service -> order.getPaymentType() == service.getPaymentType())
                 .findFirst()
-                .orElseThrow(() -> new Exception("Your order has no ukheshe type set or the ukheshe provider for " + order.getPaymentType() + " not configured on the server"));
+                .orElseThrow(() -> new IllegalArgumentException("Your order has no ukheshe type set or the ukheshe provider for " + order.getPaymentType() + " not configured on the server"));
         return paymentProvider.paymentReceived(order);
     }
 
-    public boolean reversePayment(Order order) throws Exception {
-        PaymentProvider paymentProvider = paymentProviders.stream()
+    public boolean reversePayment(Order order) {
+        return paymentProviders.stream()
                 .filter(service -> order.getPaymentType() == service.getPaymentType())
-                .findFirst()
-                .orElseThrow(() -> new Exception("Your order has no ukheshe type set or the ukheshe provider for " + order.getPaymentType() + " not configured on the server"));
-        return paymentProvider.reversePayment(order);
+                .findFirst().map(paymentProvider -> paymentProvider.reversePayment(order))
+                .orElse(true);
     }
 
     public List<PaymentType> getAllowedPaymentTypes(String customerId, StoreType storeType) {
             List<PaymentType> paymentsTypes = new ArrayList<>();
             paymentsTypes.add(PaymentType.YOCO);
             var pastOrders = orderRepo.findByCustomerId(customerId);
-            if (pastOrders == null || storeType == StoreType.TIPS) {
+            if (pastOrders == null || storeType == StoreType.TIPS || storeType == StoreType.MOVERS) {
                 return paymentsTypes;
             }
 

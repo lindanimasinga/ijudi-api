@@ -1,18 +1,18 @@
 package io.curiousoft.izinga.recon
 
 import io.curiousoft.izinga.commons.model.*
-import io.curiousoft.izinga.commons.repo.OrderRepository
+import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.payout.*
-import io.curiousoft.izinga.recon.payout.repo.PayoutBundleRepo
-import io.curiousoft.izinga.recon.payout.repo.PayoutRepository
-import io.curiousoft.izinga.recon.tips.TipsService
+import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
+import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
 import io.mockk.*
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
-import org.springframework.data.repository.findByIdOrNull
+import org.springframework.context.ApplicationEvent
+import org.springframework.context.ApplicationEventPublisher
 import java.time.DayOfWeek
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -20,18 +20,21 @@ import java.util.*
 
 class ReconServiceTest {
 
-    lateinit var sut: ReconService
-    private val orderRepo = mockk<OrderRepository>()
-    private val payoutBundleRepo = mockk<PayoutBundleRepo>()
+    lateinit var sut: ReconServiceImpl
     private val storeRepo = mockk<StoreRepository>()
     private val messengerRepo = mockk<UserProfileRepo>()
-    private val payoutRepo = mockk<PayoutRepository>()
-    private val tipService = mockk<TipsService>()
+    private val shopPayoutRepository = mockk<ShopPayoutRepository>()
+    private val messengerPayoutRepository = mockk<MessengerPayoutRepository>()
+    private val applicationEventPublisher = mockk<ApplicationEventPublisher>()
 
     @Before
     fun setUp() {
-        sut = ReconServiceImpl(orderRepo = orderRepo, payoutBundleRepo = payoutBundleRepo, storeRepo = storeRepo,
-            messengerRepo = messengerRepo, payoutRepo = payoutRepo, tipsService = tipService)
+        sut = ReconServiceImpl(
+            storeRepo = storeRepo,
+            userProfileRepo = messengerRepo,
+            shopPayoutRepo = shopPayoutRepository,
+            messengerPayoutRepository = messengerPayoutRepository,
+            applicationEventPublisher = applicationEventPublisher)
     }
 
     @Test
@@ -73,15 +76,15 @@ class ReconServiceTest {
             toId = shop1,
             toName = shop1Name,
             toBankName = "Ewallet",
-            toAccountNumber = "shop1",
             toType = BankAccType.CHEQUE,
+            toAccountNumber = "shop1",
             orders = shop1Orders,
             toBranchCode = "codeBranch",
             fromReference = "fromRef",
             toReference = "toRef",
-            emailSubject = "email",
+            emailNotify = "email",
             emailAddress = "email",
-            emailNotify = "email"
+            emailSubject = "email",
         )
         val payout2 = ShopPayout(
             toId = shop2,
@@ -93,116 +96,34 @@ class ReconServiceTest {
             toBranchCode = "codeBranch",
             fromReference = "fromRef",
             toReference = "toRef",
-            emailSubject = "email",
+            emailNotify = "email",
             emailAddress = "email",
-            emailNotify = "email"
+            emailSubject = "email",
         )
         val payout3 = ShopPayout(
             toId = shop3,
             toName = shop3Name,
-            toType = BankAccType.CHEQUE,
             toBankName = "ABSA",
+            toType = BankAccType.CHEQUE,
             toAccountNumber = "shop3",
             orders = shop3Orders,
             toBranchCode = "codeBranch",
             fromReference = "fromRef",
             toReference = "toRef",
-            emailSubject = "email",
+            emailNotify = "email",
             emailAddress = "email",
-            emailNotify = "email"
+            emailSubject = "email",
         )
 
-        every { payoutBundleRepo.findOneByTypeAndExecuted(PayoutType.SHOP) } returns PayoutBundle(payouts = listOf(payout1,payout2,payout3),
-            createdBy = "Lindani", type = PayoutType.SHOP)
-
-        every { orderRepo.findByShopPaidAndStage(false, OrderStage.STAGE_7_ALL_PAID) } returns shop1Orders.plus(shop2Orders).plus(shop3Orders).toList()
-
-        every { storeRepo.findById(shop1) } returns Optional.of(createStoreProfile(StoreType.FOOD, 8, 18))
-        every { storeRepo.findById(shop2) } returns Optional.of(createStoreProfile(StoreType.FOOD, 8, 18))
-        every { storeRepo.findById(shop3) } returns Optional.of(createStoreProfile(StoreType.FOOD, 8, 18))
-
-        every { payoutBundleRepo.save(any()) } returnsArgument 0
+        every { shopPayoutRepository.findByPayoutStage() } returns listOf(payout1,payout2,payout3)
 
         //when
-        val paybundle = sut.generateNextPayoutsToShop()
+        val paybundle = sut.getCurrentPayoutBundleForShops()
 
         //then
-        assertFalse(paybundle?.executed!!)
         assertEquals(3, paybundle.payouts.size)
         assertEquals(3, paybundle.numberOfPayouts)
         assertEquals(700.0.toBigDecimal(), paybundle.payoutTotalAmount)
-        verify { payoutBundleRepo.save(any()) }
-    }
-
-    @Test
-    fun `generate next payout for shops if not exist`() {
-        //given 3 orders not paid to shop
-        val shop1 = "shop1-id"
-        val shop2 = "shop2-id"
-        val shop3 = "shop3-id"
-
-        val shop1Orders: List<Order> = mutableListOf(
-            mockk<Order>().also {
-                every { it.basketAmount } returns 300.0
-                every { it.shopPaid } returns false
-                every { it.shopPaid = true } just runs
-                every { it.shopId } returns shop1
-            },
-            mockk<Order>().also {
-                every { it.basketAmount } returns 300.0
-                every { it.shopPaid } returns false
-                every { it.shopPaid = true } just runs
-                every { it.shopId } returns shop2
-            },
-            mockk<Order>().also {
-                every { it.basketAmount } returns 100.0
-                every { it.shopPaid } returns false
-                every { it.shopPaid = true } just runs
-                every { it.shopId } returns shop3
-            }
-        )
-
-        every { payoutBundleRepo.findOneByTypeAndExecuted(PayoutType.SHOP) } returns null
-        every { orderRepo.findByShopPaidAndStage(false, OrderStage.STAGE_7_ALL_PAID) } returns shop1Orders
-
-        every { storeRepo.findByIdOrNull(shop1) } returns mockk<StoreProfile>().also {
-            every { it.bank } returns Bank().apply { name = "FNB"; accountId = "1234543"; type = BankAccType.EWALLET; branchCode = "code" }
-            every { it.name } returns shop1
-            every { it.emailAddress } returns "shop1"
-        }
-        every { storeRepo.findByIdOrNull(shop2) } returns mockk<StoreProfile>().also {
-            every { it.bank } returns Bank().apply { name = "Ewallet"; accountId = "0812815707"; type = BankAccType.EWALLET; branchCode = "code" }
-            every { it.name } returns shop2
-            every { it.emailAddress } returns "shop2"
-        }
-        every { storeRepo.findByIdOrNull(shop3) } returns mockk<StoreProfile>().also {
-            every { it.bank } returns Bank().apply { name = "ABSA"; accountId = "1221122112"; type = BankAccType.EWALLET; branchCode = "code" }
-            every { it.name } returns shop3
-            every { it.emailAddress } returns "shop3"
-        }
-
-        every { payoutBundleRepo.save(any()) } returnsArgument 0
-
-        //when
-        val paybundle = sut.generateNextPayoutsToShop()
-
-        //then
-        assertFalse(paybundle?.executed!!)
-        assertNotNull(paybundle.createdDate)
-        assertEquals(3, paybundle.payouts.size)
-        assertEquals(3, paybundle.numberOfPayouts)
-        assertEquals(700.0.toBigDecimal(), paybundle.payoutTotalAmount)
-
-        paybundle.payouts.forEach {
-            assertNotNull(it.toBankName)
-            assertNotNull(it.toAccountNumber)
-            assertNotNull(it.toId)
-        }
-
-        verify { storeRepo.findByIdOrNull(shop1) }
-        verify { storeRepo.findByIdOrNull(shop2) }
-        verify { storeRepo.findByIdOrNull(shop3) }
-        verify { payoutBundleRepo.save(any()) }
     }
 
     @Test
@@ -220,21 +141,21 @@ class ReconServiceTest {
             Order().also {
                 it.description = "order1"
                 it.messengerPaid = false
-                it.shippingData = ShippingData().apply { messengerId = messenger1; fee = 30.0 }
+                it.shippingData = ShippingData().apply { messengerId = messenger1; deliveryFee = 30.0 }
             }
         )
         val shop2Orders: MutableSet<Order> = mutableSetOf(
             Order().also {
                 it.description = "order2"
                 it.messengerPaid = false
-                it.shippingData = ShippingData().apply { messengerId = messenger2; fee = 40.0 }
+                it.shippingData = ShippingData().apply { messengerId = messenger2; deliveryFee = 40.0 }
             }
         )
         val shop3Orders: MutableSet<Order> = mutableSetOf(
             Order().also {
                 it.description = "order3"
                 it.messengerPaid = false
-                it.shippingData = ShippingData().apply { messengerId = messenger3; fee = 35.75 }
+                it.shippingData = ShippingData().apply { messengerId = messenger3; deliveryFee = 35.75 }
             }
         )
 
@@ -272,160 +193,115 @@ class ReconServiceTest {
             emailSubject = "email"
         )
 
-        every { payoutBundleRepo.findOneByTypeAndExecuted(PayoutType.MESSENGER) } returns PayoutBundle(payouts = listOf(shopPayout1,payout2,payout3),
-            createdBy = "Lindani", type = PayoutType.MESSENGER)
+        every { messengerPayoutRepository.findByPayoutStage() } returns listOf(shopPayout1,payout2,payout3)
 
-        every { orderRepo.findByMessengerPaidAndStage(false, OrderStage.STAGE_7_ALL_PAID) } returns shop1Orders.plus(shop2Orders).plus(shop3Orders).toList()
-
-        every { messengerRepo.findById(messenger1) } returns mockk<UserProfile>().also {
-            every { it.emailAddress } returns "l@email.com"
-            every { it.bank } returns Bank().apply { name = "FNB"; accountId = "1234543"; type = BankAccType.EWALLET; branchCode = "code"  }
-            every { it.name } returns messenger1
-        }.let { Optional.of(it) }
-
-        every { messengerRepo.findById(messenger2) } returns mockk<UserProfile>().also {
-            every { it.emailAddress } returns "l@email.com"
-            every { it.bank } returns Bank().apply { name = "Ewallet"; accountId = "0812815707"; type = BankAccType.EWALLET; branchCode = "code"  }
-            every { it.name } returns messenger2
-        }.let { Optional.of(it) }
-
-        every { messengerRepo.findById(messenger3) } returns mockk<UserProfile>().also {
-            every { it.emailAddress } returns "l@email.com"
-            every { it.bank } returns Bank().apply { name = "ABSA"; accountId = "1221122112"; type = BankAccType.EWALLET; branchCode = "code"  }
-            every { it.name } returns messenger3
-        }.let { Optional.of(it) }
-
-        every { payoutBundleRepo.save(any()) } returnsArgument 0
+        every { messengerPayoutRepository.save(any()) } returnsArgument 0
+        every { shopPayoutRepository.save(any()) } returnsArgument 0
 
         //when
-        val paybundle = sut.generateNextPayoutsToMessenger()
+        val paybundle = sut.getCurrentPayoutBundleForMessenger()
 
         //then
-        assertFalse(paybundle?.executed!!)
         assertEquals(3, paybundle.payouts.size)
         assertEquals(PayoutType.MESSENGER, paybundle.type)
         assertEquals(3, paybundle.numberOfPayouts)
         assertEquals(105.75.toBigDecimal(), paybundle.payoutTotalAmount)
-        verify { payoutBundleRepo.save(any()) }
     }
 
     @Test
-    fun `generate next payout for messengers if not exist`() {
+    fun `get next payout for messengers mark as processing`() {
         //given 3 orders not paid to messengers
         val messenger1 = "messenger1-id"
         val messenger2 = "messenger2-id"
         val messenger3 = "messenger3-id"
 
-        val shop1Orders: List<Order> = mutableListOf(
-            mockk<Order>().also {
-                every { it.shippingData } returns ShippingData().apply { fee = 40.0; messengerId = messenger1 }
-                every { it.messengerPaid } returns false
-            },
-            mockk<Order>().also {
-                every { it.shippingData } returns ShippingData().apply { fee = 40.0; messengerId = messenger2 }
-                every { it.messengerPaid } returns false
-            },
-            mockk<Order>().also {
-                every { it.shippingData } returns ShippingData().apply { fee = 40.56; messengerId = messenger3 }
-                every { it.messengerPaid } returns false
+        val messenger1Name = "messenger1name"
+        val messenger2Name = "messenger2name"
+        val messenger3Name = "messenger3name"
+
+        val shop1Orders: MutableSet<Order> = mutableSetOf(
+            Order().also {
+                it.description = "order1"
+                it.messengerPaid = false
+                it.shippingData = ShippingData().apply { messengerId = messenger1; deliveryFee = 30.0 }
+            }
+        )
+        val shop2Orders: MutableSet<Order> = mutableSetOf(
+            Order().also {
+                it.description = "order2"
+                it.messengerPaid = false
+                it.shippingData = ShippingData().apply { messengerId = messenger2; deliveryFee = 40.0 }
+            }
+        )
+        val shop3Orders: MutableSet<Order> = mutableSetOf(
+            Order().also {
+                it.description = "order3"
+                it.messengerPaid = false
+                it.shippingData = ShippingData().apply { messengerId = messenger3; deliveryFee = 35.75 }
             }
         )
 
-        every { payoutBundleRepo.findOneByTypeAndExecuted(PayoutType.MESSENGER) } returns null
-        every { orderRepo.findByMessengerPaidAndStage(false, OrderStage.STAGE_7_ALL_PAID) } returns shop1Orders
+        val shopPayout1 = MessengerPayout(
+            toId = messenger1, toName = messenger1Name, toBankName = "Ewallet", toType = BankAccType.CHEQUE,
+            toAccountNumber = "messenger1",
+            toBranchCode = "codeBranch",
+            fromReference = "fromRef",
+            toReference = "toRef",
+            emailNotify = "email",
+            orders = shop1Orders,
+            emailAddress = "email",
+            emailSubject = "email"
+        )
+        val payout2 = MessengerPayout(
+            toId = messenger2, toName = messenger2Name, toBankName = "FNB", toType = BankAccType.CHEQUE,
+            toAccountNumber = "messenger2",
+            toBranchCode = "codeBranch",
+            fromReference = "fromRef",
+            toReference = "toRef",
+            emailNotify = "email",
+            orders = shop2Orders,
+            emailAddress = "email",
+            emailSubject = "email"
+        )
+        val payout3 = MessengerPayout(
+            toId = messenger3, toName = messenger3Name, toBankName = "ABSA", toType = BankAccType.CHEQUE,
+            toAccountNumber = "messenger3",
+            toBranchCode = "codeBranch",
+            fromReference = "fromRef",
+            toReference = "toRef",
+            emailNotify = "email",
+            orders = shop3Orders,
+            emailAddress = "email",
+            emailSubject = "email"
+        )
 
-        every { messengerRepo.findByIdOrNull(messenger1) } returns mockk<UserProfile>().also {
-            every { it.emailAddress } returns "l@email.com"
-            every { it.bank } returns Bank().apply { name = "FNB"; accountId = "1234543"; type = BankAccType.EWALLET; branchCode = "code"  }
-            every { it.name } returns messenger1
-        }
-        every { messengerRepo.findByIdOrNull(messenger2) } returns mockk<UserProfile>().also {
-            every { it.emailAddress } returns "l@email.com"
-            every { it.bank } returns Bank().apply { name = "Ewallet"; accountId = "0812815707"; type = BankAccType.EWALLET; branchCode = "code"  }
-            every { it.name } returns messenger2
-        }
-        every { messengerRepo.findByIdOrNull(messenger3) } returns mockk<UserProfile>().also {
-            every { it.emailAddress } returns "l@email.com"
-            every { it.bank } returns Bank().apply { name = "ABSA"; accountId = "1221122112"; type = BankAccType.EWALLET; branchCode = "code"  }
-            every { it.name } returns messenger3
-        }
+        every { messengerPayoutRepository.findByPayoutStage() } returns listOf(shopPayout1,payout2,payout3)
 
-        every { payoutBundleRepo.save(any()) } returnsArgument 0
+        every { messengerPayoutRepository.save(any()) } returnsArgument 0
+        every { shopPayoutRepository.save(any()) } returnsArgument 0
+
+        //mark payout as processing
+        var paybundle = sut.getCurrentPayoutBundleForMessenger()
+        paybundle.payouts.forEach { it.payoutStage = PayoutStage.PROCESSING }
+        sut.updateBundle(paybundle)
 
         //when
-        val paybundle = sut.generateNextPayoutsToMessenger()
+        paybundle = sut.getCurrentPayoutBundleForMessenger()
 
         //then
-        assertFalse(paybundle?.executed!!)
-        assertNotNull(paybundle.createdDate)
-        assertEquals(3, paybundle.payouts.size)
-        assertEquals(3, paybundle.numberOfPayouts)
-        assertEquals(120.56.toBigDecimal(), paybundle.payoutTotalAmount)
-
-        paybundle.payouts.forEach {
-            assertNotNull(it.toBankName)
-            assertNotNull(it.toAccountNumber)
-            assertNotNull(it.toId)
-        }
-
-        verify { messengerRepo.findByIdOrNull(messenger1) }
-        verify { messengerRepo.findByIdOrNull(messenger2) }
-        verify { messengerRepo.findByIdOrNull(messenger3) }
-        verify { payoutBundleRepo.save(any()) }
+        assertEquals(0, paybundle.payouts.size)
+        assertEquals(PayoutType.MESSENGER, paybundle.type)
+        assertEquals(0, paybundle.numberOfPayouts)
+        assertEquals(0.00.toBigDecimal(), paybundle.payoutTotalAmount)
     }
 
     @Test
-    fun `update payout status for all shops and orders`() {
+    fun `update payout status for all messengers and orders in payoutBundle`() {
         //given
         val a = 0..1
-        val payoutBundleResults = PayoutBundleResults(bundleId = "12344554",
-            payoutItemResults = (0..100).mapIndexed { index, it ->
-                PayoutItemResults(payoutId = "$it", paid = index%3==0)
-            } )
-
-        every { payoutBundleRepo.findByIdOrNull("12344554") } returns PayoutBundle(
-            executed = false,
-            createdBy = "test",
-            type = PayoutType.SHOP,
-            payouts = (0..100).map { ShopPayout(
-                toId = "shop1",
-                toName = "shop1Name",
-                toBankName = "Ewallet",
-                toType = BankAccType.CHEQUE,
-                toAccountNumber = "shop1",
-                orders = mutableSetOf(),
-                toBranchCode = "codeBranch",
-                fromReference = "fromRef",
-                toReference = "toRef",
-                emailSubject = "email",
-                emailAddress = "email",
-                emailNotify = "email"
-            ).apply { id = "$it" } }
-        ).apply { id = "12344554" }
-
-        every { payoutBundleRepo.save(match { it.id == "12344554" && it.executed }) } returns payoutBundleRepo.findByIdOrNull("12344554")!!
-
-        //when
-        val payoutBundle = sut.updatePayoutStatus(bundleResponse = payoutBundleResults)
-
-        //then
-        assertEquals(true, payoutBundle?.executed)
-        payoutBundle?.payouts?.forEachIndexed { index, py ->
-            assertEquals(index%3==0, py.paid)
-        }
-
-        verify { payoutBundleRepo.findByIdOrNull("12344554") }
-        verify { payoutBundleRepo.save(match { it.id == "12344554" && it.executed }) }
-    }
-
-    @Test
-    fun `update payout status for all shops and orders in payoutBundle`() {
-        //given
-        val a = 0..1
-        val payoutBundleResults = PayoutBundleResults(bundleId = "12344554")
-        val shop1Orders: MutableSet<Order> = mutableSetOf(
+        val messengerOrders: MutableSet<Order> = mutableSetOf(
             mockk<Order>().also {
-                every { it.shippingData } returns ShippingData().apply { fee = 40.0; messengerId = "messenger1" }
+                every { it.shippingData } returns ShippingData().apply { deliveryFee = 40.0; messengerId = "messenger1" }
                 every { it.messengerPaid } returns false
                 every { it.basketAmount } returns 10.00
                 every { it.id } returns "10.00"
@@ -433,7 +309,7 @@ class ReconServiceTest {
                 every { it.messengerPaid = false } just runs
             },
             mockk<Order>().also {
-                every { it.shippingData } returns ShippingData().apply { fee = 40.0; messengerId = "messenger2" }
+                every { it.shippingData } returns ShippingData().apply { deliveryFee = 40.0; messengerId = "messenger2" }
                 every { it.messengerPaid } returns false
                 every { it.basketAmount } returns 30.00
                 every { it.id } returns "30.00"
@@ -441,7 +317,7 @@ class ReconServiceTest {
                 every { it.messengerPaid = false } just runs
             },
             mockk<Order>().also {
-                every { it.shippingData } returns ShippingData().apply { fee = 40.56; messengerId = "messenger3" }
+                every { it.shippingData } returns ShippingData().apply { deliveryFee = 40.56; messengerId = "messenger3" }
                 every { it.messengerPaid } returns false
                 every { it.basketAmount } returns 20.00
                 every { it.id } returns "20.00"
@@ -450,46 +326,228 @@ class ReconServiceTest {
             }
         )
 
-        val bundle = PayoutBundle(
-            executed = false,
-            createdBy = "test",
-            type = PayoutType.SHOP,
-            payouts = (0..100).map {
+        val payoutBundleResults = PayoutBundleResults(
+            bundleId = "12344554" ,
+            payoutItemResults = (0..100).map {
+                PayoutItemResults(
+                    type = PayoutType.MESSENGER,
+                    paid = Random().nextBoolean(),
+                    toId = "Messenger $it",
+                    message = "Failed or passed due to system settings"
+                )
+            })
+        val storedPayoutList = (0..100).map {
+            MessengerPayout(
+                toId = "Messenger $it",
+                toName = "Messenger $it name",
+                toBankName = "Bank $it",
+                toType = BankAccType.CHEQUE,
+                toAccountNumber = "12345$it",
+                orders = messengerOrders,
+                toBranchCode = "codeBranch",
+                fromReference = "fromRef",
+                toReference = "toRef",
+                emailSubject = "email",
+                emailAddress = "email",
+                emailNotify = "email",
+                payoutStage = if (it % 3 == 0) PayoutStage.PENDING else if (it % 2 == 0) PayoutStage.PROCESSING else PayoutStage.COMPLETED
+            ).apply { id = "$it" }
+        }
+
+        storedPayoutList.forEach {
+            every { messengerPayoutRepository.findByToIdAndPayoutStage(it.toId, PayoutStage.PROCESSING) } returns it
+        }
+        payoutBundleResults.payoutItemResults.forEach { results ->
+            every { messengerPayoutRepository.save(match { it.paid == results.paid  && it.toId == results.toId}) } returnsArgument 0
+        }
+
+        every { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) } just runs
+
+        //when
+        sut.updatePayoutStatus(bundleResponse = payoutBundleResults)
+
+        //then
+        payoutBundleResults.payoutItemResults.forEach { results ->
+            verify { messengerPayoutRepository.save(match { it.paid == results.paid  && it.toId == results.toId}) }
+        }
+
+        verify (timeout = 3) {
+            applicationEventPublisher.publishEvent(
+                match {
+                    (it as OrderPayoutEvent)
+                    it.isMessengerPaid
+                }
+            )
+        }
+    }
+
+    @Test
+    fun `update payout status for all shops and orders in payoutBundle`() {
+        //given
+        val a = 0..1
+        val shop1Orders: MutableSet<Order> = mutableSetOf(
+            mockk<Order>().also {
+                every { it.shippingData } returns ShippingData().apply { deliveryFee = 40.0; messengerId = "messenger1" }
+                every { it.messengerPaid } returns false
+                every { it.basketAmount } returns 10.00
+                every { it.id } returns "10.00"
+                every { it.shopPaid = true } just runs
+                every { it.messengerPaid = false } just runs
+            },
+            mockk<Order>().also {
+                every { it.shippingData } returns ShippingData().apply { deliveryFee = 40.0; messengerId = "messenger2" }
+                every { it.messengerPaid } returns false
+                every { it.basketAmount } returns 30.00
+                every { it.id } returns "30.00"
+                every { it.shopPaid = true } just runs
+                every { it.messengerPaid = false } just runs
+            },
+            mockk<Order>().also {
+                every { it.shippingData } returns ShippingData().apply { deliveryFee = 40.56; messengerId = "messenger3" }
+                every { it.messengerPaid } returns false
+                every { it.basketAmount } returns 20.00
+                every { it.id } returns "20.00"
+                every { it.shopPaid = true } just runs
+                every { it.messengerPaid = false } just runs
+            }
+        )
+
+        val payoutBundleResults = PayoutBundleResults(
+            bundleId = "12344554" ,
+            payoutItemResults = (0..100).map {
+                PayoutItemResults(
+                    type = PayoutType.SHOP,
+                    paid = Random().nextBoolean(),
+                    toId = "shop $it",
+                    message = "Failed or passed due to system settings"
+                )
+            })
+        val storedPayoutList = (0..100).map {
                 ShopPayout(
-                    toId = "shop1",
-                    toName = "shop1Name",
-                    toBankName = "Ewallet",
+                    toId = "shop $it",
+                    toName = "shop $it name",
+                    toBankName = "Bank $it",
                     toType = BankAccType.CHEQUE,
-                    toAccountNumber = "shop1",
+                    toAccountNumber = "12345$it",
                     orders = shop1Orders,
                     toBranchCode = "codeBranch",
                     fromReference = "fromRef",
                     toReference = "toRef",
-                    emailSubject = "email",
+                    emailNotify = "email",
                     emailAddress = "email",
-                    emailNotify = "email"
+                    emailSubject = "email",
                 ).apply { id = "$it" }
             }
-        ).apply { id = "12344554" }
-        every { payoutBundleRepo.findByIdOrNull("12344554") } returns bundle
 
-        every { orderRepo.findByIdIn(listOf("10.00", "30.00", "20.00")) } returns shop1Orders.toList()
-        every { orderRepo.save(match { it.id in listOf("10.00", "30.00", "20.00")}) } returnsArgument 0
-        every { payoutBundleRepo.save(match { it.id == "12344554" && it.executed }) } returns bundle
-
-        //when
-        val payoutBundle = sut.updatePayoutStatus(bundleResponse = payoutBundleResults)
-
-        //then
-        assertEquals(true, payoutBundle?.executed)
-        payoutBundle?.payouts?.forEachIndexed { index, py ->
-            assertEquals(true, py.paid)
+        storedPayoutList.forEach {
+            every { shopPayoutRepository.findByToIdAndPayoutStage(it.toId, PayoutStage.PROCESSING) } returns it
+        }
+        payoutBundleResults.payoutItemResults.forEach { results ->
+            every { shopPayoutRepository.save(match { it.paid == results.paid  && it.toId == results.toId}) } returnsArgument 0
         }
 
-        verify { payoutBundleRepo.findByIdOrNull("12344554") }
-        verify { orderRepo.findByIdIn(listOf("10.00", "30.00", "20.00")) }
-        verify { orderRepo.save(any()) }
-        verify { payoutBundleRepo.save(match { it.id == "12344554" && it.executed }) }
+        every { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) } just runs
+
+        //when
+        sut.updatePayoutStatus(bundleResponse = payoutBundleResults)
+
+        //then
+        payoutBundleResults.payoutItemResults.forEach { results ->
+            verify { shopPayoutRepository.save(match { it.paid == results.paid  && it.toId == results.toId}) }
+        }
+
+        verify (timeout = 3) {
+            applicationEventPublisher.publishEvent(
+                match {
+                    (it as OrderPayoutEvent)
+                    it.isStorePaid
+                }
+            )
+        }
+    }
+
+    @Test
+    fun `get payouts for messenger admin returns team payouts`() {
+        val adminId = "admin-1"
+        val managedMessenger = UserProfile(
+            "messenger-name",
+            UserProfile.SignUpReason.DELIVERY_DRIVER,
+            "address",
+            "https://image.url",
+            "0810000001",
+            ProfileRoles.MESSENGER
+        ).apply { id = "messenger-1" }
+
+        val admin = UserProfile(
+            "admin-name",
+            UserProfile.SignUpReason.BUY,
+            "address",
+            "https://image.url",
+            "0810000002",
+            ProfileRoles.MESSENGER_ADMIN
+        ).apply { id = adminId }
+
+        val payout = MessengerPayout(
+            toId = "messenger-1",
+            toName = "Messenger 1",
+            toBankName = "Bank",
+            toType = BankAccType.CHEQUE,
+            toAccountNumber = "123",
+            orders = mutableSetOf(),
+            toBranchCode = "250655",
+            fromReference = "from",
+            toReference = "to",
+            emailNotify = "",
+            emailAddress = "m@x.com",
+            emailSubject = "subject"
+        )
+
+        val from = Date(System.currentTimeMillis() - 10000)
+        val to = Date()
+
+        every { messengerRepo.findById(adminId) } returns Optional.of(admin)
+        every { messengerRepo.findByRoleAndMessengerAdminId(ProfileRoles.MESSENGER, adminId) } returns listOf(managedMessenger)
+        every { messengerPayoutRepository.findByModifiedDateBetweenAndToIdIn(from, to, listOf("messenger-1")) } returns listOf(payout)
+
+        val payouts = sut.getAllPayoutsForMessengerAdmin(from, to, adminId, null)
+
+        assertEquals(1, payouts.size)
+        assertEquals("messenger-1", payouts.first().toId)
+    }
+
+    @Test
+    fun `get payouts for messenger admin rejects messenger not in team`() {
+        val adminId = "admin-1"
+        val managedMessenger = UserProfile(
+            "messenger-name",
+            UserProfile.SignUpReason.DELIVERY_DRIVER,
+            "address",
+            "https://image.url",
+            "0810000001",
+            ProfileRoles.MESSENGER
+        ).apply { id = "messenger-1" }
+
+        val admin = UserProfile(
+            "admin-name",
+            UserProfile.SignUpReason.BUY,
+            "address",
+            "https://image.url",
+            "0810000002",
+            ProfileRoles.MESSENGER_ADMIN
+        ).apply { id = adminId }
+
+        val from = Date(System.currentTimeMillis() - 10000)
+        val to = Date()
+
+        every { messengerRepo.findById(adminId) } returns Optional.of(admin)
+        every { messengerRepo.findByRoleAndMessengerAdminId(ProfileRoles.MESSENGER, adminId) } returns listOf(managedMessenger)
+
+        try {
+            sut.getAllPayoutsForMessengerAdmin(from, to, adminId, "messenger-999")
+            fail("Expected IllegalArgumentException")
+        } catch (e: IllegalArgumentException) {
+            assertEquals("Messenger does not belong to this admin", e.message)
+        }
     }
 
     private fun createStoreProfile(food: StoreType, openHour: Int, closeHour: Int): StoreProfile {

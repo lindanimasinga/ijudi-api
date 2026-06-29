@@ -24,20 +24,28 @@ class DailyPayoutEmailNotificationService(
 
     @Scheduled(cron = "0 0 17 1/1 * ?") // every day at 7pm
     fun notifyDailyPayouts() {
-        val allPayouts = mutableListOf<Payout>()
-        reconService.generateNextPayoutsToShop()?.payouts?.let {
-            allPayouts.addAll(it)
-        }
-        reconService.generateNextPayoutsToMessenger()?.payouts?.let {
-            allPayouts.addAll(it)
-        }
+        val shopPayouts = reconService.getCurrentPayoutBundleForShops()
+        val messagerPayouts = reconService.getCurrentPayoutBundleForMessenger()
 
-        allPayouts.map {
+        shopPayouts.payouts
+            .filter { !it.emailSent }
+            .map { sendPayoutEmail(it) }
+
+        messagerPayouts.payouts
+            .filter { !it.emailSent }
+            .map { sendPayoutEmail(it) }
+
+        reconService.updateBundle(shopPayouts)
+        reconService.updateBundle(messagerPayouts)
+    }
+
+    private fun sendPayoutEmail(it: Payout) {
+        it.emailAddress?.let { emailAddress ->
             val emailMessage = EmailRequest();
             emailMessage.template_id = dailyPayoutTemplate
-            emailMessage.to = listOf(To(it.emailAddress))
+            emailMessage.to = listOf(To(emailAddress))
             val data = Data(it)
-            emailMessage.personalization = listOf(Personalization(it.emailAddress, data))
+            emailMessage.personalization = listOf(Personalization(emailAddress, data))
 
             val headers = HttpHeaders()
             headers["Content-Type"] = "application/json"
@@ -47,6 +55,7 @@ class DailyPayoutEmailNotificationService(
                 "https://api.mailersend.com/v1/email",
                 entity, String::class.java
             )
+            it.emailSent = true
         }
     }
 }

@@ -1,0 +1,69 @@
+package io.curiousoft.izinga.ordermanagement.stores.event.handler;
+
+import io.curiousoft.izinga.commons.model.Device;
+import io.curiousoft.izinga.commons.model.PushHeading;
+import io.curiousoft.izinga.commons.model.PushMessage;
+import io.curiousoft.izinga.commons.model.PushMessageType;
+import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
+import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
+import io.curiousoft.izinga.messaging.AdminOnlyNotificationService;
+import io.curiousoft.izinga.ordermanagement.service.DeviceService;
+import io.curiousoft.izinga.ordermanagement.stores.event.StoreCreatedEvent;
+import io.curiousoft.izinga.ordermanagement.stores.event.StoreDeletedEvent;
+import io.curiousoft.izinga.ordermanagement.stores.event.StoreUpdatedEvent;
+import io.curiousoft.izinga.usermanagement.users.UserProfileService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+
+@Service
+@RequiredArgsConstructor
+public class StoreAdminStoreProfileEventHandler implements StoreProfileEventHandler {
+
+    private final FirebaseNotificationService pushNotificationService;
+    private final AdminOnlyNotificationService adminOnlyNotificationService;
+    private final EmailNotificationService emailNotificationService;
+    private final DeviceService deviceService;
+    private final UserProfileService userProfileService;
+
+    @Value("${admin.cellNumber}")
+    private List<String> adminCellNumbers;
+
+    @EventListener
+    @Override
+    public void handleNewStoreCreatedEvent(StoreCreatedEvent event) throws Exception {
+        var store = event.getStoreProfile();
+        adminCellNumbers.stream()
+                .map(userProfileService::findUserByPhone)
+                .forEach(admin -> {
+                    List<Device> shopDevices = deviceService.findByUserId(store.getOwnerId());
+                    if (!shopDevices.isEmpty()) {
+                        PushHeading heading = new PushHeading("%s Requires approval".formatted(store.getName()),
+                                "New store added onto iZinga",
+                                null, null);
+                        PushMessage pushMessage = new PushMessage(PushMessageType.MARKETING, heading, null);
+                        pushNotificationService.sendNotifications(shopDevices, pushMessage);
+                    } else {
+                        adminOnlyNotificationService.sendMessage(admin.getMobileNumber(),
+                                "%s store added onto iZinga requires approval".formatted(store.getName()));
+                    }
+                });
+    }
+
+
+    @EventListener
+    @Override
+    public void handleStoreUpdatedEvent(StoreUpdatedEvent event) {
+
+    }
+
+    @EventListener
+    @Override
+    public void handleStoreDeletedEvent(StoreDeletedEvent event) {
+
+    }
+}

@@ -1,0 +1,39 @@
+package io.curiousoft.izinga.commons.order
+
+import io.curiousoft.izinga.commons.model.Order
+import io.curiousoft.izinga.commons.model.QouteApproval
+
+interface OrderService {
+    fun startOrder(order: Order?): Order?
+
+    fun finishOder(order: Order?): Order?
+
+    fun findOrder(orderId: String?): Order?
+
+    fun progressNextStage(orderId: String?): Order?
+
+    fun progressNextStage(orderId: String?, latitude: Double?, longitude: Double?): Order?
+
+    fun applyPromoCode(promoCode: String?, order: Order?): Order?
+
+    fun findOrderByUserId(userId: String?): MutableList<Order?>?
+
+    fun findOrderByPhone(userId: String?): MutableList<Order?>?
+
+    fun findOrderByStoreId(shopId: String?): MutableList<Order?>?
+
+    fun findOrderByMessengerId(id: String?, allStages: Boolean): Set<Order?>?
+
+    fun findOrderForMessenger(orderId: String): Order?
+
+    fun findOrdersByMessengerAdminId(adminId: String?, allStages: Boolean): MutableList<Order?>?
+
+    fun findAll(): MutableList<Order?>?
+
+    fun findOrdersInProgress(): List<Order>
+
+    fun getDeliveryPriceEstimate(category: String?, fromAddress: String?, toAddress: String?, shopId: String?): DeliveryPriceEstimateDto
+
+    fun cancelOrder(id: String?): Order?
+    fun acceptQuote(orderId: String, quoteApproval: QouteApproval): Order?
+}

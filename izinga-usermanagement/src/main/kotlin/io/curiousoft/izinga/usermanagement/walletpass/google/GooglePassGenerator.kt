@@ -17,8 +17,7 @@ import io.curiousoft.izinga.usermanagement.walletpass.PassGenerator
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 import java.io.ByteArrayInputStream
-import java.io.IOException
-import java.io.InputStream
+import java.math.BigDecimal
 import java.security.interfaces.RSAPrivateKey
 import java.util.*
 import java.util.List
@@ -32,22 +31,22 @@ class GooglePassGenerator : PassGenerator<String> {
 
     private lateinit var service: Walletobjects
     private lateinit var credentials: GoogleCredentials
-
-    private var googleConfig: GoogleConfig
+    private lateinit var googleConfig: GoogleConfig
 
     @Autowired
     constructor(googleConfig: GoogleConfig) {
         this.googleConfig = googleConfig
         val walletKeyStream = ByteArrayInputStream(googleConfig.configAsJson().toByteArray())
         credentials = GoogleCredentials.fromStream(walletKeyStream)
-            .createScoped(List.of(WalletobjectsScopes.WALLET_OBJECT_ISSUER))
+                .createScoped(List.of(WalletobjectsScopes.WALLET_OBJECT_ISSUER))
         credentials.refresh()
         val httpTransport: HttpTransport = GoogleNetHttpTransport.newTrustedTransport()
 
         // Initialize Google Wallet API service
-        service = Walletobjects.Builder(httpTransport, GsonFactory.getDefaultInstance(), HttpCredentialsAdapter(credentials))
-            .setApplicationName("APPLICATION_NAME")
-            .build()
+        service =
+            Walletobjects.Builder(httpTransport, GsonFactory.getDefaultInstance(), HttpCredentialsAdapter(credentials))
+                .setApplicationName("APPLICATION_NAME")
+                .build()
     }
 
     override fun generatePass(user: UserProfile): String {
@@ -55,99 +54,26 @@ class GooglePassGenerator : PassGenerator<String> {
     }
 
     fun createJWTNewObjects(user: UserProfile): String {
-        val objectSuffix = "loyalty-${user.id}"
-        val issuerId = "3388000000021566341"
-        val classSuffix = "io.curiousoft.izinga"
 
-        createObject(issuerId, classSuffix, objectSuffix, user)
-
-        // See link below for more information on required properties
-        // https://developers.google.com/wallet/retail/loyalty-cards/rest/v1/loyaltyclass
-        val newClass = LoyaltyClass()
-            .setId(String.format("%s.%s", issuerId, classSuffix))
-            .setIssuerName("izinga")
-            .setReviewStatus("UNDER_REVIEW")
-            .setProgramName("Program name")
-            .setProgramLogo(
-                Image()
-                    .setSourceUri(
-                        ImageUri()
-                            .setUri(
-                                "https://farm4.staticflickr.com/3723/11177041115_6e6a3b6f49_o.jpg"
-                            )
-                    )
-                    .setContentDescription(
-                        LocalizedString()
-                            .setDefaultValue(
-                                TranslatedString()
-                                    .setLanguage("en-US")
-                                    .setValue("Logo description")
-                            )
-                    )
-            )
-
-
-        // See link below for more information on required properties
-        // https://developers.google.com/wallet/retail/loyalty-cards/rest/v1/loyaltyobject
-        val newObject = LoyaltyObject()
-            .setId(String.format("%s.%s", issuerId, objectSuffix))
-            .setClassId(String.format("%s.%s", issuerId, classSuffix))
-            .setState("ACTIVE")
-            .setHeroImage(
-                Image()
-                    .setSourceUri(ImageUri().setUri("https://farm4.staticflickr.com/3723/11177041115_6e6a3b6f49_o.jpg"))
-                    .setContentDescription(LocalizedString()
-                        .setDefaultValue(TranslatedString()
-                            .setLanguage("en-US")
-                            .setValue("Hero image description"))))
-            .setTextModulesData(listOf(TextModuleData()
-                .setHeader("Text module header")
-                .setBody("Text module body")
-                .setId("TEXT_MODULE_ID")))
-            .setLinksModuleData(LinksModuleData()
-                .setUris(
-                Arrays.asList(Uri()
-                    .setUri("http://maps.google.com/")
-                    .setDescription("Link module URI description")
-                    .setId("LINK_MODULE_URI_ID"),
-                    Uri()
-                        .setUri("tel:6505555555")
-                        .setDescription("Link module tel description")
-                        .setId("LINK_MODULE_TEL_ID"))))
-            .setImageModulesData(listOf(ImageModuleData()
-                .setMainImage(Image()
-                    .setSourceUri(ImageUri().setUri("http://farm4.staticflickr.com/3738/12440799783_3dc3c20606_b.jpg"))
-                    .setContentDescription(LocalizedString()
-                        .setDefaultValue(TranslatedString()
-                            .setLanguage("en-US")
-                            .setValue("Image module description"))))
-                        .setId("IMAGE_MODULE_ID")))
-            .setBarcode(Barcode().setType("QR_CODE").setValue("QR code value"))
-            .setLocations(listOf(LatLongPoint()
-                .setLatitude(37.424015499999996)
-                .setLongitude(-122.09259560000001)))
-            .setAccountId("Account ID")
-            .setAccountName("Account name")
-            .setLoyaltyPoints(LoyaltyPoints()
-                .setLabel("Points")
-                .setBalance(LoyaltyPointsBalance().setInt(800)))
+        val loyaltyObject = createObject(issuerId, classSuffix, user.loyaltyId(), user)
 
         // Create the JWT as a HashMap object
         val claims = HashMap<String, Any>()
         claims["iss"] = (credentials as ServiceAccountCredentials).clientEmail
         claims["aud"] = "google"
-        claims["origins"] = listOf("www.example.com")
+        claims["origins"] = listOf("izinga.co.za")
         claims["typ"] = "savetowallet"
 
         // Create the Google Wallet payload and add to the JWT
         val payload = HashMap<String, Any>()
-        payload["loyaltyClasses"] = listOf(newClass)
-        payload["loyaltyObjects"] = listOf(newObject)
+        //payload["loyaltyClasses"] = listOf(newClass)
+        payload["loyaltyObjects"] = listOf(loyaltyObject)
         claims["payload"] = payload
 
         // Loyalty cards
         // The service account credentials are used to sign the JWT
-        val algorithm: Algorithm = Algorithm.RSA256(null, (credentials as ServiceAccountCredentials).privateKey as RSAPrivateKey)
+        val algorithm: Algorithm =
+            Algorithm.RSA256(null, (credentials as ServiceAccountCredentials).privateKey as RSAPrivateKey)
 
         val token = JWT.create().withPayload(claims).sign(algorithm)
         println("Add to Google Wallet link")
@@ -155,74 +81,39 @@ class GooglePassGenerator : PassGenerator<String> {
         return "https://pay.google.com/gp/v/save/$token"
     }
 
-    @Throws(IOException::class)
-    fun createObject(issuerId: String, classSuffix: String, objectSuffix: String, user: UserProfile): String {
+    fun createObject(issuerId: String, classSuffix: String, objectSuffix: String, user: UserProfile): LoyaltyObject? {
         // Check if the object exists
-        try {
-            service.loyaltyobject()["$issuerId.$objectSuffix"].execute()
-            System.out.printf("Object %s.%s already exists!%n", issuerId, objectSuffix)
-            return "$issuerId.$objectSuffix"
-        } catch (ex: GoogleJsonResponseException) {
-            if (ex.statusCode != 404) {
-                // Something else went wrong...
-                ex.printStackTrace()
-                return "$issuerId.$objectSuffix"
+        return runCatching { service.loyaltyobject()["$issuerId.$objectSuffix"].execute() }
+            .onSuccess {
+                it.updateIzingaLoyalty(user)
+                return service.loyaltyobject().update(it.id, it).execute()
             }
-        }
+            .exceptionOrNull()
+            ?.takeIf { (it as GoogleJsonResponseException).statusCode == 404 }
+            ?.let { LoyaltyObject() }
+            ?.let {
+                it.updateIzingaLoyalty(user)
+                it.id
+                service.loyaltyobject().insert(it).execute()
+            }
+    }
 
-        // See link below for more information on required properties
-        // https://developers.google.com/wallet/retail/loyalty-cards/rest/v1/loyaltyobject
-        val newObject = LoyaltyObject().apply {
-            id = "$issuerId.$objectSuffix"
-            classId = "$issuerId.$classSuffix"
-            state = ("ACTIVE")
-            heroImage = Image()
-                .setSourceUri(ImageUri()
-                    .setUri("https://shop.izinga.co.za/assets/images/izinga-logo.png"))
-            textModulesData = (List.of(TextModuleData()
-                .setHeader("Text module header")
-                .setBody("Text module body")
-                .setId("TEXT_MODULE_ID")))
-            linksModuleData = (LinksModuleData()
-                .setUris(Arrays
-                    .asList(Uri()
-                        .setUri("https://onboard.izinga.co.za/user-lookup/${user.mobileNumber}")
-                        .setDescription("Click To Update Banking Details")
-                        .setId("LINK_MODULE_URI_ID"),
-                        Uri()
-                            .setUri("tel:+27812815707")
-                            .setDescription("Contact Support")
-                            .setId("LINK_MODULE_TEL_ID"))))
-            imageModulesData = listOf(ImageModuleData()
-                .setMainImage(Image()
-                .setSourceUri(ImageUri()
-                    .setUri("http://farm4.staticflickr.com/3738/12440799783_3dc3c20606_b.jpg"))
-                .setContentDescription(LocalizedString()
-                    .setDefaultValue(TranslatedString()
-                        .setLanguage("en-US")
-                        .setValue("Image module description"))))
-                .setId("IMAGE_MODULE_ID"))
-            barcode = Barcode().setType("QR_CODE").setValue("https://tips.izinga.co.za/tip?messengerId=" + user.id)
-            locations = listOf(LatLongPoint().apply {
-                        latitude = 37.424015499999996
-                        longitude = -122.09259560000001
-            })
-            accountId = user.mobileNumber
-            accountName = user.name
-            loyaltyPoints = LoyaltyPoints().apply {
-                    label = "Points"
-                    balance = LoyaltyPointsBalance().apply {
-                        money = Money().apply {
-                            currencyCode = "ZAR"
-                            micros = 100L
-                        }
-                    }
-                }
-        }
-        val response = service.loyaltyobject().insert(newObject).execute()
-        println("Object insert response")
-        println(response.toPrettyString())
-        return response.id
+    fun getObject(issuerId: String, classSuffix: String, objectSuffix: String, user: UserProfile): LoyaltyObject? {
+        return runCatching { service.loyaltyobject()["$issuerId.$objectSuffix"].execute() }.getOrNull()
+    }
+
+    fun updateObject(issuerId: String, classSuffix: String, objectSuffix: String, loyaltyObject: LoyaltyObject) {
+        return run { service.loyaltyobject().update("$issuerId.$objectSuffix", loyaltyObject).execute() }
+    }
+
+    fun deleteObject(issuerId: String, classSuffix: String, objectSuffix: String, loyaltyObject: LoyaltyObject) {
+        return run { service.loyaltyobject().update("$issuerId.$objectSuffix", loyaltyObject).execute() }
+    }
+
+    override fun updateBalance(user: UserProfile, balance: BigDecimal): Boolean {
+        val loyaltyObject = getObject(issuerId, classSuffix, user.loyaltyId(), user)
+        loyaltyObject?.loyaltyPoints?.balance?.money?.micros = (balance * 1000000.toBigDecimal()).toLong()
+        return loyaltyObject?.let { updateObject(issuerId, classSuffix, user.loyaltyId(), it); true } ?: false
     }
 
 }

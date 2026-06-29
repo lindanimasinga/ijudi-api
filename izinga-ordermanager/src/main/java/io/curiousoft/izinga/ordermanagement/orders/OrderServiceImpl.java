@@ -1,0 +1,722 @@
+package io.curiousoft.izinga.ordermanagement.orders;
+
+import io.curiousoft.izinga.commons.model.*;
+import io.curiousoft.izinga.commons.order.DeliveryPriceEstimateDto;
+import io.curiousoft.izinga.commons.order.MessengerOrderDto;
+import io.curiousoft.izinga.commons.order.OrderService;
+import io.curiousoft.izinga.commons.order.events.*;
+import io.curiousoft.izinga.commons.repo.DeviceRepository;
+import io.curiousoft.izinga.commons.order.OrderRepository;
+import io.curiousoft.izinga.commons.repo.StoreRepository;
+import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
+import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
+import io.curiousoft.izinga.ordermanagement.orders.quote.OrderQuote;
+import io.curiousoft.izinga.ordermanagement.orders.quote.OrderQuoteRepository;
+import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
+import io.curiousoft.izinga.messaging.AdminOnlyNotificationService;
+import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import jakarta.validation.ValidatorFactory;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static io.curiousoft.izinga.commons.model.OrderKt.generateId;
+import static io.curiousoft.izinga.commons.model.OrderType.INSTORE;
+import static io.curiousoft.izinga.commons.model.OrderType.ONLINE;
+import static io.curiousoft.izinga.ordermanagement.utils.IjudiUtils.calculateDeliveryDistanceFee;
+import static io.curiousoft.izinga.ordermanagement.utils.IjudiUtils.calculateDrivingDirectionKM;
+
+@Service
+public class OrderServiceImpl implements OrderService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(OrderServiceImpl.class);
+
+    private final LinkedList<OrderStage> onlineCollectionStages;
+    private final LinkedList<OrderStage> onlineDeliveryStages;
+    private final OrderRepository orderRepo;
+    private final StoreRepository storeRepository;
+    private final UserProfileRepo userProfileRepo;
+    private final Validator validator;
+    private final PaymentService paymentService;
+    private final DeviceRepository deviceRepo;
+    private final FirebaseNotificationService pushNotificationService;
+    private final double starndardDeliveryFee;
+    private final double serviceFeePerc;
+    private final double izingaCommissionPerc;
+    private final String googleMapsApiKey;
+    private final double starndardDeliveryKm;
+    private final double ratePerKm;
+    private final PromoCodeClient promoCodeClient;
+    private final ApplicationEventPublisher applicationEventPublisher;
+    private final RestrictedRegionService restrictedRegionService;
+    private final OrderQuoteRepository quoteRepository;
+
+    @Autowired
+    public OrderServiceImpl(@Value("${service.delivery.standardFee}") double starndardDeliveryFee,
+                            @Value("${service.delivery.standardKm}") double starndardDeliveryKm,
+                            @Value("${service.delivery.ratePerKm}") double ratePerKm,
+                            @Value("${service.fee.perc}") double serviceFeePerc,
+                            @Value("${service.commission.perc}") double izingaCommissionPerc,
+                            @Value("${order.cleanup.unpaid.minutes}") long cleanUpMinutes,
+                            @Value("${admin.cellNumber}") List<String> adminCellNumbers,
+                            @Value("${google.maps.api.key}") String googleMapsApiKey,
+                            OrderRepository orderRepository,
+                            StoreRepository storeRepository,
+                            UserProfileRepo userProfileRepo, PaymentService paymentService,
+                            DeviceRepository deviceRepo,
+                            FirebaseNotificationService pushNotificationService,
+                            AdminOnlyNotificationService smsNotifcationService,
+                            EmailNotificationService emailNotificationService,
+                            PromoCodeClient promoCodeClient,
+                            ApplicationEventPublisher applicationEventPublisher,
+                            RestrictedRegionService restrictedRegionService, OrderQuoteRepository quoteRepository) {
+        this.starndardDeliveryFee = starndardDeliveryFee;
+        this.starndardDeliveryKm = starndardDeliveryKm;
+        this.ratePerKm = ratePerKm;
+        this.serviceFeePerc = serviceFeePerc;
+        this.orderRepo = orderRepository;
+        this.storeRepository = storeRepository;
+        this.userProfileRepo = userProfileRepo;
+        this.paymentService = paymentService;
+        this.pushNotificationService = pushNotificationService;
+        this.deviceRepo = deviceRepo;
+        this.googleMapsApiKey = googleMapsApiKey;
+        this.promoCodeClient = promoCodeClient;
+        this.applicationEventPublisher = applicationEventPublisher;
+        this.restrictedRegionService = restrictedRegionService;
+        this.quoteRepository = quoteRepository;
+        this.izingaCommissionPerc = izingaCommissionPerc;
+        ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
+        validator = factory.getValidator();
+
+        onlineDeliveryStages = new LinkedList<>();
+        onlineDeliveryStages.add(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        onlineDeliveryStages.add(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        onlineDeliveryStages.add(OrderStage.STAGE_2_STORE_PROCESSING);
+        onlineDeliveryStages.add(OrderStage.STAGE_3_READY_FOR_COLLECTION);
+        onlineDeliveryStages.add(OrderStage.STAGE_4_ON_THE_ROAD);
+        onlineDeliveryStages.add(OrderStage.STAGE_5_ARRIVED);
+        onlineDeliveryStages.add(OrderStage.STAGE_6_WITH_CUSTOMER);
+        onlineDeliveryStages.add(OrderStage.STAGE_7_ALL_PAID);
+
+        onlineCollectionStages = new LinkedList<>();
+        onlineCollectionStages.add(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        onlineCollectionStages.add(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        onlineCollectionStages.add(OrderStage.STAGE_2_STORE_PROCESSING);
+        onlineCollectionStages.add(OrderStage.STAGE_3_READY_FOR_COLLECTION);
+        onlineCollectionStages.add(OrderStage.STAGE_6_WITH_CUSTOMER);
+        onlineCollectionStages.add(OrderStage.STAGE_7_ALL_PAID);
+    }
+
+    @Override
+    public Order startOrder(Order order) {
+
+        if (!userProfileRepo.existsById(order.getCustomerId())) {
+            throw new IllegalArgumentException("user with id " + order.getCustomerId() + " does not exist");
+        }
+
+        Optional<StoreProfile> storeOptional = storeRepository.findById(order.getShopId());
+        if (!storeOptional.isPresent()) {
+            throw new IllegalArgumentException("shop with id " + order.getShopId() + " does not exist");
+        }
+
+        if (!storeOptional.get().getScheduledDeliveryAllowed() && order.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY) {
+            throw new IllegalArgumentException("Collection or scheduled orders not allowed for " + storeOptional.get().getName());
+        }
+
+        if (storeOptional.get().isStoreOffline()) {
+            throw new IllegalArgumentException("Shop not available " + storeOptional.get().getName());
+        }
+
+        if(order.getOrderType() == ONLINE
+                && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
+                && !storeOptional.get().isDeliverNowAllowed()) {
+            throw new IllegalArgumentException("Only Scheduled delivery is allowed at this time");
+        }
+
+        List<String> stockItemNames = storeOptional.get()
+                .getStockList().stream().map(Stock::getName).toList();
+        List<String> basketItemNames = order
+                .getBasket().getItems().stream().map(BasketItem::getName).toList();
+
+        boolean isValidBasketItems = stockItemNames.containsAll(basketItemNames);
+        if (!INSTORE.equals(order.getOrderType()) && !isValidBasketItems) {
+            throw new IllegalArgumentException("Some basket item are not available in the shop.");
+        }
+
+        order.setHasVat(storeOptional.get().getHasVat());
+        String orderId = generateId();
+        order.setId(orderId);
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.addStatusHistory(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setMinimumDepositAllowedPerc(storeOptional.get().getMinimumDepositAllowedPerc());
+
+        //add a store discount
+        var basket = order.getBasket();
+        if (basket.getTotalDiscount() != 0) {
+            BasketItem discount = new BasketItem("Store Discount", 1, basket.getTotalDiscount(), 0);
+            basket.getItems().add(discount);
+        }
+
+        double deliveryFee = 0;
+        if (order.getOrderType() == OrderType.ONLINE) {
+            //if there are orders in progress going to the same location for the same customer and same messenger then add a discount
+            List<Order> allOrdersCurrentForCustomer = order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY ?
+                    findAllOrdersWithStateForCustomer(order.getCustomerId(), order.getShippingData().getMessengerId(),
+                            OrderStage.STAGE_3_READY_FOR_COLLECTION,
+                            OrderStage.STAGE_1_WAITING_STORE_CONFIRM,
+                            OrderStage.STAGE_2_STORE_PROCESSING) : List.of();
+
+            // if there are current orders for this user and its same messenger than don't charge a delivery fee.
+            var shipingGeoData = calculateDrivingDirectionKM(googleMapsApiKey, order, storeOptional.get());
+            if(allOrdersCurrentForCustomer.isEmpty()) {
+                double standardFee = resolveStandardDeliveryFee(order, storeOptional.get());
+
+                double standardDistance = storeOptional.map(StoreProfile::getRates)
+                                .map(Rates::getStandardDeliveryKm)
+                                .filter(it -> it > 0)
+                                .orElse(this.starndardDeliveryKm);
+
+                double ratePerKM = resolveRatePerKm(order, storeOptional.get());
+
+                deliveryFee = calculateDeliveryDistanceFee(standardFee, standardDistance, ratePerKM, shipingGeoData.getDistance());
+                //if the customer has already paid delivery in the previous orders going the same direction, then
+                deliveryFee = deliveryFee - allOrdersCurrentForCustomer.stream()
+                        .map(o -> o.getShippingData().getFee())
+                        .reduce(Double::sum)
+                        .orElse(0.0);
+            }
+
+            //if store has weight and volume fee, add to the total fee
+            if(storeOptional.get().getRates() != null) {
+                order.setWeightFee(storeOptional.get().getRates().getRatePerWeightKg() * order.getTotalWeight());
+                order.setVolumeFee(storeOptional.get().getRates().getRatePerVolumeCM2() * order.getTotalArea());
+            }
+
+            //if store has labour fee per floor, add to the total fee
+            if (storeOptional.get().getRates() != null && storeOptional.get().getRates().getLabourRatePerFloor() != null) {
+                var fromHasElevator = order.getShippingData().getFromBuildingHasElevator() != null ?
+                        order.getShippingData().getFromBuildingHasElevator() : false;
+                var toHasElevator = order.getShippingData().getBuildingHasElevator() != null ?
+                        order.getShippingData().getBuildingHasElevator() : false;
+
+                //if there is no elevator, calculate the labour fee based on the floor level, otherwise, no labour fee
+                var fromFloor = !fromHasElevator && order.getShippingData().getFromFloorLevel() != null ? order.getShippingData().getFromFloorLevel() : 0;
+                var toFloor = !toHasElevator && order.getShippingData().getFloorLevel() != null ? order.getShippingData().getFloorLevel() : 0;
+
+                var labourFee = storeOptional.get().getRates().getLabourRatePerFloor() * fromFloor * order.getTotalWeight()
+                        + storeOptional.get().getRates().getLabourRatePerFloor() * toFloor * order.getTotalWeight();
+                order.setLabourFee(labourFee);
+            }
+
+            order.getShippingData().setDeliveryFee(deliveryFee);
+            order.getShippingData().setDistance(shipingGeoData.getDistance());
+            order.getShippingData().setShippingDataGeoData(shipingGeoData);
+            // Calculate and set izinga commission
+            double commission = deliveryFee * izingaCommissionPerc;
+            order.getShippingData().setIzingaCommission(commission);
+            restrictedRegionService.validationRestrictedRegions(order);
+        }
+
+        boolean isEligibleForFreeDelivery = storeOptional.get().isEligibleForFreeDelivery(order);
+        order.setFreeDelivery(isEligibleForFreeDelivery);
+
+        if (canChargeServiceFees(storeOptional.get())) {
+            order.setServiceFee(serviceFeePerc * (order.getBasketAmount() + (order.getFreeDelivery() ? 0 : order.getShippingData().getFee())));
+        }
+
+        var isQuoteRequired = storeOptional.get().isQuoteRequired();
+        if (isQuoteRequired) {
+            order.getTag().put("quoteRequired", String.valueOf(isQuoteRequired));
+            OrderQuoteCreatedEvent quoteRequestedEvent = new OrderQuoteCreatedEvent(this, order, storeOptional.get());
+            applicationEventPublisher.publishEvent(quoteRequestedEvent);
+        }
+
+        List<PaymentType> paymentTypes = paymentService.getAllowedPaymentTypes(order.getCustomerId(), storeOptional.get().getStoreType());
+        order.setPaymentTypesAllowed(paymentTypes);
+        return orderRepo.save(order);
+    }
+
+    private List<Order> findAllOrdersWithStateForCustomer(String customerId, String messengerId, OrderStage... stages) {
+        return orderRepo.findByCustomerIdAndShippingDataMessengerIdAndStageIn(customerId, messengerId,  stages);
+    }
+
+    private double resolveStandardDeliveryFee(Order order, StoreProfile storeProfile) {
+        Rates rates = storeProfile.getRates();
+        if (rates == null) {
+            return this.starndardDeliveryFee;
+        }
+
+        String requestedVehicleType = resolveRequestedVehicleType(order);
+        Double vehicleStandardFee = switch (requestedVehicleType.toUpperCase()) {
+            case "BIKE DELIVERY DRIVER" -> rates.getStandardDeliveryPriceBike();
+            case "SMALL/MEDIUM VEHICLE DRIVER" -> rates.getStandardDeliveryPriceCar();
+            case "BAKKIE DELIVERY DRIVER" -> rates.getStandardDeliveryPriceBakkie();
+            case "TRUCK DELIVERY DRIVER" -> rates.getStandardDeliveryPriceTruck();
+            default -> null;
+        };
+
+        if (vehicleStandardFee != null && vehicleStandardFee > 0) {
+            return vehicleStandardFee;
+        }
+
+        Double defaultStoreFee = rates.getStandardDeliveryPrice();
+        if (defaultStoreFee != null && defaultStoreFee > 0) {
+            return defaultStoreFee;
+        }
+
+        return this.starndardDeliveryFee;
+    }
+
+    private double resolveRatePerKm(Order order, StoreProfile storeProfile) {
+        Rates rates = storeProfile.getRates();
+        if (rates == null) {
+            return this.ratePerKm;
+        }
+
+        String requestedVehicleType = resolveRequestedVehicleType(order);
+        Double vehicleRatePerKm = switch (requestedVehicleType.toUpperCase()) {
+            case "BIKE DELIVERY DRIVER" -> rates.getRatePerKmBike();
+            case "SMALL/MEDIUM VEHICLE DRIVER" -> rates.getRatePerKmCar();
+            case "BAKKIE DELIVERY DRIVER" -> rates.getRatePerKmBakkie();
+            case "TRUCK DELIVERY DRIVER" -> rates.getRatePerKmTruck();
+            default -> null;
+        };
+
+        if (vehicleRatePerKm != null && vehicleRatePerKm > 0) {
+            return vehicleRatePerKm;
+        }
+
+        Double defaultStoreRate = rates.getRatePerKm();
+        if (defaultStoreRate != null && defaultStoreRate > 0) {
+            return defaultStoreRate;
+        }
+
+        return this.ratePerKm;
+    }
+
+    private String resolveRequestedVehicleType(Order order) {
+        if (order == null) {
+            return "";
+        }
+
+        var tag = order.getTag();
+        if (tag != null) {
+            String vehicleType = tag.get("vehicleType");
+            if (StringUtils.hasText(vehicleType)) {
+                return vehicleType.trim().toUpperCase(Locale.ROOT);
+            }
+        }
+
+        var shippingData = order.getShippingData();
+        if (shippingData != null && shippingData.getCategory() != null) {
+            Optional<String> matchedVehicleType = shippingData.getCategory().stream()
+                    .map(String::trim)
+                    .filter(it -> it.equalsIgnoreCase("Bakkie Delivery Driver") ||
+                            it.equalsIgnoreCase("Truck Delivery Driver") ||
+                            it.equalsIgnoreCase("Small/Medium Vehicle Driver") ||
+                            it.equalsIgnoreCase("Bike Delivery Driver"))
+                    .findFirst();
+            if (matchedVehicleType.isPresent()) {
+                return matchedVehicleType.get();
+            }
+        }
+
+        return "";
+    }
+
+    private boolean canChargeServiceFees(StoreProfile storeProfile) {
+        return true;
+    }
+
+    @Override
+    public Order finishOder(Order order) {
+        Order persistedOrder = orderRepo.findById(order.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Order with id %s not found.".formatted(order.getId())));
+
+        if(order.getStage() != OrderStage.STAGE_0_CUSTOMER_NOT_PAID) {
+            return persistedOrder;
+        }
+
+        persistedOrder.setDescription(order.getDescription());
+        persistedOrder.setPaymentType(order.getPaymentType());
+
+        if (!paymentService.paymentReceived(persistedOrder)) {
+            throw new IllegalArgumentException("Payment not cleared yet. please verify again.");
+        }
+
+        if (persistedOrder.getOrderType() != INSTORE) {
+            persistedOrder.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+            persistedOrder.addStatusHistory(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        } else if (persistedOrder.getShopPaid()) {
+            return order;
+        } else {
+            persistedOrder.setStage(OrderStage.STAGE_7_ALL_PAID);
+            persistedOrder.addStatusHistory(OrderStage.STAGE_7_ALL_PAID);
+        }
+
+        var promoCode = order.getTag().get("promoCode");
+        if(promoCode != null) {
+            PromoCodeClient.UserPromoDetails promoDetails = new PromoCodeClient.UserPromoDetails(order.getCustomerId(),
+                    promoCode,
+                    true,
+                    0.00,
+                    null,
+                    order.getId());
+            promoCodeClient.redeemed(promoDetails);
+        }
+
+        //decrease stock available
+        Optional<StoreProfile> optional = storeRepository.findById(persistedOrder.getShopId());
+        StoreProfile store = optional.get();
+        Collection<Stock> stock = store.getStockList() == null ? new ArrayList<>() : new ArrayList<>(store.getStockList());
+        persistedOrder.getBasket()
+                .getItems()
+                .forEach(item -> stock.stream()
+                        .filter(sto -> sto.getName().equals(item.getName()))
+                        .findFirst()
+                        .ifPresent(stockItem -> {
+                            stockItem.setQuantity(stockItem.getQuantity() - item.getQuantity());
+                            if(store.getStoreWebsiteUrl() != null) {
+                                String fullUrl = (store.getStoreWebsiteUrl() + "/" + stockItem.getExternalUrlPath())
+                                        .replaceAll("(/){2,}", "/")
+                                        .replaceAll(":/", "://");
+                                item.setExternalUrl(fullUrl);
+                            }
+                        }));
+        store.setServicesCompleted(store.getServicesCompleted() + 1);
+        storeRepository.save(store);
+        LOG.info("New order placed. Order No. {}, Basket Amount. R{}", order.getId(), order.getBasketAmount());
+        LOG.info("New order placed. Order No. {}, Delivery Fee. R{}", order.getId(), order.getShippingData().getFee());
+        var orderCompleted = orderRepo.save(persistedOrder);
+
+        //send order event
+        OrderEvent newOrderEvent = orderCompleted.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY ?
+                new ScheduledOrderEvent(this, orderCompleted, persistedOrder.getShippingData().getMessengerId(), store)
+        : new NewOrderEvent(this, orderCompleted, persistedOrder.getShippingData().getMessengerId(), store);
+        applicationEventPublisher.publishEvent(newOrderEvent);
+        return orderCompleted;
+    }
+
+    @Tool(name = "find_order_by_id", description = "Find order by id and return the order details")
+    @Override
+    public Order findOrder(String orderId) {
+        return orderRepo.findById(orderId).orElse(null);
+    }
+
+    @Override
+    public DeliveryPriceEstimateDto getDeliveryPriceEstimate(String category, String fromAddress, String toAddress, String shopId) {
+        if (!StringUtils.hasText(category)) {
+            throw new IllegalArgumentException("category is required");
+        }
+
+        if (!StringUtils.hasText(fromAddress)) {
+            throw new IllegalArgumentException("fromAddress is required");
+        }
+
+        if (!StringUtils.hasText(toAddress)) {
+            throw new IllegalArgumentException("toAddress is required");
+        }
+
+        StoreProfile pricingContextStore = createPricingContextStore(shopId);
+
+        ShippingData shippingData = new ShippingData(fromAddress.trim(), toAddress.trim(), ShippingData.ShippingType.DELIVERY);
+        shippingData.setCategory(List.of(category.trim()));
+
+        Order pricingOrder = new Order();
+        pricingOrder.setShippingData(shippingData);
+
+        ShipingGeoData shipingGeoData = calculateDrivingDirectionKM(googleMapsApiKey, pricingOrder, pricingContextStore);
+
+        double standardFee = resolveStandardDeliveryFee(pricingOrder, pricingContextStore);
+        double standardDistance = Optional.ofNullable(pricingContextStore.getRates())
+                .map(Rates::getStandardDeliveryKm)
+                .filter(it -> it > 0)
+                .orElse(this.starndardDeliveryKm);
+        double ratePerKM = resolveRatePerKm(pricingOrder, pricingContextStore);
+        double estimatedDeliveryFee = calculateDeliveryDistanceFee(standardFee, standardDistance, ratePerKM, shipingGeoData.getDistance());
+
+        return new DeliveryPriceEstimateDto(
+            category.trim(),
+            fromAddress.trim(),
+            toAddress.trim(),
+            shipingGeoData.getDistance(),
+            standardFee,
+            standardDistance,
+            ratePerKM,
+            estimatedDeliveryFee
+        );
+    }
+
+    private StoreProfile createPricingContextStore(String shopId) {
+        Rates rates = null;
+        if (StringUtils.hasText(shopId)) {
+            StoreProfile selectedStore = storeRepository.findById(shopId)
+                    .orElseThrow(() -> new IllegalArgumentException("shop with id " + shopId + " does not exist"));
+            rates = selectedStore.getRates();
+        }
+
+        StoreProfile pricingContextStore = new StoreProfile(
+                StoreType.MOVERS,
+                "delivery-pricing",
+                "delivery-pricing",
+                "delivery-pricing",
+                "delivery-pricing",
+                "0000000000",
+                new ArrayList<>(List.of("delivery-pricing")),
+                new ArrayList<>(),
+                "delivery-pricing-owner",
+                new Bank()
+        );
+        pricingContextStore.setDeliversFromMultipleAddresses(true);
+        pricingContextStore.setRates(rates);
+        return pricingContextStore;
+    }
+
+    public Order progressNextStage(String orderId) {
+        return progressNextStage(orderId, null, null);
+    }
+
+    @Override
+    public Order progressNextStage(String orderId, Double latitude, Double longitude) {
+        Order order = orderRepo.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order with id " + orderId + " not found."));
+        int index = onlineDeliveryStages.indexOf(order.getStage());
+
+        if(order.getStage() == OrderStage.CANCELLED) throw new IllegalArgumentException("Order with id " + orderId + " has been cancelled");
+
+        OrderStage stage = onlineDeliveryStages.get(index + 1);
+        order.setStage(stage);
+        order.addStatusHistory(stage, latitude, longitude);
+        var store = storeRepository.findById(order.getShopId()).get();
+        OrderUpdatedEvent orderUpdatedEvent = new OrderUpdatedEvent(this, order, order.getShippingData().getMessengerId(), store);
+        applicationEventPublisher.publishEvent(orderUpdatedEvent);
+        return orderRepo.save(order);
+    }
+
+    @Override
+    public Order applyPromoCode(String promoCode, Order order) {
+        var promoData = promoCodeClient.findForUser(order.getId(), order.getCustomerId(), promoCode);
+        if (!promoData.verified()) {
+            throw new IllegalArgumentException("Promo code not verified.");
+        }
+        return orderRepo.findById(order.getId())
+                .map(ord -> {
+                    BasketItem discount = new BasketItem(promoData.promo(),
+                            1,
+                            promoData.amount(),
+                            0);
+                    ord.getBasket().getItems().add(discount);
+                    ord.getTag().put("promoCode", promoCode);
+                    return orderRepo.save(ord);
+                }).orElseThrow();
+    }
+
+    @Tool(name = "find_orders_by_user_id", description = "Find orders by user id and return the order details")
+    @Override
+    public List<Order> findOrderByUserId(String userId) {
+        return orderRepo.findByCustomerId(userId).orElse(new ArrayList<>());
+    }
+
+    @Tool(name = "find_order_for_messenger", description = "Find order by id and return the order details as MessengerOrderDto")
+    @Override
+    public Order findOrderForMessenger(String orderId) {
+        return orderRepo.findById(orderId)
+                .map(ir -> new MessengerOrderDto(ir, izingaCommissionPerc))
+                .orElseThrow(() -> new IllegalArgumentException("Order with id " + orderId + " not found."));
+    }
+
+    @Tool(name = "find_orders_by_phone_number", description = "Find orders by phone number and return the order details")
+    @Override
+    public List<Order> findOrderByPhone(String phone) {
+        String last9Digits = phone.substring(phone.length() - 9);
+        for(String code : List.of("0", "+27", "27")) {
+            Optional<UserProfile> user = Optional.ofNullable(userProfileRepo.findByMobileNumber("%s%s".formatted(code, last9Digits)));
+            if (user.isPresent()) {
+                return orderRepo.findByCustomerId(user.get().getId()).orElse(new ArrayList<>());
+            }
+        }
+        throw new IllegalArgumentException("User not found");
+    }
+
+    @Override
+    public List<Order> findOrderByStoreId(String shopId) {
+        StoreProfile store = storeRepository.findById(shopId)
+                .orElseThrow(() -> new IllegalArgumentException("Store not found"));
+        return orderRepo.findByShopIdAndStageNot(store.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+    }
+
+    @Tool(name = "find_orders_by_messenger_id", description = "Find orders by messenger id and return the order details as MessengerOrderDto")
+    @Override
+    public Set<Order> findOrderByMessengerId(String id, @ToolParam(required = false) boolean allStages) {
+        var ordersAssigned = allStages ? orderRepo.findByShippingDataMessengerId(id) : orderRepo.findByShippingDataMessengerIdAndStageNot(id, OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+
+        var ordersQuoteRequested = quoteRepository.findBySentToMessengerIds(id)
+                .stream()
+                .filter(it -> it.getAccpetedByMessengerId() == null)
+                .map(OrderQuote::getOrderId)
+                .toList();
+
+        List<Order> resultOrders;
+        if(ordersQuoteRequested.isEmpty()) {
+            resultOrders = ordersAssigned != null ? ordersAssigned : new ArrayList<>();
+        } else {
+            var ordersFromQuotes = orderRepo.findAllById(ordersQuoteRequested);
+            if (ordersAssigned != null) {
+                ordersAssigned.addAll(ordersFromQuotes);
+                resultOrders = ordersAssigned;
+            } else {
+                resultOrders = ordersFromQuotes;
+            }
+        }
+        return resultOrders.stream()
+                .map(it -> (Order) new MessengerOrderDto(it, izingaCommissionPerc))
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public List<Order> findOrdersByMessengerAdminId(String adminId, boolean allStages) {
+        UserProfile admin = userProfileRepo.findById(adminId)
+                .orElseThrow(() -> new IllegalArgumentException("Messenger admin with id " + adminId + " not found"));
+
+        if (admin.getRole() != ProfileRoles.MESSENGER_ADMIN) {
+            throw new IllegalArgumentException("Profile " + adminId + " is not a messenger admin");
+        }
+
+        List<String> messengerIds = userProfileRepo.findByRoleAndMessengerAdminId(ProfileRoles.MESSENGER, adminId)
+                .stream()
+                .map(UserProfile::getId)
+                .filter(Objects::nonNull)
+                .toList();
+
+        if (messengerIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        var ordersAssigned = allStages
+                ? orderRepo.findByShippingDataMessengerIdIn(messengerIds)
+                : orderRepo.findByShippingDataMessengerIdInAndStageNot(messengerIds, OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+
+        var quoteOrderIds = messengerIds.stream()
+                .flatMap(messengerId -> quoteRepository.findBySentToMessengerIds(messengerId).stream())
+                .filter(it -> it.getAccpetedByMessengerId() == null)
+                .map(OrderQuote::getOrderId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        if (quoteOrderIds.isEmpty()) {
+            return ordersAssigned != null ? ordersAssigned : new ArrayList<>();
+        }
+
+        var ordersFromQuotes = orderRepo.findAllById(quoteOrderIds);
+        if (ordersAssigned != null) {
+            ordersAssigned.addAll(ordersFromQuotes);
+            return ordersAssigned;
+        }
+        return ordersFromQuotes;
+    }
+
+    @Override
+    public List<Order> findAll() {
+        return orderRepo.findAll();
+    }
+
+    @Override
+    public List<Order> findOrdersInProgress() {
+        return orderRepo.findByStageNotIn(List.of(OrderStage.STAGE_7_ALL_PAID, OrderStage.CANCELLED));
+    }
+
+    @Override
+    public Order cancelOrder(String id) {
+        Order order = orderRepo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Order with id " + id + " not found."));
+
+        if(order.getStage() == OrderStage.STAGE_6_WITH_CUSTOMER || order.getStage() == OrderStage.STAGE_7_ALL_PAID) {
+            throw  new IllegalArgumentException("Cannot cancel this order. Please cancel manually.");
+        }
+        boolean successful = paymentService.reversePayment(order);
+        if(!successful) throw  new IllegalArgumentException("Unable to reserve payment. Please reverse manually.");
+
+        order.setStage(OrderStage.CANCELLED);
+        order.addStatusHistory(OrderStage.CANCELLED);
+        order = orderRepo.save(order);
+        List<Device> customerDevices = deviceRepo.findByUserId(order.getCustomerId());
+        PushHeading pushMessage = new PushHeading(
+                "Your order has been cancelled. Payment has been reversed to your account.",
+                "Your order has been cancelled.", null,
+                String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
+        PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, pushMessage, order);
+        customerDevices.forEach(device -> {
+            try {
+                pushNotificationService.sendNotification(device, message);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+        return order;
+    }
+
+    @Override
+    public @Nullable Order acceptQuote(@NotNull String orderId, @NotNull QouteApproval quoteApproval) {
+        // load order
+        Order order = orderRepo.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order with id " + orderId + " not found."));
+
+        if (order.getStage() == OrderStage.CANCELLED) {
+            throw new IllegalArgumentException("Order with id " + orderId + " has been cancelled");
+        }
+
+        // basic sanity: ensure the approval references the same order
+        if (quoteApproval.getOrderId() != null && !quoteApproval.getOrderId().equals(orderId)) {
+            throw new IllegalArgumentException("Quote approval orderId does not match path orderId");
+        }
+
+        boolean isAlreadyAccepted = StringUtils.hasText(order.getTag().get("quoteAcceptedBy"));
+        if(isAlreadyAccepted) {
+            throw new IllegalArgumentException("Quote for order " + orderId + " has already been processed");
+        }
+
+        // if approved, assign messenger and (if appropriate) advance stage
+        if (quoteApproval.getApproved()) {
+            order.getShippingData().setMessengerId(quoteApproval.getMessengerId());
+            order.getTag().put("quoteAcceptedBy", quoteApproval.getMessengerId());
+            quoteRepository.findById(orderId).ifPresent(it -> {
+                it.setAccpetedByMessengerId(quoteApproval.getMessengerId());
+                quoteRepository.save(it);
+            });
+        } else {
+            // record rejection reason and messenger that rejected
+            order.getTag().put("quoteRejectedBy", quoteApproval.getMessengerId());
+            if (quoteApproval.getReason() != null) {
+                order.getTag().put("quoteRejectionReason", quoteApproval.getReason());
+            }
+        }
+
+        Order saved = orderRepo.save(order);
+        // publish update event so other services can react (e.g., push notifications)
+        var store = storeRepository.findById(order.getShopId()).orElse(null);
+        if (store != null) {
+            QuoteAcceptedEvent event = new QuoteAcceptedEvent(this, saved, quoteApproval.getMessengerId(), store);
+            applicationEventPublisher.publishEvent(event);
+        } else {
+            LOG.warn("Store not found when publishing quote acceptance event for order {}", orderId);
+        }
+
+        return saved;
+    }
+}

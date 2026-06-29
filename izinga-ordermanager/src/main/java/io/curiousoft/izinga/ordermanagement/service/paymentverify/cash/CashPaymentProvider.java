@@ -17,7 +17,7 @@ public class CashPaymentProvider extends PaymentProvider {
     }
 
     @Override
-    public boolean paymentReceived(Order order) throws Exception {
+    public boolean paymentReceived(Order order) {
         return true;
     }
 

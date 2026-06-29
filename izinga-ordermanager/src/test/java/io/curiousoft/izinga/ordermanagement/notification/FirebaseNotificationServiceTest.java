@@ -21,7 +21,7 @@ import static org.mockito.Mockito.*;
 @RunWith(MockitoJUnitRunner.class)
 public class FirebaseNotificationServiceTest {
 
-    private FirebaseNotificationService firebaseNotificationService;
+    private io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService firebaseNotificationService;
     @Mock
     private FirebaseConnectionWrapper wrapper;
     @Mock
@@ -29,7 +29,7 @@ public class FirebaseNotificationServiceTest {
 
     @Before
     public void setUp() throws Exception {
-        firebaseNotificationService = new FirebaseNotificationService(wrapper, deviceRepo);
+        firebaseNotificationService = new io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService(wrapper, deviceRepo);
     }
 
     @Test
@@ -37,14 +37,11 @@ public class FirebaseNotificationServiceTest {
         //given
         Device device = new Device("testToken");
         String content = "hello world";
-        PushHeading heading = new PushHeading("hello", "greetings", null);
+        PushHeading heading = new PushHeading("hello", "greetings", null, null);
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER, heading, content);
 
-        Map data = new HashMap<>();
-        data.put("messageType", message.getPushMessageType());
-        data.put("messageContent", message.getPushContent());
         FCMNotification notification = new FCMNotification(heading.getBody(), heading.getTitle(), null);
-        FCMMessage fcmMessage = new FCMMessage(device.getToken(), notification, data);
+        FCMMessage fcmMessage = new FCMMessage(device.getToken(), notification, null);
 
         //when
         firebaseNotificationService.sendNotification(device, message);
@@ -177,14 +174,11 @@ public class FirebaseNotificationServiceTest {
         String content = "hello world";
         String topicName = "topic";
 
-        PushHeading heading = new PushHeading("hello", "greetings", null);
+        PushHeading heading = new PushHeading("hello", "greetings", null, null);
         PushMessage message = new PushMessage(PushMessageType.MARKETING, heading, content);
 
-        Map data = new HashMap<>();
-        data.put("messageType", message.getPushMessageType());
-        data.put("messageContent", message.getPushContent());
         FCMNotification notification = new FCMNotification(heading.getBody(), heading.getTitle(), null);
-        FCMMessage fcmMessage = new FCMMessage("/topics/"+topicName, notification, data);
+        FCMMessage fcmMessage = new FCMMessage("/topics/"+topicName, notification, null);
 
         //when
         firebaseNotificationService.publishTopic(topicName, message);

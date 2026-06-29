@@ -2,13 +2,17 @@ package io.curiousoft.izinga.ordermanagement.service.order;
 
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
-import io.curiousoft.izinga.commons.repo.OrderRepository;
+import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
-import io.curiousoft.izinga.ordermanagement.notification.PushNotificationService;
-import io.curiousoft.izinga.ordermanagement.service.AdminOnlyNotificationService;
+import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
+import io.curiousoft.izinga.ordermanagement.orders.RestrictedRegionService;
+import io.curiousoft.izinga.messaging.AdminOnlyNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
+import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
+import io.curiousoft.izinga.ordermanagement.orders.quote.OrderQuoteRepository;
 import org.assertj.core.util.Lists;
 import org.junit.Assert;
 import org.junit.Before;
@@ -39,7 +43,7 @@ public class OrderServiceTest {
     @Mock
     private PaymentService paymentService;
     @Mock
-    private PushNotificationService pushNotificationService;
+    private FirebaseNotificationService pushNotificationService;
     @Mock
     private AdminOnlyNotificationService smsNotifcation;
     @Mock
@@ -48,6 +52,12 @@ public class OrderServiceTest {
     private DeviceRepository deviceRepo;
     @Mock
     private ApplicationEventPublisher applicationEventPublisher;
+    @Mock
+    private PromoCodeClient promoCodeClient;
+    @Mock
+    private RestrictedRegionService restrictedRegionService;
+    @Mock
+    private OrderQuoteRepository orderQuoteRepository;
 
     List<String> phoneNumbers = Lists.list("08128155660", "0812815707");
 
@@ -66,6 +76,7 @@ public class OrderServiceTest {
                 standardDeliveryKm,
                 ratePerKm,
                 serviceFee,
+                0.10,
                 cleanInMinutes,
                 phoneNumbers,
                 "AIzaSyAZbvE4NBcJIplfzmy8cSEdSpbocBggylc",
@@ -75,8 +86,13 @@ public class OrderServiceTest {
                 paymentService,
                 deviceRepo,
                 pushNotificationService,
-                smsNotifcation, emailNotificationService,
-                applicationEventPublisher);
+                smsNotifcation,
+                emailNotificationService,
+                promoCodeClient,
+                applicationEventPublisher,
+                restrictedRegionService,
+                orderQuoteRepository
+                );
     }
 
     public static StoreProfile createStoreProfile(StoreType food) {
@@ -383,9 +399,9 @@ public class OrderServiceTest {
         //given
         StoreProfile storeProfile = createStoreProfile(StoreType.CLOTHING);
 
-        storeProfile.setStandardDeliveryPrice(20.00);
-        storeProfile.setStandardDeliveryKm(3);
-        storeProfile.setRatePerKm(5);
+        storeProfile.getRates().setStandardDeliveryPrice(20.00);
+        storeProfile.getRates().setStandardDeliveryKm(3.00);
+        storeProfile.getRates().setRatePerKm(5.00);
 
         HashSet<Stock> stockItems = new HashSet<>();
         stockItems.add(new Stock("skirt", 2, 10, 0, Collections.emptyList()));
@@ -426,6 +442,149 @@ public class OrderServiceTest {
         Assert.assertEquals(0, order.getServiceFee(), 0);
         Assert.assertEquals(40.00, order.getBasketAmount(), 0);
         Assert.assertEquals(false, order.getHasVat());
+        verify(repo).save(order);
+        verify(customerRepo).existsById(order.getCustomerId());
+        verify(storeRepo).findById(order.getShopId());
+    }
+
+    @Test
+    public void startOrder_store_own_delivery_uses_vehicle_specific_rate_from_order_tag() throws Exception {
+        StoreProfile storeProfile = createStoreProfile(StoreType.CLOTHING);
+        storeProfile.getRates().setStandardDeliveryPrice(20.00);
+        storeProfile.getRates().setStandardDeliveryPriceCar(40.00);
+        storeProfile.getRates().setStandardDeliveryKm(3.00);
+        storeProfile.getRates().setRatePerKm(5.00);
+
+        HashSet<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("skirt", 2, 10, 0, Collections.emptyList()));
+        stockItems.add(new Stock("shirt", 1, 20, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("skirt", 2, 10, 0));
+        items.add(new BasketItem("shirt", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+        ShippingData shipping = new ShippingData("shopAddress",
+                "50 Ududu Rd, Emlandweni, KwaMashu, 4051",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messagerID");
+        shipping.setBuildingType(BuildingType.HOUSE);
+        order.setShippingData(shipping);
+        order.getTag().put("vehicleType", "CAR");
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+        when(repo.save(order)).thenReturn(order);
+
+        Order newOrder = sut.startOrder(order);
+
+        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        Assert.assertNotNull(order.getId());
+        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
+        Assert.assertEquals(55, order.getShippingData().getFee(), 0);
+        verify(repo).save(order);
+        verify(customerRepo).existsById(order.getCustomerId());
+        verify(storeRepo).findById(order.getShopId());
+    }
+
+    @Test
+    public void startOrder_store_own_delivery_uses_vehicle_specific_rate_from_shipping_category() throws Exception {
+        StoreProfile storeProfile = createStoreProfile(StoreType.CLOTHING);
+        storeProfile.getRates().setStandardDeliveryPrice(20.00);
+        storeProfile.getRates().setStandardDeliveryPriceTruck(70.00);
+        storeProfile.getRates().setStandardDeliveryKm(3.00);
+        storeProfile.getRates().setRatePerKm(5.00);
+
+        HashSet<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("table", 1, 10, 0, Collections.emptyList()));
+        stockItems.add(new Stock("chair", 1, 20, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("table", 1, 10, 0));
+        items.add(new BasketItem("chair", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+        ShippingData shipping = new ShippingData("shopAddress",
+                "50 Ududu Rd, Emlandweni, KwaMashu, 4051",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messagerID");
+        shipping.setBuildingType(BuildingType.HOUSE);
+        shipping.setCategory(List.of("truck", "fragile"));
+        order.setShippingData(shipping);
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+        when(repo.save(order)).thenReturn(order);
+
+        Order newOrder = sut.startOrder(order);
+
+        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        Assert.assertNotNull(order.getId());
+        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
+        Assert.assertEquals(85, order.getShippingData().getFee(), 0);
+        verify(repo).save(order);
+        verify(customerRepo).existsById(order.getCustomerId());
+        verify(storeRepo).findById(order.getShopId());
+    }
+
+    @Test
+    public void startOrder_store_own_delivery_falls_back_to_default_standard_fee_when_vehicle_rate_missing() throws Exception {
+        StoreProfile storeProfile = createStoreProfile(StoreType.CLOTHING);
+        storeProfile.getRates().setStandardDeliveryPrice(20.00);
+        storeProfile.getRates().setStandardDeliveryKm(3.00);
+        storeProfile.getRates().setRatePerKm(5.00);
+
+        HashSet<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("box", 1, 10, 0, Collections.emptyList()));
+        stockItems.add(new Stock("lamp", 1, 20, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("box", 1, 10, 0));
+        items.add(new BasketItem("lamp", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+        ShippingData shipping = new ShippingData("shopAddress",
+                "50 Ududu Rd, Emlandweni, KwaMashu, 4051",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messagerID");
+        shipping.setBuildingType(BuildingType.HOUSE);
+        order.setShippingData(shipping);
+        order.getTag().put("vehicleType", "BIKE");
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+        when(repo.save(order)).thenReturn(order);
+
+        Order newOrder = sut.startOrder(order);
+
+        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        Assert.assertNotNull(order.getId());
+        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
+        Assert.assertEquals(35, order.getShippingData().getFee(), 0);
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
@@ -1250,7 +1409,7 @@ public class OrderServiceTest {
         verify(storeRepo).save(shop);
         verify(pushNotificationService, times(0)).notifyStoreOrderPlaced("ShopName", storeDevices, order);
         verify(pushNotificationService, times(0)).notifyStoreOrderPlaced("ShopName", storeDevices, order);
-        verify(smsNotifcation).notifyOrderPlaced(shop, order, customer);
+        verify(smsNotifcation).notifyOrderPlaced(order, customer);
         verify(pushNotificationService).notifyMessengerOrderPlaced(messengerDevices, order, shop);
         verify(deviceRepo).findByUserId(shop.getOwnerId());
     }
@@ -1569,16 +1728,24 @@ public class OrderServiceTest {
         order.setShopId(shopId);
         order.setDescription("desc");
         Device device = new Device("token");
-        PushHeading title = new PushHeading("The store has started processing your order " + order.getId(),
-                "Order Status Updated", null);
+        PushHeading title = new PushHeading(
+                "The store has started processing your order " + order.getId(),
+                "Order Status Updated", null,
+                String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
         when(repo.save(order)).thenReturn(order);
         when(deviceRepo.findByUserId(order.getCustomerId())).thenReturn(Collections.singletonList(device));
-        Order finalOrder = sut.progressNextStage(order.getId());
+        Order finalOrder = sut.progressNextStage(order.getId(), 12.3123, 32.345);
         //verify
         Assert.assertEquals(OrderStage.STAGE_2_STORE_PROCESSING, finalOrder.getStage());
+        Assert.assertNotNull(finalOrder.getStatusHistory());
+        Assert.assertEquals(1, finalOrder.getStatusHistory().size());
+        Assert.assertEquals(OrderStage.STAGE_2_STORE_PROCESSING, finalOrder.getStatusHistory().get(0).getStage());
+        Assert.assertNotNull(finalOrder.getStatusHistory().get(0).getLocation());
+        Assert.assertEquals(12.3123, finalOrder.getStatusHistory().get(0).getLocation().getLati(), 0.0001);
+        Assert.assertEquals(32.345, finalOrder.getStatusHistory().get(0).getLocation().getLongi(), 0.0001);
         verify(deviceRepo).findByUserId(order.getCustomerId());
         verify(pushNotificationService).sendNotification(device, message);
         verify(repo).findById(order.getId());
@@ -1609,8 +1776,10 @@ public class OrderServiceTest {
         order.setShopId(shopId);
         order.setDescription("desc");
         Device device = new Device("token");
-        PushHeading title = new PushHeading("Food is ready for Collection at " + shop.getName(),
-                "Order Status Updated", null);
+        PushHeading title = new PushHeading(
+                "Food is ready for Collection at %s".formatted(shop.getName()),
+                "Order Status Updated", null,
+                String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
@@ -1654,7 +1823,8 @@ public class OrderServiceTest {
         order.setDescription("desc");
         Device device = new Device("token");
         PushHeading title = new PushHeading("The driver is on the way",
-                "Order Status Updated", null);
+                "Order Status Updated", null,
+                String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
@@ -1696,7 +1866,8 @@ public class OrderServiceTest {
         order.setDescription("desc");
         Device device = new Device("token");
         PushHeading title = new PushHeading("The driver has arrived",
-                "Order Status Updated", null);
+                "Order Status Updated", null,
+                String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
@@ -1820,7 +1991,8 @@ public class OrderServiceTest {
         order.setDescription("desc");
         Device device = new Device("token");
         PushHeading title = new PushHeading("Food is ready for Collection at " + storeProfile.getName(),
-                "Order Status Updated", null);
+                "Order Status Updated", null,
+                String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
@@ -1864,7 +2036,8 @@ public class OrderServiceTest {
         order.setDescription("desc");
         Device device = new Device("token");
         PushHeading title = new PushHeading("Food is ready for Collection at " + storeProfile.getName(),
-                "Order Status Updated", null);
+                "Order Status Updated", null,
+                String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
 
         //when
@@ -1901,7 +2074,8 @@ public class OrderServiceTest {
         order.setDescription("desc");
         Device device = new Device("token");
         PushHeading title = new PushHeading("The store has started processing your order " + order.getId(),
-                "Order Status Updated", null);
+                "Order Status Updated", null,
+                String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
@@ -2006,13 +2180,78 @@ public class OrderServiceTest {
         orders.add(order2);
         //when
         when(repo.findByShippingDataMessengerIdAndStageNot(patchProfileRequest.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID)).thenReturn(orders);
-        List<Order> finalOrder = sut.findOrderByMessengerId(patchProfileRequest.getId());
+        List<Order> finalOrder = sut.findOrderByMessengerId(patchProfileRequest.getId(), false).stream().toList();
         //verify
         Assert.assertNotNull(finalOrder);
         Assert.assertEquals(2, finalOrder.size());
         Assert.assertEquals(patchProfileRequest.getId(),  finalOrder.get(0).getShippingData().getMessengerId());
         verify(repo).findByShippingDataMessengerIdAndStageNot(patchProfileRequest.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
     }
+
+    @Test
+    public void findOrdersByMessengerAdminId_returnsTeamOrders() {
+        String adminId = "messenger-admin-1";
+        UserProfile admin = new UserProfile(
+                "admin",
+                UserProfile.SignUpReason.BUY,
+                "address",
+                "https://image.url",
+                "0812815707",
+                ProfileRoles.MESSENGER_ADMIN
+        );
+        admin.setId(adminId);
+
+        UserProfile messenger = new UserProfile(
+                "messenger",
+                UserProfile.SignUpReason.DELIVERY_DRIVER,
+                "address",
+                "https://image.url",
+                "0812815708",
+                ProfileRoles.MESSENGER
+        );
+        messenger.setId("messenger-1");
+
+        Order order = new Order();
+        order.setId("order-1");
+        order.setBasket(new Basket());
+        ShippingData shippingData = new ShippingData("from", "to", ShippingData.ShippingType.DELIVERY);
+        shippingData.setMessengerId("messenger-1");
+        order.setShippingData(shippingData);
+        order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+
+        when(customerRepo.findById(adminId)).thenReturn(Optional.of(admin));
+        when(customerRepo.findByRoleAndMessengerAdminId(ProfileRoles.MESSENGER, adminId)).thenReturn(List.of(messenger));
+        when(repo.findByShippingDataMessengerIdInAndStageNot(List.of("messenger-1"), OrderStage.STAGE_0_CUSTOMER_NOT_PAID)).thenReturn(new ArrayList<>(List.of(order)));
+        when(orderQuoteRepository.findBySentToMessengerIds("messenger-1")).thenReturn(Collections.emptyList());
+
+        List<Order> orders = sut.findOrdersByMessengerAdminId(adminId, false);
+
+        Assert.assertEquals(1, orders.size());
+        verify(repo).findByShippingDataMessengerIdInAndStageNot(List.of("messenger-1"), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+    }
+
+    @Test
+    public void findOrdersByMessengerAdminId_rejectsNonAdminRole() {
+        String profileId = "profile-1";
+        UserProfile profile = new UserProfile(
+                "messenger",
+                UserProfile.SignUpReason.DELIVERY_DRIVER,
+                "address",
+                "https://image.url",
+                "0812815708",
+                ProfileRoles.MESSENGER
+        );
+        profile.setId(profileId);
+        when(customerRepo.findById(profileId)).thenReturn(Optional.of(profile));
+
+        try {
+            sut.findOrdersByMessengerAdminId(profileId, true);
+            fail();
+        } catch (IllegalArgumentException e) {
+            Assert.assertEquals("Profile profile-1 is not a messenger admin", e.getMessage());
+        }
+    }
+
     @Test
     public void findOrderByStoreIdNoUpdaidOrdersRetuned() throws Exception {
         //order 1
@@ -2105,7 +2344,8 @@ public class OrderServiceTest {
         verify(repo).findById(order.getId());
         verify(paymentService).reversePayment(order);
         PushHeading title = new PushHeading("Your order has been cancelled. Payment has been reversed to your account.",
-                "Your order has been cancelled.", null);
+                "Your order has been cancelled.", null,
+                String.format("https://onboard.izinga.co.za/business/info/%s/order/%s", order.getShopId(), order.getId()));
         PushMessage message = new PushMessage(PushMessageType.NEW_ORDER_UPDATE, title, order);
         verify(pushNotificationService, times(2)).sendNotification(any(), eq(message));
         assertEquals(OrderStage.CANCELLED, cancelledOrder.getStage());

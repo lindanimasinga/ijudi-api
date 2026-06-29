@@ -6,6 +6,7 @@ import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.model.PaymentType;
 import io.curiousoft.izinga.commons.model.StoreProfile;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentProvider;
+import lombok.SneakyThrows;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
@@ -48,7 +49,7 @@ public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
     }
 
     @Override
-    protected boolean paymentReceived(Order order) throws Exception {
+    protected boolean paymentReceived(Order order) {
         var computed = checksum(format("%s%s%s", order.getId(),order.getTotalAmount(), order.getCustomerId()));
         return Arrays.stream(Objects.requireNonNull(order.getDescription())
                 .split(":"))
@@ -58,7 +59,8 @@ public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
                 .map(i -> i.equals(computed)).orElse(false);
     }
 
-    String checksum(String data) throws NoSuchAlgorithmException {
+    @SneakyThrows
+    String checksum(String data) {
         var digest = MessageDigest.getInstance("MD5")
                 .digest(format("%s%s", data, apiKey).getBytes());
         return new String(Base64.getEncoder().encode(digest));
@@ -85,7 +87,7 @@ public class YocoPaymentProvider extends PaymentProvider<YocoPaymentData> {
     }
 
     @Override
-    public boolean reversePayment(Order order) throws JsonProcessingException {
+    public boolean reversePayment(Order order) {
         String url = izingaUrl + "/refund/initiate";
         RestTemplate rest = new RestTemplateBuilder()
                 .requestFactory(HttpComponentsClientHttpRequestFactory.class)
