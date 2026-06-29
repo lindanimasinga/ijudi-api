@@ -1,112 +1,279 @@
 package io.curiousoft.izinga.recon
 
+import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.commons.model.OrderStage
-import io.curiousoft.izinga.commons.repo.OrderRepository
+import io.curiousoft.izinga.commons.model.ProfileRoles
+import io.curiousoft.izinga.commons.model.Bank
+import io.curiousoft.izinga.commons.model.BankAccType
+import io.curiousoft.izinga.commons.model.StoreProfile
+import io.curiousoft.izinga.commons.model.UserProfile
+import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
+import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.payout.*
-import io.curiousoft.izinga.recon.payout.repo.PayoutBundleRepo
-import io.curiousoft.izinga.recon.payout.repo.PayoutRepository
-import io.curiousoft.izinga.recon.tips.TipsService
+import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
+import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
+import org.slf4j.LoggerFactory
+import org.springframework.ai.tool.annotation.Tool
+import org.springframework.ai.tool.annotation.ToolParam
+import org.springframework.context.ApplicationEventPublisher
+import org.springframework.context.event.EventListener
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Service
 import java.util.*
 
 @Service
 class ReconServiceImpl(
-    private val orderRepo: OrderRepository,
-    private val payoutBundleRepo: PayoutBundleRepo,
     private val storeRepo: StoreRepository,
-    private val messengerRepo: UserProfileRepo,
-    private val payoutRepo: PayoutRepository,
-    private val tipsService: TipsService
+    private val userProfileRepo: UserProfileRepo,
+    private val shopPayoutRepo: ShopPayoutRepository,
+    private val messengerPayoutRepository: MessengerPayoutRepository,
+    private val applicationEventPublisher: ApplicationEventPublisher
 ) : ReconService {
 
-    override fun generateNextPayoutsToShop(): PayoutBundle? {
-        return orderRepo.findByShopPaidAndStage(false, OrderStage.STAGE_7_ALL_PAID)
-            ?.groupBy { it.shopId }
-            ?.map { map ->
-                storeRepo.findByIdOrNull(map.key)?.let {
-                    ShopPayout(
-                    toId = map.key, toName = it.name!!, toBankName = it.bank?.name!!, toAccountNumber = it.bank?.accountId!!, toType = it.bank?.type!!,
-                        orders = map.value.toMutableSet(), toBranchCode = it.bank?.branchCode!!, toReference = "Payment from iZinga", fromReference = "Payment to ${it.name}",
-                        emailAddress = it.emailAddress!!, emailNotify = "", emailSubject = "Payment from iZinga"
-                    )
-                }
-            }
-            ?.filterNotNull()?.toList()?.let {
-                val bundle = payoutBundleRepo.findOneByTypeAndExecuted(PayoutType.SHOP)?.apply { payouts = it } ?:
-                PayoutBundle(payouts = it, createdBy = "System", type = PayoutType.SHOP)
-                payoutBundleRepo.save(bundle)
-            }
+    private val logger = LoggerFactory.getLogger(ReconServiceImpl::class.java)
+
+    override fun generatePayoutForShopAndOrder(order: Order): ShopPayout? {
+        if (order.stage != OrderStage.STAGE_7_ALL_PAID) {
+            logger.info("no payout generated for order {} at stage STAGE_7_ALL_PAID", order.id)
+            return null
+        }
+
+        val store = storeRepo.findByIdOrNull(order.shopId);
+        if (store?.hasPaymentAgreement == false) {
+            logger.info("no payout created because store {} has no payout agreement", store.id);
+            return null
+        }
+
+        val payout = shopPayoutRepo.findByToIdAndPayoutStage(order.shopId, PayoutStage.PENDING) ?: ShopPayout(
+            toId = store?.id!!,
+            toName = store.name!!,
+            toBankName = store.bank?.name!!,
+            toType = store.bank?.type!!,
+            toAccountNumber = getPayoutAccountNumber(store.bank?.accountId, store.bank?.type)!!,
+            orders = mutableSetOf(),
+            toBranchCode = store.bank?.branchCode!!,
+            fromReference = "Payment to ${store.name}",
+            toReference = "iZinga pay",
+            emailNotify = "",
+            emailAddress = store.emailAddress,
+            emailSubject = "iZinga pay",
+        )
+
+        payout.orders.add(order)
+        payout.emailSent = false
+        return shopPayoutRepo.save(payout)
     }
 
-    override fun generateNextPayoutsToMessenger(): PayoutBundle? {
-        val bundle = payoutBundleRepo.findOneByTypeAndExecuted(PayoutType.MESSENGER)
-        val tips = tipsService.getTodayTips()
-        return orderRepo.findByMessengerPaidAndStage(false, OrderStage.STAGE_7_ALL_PAID)
-            ?.filter { it.shippingData?.messengerId?.isNotEmpty() ?: false }
-            ?.groupBy { it.shippingData?.messengerId }
-            ?.map { map ->
-                messengerRepo.findByIdOrNull(map.key)?.let { messng ->
-                    bundle?.payouts?.firstOrNull { it.toId == messng.id }?.also { payout ->
-                        payout.orders = map.value.toMutableSet()
-                        tips?.filter { messng.emailAddress == it.emailAddress }
-                            ?.toMutableSet()
-                            ?.also { payout.tips?.addAll(it) }
-                    } ?: MessengerPayout(
-                        toId = messng.id!!,
-                        toName = messng.name!!,
-                        toBankName = messng.bank?.name!!,
-                        toType = messng.bank?.type!!,
-                        toAccountNumber = messng.bank?.accountId!!,
-                        orders = map.value.toMutableSet(),
-                        toBranchCode = messng.bank!!.branchCode!!,
-                        toReference = "Payment from iZinga", fromReference = "Payment to ${messng.name}",
-                        tips = tips?.filter { messng.emailAddress == it.emailAddress }?.toMutableSet(),
-                        emailAddress = messng.emailAddress!!, emailNotify = "", emailSubject = "Payment from iZinga"
-                    ).also {
-                        it.isPermEmployed = messng.isPermanentEmployed
-                    }
-                }
-            }?.filterNotNull()
-            ?.filter { it.total > 0.toBigDecimal() }
-            ?.toList()
-            ?.let {
-                val bundle = bundle?.let { b -> b.payouts = it; b } ?: PayoutBundle(payouts = it, createdBy = "System", type = PayoutType.MESSENGER)
-                payoutBundleRepo.save(bundle)
+    override fun generatePayoutForMessengerAndOrder(order: Order): MessengerPayout? {
+        val messng = userProfileRepo.findByIdOrNull(order.shippingData?.messengerId!!)
+        if (messng?.isPermanentEmployed == true && order.tip?.let { it <= 0 } == true) {
+            return null
+        }
+
+        //val tips = tipsService.getTodayTips()
+        val payout = messengerPayoutRepository.findByToIdAndPayoutStage(messng?.id!!, PayoutStage.PENDING) ?: MessengerPayout(
+            toId = messng.id!!,
+            toName = messng.name!!,
+            toBankName = messng.bank?.name!!,
+            toType = messng.bank?.type!!,
+            toAccountNumber = getPayoutAccountNumber(messng.bank?.accountId, messng.bank?.type)!!,
+            orders = mutableSetOf(),
+            toBranchCode = messng.bank!!.branchCode!!,
+            toReference = "iZinga pay",
+            fromReference = "Payment to ${messng.name}",
+            tips = mutableSetOf(),
+            emailAddress = messng.emailAddress!!,
+            emailNotify = "",
+            emailSubject = "iZinga pay"
+        ).also {
+            it.isPermEmployed = messng.isPermanentEmployed ?: false
+        }
+
+        payout.orders.firstOrNull { it == order }
+            ?.let { logger.info("payout already processed for the order {}", it.id) } ?: run {
+                logger.info("adding order {} to messenger payout {}", order.id, payout.id)
+                payout.orders.add(order)
+                payout.emailSent = false
             }
+        return messengerPayoutRepository.save(payout)
     }
 
-    override fun updatePayoutStatus(bundleResponse: PayoutBundleResults): PayoutBundle? {
-        return payoutBundleRepo.findByIdOrNull(bundleResponse.bundleId)?.also { payoutBundle ->
-            bundleResponse.payoutItemResults?.forEach { payResults ->
-                payoutBundle.payouts.firstOrNull { payResults.payoutId == it.id }?.apply { paid = payResults.paid }
-            } ?: payoutBundle.payouts.forEach { payout ->
-                payout.paid = true
-                orderRepo.findByIdIn(payout.orders.mapNotNull { it.id })
-                    .forEach {
-                        it.shopPaid = it.shopPaid || payoutBundle.type == PayoutType.SHOP
-                        it.messengerPaid = it.messengerPaid || payoutBundle.type == PayoutType.MESSENGER
-                        orderRepo.save(it)
-                    }
-            }
-        }?.let {
-            it.executed = true
-            payoutBundleRepo.save(it)
+    @Async
+    @EventListener
+    override fun handleProfileUpdated(event: ProfileUpdatedEvent) {
+        when (val profile = event.profile) {
+            is UserProfile -> refreshPendingPayoutBankDetails(
+                payouts = messengerPayoutRepository.findAllByToIdAndPayoutStage(profile.id ?: return, PayoutStage.PENDING),
+                bank = profile.bank
+            )
+            is StoreProfile -> refreshPendingPayoutBankDetails(
+                payouts = shopPayoutRepo.findAllByToIdAndPayoutStage(profile.id ?: return, PayoutStage.PENDING),
+                bank = profile.bank
+            )
         }
     }
 
-    override fun getAllPayoutBundles(payoutType: PayoutType, fromDate: Date, toDate: Date): List<PayoutBundle> {
-        return payoutBundleRepo.findByCreatedDateBetweenAndType(fromDate, toDate, payoutType)
+    private fun refreshPendingPayoutBankDetails(payouts: List<Payout>, bank: Bank?) {
+        if (payouts.isEmpty()) {
+            return
+        }
+
+        bank ?: return
+        val bankName = bank.name ?: return
+        val bankType = bank.type ?: return
+        val branchCode = bank.branchCode ?: return
+        val accountId = if (bankType == BankAccType.EWALLET) {
+            normalizeBankAccountId(bank.accountId) ?: return
+        } else null
+
+        payouts.forEach {
+            it.toBankName = bankName
+            it.toType = bankType
+            if (accountId != null) {
+                it.toAccountNumber = accountId
+            }
+            it.toBranchCode = branchCode
+        }
+        val shopPayouts = payouts.filterIsInstance<ShopPayout>()
+        if (shopPayouts.isNotEmpty()) {
+            shopPayoutRepo.saveAll(shopPayouts)
+        }
+
+        val messengerPayouts = payouts.filterIsInstance<MessengerPayout>()
+        if (messengerPayouts.isNotEmpty()) {
+            messengerPayoutRepository.saveAll(messengerPayouts)
+        }
     }
 
-    override fun getAllPayouts(payoutType: PayoutType, fromDate: Date, toDate: Date, toId: String): List<Payout> =
-        getAllPayoutBundles(payoutType, fromDate, toDate)
-            .filter { it.executed }
-            .flatMap { it.payouts }
-            .filter { it.toId == toId }
+    override fun updatePayoutStatus(bundleResponse: PayoutBundleResults) {
+        bundleResponse.payoutItemResults
+            .filter { it.type == PayoutType.SHOP }
+            .mapNotNull {
+                shopPayoutRepo.findByToIdAndPayoutStage(it.toId, PayoutStage.PROCESSING)
+                    ?.let { payout ->
+                        payout.paid = it.paid
+                        payout.bundleId = bundleResponse.bundleId
+                        shopPayoutRepo.save(payout)
+                        payout
+                    }
+            }
+            .filter { it.paid }
+            .onEach {
+                it.payoutStage = PayoutStage.COMPLETED
+                shopPayoutRepo.save(it)
+            }
+            .flatMap { it.orders }
+            .forEach {
+                val payoutEvent = OrderPayoutEvent(
+                    source = this,
+                    orderId = it.id!!,
+                    isStorePaid = true
+                )
+                applicationEventPublisher.publishEvent(payoutEvent)
+            }
 
-    override fun findPayout(bundleId: String, payoutId: String): Payout? =
-        payoutRepo.findByIdOrNull(bundleId)?.let { it.payouts.firstOrNull { a -> a.toId == payoutId } }
+        bundleResponse.payoutItemResults
+            .filter { it.type == PayoutType.MESSENGER }
+            .mapNotNull {
+                messengerPayoutRepository.findByToIdAndPayoutStage(it.toId, PayoutStage.PROCESSING)
+                    ?.let { payout ->
+                        payout.paid = it.paid
+                        messengerPayoutRepository.save(payout)
+                        payout
+                    }
+            }
+            .filter { it.paid }
+            .onEach {
+                it.payoutStage = PayoutStage.COMPLETED
+                messengerPayoutRepository.save(it)
+            }
+            .flatMap { it.orders }
+            .forEach {
+                val event  = OrderPayoutEvent(
+                    source = this,
+                    orderId = it.id!!,
+                    isMessengerPaid = true)
+                applicationEventPublisher.publishEvent(event)
+            }
+    }
+
+    override fun updateBundle(bundle: PayoutBundle) {
+        return bundle.payouts.groupBy { it.javaClass.name }
+            .forEach( {
+                when (it.key) {
+                    ShopPayout::class.qualifiedName -> shopPayoutRepo.saveAll(it.value as List<ShopPayout>)
+                    MessengerPayout::class.qualifiedName -> messengerPayoutRepository.saveAll(it.value as List<MessengerPayout>)
+                }
+        })
+    }
+
+    @Tool(name="get_payouts_for_user",  description = "Get all payouts for a given payout type, date range and toId. The default date range is past 7 days. " +
+            "The Payout will have all orders for this payout and the total amount for the payout. " +
+            "For driver the payoutType is MESSENGER and the toId is the driver id. " +
+            "For shop the payoutType is SHOP and the toId is the shop id.")
+    override fun getAllPayouts(@ToolParam(description = "For driver the payoutType is MESSENGER") payoutType: PayoutType,
+                               @ToolParam(description = "Date time format is like 2026-04-09T00:00:00.000+00:00") from: Date,
+                               @ToolParam(description = "Date time format is like 2026-04-09T00:00:00.000+00:00") toDate: Date,
+                               @ToolParam(description = "This is the Driver/Messenger id to use for lookup") toId: String): List<Payout> {
+        return when (payoutType) {
+            PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetweenAndToId(from, toDate, toId)
+            PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateBetweenAndToId(from, toDate, toId)
+        }
+    }
+
+    override fun getAllPayoutsForMessengerAdmin(from: Date, toDate: Date, messengerAdminId: String, messengerId: String?): List<Payout> {
+        val messengerAdmin = userProfileRepo.findByIdOrNull(messengerAdminId)
+            ?: throw IllegalArgumentException("Messenger admin not found")
+
+        if (messengerAdmin.role != ProfileRoles.MESSENGER_ADMIN) {
+            throw IllegalArgumentException("Profile is not a messenger admin")
+        }
+
+        val managedMessengerIds = userProfileRepo.findByRoleAndMessengerAdminId(ProfileRoles.MESSENGER, messengerAdminId)
+            .mapNotNull { it.id }
+
+        if (managedMessengerIds.isEmpty()) {
+            return emptyList()
+        }
+
+        val filteredMessengerIds = if (!messengerId.isNullOrBlank()) {
+            if (!managedMessengerIds.contains(messengerId)) {
+                throw IllegalArgumentException("Messenger does not belong to this admin")
+            }
+            listOf(messengerId)
+        } else managedMessengerIds
+
+        return messengerPayoutRepository.findByModifiedDateBetweenAndToIdIn(from, toDate, filteredMessengerIds)
+    }
+
+    override fun getAllPayoutBundles(payoutType: PayoutType, from: Date, toDate: Date): List<Payout> {
+        return when (payoutType) {
+            PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetween(from, toDate)
+            PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateBetween(from, toDate)
+        }
+    }
+
+    override fun getCurrentPayoutBundleForShops(): PayoutBundle {
+        return PayoutBundle(payouts = shopPayoutRepo.findByPayoutStage(),
+            type = PayoutType.SHOP,
+            createdBy = "izinga-system")
+    }
+
+    override fun getCurrentPayoutBundleForMessenger(): PayoutBundle {
+        return PayoutBundle(payouts = messengerPayoutRepository.findByPayoutStage(),
+            type = PayoutType.MESSENGER,
+            createdBy = "izinga-system")
+    }
+
+    override fun findPayout(bundleId: String, payoutId: String): Payout? = shopPayoutRepo.findByIdOrNull(payoutId)
+        ?: messengerPayoutRepository.findByIdOrNull(payoutId)
+
+    private fun normalizeBankAccountId(accountId: String?): String? = accountId?.replace("+27", "0")
+
+    private fun getPayoutAccountNumber(accountId: String?, bankType: BankAccType?): String? =
+        if (bankType == BankAccType.EWALLET) normalizeBankAccountId(accountId) else accountId
+
 }

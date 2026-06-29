@@ -1,10 +1,8 @@
 admin:
     cellNumber: 0812815707,0815546658
+    email: hloniphanimanzi@gmail.com,lindanimasinga@gmail.com
 allowed:
     origins: http://localhost:4200,https://dev.celestemonique.com,https://api-uat.izinga.co.za,app://izinga,https://shop.izinga.co.za,app://izinga-lambda
-amz:
-    accessKey: AKIAUTE3KPBGHYXR3V6C
-    secretKey: 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
 google:
     api:
         key: AAAASXcChds:APA91bGMdjB7knpWAtdyHELx9lvMiar2pHQ-_aZjky9YSphe1cJCEQe8ks5qy1e5W6T8mrPMxtPTCGrMNCjqxGM4eKzw0xPZCOWDRp9XAqID3SWhkcNx1HWcRK9Oo2ODMunaSU_n3X4X
@@ -14,7 +12,7 @@ google:
 logging:
     level:
         io:
-            curiousoft: DEBUG
+            curiousoft: INFO
         org:
             springframework:
                 data:
@@ -66,29 +64,12 @@ feign:
     okhttp:
         enabled: true
 spring:
-    cloud:
-        openfeign:
-            client:
-                config:
-                    default:
-                        loggerLevel: testing
-                    izinga-order-manager:
-                        url: ./
-                        connectTimeout: 20000
-                    yoco-api:
-                        loggerLevel: full
-                        connectTimeout: 20000
-                        url: https://payments.yoco.com/api/
-                        defaultRequestHeaders:
-                            Authorization: Bearer ${yoco.api.key}
-                    yocoDashboard-api:
-                        loggerLevel: full
-                        connectTimeout: 20000
-                        url: https://payments.yoco.com/api/
-                        defaultRequestHeaders:
-                            x-auth-token: ${yoco.dashboard-api.token}
-                            useruuid: ${yoco.dashboard-api.user}
-                            businessuuid: ${yoco.dashboard-api.businessuuid}
+    security:
+        oauth2:
+            resourceserver:
+                jwt:
+                    jws-algorithms: RS512
+                    issuer-uri: https://securetoken.google.com/ijudi-d19bd
     data:
         mongodb:
             uri: mongodb+srv://onusmongouser:wfsuser@cluster0-7odiz.mongodb.net/ijudi?retryWrites=true&w=majority
@@ -99,6 +80,14 @@ spring:
             time: HH:mm:ss
     jackson:
         date-format: yyyy-MM-dd HH:mm:ss
+    ai:
+        mcp:
+            server:
+                protocol: STREAMABLE
+                name: izinga-mcp-server
+                version: 1.0.0
+                instructions: "Izinga marketplace API. Use the available tools to look up users and stores, create orders, and manage deliveries."
+                type: sync
 ukheshe:
     apiUrl: https://ukheshe-sandbox.jini.rocks/ukheshe-conductor/rest/v1
     customerId: 534
@@ -121,3 +110,34 @@ zoomconnectsms:
         endpoint: https://www.zoomconnect.com/app/api/rest/v1/sms/send
         key: c0217d42-dd53-4d6b-811c-a79b584e5177
     enable: true
+promocodes:
+    verifier:
+        url: http://localhost/
+izinga:
+    api:
+        url: http://localhost
+
+client:
+    config:
+        default:
+            loggerLevel: DEBUG
+        izinga-order-manager:
+            url: ./
+            connectTimeout: 20000
+        promo-code-service:
+            url: ./
+            connectTimeout: 20000
+        yoco-api:
+            loggerLevel: full
+            connectTimeout: 20000
+            url: https://payments.yoco.com/api/
+            defaultRequestHeaders:
+                Authorization: Bearer ${yoco.api.key}
+        yocoDashboard-api:
+            loggerLevel: full
+            connectTimeout: 20000
+            url: https://payments.yoco.com/api/
+            defaultRequestHeaders:
+                x-auth-token: ${yoco.dashboard-api.token}
+                useruuid: ${yoco.dashboard-api.user}
+                businessuuid: ${yoco.dashboard-api.businessuuid}

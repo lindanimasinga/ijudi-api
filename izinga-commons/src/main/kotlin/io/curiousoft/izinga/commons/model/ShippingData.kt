@@ -1,23 +1,40 @@
 package io.curiousoft.izinga.commons.model
 
 import java.util.*
-import javax.validation.constraints.Future
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.NotNull
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Future
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 
-class ShippingData {
+open class ShippingData {
     var id: String? = null
     var fromAddress: @NotBlank(message = "shipping address not valid") String? = null
+    var fromBuildingType: BuildingType? = null
+    var fromUnitNumber: String? = null
+    var fromFloorLevel: Int? = null
+    var fromBuildingName: String? = null
+    var fromBuildingHasElevator: Boolean? = null
     var toAddress: @NotBlank(message = "Shipping address not valid") String? = null
     var buildingType: BuildingType? = null
     var unitNumber: String? = null
     var buildingName: String? = null
+    var floorLevel: Int? = null
+    var buildingHasElevator: Boolean? = null
     var additionalInstructions: String? = null
     var type: @NotNull(message = "shipping type not valid") ShippingType? = null
-    var fee: Double = 0.0
+    var deliveryFee: Double = 0.0
     var messengerId: String? = null
     var pickUpTime: @Future(message = "pickup date must be at least 15 minutes ahead") Date? = null
     var distance: Double = 0.0
+    var shippingDataGeoData: ShipingGeoData? = null
+    var weigthFee: Double = 0.0
+    var volumeFee: Double = 0.0
+    var labourFee: Double = 0.0
+    var category: List<String>? = null
+    var izingaCommission: Double? = null
+
+    open val fee: Double get() = deliveryFee + weigthFee + volumeFee + labourFee
+    var feeForDriver = fee - (izingaCommission ?: 0.0)
 
     constructor()
     constructor(
@@ -34,3 +51,5 @@ class ShippingData {
         COLLECTION, DELIVERY, SCHEDULED_DELIVERY
     }
 }
+
+class ShipingGeoData(val fromGeoPoint: @Valid GeoPointImpl, val toGeoPoint: @Valid GeoPointImpl, val distance: Double)

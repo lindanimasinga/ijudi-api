@@ -1,12 +1,11 @@
 package io.curiousoft.izinga.commons.model
 
-import io.curiousoft.izinga.commons.utils.calculateMarkupPrice
 import org.springframework.data.annotation.Transient
 import java.util.*
-import javax.validation.constraints.DecimalMin
-import javax.validation.constraints.Min
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.NotNull
+import jakarta.validation.constraints.DecimalMin
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 
 class Stock: Comparable<Stock> {
     var id: String? = UUID.randomUUID().toString()
@@ -17,6 +16,12 @@ class Stock: Comparable<Stock> {
     var group: String? = null
     var position = 10000
     var quantity = 0
+    var minWieght: Double? = null
+    var maxWeight: Double? = null
+    var weight: Double? = null
+    var width: Double? = null
+    var height: Double? = null
+    var depth: Double? = null
     var storePrice = 0.0
     var discountPerc = 0.0
     var images: List<String>? = null
@@ -61,4 +66,12 @@ class Stock: Comparable<Stock> {
 
     override operator fun compareTo(other: Stock): Int = if(this.hashCode() > other.hashCode()) 1 else -1
 
+    /**
+     * Calculates markup price keeping original decimals/cents similar to Kotlin version.
+     */
+    fun calculateMarkupPrice(storePrice: Double, markPercentage: Double): Double {
+        val cents = storePrice - storePrice.toInt()
+        val markupPrice = storePrice + storePrice * markPercentage
+        return markupPrice.toInt() + (if (cents > 0.45) cents else 1 + cents)
+    }
 }

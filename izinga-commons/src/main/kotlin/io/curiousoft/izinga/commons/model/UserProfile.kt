@@ -1,8 +1,9 @@
 package io.curiousoft.izinga.commons.model
 
 import com.fasterxml.jackson.annotation.JsonIgnore
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.NotNull
+import java.util.Date
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 
 class UserProfile(
     name: @NotBlank(message = "profile name not valid") String?,
@@ -11,13 +12,39 @@ class UserProfile(
     imageUrl: @NotBlank(message = "profile image url not valid") String?,
     mobileNumber: @NotBlank(message = "profile mobile number not valid") String?,
     role: @NotNull(message = "role not valid") ProfileRoles?) : Profile(name, address, imageUrl, mobileNumber, role) {
+    var surname: String? = null
+    var missingDocumentsReminderSent: Boolean? = null
+    var welcomeMessageSent: Boolean = false
 
     @set:JsonIgnore
-    var isPermanentEmployed: Boolean = false
+    var isPermanentEmployed: Boolean? = null
 
     var idNumber: String? = null
+    var dateOfBirth: String? = null
+    var termsAccepted: Boolean? = null
+    var termsAcceptedDate: Date? = null
+    var crminalCheckData: CriminalCheckData? = null
 
     enum class SignUpReason {
-        DELIVERY_DRIVER, SELL, BUY
+        DELIVERY_DRIVER, SELL, BUY, LICENSING
     }
+
+    val vehicle: Vehicle
+        get() = Vehicle().apply {
+            this.vehicleMake = tag["vehicleMake"]
+            this.vehicleModel = tag["vehicleModel"]
+            this.loadCapacity = (tag["loadCapacity"] ?: tag["cargoCapacity"])?.toDoubleOrNull()
+            this.ownerId = tag["ownerId"]
+            this.driverId = id
+            this.vehicleRegistration = tag["vehicleRegistration"]
+    }
+}
+
+
+class CriminalCheckData {
+    var criminalRecordCheckAccepted: Boolean? = null
+    var criminalCheckMessageSent: Boolean = false
+    var criminalRecordCheckDate: Date? = null
+    var criminalRecordCheckDocument: DocumentAttachment? = null
+    var criminalCheckPass: Boolean? = null
 }

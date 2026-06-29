@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.messaging.firebase;
 
+import com.google.auth.oauth2.GoogleCredentials;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import retrofit2.Call;
@@ -13,54 +14,68 @@ public class FirebaseConnectionWrapper {
 
     private static Logger LOGGER = LoggerFactory.getLogger(FirebaseConnectionWrapper.class);
 
-    private String apiKey;
+    private GoogleCredentials credentials;
+    private String projectId;
     private GoogleServices.FirebaseInstanceIdHttpService firebaseHttpService;
     private GoogleServices.FirebaseMessageService firebaseMessagingHttpService;
 
-    public FirebaseConnectionWrapper() {
+    private FirebaseConnectionWrapper() {
         firebaseHttpService = GoogleServices.getInstanceIdService();
         firebaseMessagingHttpService = GoogleServices.getMessagingService();
     }
 
-    public FirebaseConnectionWrapper(String apiKey) {
+    public FirebaseConnectionWrapper(GoogleCredentials credentials, String projectId) {
         this();
-        this.apiKey = "key=" + apiKey;
+        this.credentials = credentials;
+        this.projectId = projectId;
     }
 
-    public FirebaseConnectionWrapper(String apiKey, GoogleServices.FirebaseInstanceIdHttpService firebaseHttpService,
-            GoogleServices.FirebaseMessageService firebaseMessageService) {
+    public FirebaseConnectionWrapper(GoogleCredentials credentials, String projectId, GoogleServices.FirebaseInstanceIdHttpService firebaseHttpService,
+                                     GoogleServices.FirebaseMessageService firebaseMessageService) {
         this.firebaseHttpService = firebaseHttpService;
         this.firebaseMessagingHttpService = firebaseMessageService;
-        this.apiKey = "key=" + apiKey;
+        this.credentials = credentials;
+        this.projectId = projectId;
     }
 
     public Map sendMessage(FCMMessage fcmMessage) throws Exception {
-        Call<Map> requestCall = firebaseMessagingHttpService.sendMessage(apiKey, fcmMessage);
+        credentials.refreshIfExpired();
+        var token = "Bearer %s".formatted(credentials.getAccessToken().getTokenValue());
+        Call<Map> requestCall = firebaseMessagingHttpService.sendMessage(token, projectId, fcmMessage);
         Map response = processRequest(requestCall);
-        LOGGER.info("Message sent to " + fcmMessage.getTo());
-        LOGGER.info("Message data " + fcmMessage.getData());
+        LOGGER.info("Message sent to {}", fcmMessage.getMessage().token());
+        LOGGER.info("Message notification {}", fcmMessage.getMessage().notification());
         return response;
     }
 
     public String createTopic(String topicName, String deviceToken) throws Exception {
-        Call<Map> requestCall = firebaseHttpService.createTopic(apiKey, deviceToken, topicName);
+        credentials.refreshIfExpired();
+        var token = "Bearer %s".formatted(credentials.getAccessToken().getTokenValue());
+        Call<Map> requestCall = firebaseHttpService.createTopic(token, deviceToken, topicName);
         processRequest(requestCall);
         return topicName;
     }
 
-    public <T> T processRequest(Call<T> requestCall) throws Exception {
-        LOGGER.info("FCM Request " + requestCall.request().toString());
+    private <T> T processRequest(Call<T> requestCall) throws Exception {
+        LOGGER.debug("FCM Request {}", requestCall.request().toString());
+        LOGGER.info("Executing FCM request to URL: {}", requestCall.request().url());
         Response<T> response = requestCall.execute();
-        if (!response.isSuccessful()) {
-            LOGGER.error("FCM response code: " + response.code() + " Body " + response.errorBody().string());
-            throw new Exception(response.errorBody().string());
+        if (response.isSuccessful()) {
+            LOGGER.debug("FCM Response success! code: {} body: {}",  response.code(), response.body());
+            LOGGER.info("FCM request successful with status code: {}", response.code());
+            return response.body();
         }
-        LOGGER.info("FCM Response success! code: " + response.code() + " body: " + response.body());
-        return response.body();
+        LOGGER.error("FCM response code: {} Body {}", response.code(), response.errorBody().string());
+        if (response.code() == 404) {
+            throw new FirebaseTokenNotFound(response.code());
+        }
+        throw new Exception(response.errorBody().string());
     }
 
     public void subscribeTopic(String topicName, String deviceToken) throws Exception {
-        Call<Map> requestCall = firebaseHttpService.subscribeTopic(apiKey, deviceToken, topicName);
+        credentials.refreshIfExpired();
+        var token = "Bearer %s".formatted(credentials.getAccessToken().getTokenValue());
+        Call<Map> requestCall = firebaseHttpService.subscribeTopic(token, deviceToken, topicName);
         processRequest(requestCall);
     }
 
@@ -77,17 +92,11 @@ public class FirebaseConnectionWrapper {
     }
 
     public void unSubscribe(String name, String deviceToken) throws Exception {
+        credentials.refreshIfExpired();
+        var token = "Bearer %s".formatted(credentials.getAccessToken().getTokenValue());
         FCMUnSubscribeMessage message = new FCMUnSubscribeMessage(name, Collections.singletonList(deviceToken));
-        Call<Map> requestCall = firebaseHttpService.unSubscribeTopic(apiKey, message);
+        Call<Map> requestCall = firebaseHttpService.unSubscribeTopic(token, message);
         processRequest(requestCall);
-    }
-
-    public String getApiKey() {
-        return apiKey;
-    }
-
-    public void setApiKey(String apiKey) {
-        this.apiKey = apiKey;
     }
 
     public GoogleServices.FirebaseInstanceIdHttpService getFirebaseHttpService() {

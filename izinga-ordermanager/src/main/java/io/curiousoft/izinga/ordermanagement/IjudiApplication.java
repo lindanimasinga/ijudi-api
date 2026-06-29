@@ -12,7 +12,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import java.util.Optional ;
 import java.util.TimeZone;
 
@@ -24,28 +24,39 @@ import java.util.TimeZone;
 		"io.curiousoft.izinga.recon",
 		"io.curiousoft.izinga.messaging",
 		"io.curiousoft.izinga.yocopay",
-		"io.curiousoft.izinga.usermanagement"})
+		"io.curiousoft.izinga.usermanagement",
+		"io.curiousoft.izinga.qrcodegenerator",
+		"io.curiousoft.izinga.documentmanagement"})
 @EntityScan({"io.curiousoft.izinga.ordermanagement",
 		"io.curiousoft.izinga.commons",
 		"io.curiousoft.izinga.recon",
 		"io.curiousoft.izinga.messaging",
 		"io.curiousoft.izinga.yocopay",
-		"io.curiousoft.izinga.usermanagement"})
+		"io.curiousoft.izinga.usermanagement",
+		"io.curiousoft.izinga.qrcodegenerator",
+		"io.curiousoft.izinga.documentmanagement"})
 @EnableMongoRepositories({"io.curiousoft.izinga.ordermanagement",
 		"io.curiousoft.izinga.commons",
 		"io.curiousoft.izinga.recon",
 		"io.curiousoft.izinga.messaging",
 		"io.curiousoft.izinga.yocopay",
-		"io.curiousoft.izinga.usermanagement"})
+		"io.curiousoft.izinga.usermanagement",
+		"io.curiousoft.izinga.qrcodegenerator",
+		"io.curiousoft.izinga.documentmanagement"})
 @ConfigurationPropertiesScan({"io.curiousoft.izinga.ordermanagement",
 		"io.curiousoft.izinga.yocopay",
-		"io.curiousoft.izinga.usermanagement"})
+		"io.curiousoft.izinga.messaging",
+		"io.curiousoft.izinga.usermanagement",
+		"io.curiousoft.izinga.qrcodegenerator",
+		"io.curiousoft.izinga.documentmanagement"})
 @EnableFeignClients({"io.curiousoft.izinga.ordermanagement",
 		"io.curiousoft.izinga.commons",
 		"io.curiousoft.izinga.recon",
 		"io.curiousoft.izinga.messaging",
 		"io.curiousoft.izinga.yocopay",
-		"io.curiousoft.izinga.usermanagement"})
+		"io.curiousoft.izinga.usermanagement",
+		"io.curiousoft.izinga.qrcodegenerator",
+		"io.curiousoft.izinga.documentmanagement"})
 public class IjudiApplication {
 
 	static Optional<ApplicationContext> app = Optional.empty();

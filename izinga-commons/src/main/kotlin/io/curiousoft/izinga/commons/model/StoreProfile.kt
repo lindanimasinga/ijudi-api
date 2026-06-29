@@ -6,10 +6,27 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.*
 import java.util.function.Consumer
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.NotEmpty
-import javax.validation.constraints.NotNull
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotEmpty
+import jakarta.validation.constraints.NotNull
 import kotlin.collections.HashSet
+
+/**
+ * A delivery or product category associated with a store.
+ *
+ * [name] must match a StockItem tag exactly (case-sensitive) — this invariant is enforced in
+ * StoreService before any create/update that includes categories.
+ *
+ * [image] is intentionally left as an empty string or placeholder S3 URL at seed time;
+ * the onboarding team uploads real images via the existing S3 document endpoint.
+ * TODO #62: Verify S3 bucket ACL allows public-read on category images (DevOps/Lindani item — out of scope here).
+ */
+data class Category(
+    val id: String,
+    val name: String,
+    val image: String,
+    val active: Boolean
+)
 
 class StoreProfile(
     var storeType: @NotNull(message = "storeType is not valid") StoreType?,
@@ -25,23 +42,30 @@ class StoreProfile(
 ) : Profile(name, address, imageUrl, mobileNumber, ProfileRoles.STORE), GeoPoint {
     @Indexed(unique = true)
     var regNumber: String? = null
-
     var stockList: HashSet<Stock> = HashSet()
     var hasVat = false
     var featured = false
     var featuredExpiry: Date? = null
-    var storeMessenger: HashSet<Messager>? = HashSet()
+    var storeMessenger: HashSet<StoreMessenger>? = HashSet()
     var storeWebsiteUrl: String? = null
     var izingaTakesCommission = false
     var scheduledDeliveryAllowed = false
-    var availability = AVAILABILITY.SPECIFIC_HOURS
+    var availability = AVAILABILITY.OFFLINE
     var freeDeliveryMinAmount = 0.0
     var markUpPrice = true
     var minimumDepositAllowedPerc = 1.0
-    var standardDeliveryPrice = 0.0
-    var standardDeliveryKm = 0.0
-    var ratePerKm = 0.0
     var franchiseName: String? = null
+    var rates: Rates? = null
+    /** Delivery/product categories for this store. Never null — defaults to empty list. */
+    var categories: List<Category> = emptyList()
+    /** Whether the store has an active payment agreement with iZinga. */
+    var hasPaymentAgreement: Boolean = false
+    /** Whether the store can fulfill orders from more than one physical address. */
+    var deliversFromMultipleAddresses: Boolean = false
+    /** Whether the system should auto-generate missing stock images for this store. */
+    var generateMissingImages: Boolean = false
+    /** Whether a quote must be accepted by the customer before the order is confirmed. */
+    var isQuoteRequired: Boolean = false
 
     init {
         super.bank = bank
@@ -122,6 +146,14 @@ class StoreProfile(
     //should not accept orders 15 minutes before store closes
     val isDeliverNowAllowed: Boolean
         get() {
+            if (availability == AVAILABILITY.ONLINE24_7) {
+                return true
+            }
+
+            if (availability == AVAILABILITY.OFFLINE) {
+                return false
+            }
+
             if (businessHours == null || businessHours!!.isEmpty()) {
                 return false
             }
@@ -167,4 +199,21 @@ class StoreProfile(
     enum class AVAILABILITY {
         OFFLINE, SPECIFIC_HOURS, ONLINE24_7
     }
+}
+
+class Rates() {
+    var labourRatePerFloor: Double? = null
+    var standardDeliveryPrice: Double? = null
+    var standardDeliveryPriceBike: Double? = null
+    var standardDeliveryPriceCar: Double? = null
+    var standardDeliveryPriceBakkie: Double? = null
+    var standardDeliveryPriceTruck: Double? = null
+    var standardDeliveryKm: Double? = null
+    var ratePerKmBike: Double? = null
+    var ratePerKmCar: Double? = null
+    var ratePerKmBakkie: Double? = null
+    var ratePerKmTruck: Double? = null
+    var ratePerKm: Double? = null
+    var ratePerVolumeCM2: Double? = null
+    var ratePerWeightKg: Double? = null
 }

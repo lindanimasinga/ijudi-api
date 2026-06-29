@@ -1,26 +1,26 @@
 package io.curiousoft.izinga.yocopay.config
 
 import feign.RequestInterceptor
-import okhttp3.OkHttpClient
+import org.apache.hc.client5.http.impl.classic.HttpClients
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder
 import org.bouncycastle.crypto.digests.SHA256Digest
 import org.bouncycastle.crypto.macs.HMac
 import org.bouncycastle.crypto.params.KeyParameter
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.context.properties.ConfigurationProperties
-import org.springframework.boot.context.properties.ConstructorBinding
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
+import org.springframework.web.client.RestTemplate
 import java.math.BigInteger
 import java.security.MessageDigest
 import java.util.*
 
 
-@ConstructorBinding
 @ConfigurationProperties(prefix = "yoco.api")
 data class YocoConfiguration(val url: String, val key: String, val webhooksec: String)
 
-@ConstructorBinding
 @ConfigurationProperties(prefix = "yoco.dashboard-api")
 data class YocoDashBoardConfiguration(val url: String, val user: String, val token: String, val businessuuid: String)
 
@@ -63,7 +63,8 @@ private fun convertToHex(messageDigest: ByteArray): String {
 }
 
 @Configuration
-class HeaderConfig {
+class YocoHeaderConfig {
+
     @Bean
     fun basicAuthRequestInterceptor(@Value("\${yoco.api.key}") apiKey: String, yocoDashBoard: YocoDashBoardConfiguration): RequestInterceptor = RequestInterceptor {
         it.header("Authorization", "Bearer $apiKey")
@@ -71,4 +72,16 @@ class HeaderConfig {
         it.header("useruuid", yocoDashBoard.user)
         it.header("businessuuid", yocoDashBoard.businessuuid)
     };
+
+    @Bean
+    fun restTemplate(): RestTemplate = RestTemplate().apply {
+        val connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
+            .setMaxConnTotal(200)
+            .setMaxConnPerRoute(20)
+            .build()
+        val httpClient = HttpClients.custom()
+            .setConnectionManager(connectionManager)
+            .build()
+        requestFactory = HttpComponentsClientHttpRequestFactory(httpClient)
+    }
 }

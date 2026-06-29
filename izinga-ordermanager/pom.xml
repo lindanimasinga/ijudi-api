@@ -16,7 +16,7 @@
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
-        <kotlin.version>1.7.20</kotlin.version>
+        <kotlin.version>2.0.0</kotlin.version>
     </properties>
 
     <dependencies>
@@ -33,7 +33,7 @@
         <dependency>
             <groupId>io.curiousoft.izinga</groupId>
             <artifactId>izinga-commons</artifactId>
-            <version>1.0.2</version>
+            <version>1.0.3</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -46,7 +46,7 @@
             <groupId>io.curiousoft.izinga</groupId>
             <artifactId>izinga-recon</artifactId>
             <version>1.0.0</version>
-            <scope>runtime</scope>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>io.curiousoft.izinga</groupId>
@@ -55,25 +55,80 @@
             <scope>runtime</scope>
         </dependency>
         <dependency>
+            <groupId>io.curiousoft.izinga</groupId>
+            <artifactId>izinga-documentmanagement</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.curiousoft.izinga</groupId>
+            <artifactId>izinga-messaging</artifactId>
+            <version>1.3.0</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
             <groupId>io.curiousoft.storemenu</groupId>
             <artifactId>store-menu-to-izinga-menu</artifactId>
             <version>1.0.3</version>
             <scope>compile</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-databind</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpclient</artifactId>
-            <version>4.5.12</version>
+            <groupId>io.curiousoft.izinga</groupId>
+            <artifactId>izinga-qrcode-generator</artifactId>
+            <version>1.0</version>
+            <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>com.github.mailersend</groupId>
-            <artifactId>mailersend-java</artifactId>
-            <version>v0.0.3</version>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.36</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-ui</artifactId>
-            <version>1.7.0</version>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.3.0</version>
+            <exclusions>
+                <!-- spring-ai-model requires jsonschema-generator 4.37+; exclude 4.32 brought by springdoc -->
+                <exclusion>
+                    <groupId>com.github.victools</groupId>
+                    <artifactId>jsonschema-generator</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.github.victools</groupId>
+                    <artifactId>jsonschema-module-jackson</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.github.victools</groupId>
+                    <artifactId>jsonschema-module-swagger-2</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- Force jsonschema-generator 4.37.0 required by spring-ai-model MethodToolCallbackProvider -->
+        <dependency>
+            <groupId>com.github.victools</groupId>
+            <artifactId>jsonschema-generator</artifactId>
+            <version>4.37.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.victools</groupId>
+            <artifactId>jsonschema-module-jackson</artifactId>
+            <version>4.37.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.victools</groupId>
+            <artifactId>jsonschema-module-swagger-2</artifactId>
+            <version>4.37.0</version>
         </dependency>
         <dependency>
             <groupId>de.brendamour</groupId>

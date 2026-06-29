@@ -5,8 +5,8 @@ import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.commons.model.ShippingData
 import org.springframework.util.StringUtils
 import java.util.*
-import javax.validation.ConstraintValidator
-import javax.validation.ConstraintValidatorContext
+import jakarta.validation.ConstraintValidator
+import jakarta.validation.ConstraintValidatorContext
 
 class ShippingValidator : ConstraintValidator<ValidDeliveryInfo?, Order> {
     override fun isValid(order: Order, context: ConstraintValidatorContext): Boolean {

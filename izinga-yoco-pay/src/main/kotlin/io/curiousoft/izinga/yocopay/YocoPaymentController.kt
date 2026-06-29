@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.yocopay
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.curiousoft.izinga.commons.model.PaymentType
 import io.curiousoft.izinga.yocopay.api.YocoPaymentClient
 import io.curiousoft.izinga.yocopay.api.YocoPaymentInitiate
@@ -13,7 +14,7 @@ import org.springframework.http.*
 import org.springframework.web.bind.annotation.*
 import java.util.*
 import java.util.stream.Collectors
-import javax.servlet.http.HttpServletRequest
+import jakarta.servlet.http.HttpServletRequest
 
 
 @RestController
@@ -28,6 +29,7 @@ class YocoPaymentController(private val yocoConfiguration: YocoConfiguration,
 
     @PostMapping("/finalise/raw")
     fun verifyPaymentSuccess(request: HttpServletRequest): ResponseEntity<Any>  {
+        log.info("Received yoco webhook request {}", request.getHeader("webhook-id"))
         val reader = request.reader
         val body = reader.lines().collect(Collectors.joining("\n"))
         val webhookId = request.getHeader("webhook-id")
@@ -49,20 +51,20 @@ class YocoPaymentController(private val yocoConfiguration: YocoConfiguration,
     @PostMapping("/finalise/json")
     fun verifyPaymentSuccess(@RequestBody successEvent: YocoEvent, yocoHash: String): ResponseEntity<Any> {
         log.info("yoco payment is ${successEvent.type}")
+        log.info("yoco payment event payload ${jacksonObjectMapper().writeValueAsString(successEvent)}")
         val paymentSuccessful = successEvent.type == "payment.succeeded"
-        val orderId = successEvent.payload?.metadata?.orderId!!
+        val orderId = successEvent.payload.metadata?.externalId!!
         return when(successEvent.type) {
             "payment.succeeded" -> Result.runCatching {
                     log.info("fetching order $orderId")
                     izingaOrderMananger.findOrder(orderId)
-                }
-                .map {
-                    val checksum = yocoConfiguration.checksum("$orderId${it.totalAmount}${it.customerId}")
-                    it.description = "${it.description}:yoco-$checksum:"
-                    it.paymentType = PaymentType.YOCO
-                    it.tag["yoco-checkout-id"] = successEvent.payload.metadata?.checkoutId!!
+                }.map {
+                    val checksum = yocoConfiguration.checksum("$orderId${it?.totalAmount}${it?.customerId}")
+                    it?.description = "${it.description}:yoco-$checksum:"
+                    it?.paymentType = PaymentType.YOCO
+                    it?.tag["yoco-checkout-id"] = successEvent.payload.metadata?.checkoutId!!
                     log.info("finishing order $orderId")
-                    izingaOrderMananger.finishOrder(it.id!!, it)
+                    izingaOrderMananger.finishOrder(it?.id!!, it)
                 }
                 .fold(
                     onSuccess = { ResponseEntity.ok().build() },

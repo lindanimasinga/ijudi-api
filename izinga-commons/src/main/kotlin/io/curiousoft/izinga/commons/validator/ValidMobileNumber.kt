@@ -3,7 +3,7 @@ package io.curiousoft.izinga.commons.validator
 import java.lang.annotation.Documented
 import java.lang.annotation.Retention
 import java.lang.annotation.RetentionPolicy
-import javax.validation.Payload
+import jakarta.validation.Payload
 import kotlin.reflect.KClass
 
 @Target(

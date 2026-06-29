@@ -1,0 +1,134 @@
+package io.curiousoft.izinga.qrcodegenerator.promocodes
+
+import dev.forkhandles.result4k.Failure
+import dev.forkhandles.result4k.Result
+import dev.forkhandles.result4k.resultFrom
+import io.curiousoft.izinga.commons.model.Order
+import io.curiousoft.izinga.commons.model.OrderStage
+import io.curiousoft.izinga.commons.model.UserProfile
+import io.curiousoft.izinga.commons.order.OrderRepository
+import io.curiousoft.izinga.commons.repo.UserProfileRepo
+import io.curiousoft.izinga.qrcodegenerator.promocodes.model.PromoCode
+import io.curiousoft.izinga.qrcodegenerator.promocodes.model.PromoType
+import io.curiousoft.izinga.qrcodegenerator.promocodes.model.RedeemedCode
+import io.curiousoft.izinga.qrcodegenerator.promocodes.model.UserPromoDetails
+import io.curiousoft.izinga.qrcodegenerator.promocodes.repo.PromoCodeRepository
+import io.curiousoft.izinga.qrcodegenerator.promocodes.repo.RedeemedCodeRepository
+import org.springframework.data.repository.findByIdOrNull
+import org.springframework.stereotype.Service
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.util.Date
+
+@Service
+class PromoCodeService(val promoCodeRepository: PromoCodeRepository,
+                       val redeemedCodeRepository: RedeemedCodeRepository,
+                       val userProfileRepo: UserProfileRepo,
+                       val orderRepository: OrderRepository) {
+
+    fun createPromoCodes(promoCodes: List<PromoCode>): List<PromoCode> {
+        promoCodes.map { it.code = it.code.uppercase() }
+        return promoCodeRepository.saveAll(promoCodes)
+    }
+
+    fun getPromoDetailsForUser(userId: String, promoCode: String, orderId: String): Result<UserPromoDetails, Exception> {
+        return redeemedCodeRepository.findByCodeAndUserId(promoCode, userId)
+            ?.let { Failure(Exception("error.userAlreadyRedeemed")) }
+            ?: promoCodeRepository.findByCode(promoCode)
+                ?.let {
+                    userPromoDetails(userId, it, orderId)
+                }
+            ?: Failure(Exception("error.promoCodeNotFound"))
+
+    }
+
+    private fun userPromoDetails(userId: String, promoCode: PromoCode, orderId: String): Result<UserPromoDetails, Exception> {
+        val maxRedemptionReached = redeemedCodeRepository.countByCode(promoCode.code) >= promoCode.maxRedemption
+        if (maxRedemptionReached) {
+            return Failure(Exception("error.maxRedemptionReached"))
+        }
+
+        val order = orderRepository.findById(orderId) ?: return Failure(Exception("error.orderNotFound"))
+
+        return userProfileRepo.findByIdOrNull(userId)?.let {
+            val codeType = promoCode.type
+            when (codeType) {
+                PromoType.DISCOUNT -> userPromoDetailsForAll(it, promoCode, order.get())
+                PromoType.CASH -> userPromoForTips(it, promoCode, order.get())
+                PromoType.SIGNUP -> userPromoDetailsForNewUser(it, promoCode, order.get())
+            }
+        } ?: Failure(Exception("error.userNotFound"))
+    }
+
+    private fun userPromoDetailsForAll(user: UserProfile, promoCode: PromoCode, order: Order): Result<UserPromoDetails, Exception> {
+        promoCode.storeId?.let {
+            if (order.shopId != it) {
+                return Failure(Exception("error.orderFromShopNotEligible"))
+            }
+        }
+
+        return resultFrom {
+            UserPromoDetails(userId = user.id!!,
+                promo = promoCode.code,
+                verified = true,
+                expiry = promoCode.expiryDate,
+                amount = (promoCode.amount ?: promoCode.percentage?.let { (it * order.totalAmount).toBigDecimal() } ?: 0.toBigDecimal()) * (-1).toBigDecimal(),
+                orderId = order.id!!)
+        }
+    }
+
+    private fun userPromoForTips(user: UserProfile, promoCode: PromoCode, order: Order): Result<UserPromoDetails, Exception> {
+        val tipShopId = "adace792-5b97-4708-b1d3-ff8448854b30"
+        order.basket.items.firstOrNull { it.name.lowercase() == "tip" } ?: return Failure(Exception("error.orderNotEligible"))
+
+        val orderCount = orderRepository.findByCustomerIdAndModifiedDateAfter(
+            order.customerId!!,
+            Date.from(LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant())
+        ).count { it.shopId == tipShopId }
+
+        if (orderCount < promoCode.minimumOrderRequired) return Failure(Exception("error.previousOrderMustMeetRequirements"))
+
+        return resultFrom {
+            UserPromoDetails(userId = user.id!!,
+                promo = promoCode.code,
+                verified = true,
+                expiry = promoCode.expiryDate,
+                amount = promoCode.amount ?: 0.toBigDecimal(),
+                orderId = order.id!!
+            )
+        }
+    }
+
+    private fun userPromoDetailsForNewUser(user: UserProfile, promoCode: PromoCode, order: Order): Result<UserPromoDetails, Exception> {
+        val previousOrders = orderRepository.findByCustomerIdAndStage(user.id!!, OrderStage.STAGE_7_ALL_PAID)
+        if (previousOrders?.isNotEmpty() == true) {
+            return Failure(Exception("error.userNotEligible"))
+        }
+
+        return resultFrom {
+            UserPromoDetails(userId = user.id!!,
+                promo = promoCode.code,
+                verified = true,
+                expiry = promoCode.expiryDate,
+                amount = (promoCode.amount ?: promoCode.percentage?.let { (it * order.totalAmount).toBigDecimal() } ?: 0.toBigDecimal()) * (-1).toBigDecimal(),
+                orderId = order.id!!
+            )
+        }
+    }
+
+    fun getAllPromoCodes(type: PromoType?): List<PromoCode> {
+        return type?.let {
+            promoCodeRepository.findByExpiryDateAfterAndType(LocalDateTime.now(), it)
+        } ?: promoCodeRepository.findByExpiryDateAfter(LocalDateTime.now())
+    }
+
+    fun redeem(userPromoDetails: UserPromoDetails): Result<RedeemedCode, Exception> {
+        return resultFrom {
+            redeemedCodeRepository.save(RedeemedCode(
+                code = userPromoDetails.promo,
+                userId = userPromoDetails.userId,
+                date = LocalDateTime.now()))
+        }
+    }
+}

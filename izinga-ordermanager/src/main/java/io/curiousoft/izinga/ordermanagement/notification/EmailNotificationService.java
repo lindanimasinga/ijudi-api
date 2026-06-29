@@ -1,12 +1,13 @@
 package io.curiousoft.izinga.ordermanagement.notification;
 
+import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingList;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.model.ProfileRoles;
 import io.curiousoft.izinga.commons.model.StoreProfile;
 import io.curiousoft.izinga.commons.model.UserProfile;
-import io.curiousoft.izinga.ordermanagement.service.StoreService;
+import io.curiousoft.izinga.ordermanagement.stores.StoreService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -102,5 +103,9 @@ public class EmailNotificationService {
         } catch (JsonProcessingException e) {
             e.printStackTrace();
         }
+    }
+
+    public void sendShoppingListRunNotification(UserProfile customer, ShoppingList shoppingList) {
+        // This method can be implemented to send a notification about the shopping list run
     }
 }
