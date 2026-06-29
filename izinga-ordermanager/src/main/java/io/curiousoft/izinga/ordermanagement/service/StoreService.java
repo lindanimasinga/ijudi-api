@@ -69,8 +69,58 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
             profile.setCategories(persisted.getCategories());
         }
 
-        profile.setMarkUp(markupPercentage);
-        return super.update(profileId, profile);
+        // #65 — PATCH data-loss fix: merge only non-null fields from the incoming request onto
+        // the already-loaded persisted entity. Calling super.update() would do a blind
+        // BeanUtils.copyProperties(profile, persisted) which overwrites every field — including
+        // fields the caller never sent — with null.  We own the save here instead.
+        mergeNonNullFields(profile, persisted);
+        persisted.setMarkUp(markupPercentage);
+        return profileRepo.save(persisted);
+    }
+
+    /**
+     * Copies non-null StoreProfile and Profile fields from {@code src} onto {@code dest}.
+     * Fields that are null in {@code src} are left unchanged on {@code dest}, preserving
+     * PATCH semantics.  Only the fields declared on StoreProfile and its Profile superclass
+     * that are meaningful to update are enumerated here — id, role, and internal state
+     * fields (stockList etc.) are intentionally excluded or handled elsewhere.
+     */
+    private void mergeNonNullFields(StoreProfile src, StoreProfile dest) {
+        // Profile base fields
+        if (src.getName() != null)          dest.setName(src.getName());
+        if (src.getAddress() != null)       dest.setAddress(src.getAddress());
+        if (src.getImageUrl() != null)      dest.setImageUrl(src.getImageUrl());
+        if (src.getMobileNumber() != null)  dest.setMobileNumber(src.getMobileNumber());
+        if (src.getSurname() != null)       dest.setSurname(src.getSurname());
+        if (src.getDescription() != null)   dest.setDescription(src.getDescription());
+        if (src.getEmailAddress() != null)  dest.setEmailAddress(src.getEmailAddress());
+        if (src.getBank() != null)          dest.setBank(src.getBank());
+        if (src.getLatitude() != 0.0)       dest.setLatitude(src.getLatitude());
+        if (src.getLongitude() != 0.0)      dest.setLongitude(src.getLongitude());
+        // StoreProfile-specific fields
+        if (src.getStoreType() != null)     dest.setStoreType(src.getStoreType());
+        if (src.getShortName() != null)     dest.setShortName(src.getShortName());
+        if (src.getTags() != null)          dest.setTags(src.getTags());
+        if (src.getBusinessHours() != null) dest.setBusinessHours(src.getBusinessHours());
+        if (src.getOwnerId() != null)       dest.setOwnerId(src.getOwnerId());
+        if (src.getRegNumber() != null)     dest.setRegNumber(src.getRegNumber());
+        if (src.getStoreWebsiteUrl() != null) dest.setStoreWebsiteUrl(src.getStoreWebsiteUrl());
+        if (src.getFranchiseName() != null) dest.setFranchiseName(src.getFranchiseName());
+        if (src.getFeaturedExpiry() != null) dest.setFeaturedExpiry(src.getFeaturedExpiry());
+        // Primitive/boolean fields — always copy (no null sentinel available)
+        dest.setHasVat(src.getHasVat());
+        dest.setFeatured(src.getFeatured());
+        dest.setIzingaTakesCommission(src.getIzingaTakesCommission());
+        dest.setScheduledDeliveryAllowed(src.getScheduledDeliveryAllowed());
+        dest.setAvailability(src.getAvailability());
+        dest.setFreeDeliveryMinAmount(src.getFreeDeliveryMinAmount());
+        dest.setMarkUpPrice(src.getMarkUpPrice());
+        dest.setMinimumDepositAllowedPerc(src.getMinimumDepositAllowedPerc());
+        dest.setStandardDeliveryPrice(src.getStandardDeliveryPrice());
+        dest.setStandardDeliveryKm(src.getStandardDeliveryKm());
+        dest.setRatePerKm(src.getRatePerKm());
+        // categories: already resolved above (persisted or incoming) — always copy the resolved value
+        dest.setCategories(src.getCategories());
     }
 
     /**

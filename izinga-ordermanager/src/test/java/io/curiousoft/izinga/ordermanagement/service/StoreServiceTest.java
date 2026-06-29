@@ -1171,6 +1171,59 @@ public class StoreServiceTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────
+    // #65 — PATCH data-loss fix: null fields on incoming request must not wipe persisted data
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    @Test
+    public void update_partialPatch_categoriesOnly_doesNotWipeNameAddressLatitude() throws Exception {
+        // given — persisted store has name, address, latitude set
+        String profileId = "store-65";
+        StoreProfile persisted = makeStore(profileId);
+        persisted.setName("Original Name");
+        persisted.setAddress("123 Main St");
+        persisted.setLatitude(-26.2041);
+        persisted.setLongitude(28.0473);
+        List<Category> existingCats = Collections.singletonList(new Category("c-old", "OldCategory", "", true));
+        persisted.setCategories(existingCats);
+
+        // incoming payload: only categories is set; name/address/latitude are null / 0
+        StoreProfile incoming = new StoreProfile(
+                StoreType.FOOD,
+                null,  // name is null — caller did not send it
+                null,  // shortName null
+                null,  // address null
+                null,  // imageUrl null
+                null,  // mobileNumber null
+                null,  // tags null
+                null,  // businessHours null
+                null,  // ownerId null
+                null   // bank null
+        );
+        incoming.setId(profileId);
+        // Only categories provided — must match a stock tag (store has no stock, so validation skips)
+        incoming.setCategories(Collections.singletonList(new Category("c-new", "NewCategory", "", true)));
+
+        when(storeRepository.findById(profileId)).thenReturn(Optional.of(persisted));
+        when(storeRepository.save(any(StoreProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        StoreProfile result = storeService.update(profileId, incoming);
+
+        // then — categories updated
+        Assert.assertEquals(1, result.getCategories().size());
+        Assert.assertEquals("NewCategory", result.getCategories().get(0).getName());
+
+        // then — persisted fields NOT wiped by the null incoming fields
+        Assert.assertEquals("Original Name must be preserved", "Original Name", result.getName());
+        Assert.assertEquals("Address must be preserved", "123 Main St", result.getAddress());
+        Assert.assertEquals("Latitude must be preserved", -26.2041, result.getLatitude(), 0.0001);
+        Assert.assertEquals("Longitude must be preserved", 28.0473, result.getLongitude(), 0.0001);
+
+        // save called exactly once on the persisted object (not on the raw incoming)
+        verify(storeRepository, times(1)).save(persisted);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
     // Helper
     // ─────────────────────────────────────────────────────────────────────────────────────────────
 
