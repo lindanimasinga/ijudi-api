@@ -149,12 +149,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <configuration>
-                    <!-- Java 23 exceeds Byte Buddy's officially supported range (Java 20).
-                         This flag enables experimental support so Mockito inline mocking
-                         (required for final Kotlin classes) works on the current JVM. -->
-                    <argLine>-Dnet.bytebuddy.experimental=true</argLine>
-                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

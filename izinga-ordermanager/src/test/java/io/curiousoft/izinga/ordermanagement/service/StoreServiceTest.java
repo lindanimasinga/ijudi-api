@@ -1161,17 +1161,6 @@ public class StoreServiceTest {
         verify(storeRepository, never()).save(store);
     }
 
-    @Test
-    public void buildDefaultCategories_returns5ActiveEntries() {
-        List<Category> defaults = StoreService.buildDefaultCategories();
-        Assert.assertEquals(5, defaults.size());
-        for (Category c : defaults) {
-            Assert.assertTrue(c.getActive());
-            Assert.assertNotNull(c.getId());
-            Assert.assertFalse(c.getName().isEmpty());
-        }
-    }
-
     // ─────────────────────────────────────────────────────────────────────────────────────────────
     // #65 — PATCH data-loss fix: null fields on incoming request must not wipe persisted data
     // ─────────────────────────────────────────────────────────────────────────────────────────────

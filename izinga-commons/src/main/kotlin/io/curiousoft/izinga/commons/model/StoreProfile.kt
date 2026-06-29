@@ -44,7 +44,6 @@ class StoreProfile(
     var regNumber: String? = null
     var stockList: HashSet<Stock> = HashSet()
     var hasVat = false
-    var hasPaymentAgreement = false
     var featured = false
     var featuredExpiry: Date? = null
     var storeMessenger: HashSet<StoreMessenger>? = HashSet()
@@ -56,10 +55,7 @@ class StoreProfile(
     var markUpPrice = true
     var minimumDepositAllowedPerc = 1.0
     var franchiseName: String? = null
-    var deliversFromMultipleAddresses: Boolean? = null;
-    var generateMissingImages: Boolean = false;
     var rates: Rates? = null
-    var isQuoteRequired: Boolean = false
     /** Delivery/product categories for this store. Never null — defaults to empty list. */
     var categories: List<Category> = emptyList()
     /** Whether the store has an active payment agreement with iZinga. */
@@ -70,12 +66,6 @@ class StoreProfile(
     var generateMissingImages: Boolean = false
     /** Whether a quote must be accepted by the customer before the order is confirmed. */
     var isQuoteRequired: Boolean = false
-    /**
-     * Per-vehicle-category delivery rate overrides, keyed by category label
-     * (e.g. "Bike Delivery Driver", "Small/Medium Vehicle Driver", "Bakkie Delivery Driver", "Truck Delivery Driver").
-     * When null the store-level [ratePerKm] is used; when present the matching key takes precedence.
-     */
-    var rates: MutableMap<String, Double>? = null
 
     init {
         super.bank = bank
