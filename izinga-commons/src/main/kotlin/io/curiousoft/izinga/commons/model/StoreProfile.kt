@@ -11,6 +11,23 @@ import jakarta.validation.constraints.NotEmpty
 import jakarta.validation.constraints.NotNull
 import kotlin.collections.HashSet
 
+/**
+ * A delivery or product category associated with a store.
+ *
+ * [name] must match a StockItem tag exactly (case-sensitive) — this invariant is enforced in
+ * StoreService before any create/update that includes categories.
+ *
+ * [image] is intentionally left as an empty string or placeholder S3 URL at seed time;
+ * the onboarding team uploads real images via the existing S3 document endpoint.
+ * TODO #62: Verify S3 bucket ACL allows public-read on category images (DevOps/Lindani item — out of scope here).
+ */
+data class Category(
+    val id: String,
+    val name: String,
+    val image: String,
+    val active: Boolean
+)
+
 class StoreProfile(
     var storeType: @NotNull(message = "storeType is not valid") StoreType?,
     name: @NotBlank(message = "profile name not valid") String?,
@@ -27,7 +44,6 @@ class StoreProfile(
     var regNumber: String? = null
     var stockList: HashSet<Stock> = HashSet()
     var hasVat = false
-    var hasPaymentAgreement = false
     var featured = false
     var featuredExpiry: Date? = null
     var storeMessenger: HashSet<StoreMessenger>? = HashSet()
@@ -39,9 +55,16 @@ class StoreProfile(
     var markUpPrice = true
     var minimumDepositAllowedPerc = 1.0
     var franchiseName: String? = null
-    var deliversFromMultipleAddresses: Boolean? = null;
-    var generateMissingImages: Boolean = false;
     var rates: Rates? = null
+    /** Delivery/product categories for this store. Never null — defaults to empty list. */
+    var categories: List<Category> = emptyList()
+    /** Whether the store has an active payment agreement with iZinga. */
+    var hasPaymentAgreement: Boolean = false
+    /** Whether the store can fulfill orders from more than one physical address. */
+    var deliversFromMultipleAddresses: Boolean = false
+    /** Whether the system should auto-generate missing stock images for this store. */
+    var generateMissingImages: Boolean = false
+    /** Whether a quote must be accepted by the customer before the order is confirmed. */
     var isQuoteRequired: Boolean = false
 
     init {

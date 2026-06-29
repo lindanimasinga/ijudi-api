@@ -49,12 +49,6 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
     }
 
     @Override
-    public StoreProfile update(String profileId, StoreProfile profile) throws Exception {
-        profile.setMarkUp(markupPercentage);
-        return super.update(profileId, profile);
-    }
-
-    @Override
     public List<StoreProfile> findAll() {
         return super.findAll()
                 .stream()
@@ -80,9 +74,29 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
             profileRepo.save(store);
         }
         if (store != null) {
+            // #60 — Lazy-seed default categories when the store has none.
+            // This is idempotent: if categories are already populated the branch is skipped entirely.
+            // Images are left as empty strings; the onboarding team uploads real images via the S3 endpoint.
+            // TODO #62: Confirm S3 bucket ACL allows public-read on category images before uploading (DevOps/Lindani item).
+            if (store.getCategories() == null || store.getCategories().isEmpty()) {
+                List<Category> defaults = buildDefaultCategories();
+                store.setCategories(defaults);
+                profileRepo.save(store);
+            }
             store.setMarkUp(markupPercentage);
         }
         return store;
+    }
+
+    /** Builds the 5 default delivery categories seeded for every new store on first GET. */
+    static List<Category> buildDefaultCategories() {
+        return Arrays.asList(
+                new Category(UUID.randomUUID().toString(), "Large Furniture", "", true),
+                new Category(UUID.randomUUID().toString(), "Small Furniture & Large Parcels", "", true),
+                new Category(UUID.randomUUID().toString(), "Small Parcels", "", true),
+                new Category(UUID.randomUUID().toString(), "Medicine", "", true),
+                new Category(UUID.randomUUID().toString(), "Parcels (General)", "", true)
+        );
     }
 
 
