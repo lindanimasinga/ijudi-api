@@ -79,6 +79,11 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
      * @throws IllegalArgumentException if any category name is not present in the store's StockItem tags
      */
     private void validateCategoryNames(StoreProfile store, List<Category> categories) {
+        // #59 — New stores have no stock yet; tag-matching is meaningless without stock items.
+        // Skip validation entirely so the default seeded categories can be saved.
+        if (store.getStockList() == null || store.getStockList().isEmpty()) {
+            return;
+        }
         Set<String> knownTags = store.getStockList().stream()
                 .filter(stock -> stock.getTags() != null)
                 .flatMap(stock -> stock.getTags().stream())

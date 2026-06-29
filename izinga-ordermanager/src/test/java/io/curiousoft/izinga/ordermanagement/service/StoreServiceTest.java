@@ -1070,6 +1070,35 @@ public class StoreServiceTest {
         verify(storeRepository, never()).save(any());
     }
 
+    @Test
+    public void update_presentCategories_storeHasNoStock_savesWithoutValidation() throws Exception {
+        // #59 — New stores have no stock items; tag-validation must be skipped entirely
+        // so the 5 default seeded categories can be saved during onboarding.
+        String profileId = "newStoreId";
+        StoreProfile persisted = makeStore(profileId);
+        // stockList is empty by default for a new store — no need to add any items
+        Assert.assertTrue("Pre-condition: stockList must be empty", persisted.getStockList().isEmpty());
+
+        StoreProfile incoming = makeStore(profileId);
+        incoming.setCategories(Arrays.asList(
+                new Category("c1", "Large Furniture", "", true),
+                new Category("c2", "Small Furniture & Large Parcels", "", true),
+                new Category("c3", "Small Parcels", "", true),
+                new Category("c4", "Medicine", "", true),
+                new Category("c5", "Parcels (General)", "", true)
+        ));
+
+        when(storeRepository.findById(profileId)).thenReturn(Optional.of(persisted));
+        when(storeRepository.save(any(StoreProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // when — must not throw
+        StoreProfile result = storeService.update(profileId, incoming);
+
+        // then — categories persisted, save called
+        Assert.assertNotNull(result);
+        verify(storeRepository, atLeastOnce()).save(any(StoreProfile.class));
+    }
+
     // ─────────────────────────────────────────────────────────────────────────────────────────────
     // #60 — Lazy-seed: empty categories triggers seed and persist
     // ─────────────────────────────────────────────────────────────────────────────────────────────
