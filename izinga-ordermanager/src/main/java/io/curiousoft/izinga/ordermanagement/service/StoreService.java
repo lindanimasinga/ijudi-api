@@ -46,8 +46,51 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
 
     @Override
     public StoreProfile update(String profileId, StoreProfile profile) throws Exception {
+        // #58 — PATCH / merge semantics for categories.
+        // Load the persisted store first so we can decide whether to preserve or replace categories.
+        // super.update() will call findById again internally (BeanUtils.copyProperties path), which is
+        // acceptable — the extra load is cheap and keeps the merge logic self-contained here.
+        StoreProfile persisted = profileRepo.findById(profileId)
+                .orElseThrow(() -> new Exception("Profile not found"));
+
+        List<Category> incomingCategories = profile.getCategories();
+
+        if (incomingCategories != null && !incomingCategories.isEmpty()) {
+            // #59 — Name/tag validation: the caller is explicitly providing categories.
+            // Each Category.name must match a StockItem tag exactly (case-sensitive).
+            // Stock.tags is a List<String> per stock item; we collect the full tag universe for this store.
+            // NOTE: If no stock items have tags yet, all category names will fail validation.
+            // In that scenario the store admin must add tagged stock items first, or use the seeded defaults
+            // (which are seeded before any category update is accepted).
+            validateCategoryNames(persisted, incomingCategories);
+            // Validation passed — allow the incoming categories to overwrite.
+        } else {
+            // Caller sent empty/absent categories — preserve persisted categories (PATCH semantics).
+            profile.setCategories(persisted.getCategories());
+        }
+
         profile.setMarkUp(markupPercentage);
         return super.update(profileId, profile);
+    }
+
+    /**
+     * Validates that each category name matches a known StockItem tag (case-sensitive) in this store.
+     *
+     * @throws IllegalArgumentException if any category name is not present in the store's StockItem tags
+     */
+    private void validateCategoryNames(StoreProfile store, List<Category> categories) {
+        Set<String> knownTags = store.getStockList().stream()
+                .filter(stock -> stock.getTags() != null)
+                .flatMap(stock -> stock.getTags().stream())
+                .collect(Collectors.toSet());
+
+        for (Category category : categories) {
+            if (!knownTags.contains(category.getName())) {
+                throw new IllegalArgumentException(
+                        "Category name '" + category.getName() + "' does not match any known StockItem tag. " +
+                        "Category names must match StockItem tags exactly (case-sensitive).");
+            }
+        }
     }
 
     @Override
@@ -75,9 +118,29 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
             profileRepo.save(store);
         }
         if (store != null) {
+            // #60 — Lazy-seed default categories when the store has none.
+            // This is idempotent: if categories are already populated the branch is skipped entirely.
+            // Images are left as empty strings; the onboarding team uploads real images via the S3 endpoint.
+            // TODO #62: Confirm S3 bucket ACL allows public-read on category images before uploading (DevOps/Lindani item).
+            if (store.getCategories() == null || store.getCategories().isEmpty()) {
+                List<Category> defaults = buildDefaultCategories();
+                store.setCategories(defaults);
+                profileRepo.save(store);
+            }
             store.setMarkUp(markupPercentage);
         }
         return store;
+    }
+
+    /** Builds the 5 default delivery categories seeded for every new store on first GET. */
+    static List<Category> buildDefaultCategories() {
+        return Arrays.asList(
+                new Category(UUID.randomUUID().toString(), "Large Furniture", "", true),
+                new Category(UUID.randomUUID().toString(), "Small Furniture & Large Parcels", "", true),
+                new Category(UUID.randomUUID().toString(), "Small Parcels", "", true),
+                new Category(UUID.randomUUID().toString(), "Medicine", "", true),
+                new Category(UUID.randomUUID().toString(), "Parcels (General)", "", true)
+        );
     }
 
 

@@ -11,6 +11,23 @@ import javax.validation.constraints.NotEmpty
 import javax.validation.constraints.NotNull
 import kotlin.collections.HashSet
 
+/**
+ * A delivery or product category associated with a store.
+ *
+ * [name] must match a StockItem tag exactly (case-sensitive) — this invariant is enforced in
+ * StoreService before any create/update that includes categories.
+ *
+ * [image] is intentionally left as an empty string or placeholder S3 URL at seed time;
+ * the onboarding team uploads real images via the existing S3 document endpoint.
+ * TODO #62: Verify S3 bucket ACL allows public-read on category images (DevOps/Lindani item — out of scope here).
+ */
+data class Category(
+    val id: String,
+    val name: String,
+    val image: String,
+    val active: Boolean
+)
+
 class StoreProfile(
     var storeType: @NotNull(message = "storeType is not valid") StoreType?,
     name: @NotBlank(message = "profile name not valid") String?,
@@ -42,6 +59,8 @@ class StoreProfile(
     var standardDeliveryKm = 0.0
     var ratePerKm = 0.0
     var franchiseName: String? = null
+    /** Delivery/product categories for this store. Never null — defaults to empty list. */
+    var categories: List<Category> = emptyList()
 
     init {
         super.bank = bank

@@ -162,6 +162,11 @@ public class SchedulerService {
 
     @Scheduled(cron = "* 12 7,10 * * *")// 10 minutes
     public void publishMenuOfTheDay() throws IOException {
-        Application.main(new String[]{});
+        try {
+            Application.main(new String[]{});
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Menu update interrupted", e);
+        }
     }
 }
