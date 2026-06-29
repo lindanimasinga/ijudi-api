@@ -61,6 +61,20 @@ class StoreProfile(
     var franchiseName: String? = null
     /** Delivery/product categories for this store. Never null — defaults to empty list. */
     var categories: List<Category> = emptyList()
+    /** Whether the store has an active payment agreement with iZinga. */
+    var hasPaymentAgreement: Boolean = false
+    /** Whether the store can fulfill orders from more than one physical address. */
+    var deliversFromMultipleAddresses: Boolean = false
+    /** Whether the system should auto-generate missing stock images for this store. */
+    var generateMissingImages: Boolean = false
+    /** Whether a quote must be accepted by the customer before the order is confirmed. */
+    var isQuoteRequired: Boolean = false
+    /**
+     * Per-vehicle-category delivery rate overrides, keyed by category label
+     * (e.g. "Bike Delivery Driver", "Small/Medium Vehicle Driver", "Bakkie Delivery Driver", "Truck Delivery Driver").
+     * When null the store-level [ratePerKm] is used; when present the matching key takes precedence.
+     */
+    var rates: MutableMap<String, Double>? = null
 
     init {
         super.bank = bank

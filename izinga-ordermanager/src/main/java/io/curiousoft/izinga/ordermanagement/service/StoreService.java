@@ -107,6 +107,22 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         if (src.getStoreWebsiteUrl() != null) dest.setStoreWebsiteUrl(src.getStoreWebsiteUrl());
         if (src.getFranchiseName() != null) dest.setFranchiseName(src.getFranchiseName());
         if (src.getFeaturedExpiry() != null) dest.setFeaturedExpiry(src.getFeaturedExpiry());
+        // Profile base fields — object/nullable
+        if (src.getAvailabilityStatus() != null) dest.setAvailabilityStatus(src.getAvailabilityStatus());
+        if (src.getServiceType() != null)         dest.setServiceType(src.getServiceType());
+        if (src.getDocuments() != null)           dest.setDocuments(src.getDocuments());
+        if (src.getProfileApprovedDate() != null) dest.setProfileApprovedDate(src.getProfileApprovedDate());
+        // yearsInService — int primitive, 0 is the default/unset sentinel; only copy when caller explicitly sent a positive value.
+        if (src.getYearsInService() > 0)          dest.setYearsInService(src.getYearsInService());
+        // profileApproved — boolean primitive; no null sentinel exists.
+        // LIMITATION: a PATCH that intentionally un-approves a store (false → false when persisted is true)
+        // cannot be distinguished from a PATCH that omitted the field.  The safe default is to preserve the
+        // persisted approval state unless the incoming value is true, which is the only unambiguous signal.
+        // An explicit revoke must be done via a dedicated admin endpoint that sets this field directly.
+        if (src.getProfileApproved()) dest.setProfileApproved(true);
+        // StoreProfile-specific object/nullable fields
+        if (src.getStoreMessenger() != null)              dest.setStoreMessenger(src.getStoreMessenger());
+        if (src.getRates() != null)                       dest.setRates(src.getRates());
         // Primitive/boolean fields — always copy (no null sentinel available)
         dest.setHasVat(src.getHasVat());
         dest.setFeatured(src.getFeatured());
@@ -119,6 +135,14 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         dest.setStandardDeliveryPrice(src.getStandardDeliveryPrice());
         dest.setStandardDeliveryKm(src.getStandardDeliveryKm());
         dest.setRatePerKm(src.getRatePerKm());
+        // StoreProfile boolean primitives — copy-if-true pattern (same limitation as profileApproved above:
+        // a PATCH that omits these fields sends false, which is indistinguishable from an intentional clear.
+        // The safe default is to preserve the persisted value unless the incoming value is true — the only
+        // unambiguous signal.  An explicit revoke must be done via a dedicated admin endpoint.)
+        if (src.getHasPaymentAgreement())          dest.setHasPaymentAgreement(true);
+        if (src.getDeliversFromMultipleAddresses()) dest.setDeliversFromMultipleAddresses(true);
+        if (src.getGenerateMissingImages())         dest.setGenerateMissingImages(true);
+        if (src.isQuoteRequired())                  dest.setQuoteRequired(true);
         // categories: already resolved above (persisted or incoming) — always copy the resolved value
         dest.setCategories(src.getCategories());
     }

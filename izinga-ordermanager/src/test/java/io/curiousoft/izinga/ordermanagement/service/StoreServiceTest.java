@@ -1224,6 +1224,274 @@ public class StoreServiceTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────
+    // #65 — profileApproved must never be reset by a partial PATCH
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    @Test
+    public void update_partialPatch_doesNotResetProfileApproved() throws Exception {
+        // given — store is live and approved
+        String profileId = "approved-store";
+        StoreProfile persisted = makeStore(profileId);
+        persisted.setProfileApproved(true);
+
+        // incoming PATCH contains only a name update; profileApproved is not sent (defaults to false)
+        StoreProfile incoming = new StoreProfile(
+                StoreType.FOOD,
+                "Updated Name",
+                null, null, null, null, null, null, null, null
+        );
+        incoming.setId(profileId);
+        // profileApproved defaults to false on a freshly constructed StoreProfile
+
+        when(storeRepository.findById(profileId)).thenReturn(Optional.of(persisted));
+        when(storeRepository.save(any(StoreProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        StoreProfile result = storeService.update(profileId, incoming);
+
+        // then — name updated; approval state preserved
+        Assert.assertEquals("Updated Name", result.getName());
+        Assert.assertTrue("profileApproved must remain true after a partial PATCH that omits the field",
+                result.getProfileApproved());
+
+        verify(storeRepository, times(1)).save(persisted);
+    }
+
+    @Test
+    public void update_partialPatch_profileApprovedTrue_setsApproval() throws Exception {
+        // given — store is not yet approved
+        String profileId = "unapproved-store";
+        StoreProfile persisted = makeStore(profileId);
+        Assert.assertFalse("Pre-condition: store must not be approved", persisted.getProfileApproved());
+
+        // incoming PATCH explicitly sets profileApproved = true (e.g. admin approval action)
+        StoreProfile incoming = new StoreProfile(
+                StoreType.FOOD,
+                null, null, null, null, null, null, null, null, null
+        );
+        incoming.setId(profileId);
+        incoming.setProfileApproved(true);
+
+        when(storeRepository.findById(profileId)).thenReturn(Optional.of(persisted));
+        when(storeRepository.save(any(StoreProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        StoreProfile result = storeService.update(profileId, incoming);
+
+        // then — approval granted
+        Assert.assertTrue("profileApproved must be true when incoming sends true", result.getProfileApproved());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+    // #65 — hasPaymentAgreement must not be reset by a partial PATCH
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    @Test
+    public void update_partialPatch_doesNotResetHasPaymentAgreement() throws Exception {
+        // given — store has a payment agreement in place
+        String profileId = "payment-agreement-store";
+        StoreProfile persisted = makeStore(profileId);
+        persisted.setHasPaymentAgreement(true);
+
+        // incoming PATCH omits hasPaymentAgreement (defaults to false)
+        StoreProfile incoming = new StoreProfile(
+                StoreType.FOOD, "Updated Name", null, null, null, null, null, null, null, null);
+        incoming.setId(profileId);
+
+        when(storeRepository.findById(profileId)).thenReturn(Optional.of(persisted));
+        when(storeRepository.save(any(StoreProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        StoreProfile result = storeService.update(profileId, incoming);
+
+        // then — agreement preserved
+        Assert.assertTrue("hasPaymentAgreement must remain true after a partial PATCH that omits the field",
+                result.getHasPaymentAgreement());
+        verify(storeRepository, times(1)).save(persisted);
+    }
+
+    @Test
+    public void update_partialPatch_hasPaymentAgreementTrue_setsAgreement() throws Exception {
+        // given — store does not yet have a payment agreement
+        String profileId = "no-agreement-store";
+        StoreProfile persisted = makeStore(profileId);
+        Assert.assertFalse("Pre-condition: hasPaymentAgreement must be false", persisted.getHasPaymentAgreement());
+
+        // incoming PATCH explicitly sets hasPaymentAgreement = true
+        StoreProfile incoming = new StoreProfile(
+                StoreType.FOOD, null, null, null, null, null, null, null, null, null);
+        incoming.setId(profileId);
+        incoming.setHasPaymentAgreement(true);
+
+        when(storeRepository.findById(profileId)).thenReturn(Optional.of(persisted));
+        when(storeRepository.save(any(StoreProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        StoreProfile result = storeService.update(profileId, incoming);
+
+        // then — agreement granted
+        Assert.assertTrue("hasPaymentAgreement must be true when incoming sends true",
+                result.getHasPaymentAgreement());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+    // #65 — deliversFromMultipleAddresses must not be reset by a partial PATCH
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    @Test
+    public void update_partialPatch_doesNotResetDeliversFromMultipleAddresses() throws Exception {
+        // given — store delivers from multiple addresses
+        String profileId = "multi-address-store";
+        StoreProfile persisted = makeStore(profileId);
+        persisted.setDeliversFromMultipleAddresses(true);
+
+        // incoming PATCH omits deliversFromMultipleAddresses (defaults to false)
+        StoreProfile incoming = new StoreProfile(
+                StoreType.FOOD, "Updated Name", null, null, null, null, null, null, null, null);
+        incoming.setId(profileId);
+
+        when(storeRepository.findById(profileId)).thenReturn(Optional.of(persisted));
+        when(storeRepository.save(any(StoreProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        StoreProfile result = storeService.update(profileId, incoming);
+
+        // then — flag preserved
+        Assert.assertTrue("deliversFromMultipleAddresses must remain true after a partial PATCH that omits the field",
+                result.getDeliversFromMultipleAddresses());
+        verify(storeRepository, times(1)).save(persisted);
+    }
+
+    @Test
+    public void update_partialPatch_deliversFromMultipleAddressesTrue_setsFlag() throws Exception {
+        // given — store does not yet deliver from multiple addresses
+        String profileId = "single-address-store";
+        StoreProfile persisted = makeStore(profileId);
+        Assert.assertFalse("Pre-condition: deliversFromMultipleAddresses must be false",
+                persisted.getDeliversFromMultipleAddresses());
+
+        // incoming PATCH explicitly sets the flag to true
+        StoreProfile incoming = new StoreProfile(
+                StoreType.FOOD, null, null, null, null, null, null, null, null, null);
+        incoming.setId(profileId);
+        incoming.setDeliversFromMultipleAddresses(true);
+
+        when(storeRepository.findById(profileId)).thenReturn(Optional.of(persisted));
+        when(storeRepository.save(any(StoreProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        StoreProfile result = storeService.update(profileId, incoming);
+
+        // then — flag set
+        Assert.assertTrue("deliversFromMultipleAddresses must be true when incoming sends true",
+                result.getDeliversFromMultipleAddresses());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+    // #65 — generateMissingImages must not be reset by a partial PATCH
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    @Test
+    public void update_partialPatch_doesNotResetGenerateMissingImages() throws Exception {
+        // given — store has image generation enabled
+        String profileId = "image-gen-store";
+        StoreProfile persisted = makeStore(profileId);
+        persisted.setGenerateMissingImages(true);
+
+        // incoming PATCH omits generateMissingImages (defaults to false)
+        StoreProfile incoming = new StoreProfile(
+                StoreType.FOOD, "Updated Name", null, null, null, null, null, null, null, null);
+        incoming.setId(profileId);
+
+        when(storeRepository.findById(profileId)).thenReturn(Optional.of(persisted));
+        when(storeRepository.save(any(StoreProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        StoreProfile result = storeService.update(profileId, incoming);
+
+        // then — flag preserved
+        Assert.assertTrue("generateMissingImages must remain true after a partial PATCH that omits the field",
+                result.getGenerateMissingImages());
+        verify(storeRepository, times(1)).save(persisted);
+    }
+
+    @Test
+    public void update_partialPatch_generateMissingImagesTrue_setsFlag() throws Exception {
+        // given — store does not yet have image generation enabled
+        String profileId = "no-image-gen-store";
+        StoreProfile persisted = makeStore(profileId);
+        Assert.assertFalse("Pre-condition: generateMissingImages must be false",
+                persisted.getGenerateMissingImages());
+
+        // incoming PATCH explicitly sets the flag to true
+        StoreProfile incoming = new StoreProfile(
+                StoreType.FOOD, null, null, null, null, null, null, null, null, null);
+        incoming.setId(profileId);
+        incoming.setGenerateMissingImages(true);
+
+        when(storeRepository.findById(profileId)).thenReturn(Optional.of(persisted));
+        when(storeRepository.save(any(StoreProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        StoreProfile result = storeService.update(profileId, incoming);
+
+        // then — flag set
+        Assert.assertTrue("generateMissingImages must be true when incoming sends true",
+                result.getGenerateMissingImages());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+    // #65 — quoteRequired must not be reset by a partial PATCH
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    @Test
+    public void update_partialPatch_doesNotResetQuoteRequired() throws Exception {
+        // given — store requires a quote before checkout
+        String profileId = "quote-required-store";
+        StoreProfile persisted = makeStore(profileId);
+        persisted.setQuoteRequired(true);
+
+        // incoming PATCH omits quoteRequired (defaults to false)
+        StoreProfile incoming = new StoreProfile(
+                StoreType.FOOD, "Updated Name", null, null, null, null, null, null, null, null);
+        incoming.setId(profileId);
+
+        when(storeRepository.findById(profileId)).thenReturn(Optional.of(persisted));
+        when(storeRepository.save(any(StoreProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        StoreProfile result = storeService.update(profileId, incoming);
+
+        // then — flag preserved
+        Assert.assertTrue("quoteRequired must remain true after a partial PATCH that omits the field",
+                result.isQuoteRequired());
+        verify(storeRepository, times(1)).save(persisted);
+    }
+
+    @Test
+    public void update_partialPatch_quoteRequiredTrue_setsFlag() throws Exception {
+        // given — store does not yet require a quote
+        String profileId = "no-quote-store";
+        StoreProfile persisted = makeStore(profileId);
+        Assert.assertFalse("Pre-condition: quoteRequired must be false", persisted.isQuoteRequired());
+
+        // incoming PATCH explicitly sets quoteRequired = true
+        StoreProfile incoming = new StoreProfile(
+                StoreType.FOOD, null, null, null, null, null, null, null, null, null);
+        incoming.setId(profileId);
+        incoming.setQuoteRequired(true);
+
+        when(storeRepository.findById(profileId)).thenReturn(Optional.of(persisted));
+        when(storeRepository.save(any(StoreProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        StoreProfile result = storeService.update(profileId, incoming);
+
+        // then — flag set
+        Assert.assertTrue("quoteRequired must be true when incoming sends true", result.isQuoteRequired());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
     // Helper
     // ─────────────────────────────────────────────────────────────────────────────────────────────
 

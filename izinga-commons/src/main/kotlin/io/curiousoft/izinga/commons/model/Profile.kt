@@ -33,6 +33,14 @@ open class Profile(
     var latitude = 0.0
     var longitude = 0.0
     var availabilityStatus: ProfileAvailabilityStatus = ProfileAvailabilityStatus.ONLINE
+    /** Broad service category label for this profile (e.g. "Delivery", "Food", "Salon"). */
+    var serviceType: String? = null
+    /** Document URLs or storage keys associated with this profile (e.g. ID copy, business licence). */
+    var documents: MutableList<String>? = null
+    /** Whether this profile has been approved by an iZinga admin. CRITICAL: never reset by a PATCH — see StoreService.mergeNonNullFields. */
+    var profileApproved: Boolean = false
+    /** Date on which the profile was approved; null until first approval. */
+    var profileApprovedDate: java.util.Date? = null
 }
 
 enum class ProfileAvailabilityStatus {
