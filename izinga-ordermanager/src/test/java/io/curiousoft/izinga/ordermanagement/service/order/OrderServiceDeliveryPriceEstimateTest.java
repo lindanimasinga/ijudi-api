@@ -12,6 +12,7 @@ import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationServic
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
 import io.curiousoft.izinga.ordermanagement.orders.RestrictedRegionService;
 import io.curiousoft.izinga.ordermanagement.orders.quote.OrderQuoteRepository;
+import io.curiousoft.izinga.ordermanagement.leads.LeadService;
 import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
 import io.curiousoft.izinga.ordermanagement.utils.IjudiUtils;
@@ -62,6 +63,8 @@ public class OrderServiceDeliveryPriceEstimateTest {
     private RestrictedRegionService restrictedRegionService;
     @Mock
     private OrderQuoteRepository quoteRepository;
+    @Mock
+    private LeadService leadService;
 
     private OrderServiceImpl sut;
 
@@ -87,7 +90,8 @@ public class OrderServiceDeliveryPriceEstimateTest {
                 promoCodeClient,
                 eventPublisher,
                 restrictedRegionService,
-                quoteRepository
+                quoteRepository,
+                leadService
         );
     }
 

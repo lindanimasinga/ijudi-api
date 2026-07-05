@@ -11,6 +11,7 @@ import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
+import io.curiousoft.izinga.ordermanagement.leads.LeadService;
 import io.curiousoft.izinga.ordermanagement.orders.quote.OrderQuote;
 import io.curiousoft.izinga.ordermanagement.orders.quote.OrderQuoteRepository;
 import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
@@ -64,6 +65,7 @@ public class OrderServiceImpl implements OrderService {
     private final ApplicationEventPublisher applicationEventPublisher;
     private final RestrictedRegionService restrictedRegionService;
     private final OrderQuoteRepository quoteRepository;
+    private final LeadService leadService;
 
     @Autowired
     public OrderServiceImpl(@Value("${service.delivery.standardFee}") double starndardDeliveryFee,
@@ -83,7 +85,8 @@ public class OrderServiceImpl implements OrderService {
                             EmailNotificationService emailNotificationService,
                             PromoCodeClient promoCodeClient,
                             ApplicationEventPublisher applicationEventPublisher,
-                            RestrictedRegionService restrictedRegionService, OrderQuoteRepository quoteRepository) {
+                            RestrictedRegionService restrictedRegionService, OrderQuoteRepository quoteRepository,
+                            LeadService leadService) {
         this.starndardDeliveryFee = starndardDeliveryFee;
         this.starndardDeliveryKm = starndardDeliveryKm;
         this.ratePerKm = ratePerKm;
@@ -99,6 +102,7 @@ public class OrderServiceImpl implements OrderService {
         this.applicationEventPublisher = applicationEventPublisher;
         this.restrictedRegionService = restrictedRegionService;
         this.quoteRepository = quoteRepository;
+        this.leadService = leadService;
         this.izingaCommissionPerc = izingaCommissionPerc;
         ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
         validator = factory.getValidator();
@@ -362,6 +366,15 @@ public class OrderServiceImpl implements OrderService {
         if (persistedOrder.getOrderType() != INSTORE) {
             persistedOrder.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
             persistedOrder.addStatusHistory(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+            try {
+                UserProfile customer = userProfileRepo.findById(persistedOrder.getCustomerId()).orElse(null);
+                String customerPhone = customer != null ? customer.getMobileNumber() : null;
+                if (customerPhone != null) {
+                    leadService.convertLeadByPhone(customerPhone);
+                }
+            } catch (Exception e) {
+                LOG.warn("Lead conversion failed for order {} — non-critical", persistedOrder.getId(), e);
+            }
         } else if (persistedOrder.getShopPaid()) {
             return order;
         } else {
