@@ -1,21 +1,21 @@
 package io.curiousoft.izinga.ordermanagement.leads;
 
 import io.curiousoft.izinga.commons.model.StoreType;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class LeadServiceTest {
 
     @Mock
@@ -24,7 +24,6 @@ public class LeadServiceTest {
     @InjectMocks
     private LeadService leadService;
 
-    // ---- upsertLead: phone present + existing lead -> updates fields ----
     @Test
     public void upsertLead_phonePresent_existingLead_updatesFields() {
         LeadRequest request = new LeadRequest();
@@ -52,7 +51,6 @@ public class LeadServiceTest {
         verify(leadRepository).save(existing);
     }
 
-    // ---- upsertLead: phone present + no existing lead -> inserts CAPTURED ----
     @Test
     public void upsertLead_phonePresent_noExistingLead_insertsWithCaptured() {
         LeadRequest request = new LeadRequest();
@@ -76,7 +74,6 @@ public class LeadServiceTest {
         assertEquals(LeadStatus.CAPTURED, captor.getValue().getStatus());
     }
 
-    // ---- upsertLead: phone null -> inserts anonymous, does not query by phone ----
     @Test
     public void upsertLead_phoneNull_insertsAnonymousWithoutQuery() {
         LeadRequest request = new LeadRequest();
@@ -94,7 +91,6 @@ public class LeadServiceTest {
         verify(leadRepository, never()).findByPhone(any());
     }
 
-    // ---- upsertLead: phone blank string -> inserts anonymous, does not query by phone ----
     @Test
     public void upsertLead_phoneBlank_insertsAnonymousWithoutQuery() {
         LeadRequest request = new LeadRequest();
@@ -108,7 +104,6 @@ public class LeadServiceTest {
         verify(leadRepository, never()).findByPhone(any());
     }
 
-    // ---- getLeads: returns list from repo ----
     @Test
     public void getLeads_returnsListFromRepo() {
         Lead lead = new Lead();
@@ -122,7 +117,6 @@ public class LeadServiceTest {
         verify(leadRepository).findByStoreTypeOrderByCreatedDateDesc(StoreType.MOVERS);
     }
 
-    // ---- updateLeadStatus: CAPTURED -> CONTACTED allowed ----
     @Test
     public void updateLeadStatus_capturedToContacted_allowed() {
         Lead lead = new Lead();
@@ -138,7 +132,6 @@ public class LeadServiceTest {
         verify(leadRepository).save(lead);
     }
 
-    // ---- updateLeadStatus: CONTACTED -> CLOSED allowed ----
     @Test
     public void updateLeadStatus_contactedToClosed_allowed() {
         Lead lead = new Lead();
@@ -153,8 +146,7 @@ public class LeadServiceTest {
         assertEquals(LeadStatus.CLOSED, result.getStatus());
     }
 
-    // ---- updateLeadStatus: CONTACTED -> CONVERTED rejected ----
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void updateLeadStatus_contactedToConverted_rejected() {
         Lead lead = new Lead();
         lead.setId("lead-1");
@@ -162,11 +154,11 @@ public class LeadServiceTest {
 
         when(leadRepository.findById("lead-1")).thenReturn(Optional.of(lead));
 
-        leadService.updateLeadStatus("lead-1", LeadStatus.CONVERTED);
+        assertThrows(IllegalArgumentException.class,
+                () -> leadService.updateLeadStatus("lead-1", LeadStatus.CONVERTED));
     }
 
-    // ---- updateLeadStatus: CAPTURED -> CONVERTED rejected ----
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void updateLeadStatus_capturedToConverted_rejected() {
         Lead lead = new Lead();
         lead.setId("lead-1");
@@ -174,11 +166,11 @@ public class LeadServiceTest {
 
         when(leadRepository.findById("lead-1")).thenReturn(Optional.of(lead));
 
-        leadService.updateLeadStatus("lead-1", LeadStatus.CONVERTED);
+        assertThrows(IllegalArgumentException.class,
+                () -> leadService.updateLeadStatus("lead-1", LeadStatus.CONVERTED));
     }
 
-    // ---- updateLeadStatus: CAPTURED -> CLOSED rejected ----
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void updateLeadStatus_capturedToClosed_rejected() {
         Lead lead = new Lead();
         lead.setId("lead-1");
@@ -186,18 +178,18 @@ public class LeadServiceTest {
 
         when(leadRepository.findById("lead-1")).thenReturn(Optional.of(lead));
 
-        leadService.updateLeadStatus("lead-1", LeadStatus.CLOSED);
+        assertThrows(IllegalArgumentException.class,
+                () -> leadService.updateLeadStatus("lead-1", LeadStatus.CLOSED));
     }
 
-    // ---- updateLeadStatus: id not found -> throws ----
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void updateLeadStatus_idNotFound_throws() {
         when(leadRepository.findById("missing")).thenReturn(Optional.empty());
 
-        leadService.updateLeadStatus("missing", LeadStatus.CONTACTED);
+        assertThrows(IllegalArgumentException.class,
+                () -> leadService.updateLeadStatus("missing", LeadStatus.CONTACTED));
     }
 
-    // ---- convertLeadByPhone: lead found, not CONVERTED -> sets CONVERTED ----
     @Test
     public void convertLeadByPhone_leadFound_notConverted_setsConverted() {
         Lead lead = new Lead();
@@ -213,7 +205,6 @@ public class LeadServiceTest {
         assertEquals(LeadStatus.CONVERTED, lead.getStatus());
     }
 
-    // ---- convertLeadByPhone: lead already CONVERTED -> no save ----
     @Test
     public void convertLeadByPhone_leadAlreadyConverted_noSave() {
         Lead lead = new Lead();
@@ -227,27 +218,22 @@ public class LeadServiceTest {
         verify(leadRepository, never()).save(any());
     }
 
-    // ---- convertLeadByPhone: lead not found -> no-op, no exception ----
     @Test
     public void convertLeadByPhone_leadNotFound_noOp() {
         when(leadRepository.findByPhone("+27829999999")).thenReturn(Optional.empty());
 
-        // should not throw
         leadService.convertLeadByPhone("+27829999999");
 
         verify(leadRepository, never()).save(any());
     }
 
-    // ---- convertLeadByPhone: repo throws -> swallows exception ----
     @Test
     public void convertLeadByPhone_repoThrows_swallowsException() {
         when(leadRepository.findByPhone("+27821234567")).thenThrow(new RuntimeException("DB error"));
 
-        // must not rethrow
-        leadService.convertLeadByPhone("+27821234567");
+        assertDoesNotThrow(() -> leadService.convertLeadByPhone("+27821234567"));
     }
 
-    // ---- convertLeadByPhone: null phone -> early return, no query ----
     @Test
     public void convertLeadByPhone_nullPhone_noQuery() {
         leadService.convertLeadByPhone(null);
