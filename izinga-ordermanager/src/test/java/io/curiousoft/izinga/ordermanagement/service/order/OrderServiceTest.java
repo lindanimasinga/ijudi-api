@@ -13,6 +13,7 @@ import io.curiousoft.izinga.messaging.AdminOnlyNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
 import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
 import io.curiousoft.izinga.ordermanagement.orders.quote.OrderQuoteRepository;
+import io.curiousoft.izinga.ordermanagement.leads.LeadService;
 import org.assertj.core.util.Lists;
 import org.junit.Assert;
 import org.junit.Before;
@@ -58,6 +59,8 @@ public class OrderServiceTest {
     private RestrictedRegionService restrictedRegionService;
     @Mock
     private OrderQuoteRepository orderQuoteRepository;
+    @Mock
+    private LeadService leadService;
 
     List<String> phoneNumbers = Lists.list("08128155660", "0812815707");
 
@@ -91,7 +94,8 @@ public class OrderServiceTest {
                 promoCodeClient,
                 applicationEventPublisher,
                 restrictedRegionService,
-                orderQuoteRepository
+                orderQuoteRepository,
+                leadService
                 );
     }
 

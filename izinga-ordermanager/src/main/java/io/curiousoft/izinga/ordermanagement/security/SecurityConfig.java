@@ -17,6 +17,7 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import static org.springframework.http.HttpMethod.GET;
+import static org.springframework.http.HttpMethod.POST;
 
 @Configuration
 public class SecurityConfig {
@@ -34,6 +35,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/sse", "/mcp/message", "/mcp/**").permitAll()
                         .requestMatchers(GET, "/v2/promotion/**", "/v2/store/**").permitAll()
+                        .requestMatchers(POST, "/v2/leads").permitAll()
                         .requestMatchers("/v2/**").authenticated()
                         .anyRequest().permitAll()
                 )
