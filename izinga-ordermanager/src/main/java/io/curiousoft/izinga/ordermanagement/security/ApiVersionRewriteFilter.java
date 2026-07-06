@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.ordermanagement.security;
 
+import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
@@ -8,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 
 @Component
+@Order(Ordered.LOWEST_PRECEDENCE)
 public class ApiVersionRewriteFilter implements Filter {
 
     @Override
