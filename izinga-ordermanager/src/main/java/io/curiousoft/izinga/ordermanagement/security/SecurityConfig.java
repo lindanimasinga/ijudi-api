@@ -8,6 +8,7 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
@@ -20,12 +21,16 @@ import static org.springframework.http.HttpMethod.GET;
 import static org.springframework.http.HttpMethod.POST;
 
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final ApiVersionRewriteFilter apiVersionRewriteFilter;
+    private final FirebaseJwtAuthenticationConverter jwtAuthenticationConverter;
 
-    public SecurityConfig(ApiVersionRewriteFilter apiVersionRewriteFilter) {
+    public SecurityConfig(ApiVersionRewriteFilter apiVersionRewriteFilter,
+                          FirebaseJwtAuthenticationConverter jwtAuthenticationConverter) {
         this.apiVersionRewriteFilter = apiVersionRewriteFilter;
+        this.jwtAuthenticationConverter = jwtAuthenticationConverter;
     }
 
     @Bean
@@ -39,7 +44,8 @@ public class SecurityConfig {
                         .requestMatchers("/v2/**").authenticated()
                         .anyRequest().permitAll()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
         return http.build();
     }
 
