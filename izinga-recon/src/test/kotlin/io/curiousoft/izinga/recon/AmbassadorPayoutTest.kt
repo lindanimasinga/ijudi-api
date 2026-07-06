@@ -23,7 +23,7 @@ class AmbassadorPayoutTest {
         emailAddress = "john@example.com",
         emailSubject = "Ambassador payout",
         commissionAmount = commission,
-        driverFirstDeliveryOrderId = "order-abc-123"
+        triggerDriverId = "driver-abc-123"
     )
 
     @Test
@@ -45,9 +45,9 @@ class AmbassadorPayoutTest {
     }
 
     @Test
-    fun `driverFirstDeliveryOrderId is stored correctly`() {
+    fun `triggerDriverId is stored correctly`() {
         val payout = buildPayout()
-        assertEquals("order-abc-123", payout.driverFirstDeliveryOrderId)
+        assertEquals("driver-abc-123", payout.triggerDriverId)
     }
 
     @Test

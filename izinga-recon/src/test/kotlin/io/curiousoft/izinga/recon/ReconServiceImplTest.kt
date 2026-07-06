@@ -613,6 +613,17 @@ class ReconServiceTest {
         }
     }
 
+    private fun makeDriver(driverId: String): UserProfile {
+        return UserProfile(
+            "Driver One",
+            UserProfile.SignUpReason.DELIVERY_DRIVER,
+            "1 Driver Street",
+            "img.jpg",
+            "0831111111",
+            ProfileRoles.MESSENGER
+        ).also { it.id = driverId }
+    }
+
     private fun makeOrderForAmbassador(orderId: String, messengerId: String): Order {
         val shippingData = mockk<ShippingData>()
         every { shippingData.messengerId } returns messengerId
@@ -624,40 +635,40 @@ class ReconServiceTest {
     }
 
     @Test
-    fun `generatePayoutForAmbassadorAndOrder - happy path creates payout and publishes event`() {
+    fun `generatePayoutForAmbassadorAndApproval - happy path creates payout and publishes event`() {
         val ambassadorId = "amb-001"
         val driverId = "driver-001"
         val ambassador = makeAmbassador(ambassadorId)
-        val order = makeOrderForAmbassador("order-amb-001", driverId)
+        val driver = makeDriver(driverId)
 
         every { ambassadorPayoutRepository.findByToIdAndPayoutStage(ambassadorId, PayoutStage.PENDING) } returns null
         val savedSlot = slot<AmbassadorPayout>()
         every { ambassadorPayoutRepository.save(capture(savedSlot)) } answers { savedSlot.captured.also { it.id = "PAY01" } }
         every { applicationEventPublisher.publishEvent(any<Any>()) } just runs
 
-        val result = sut.generatePayoutForAmbassadorAndOrder(order, ambassador)
+        val result = sut.generatePayoutForAmbassadorAndApproval(driver, ambassador)
 
         assertNotNull(result)
         assertEquals(ambassadorId, result!!.toId)
         assertEquals(BigDecimal("70.00"), result.commissionAmount)
-        assertEquals("order-amb-001", result.driverFirstDeliveryOrderId)
+        assertEquals(driverId, result.triggerDriverId)
         assertEquals(PayoutStage.PENDING, result.payoutStage)
+        assertTrue(result.orders.isEmpty())
         verify { ambassadorPayoutRepository.save(any()) }
         verify { applicationEventPublisher.publishEvent(any<Any>()) }
     }
 
     @Test
-    fun `generatePayoutForAmbassadorAndOrder - returns null when PENDING payout already exists`() {
+    fun `generatePayoutForAmbassadorAndApproval - returns null when PENDING payout already exists`() {
         val ambassadorId = "amb-002"
-        val driverId = "driver-002"
         val ambassador = makeAmbassador(ambassadorId)
-        val order = makeOrderForAmbassador("order-amb-002", driverId)
+        val driver = makeDriver("driver-002")
 
         val existingPayout = mockk<AmbassadorPayout>()
         every { existingPayout.id } returns "EXIST"
         every { ambassadorPayoutRepository.findByToIdAndPayoutStage(ambassadorId, PayoutStage.PENDING) } returns existingPayout
 
-        val result = sut.generatePayoutForAmbassadorAndOrder(order, ambassador)
+        val result = sut.generatePayoutForAmbassadorAndApproval(driver, ambassador)
 
         assertNull(result)
         verify(exactly = 0) { ambassadorPayoutRepository.save(any()) }
@@ -665,27 +676,25 @@ class ReconServiceTest {
     }
 
     @Test
-    fun `generatePayoutForAmbassadorAndOrder - returns null when ambassador has no id`() {
+    fun `generatePayoutForAmbassadorAndApproval - returns null when ambassador has no id`() {
         val ambassador = makeAmbassador("amb-003").also { it.id = null }
-        val order = makeOrderForAmbassador("order-amb-003", "driver-003")
+        val driver = makeDriver("driver-003")
 
-        val result = sut.generatePayoutForAmbassadorAndOrder(order, ambassador)
+        val result = sut.generatePayoutForAmbassadorAndApproval(driver, ambassador)
 
         assertNull(result)
         verify(exactly = 0) { ambassadorPayoutRepository.save(any()) }
     }
 
     @Test
-    fun `generatePayoutForAmbassadorAndOrder - returns null when order has no messengerId`() {
+    fun `generatePayoutForAmbassadorAndApproval - returns null when driver has no id`() {
         val ambassadorId = "amb-004"
         val ambassador = makeAmbassador(ambassadorId)
-        val order = mockk<Order>()
-        every { order.id } returns "order-amb-004"
-        every { order.shippingData } returns null
+        val driver = makeDriver("driver-004").also { it.id = null }
 
         every { ambassadorPayoutRepository.findByToIdAndPayoutStage(ambassadorId, PayoutStage.PENDING) } returns null
 
-        val result = sut.generatePayoutForAmbassadorAndOrder(order, ambassador)
+        val result = sut.generatePayoutForAmbassadorAndApproval(driver, ambassador)
 
         assertNull(result)
         verify(exactly = 0) { ambassadorPayoutRepository.save(any()) }

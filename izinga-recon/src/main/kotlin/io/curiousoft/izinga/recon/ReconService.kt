@@ -12,7 +12,7 @@ interface ReconService {
 
     fun generatePayoutForMessengerAndOrder(order: Order): MessengerPayout?
 
-    fun generatePayoutForAmbassadorAndOrder(order: Order, ambassador: UserProfile): AmbassadorPayout?
+    fun generatePayoutForAmbassadorAndApproval(driver: UserProfile, ambassador: UserProfile): AmbassadorPayout?
 
     fun updatePayoutStatus(bundleResponse: PayoutBundleResults)
 

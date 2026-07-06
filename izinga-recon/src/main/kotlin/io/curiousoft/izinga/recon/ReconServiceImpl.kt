@@ -106,21 +106,21 @@ class ReconServiceImpl(
         return messengerPayoutRepository.save(payout)
     }
 
-    override fun generatePayoutForAmbassadorAndOrder(order: Order, ambassador: UserProfile): AmbassadorPayout? {
+    override fun generatePayoutForAmbassadorAndApproval(driver: UserProfile, ambassador: UserProfile): AmbassadorPayout? {
         val ambassadorId = ambassador.id ?: run {
             logger.warn("ambassador has no id, skipping payout generation")
             return null
         }
-        val driverId = order.shippingData?.messengerId ?: run {
-            logger.warn("order {} has no messengerId, skipping ambassador payout", order.id)
+        val driverId = driver.id ?: run {
+            logger.warn("driver has no id, skipping ambassador payout")
             return null
         }
 
         val existing = ambassadorPayoutRepository.findByToIdAndPayoutStage(ambassadorId, PayoutStage.PENDING)
         if (existing != null) {
             logger.warn(
-                "ambassador {} already has a PENDING payout {}; skipping duplicate for driver first delivery order {}",
-                ambassadorId, existing.id, order.id
+                "ambassador {} already has a PENDING payout {}; skipping duplicate for driver approval {}",
+                ambassadorId, existing.id, driverId
             )
             return null
         }
@@ -137,14 +137,14 @@ class ReconServiceImpl(
             emailNotify = "",
             emailAddress = ambassador.emailAddress,
             emailSubject = "iZinga Ambassador Commission",
-            orders = mutableSetOf(order),
+            orders = mutableSetOf(),
             commissionAmount = ambassadorProperties.commissionAmount,
-            driverFirstDeliveryOrderId = order.id!!,
+            triggerDriverId = driverId,
             payoutStage = PayoutStage.PENDING
         )
 
         val saved = ambassadorPayoutRepository.save(payout)
-        logger.info("created ambassador payout {} for ambassador {} on driver {} first delivery order {}", saved.id, ambassadorId, driverId, order.id)
+        logger.info("created ambassador payout {} for ambassador {} on driver approval {}", saved.id, ambassadorId, driverId)
 
         applicationEventPublisher.publishEvent(
             AmbassadorPayoutEvent(

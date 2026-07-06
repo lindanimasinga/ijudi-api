@@ -71,14 +71,12 @@ class MessengerOrderEventHandlerTest {
         return order;
     }
 
-    private UserProfile makeDriver(String driverId, String ambassadorId, boolean firstDeliveryCompleted) {
+    private UserProfile makeDriver(String driverId) {
         UserProfile driver = new UserProfile(
                 "Driver Name", UserProfile.SignUpReason.DELIVERY_DRIVER,
                 "1 Driver St", "img.jpg", "0821111111", ProfileRoles.MESSENGER
         );
         driver.setId(driverId);
-        driver.setAmbassadorId(ambassadorId);
-        driver.setFirstDeliveryCompleted(firstDeliveryCompleted);
         Bank bank = new Bank();
         bank.setName("FNB");
         bank.setAccountId("0821111111");
@@ -89,29 +87,11 @@ class MessengerOrderEventHandlerTest {
         return driver;
     }
 
-    private UserProfile makeAmbassador(String ambassadorId) {
-        UserProfile ambassador = new UserProfile(
-                "Ambassador Name", UserProfile.SignUpReason.DELIVERY_DRIVER,
-                "2 Amb St", "img.jpg", "0829999999", ProfileRoles.AMBASSADOR
-        );
-        ambassador.setId(ambassadorId);
-        Bank bank = new Bank();
-        bank.setName("FNB");
-        bank.setAccountId("0829999999");
-        bank.setType(BankAccType.EWALLET);
-        bank.setBranchCode("250655");
-        ambassador.setBank(bank);
-        ambassador.setEmailAddress("ambassador@mail.com");
-        return ambassador;
-    }
-
     @Test
-    void handleOrderUpdatedEvent_stage7_triggersAmbassadorCommission_whenEligible() throws Exception {
+    void handleOrderUpdatedEvent_stage7_generatesMessengerPayoutAndNotifiesDriver() throws IOException {
         String driverId = "driver-001";
-        String ambassadorId = "amb-001";
         Order order = makeOrder("order-001", driverId);
-        UserProfile driver = makeDriver(driverId, ambassadorId, false);
-        UserProfile ambassador = makeAmbassador(ambassadorId);
+        UserProfile driver = makeDriver(driverId);
         StoreProfile store = mock(StoreProfile.class);
 
         MessengerPayout messengerPayout = mock(MessengerPayout.class);
@@ -119,30 +99,24 @@ class MessengerOrderEventHandlerTest {
         when(messengerPayout.getTotal()).thenReturn(BigDecimal.valueOf(100.0));
 
         OrderUpdatedEvent event = new OrderUpdatedEvent(this, order, driverId, store);
-
         when(userProfileService.find(driverId)).thenReturn(driver);
         when(reconService.generatePayoutForMessengerAndOrder(any())).thenReturn(messengerPayout);
-        when(userProfileService.find(ambassadorId)).thenReturn(ambassador);
-        when(reconService.generatePayoutForAmbassadorAndOrder(any(), eq(ambassador))).thenReturn(null);
-        when(userProfileService.update(eq(driverId), any())).thenReturn(driver);
 
         handler.handleOrderUpdatedEvent(event);
 
-        verify(reconService).generatePayoutForAmbassadorAndOrder(any(), eq(ambassador));
-        verify(userProfileService).update(eq(driverId), argThat(d -> d.getFirstDeliveryCompleted()));
+        verify(reconService).generatePayoutForMessengerAndOrder(any());
+        verify(smsNotificationService).sendDriverOrderCompletedMessage(eq(driver), eq("order-001"), any(), any());
     }
 
     @Test
-    void handleOrderUpdatedEvent_stage7_skipsAmbassadorCommission_whenFirstDeliveryAlreadyCompleted() throws Exception {
+    void handleOrderUpdatedEvent_stage7_permEmployedDriver_skipsDriverNotification() throws IOException {
         String driverId = "driver-002";
-        String ambassadorId = "amb-002";
         Order order = makeOrder("order-002", driverId);
-        UserProfile driver = makeDriver(driverId, ambassadorId, true);
+        UserProfile driver = makeDriver(driverId);
         StoreProfile store = mock(StoreProfile.class);
 
         MessengerPayout messengerPayout = mock(MessengerPayout.class);
-        when(messengerPayout.isPermEmployed()).thenReturn(false);
-        when(messengerPayout.getTotal()).thenReturn(BigDecimal.valueOf(100.0));
+        when(messengerPayout.isPermEmployed()).thenReturn(true);
 
         OrderUpdatedEvent event = new OrderUpdatedEvent(this, order, driverId, store);
         when(userProfileService.find(driverId)).thenReturn(driver);
@@ -150,59 +124,51 @@ class MessengerOrderEventHandlerTest {
 
         handler.handleOrderUpdatedEvent(event);
 
-        verify(reconService, never()).generatePayoutForAmbassadorAndOrder(any(), any());
-        verify(userProfileService, never()).update(any(), any());
+        verify(smsNotificationService, never()).sendDriverOrderCompletedMessage(any(), any(), any(), any());
     }
 
     @Test
-    void handleOrderUpdatedEvent_stage7_skipsAmbassadorCommission_whenNoAmbassadorId() throws Exception {
+    void handleOrderUpdatedEvent_stage7_nullPayout_skipsDriverNotification() throws IOException {
         String driverId = "driver-003";
         Order order = makeOrder("order-003", driverId);
-        UserProfile driver = makeDriver(driverId, null, false);
+        UserProfile driver = makeDriver(driverId);
         StoreProfile store = mock(StoreProfile.class);
-
-        MessengerPayout messengerPayout = mock(MessengerPayout.class);
-        when(messengerPayout.isPermEmployed()).thenReturn(false);
-        when(messengerPayout.getTotal()).thenReturn(BigDecimal.valueOf(100.0));
 
         OrderUpdatedEvent event = new OrderUpdatedEvent(this, order, driverId, store);
         when(userProfileService.find(driverId)).thenReturn(driver);
-        when(reconService.generatePayoutForMessengerAndOrder(any())).thenReturn(messengerPayout);
+        when(reconService.generatePayoutForMessengerAndOrder(any())).thenReturn(null);
 
         handler.handleOrderUpdatedEvent(event);
 
-        verify(reconService, never()).generatePayoutForAmbassadorAndOrder(any(), any());
+        verify(smsNotificationService, never()).sendDriverOrderCompletedMessage(any(), any(), any(), any());
     }
 
     @Test
-    void handleOrderUpdatedEvent_stage7_skipsAmbassadorCommission_whenAmbassadorNotFound() throws Exception {
-        String driverId = "driver-004";
-        String ambassadorId = "amb-404";
-        Order order = makeOrder("order-004", driverId);
-        UserProfile driver = makeDriver(driverId, ambassadorId, false);
+    void handleOrderUpdatedEvent_stage7_stillGeneratesMessengerPayoutEvenWhenProfileNotFound() throws IOException {
+        // The guard is on event.getMessenger() (String), which OrderUpdatedEvent requires non-null.
+        // So generatePayoutForMessengerAndOrder is still called; payout notification is skipped.
+        String unknownDriverId = "unknown-driver";
+        Order order = makeOrder("order-004", unknownDriverId);
         StoreProfile store = mock(StoreProfile.class);
 
-        MessengerPayout messengerPayout = mock(MessengerPayout.class);
-        when(messengerPayout.isPermEmployed()).thenReturn(false);
-        when(messengerPayout.getTotal()).thenReturn(BigDecimal.valueOf(100.0));
-
-        OrderUpdatedEvent event = new OrderUpdatedEvent(this, order, driverId, store);
-        when(userProfileService.find(driverId)).thenReturn(driver);
-        when(reconService.generatePayoutForMessengerAndOrder(any())).thenReturn(messengerPayout);
-        when(userProfileService.find(ambassadorId)).thenReturn(null);
+        OrderUpdatedEvent event = new OrderUpdatedEvent(this, order, unknownDriverId, store);
+        when(userProfileService.find(unknownDriverId)).thenReturn(null);
+        when(reconService.generatePayoutForMessengerAndOrder(any())).thenReturn(null);
 
         handler.handleOrderUpdatedEvent(event);
 
-        verify(reconService, never()).generatePayoutForAmbassadorAndOrder(any(), any());
-        verify(userProfileService, never()).update(any(), any());
+        verify(reconService).generatePayoutForMessengerAndOrder(any());
+        verify(smsNotificationService, never()).sendDriverOrderCompletedMessage(any(), any(), any(), any());
     }
 
     @Test
-    void handleOrderUpdatedEvent_stage7_skipsAmbassadorCommission_whenDriverHasNoAmbassadorAndNoFirstDelivery() throws Exception {
-        // Driver exists with no ambassadorId and firstDeliveryCompleted=false — still no ambassador commission
+    void handleOrderUpdatedEvent_stage7_doesNotTriggerAmbassadorCommission() throws IOException {
+        // Ambassador commission is no longer triggered from this handler — verify reconService
+        // never receives a generatePayoutForAmbassadorAndApproval call from here
         String driverId = "driver-005";
         Order order = makeOrder("order-005", driverId);
-        UserProfile driver = makeDriver(driverId, null, false); // no ambassador set
+        UserProfile driver = makeDriver(driverId);
+        driver.setAmbassadorId("amb-001");
         StoreProfile store = mock(StoreProfile.class);
 
         MessengerPayout messengerPayout = mock(MessengerPayout.class);
@@ -212,11 +178,9 @@ class MessengerOrderEventHandlerTest {
         OrderUpdatedEvent event = new OrderUpdatedEvent(this, order, driverId, store);
         when(userProfileService.find(driverId)).thenReturn(driver);
         when(reconService.generatePayoutForMessengerAndOrder(any())).thenReturn(messengerPayout);
-        // smsNotificationService.sendDriverOrderCompletedMessage is lenient
 
         handler.handleOrderUpdatedEvent(event);
 
-        verify(reconService, never()).generatePayoutForAmbassadorAndOrder(any(), any());
-        verify(userProfileService, never()).update(any(), any());
+        verify(reconService, never()).generatePayoutForAmbassadorAndApproval(any(), any());
     }
 }
