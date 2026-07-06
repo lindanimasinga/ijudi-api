@@ -4,7 +4,10 @@ import io.curiousoft.izinga.commons.model.ProfileRoles;
 import io.curiousoft.izinga.commons.model.StoreType;
 import io.curiousoft.izinga.commons.model.UserProfile;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,6 +16,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/leads")
 public class LeadController {
+
+    private static final Logger log = LoggerFactory.getLogger(LeadController.class);
 
     private final LeadService leadService;
     private final UserProfileService userProfileService;
@@ -53,8 +58,18 @@ public class LeadController {
     }
 
     private boolean isAdmin() {
-        String uid = SecurityContextHolder.getContext().getAuthentication().getName();
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        log.info("[leads] auth={} class={}", auth, auth != null ? auth.getClass().getSimpleName() : "null");
+        if (auth == null) {
+            log.warn("[leads] no authentication in SecurityContext — returning 403");
+            return false;
+        }
+        String uid = auth.getName();
+        log.info("[leads] uid={} authenticated={} authorities={}", uid, auth.isAuthenticated(), auth.getAuthorities());
         UserProfile caller = userProfileService.find(uid);
-        return caller != null && caller.getRole() == ProfileRoles.ADMIN;
+        log.info("[leads] userProfile={} role={}", caller != null ? caller.getId() : "NOT_FOUND", caller != null ? caller.getRole() : "null");
+        boolean admin = caller != null && caller.getRole() == ProfileRoles.ADMIN;
+        log.info("[leads] isAdmin={}", admin);
+        return admin;
     }
 }
