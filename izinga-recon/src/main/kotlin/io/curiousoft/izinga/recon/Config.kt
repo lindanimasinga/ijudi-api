@@ -12,7 +12,9 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.datatype.jsr310.ser.OffsetDateTimeSerializer
 import com.fasterxml.jackson.datatype.jsr310.ser.ZonedDateTimeSerializer
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import io.curiousoft.izinga.recon.ambassador.AmbassadorProperties
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
@@ -28,6 +30,7 @@ import kotlin.collections.ArrayList
 
 
 @Configuration
+@EnableConfigurationProperties(AmbassadorProperties::class)
 open class ReconConfig {
 
     @Bean
