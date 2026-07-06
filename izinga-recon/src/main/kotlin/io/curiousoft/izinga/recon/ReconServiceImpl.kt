@@ -116,11 +116,11 @@ class ReconServiceImpl(
             return null
         }
 
-        val existing = ambassadorPayoutRepository.findByToIdAndPayoutStage(ambassadorId, PayoutStage.PENDING)
+        val existing = ambassadorPayoutRepository.findByTriggerDriverId(driverId)
         if (existing != null) {
             logger.warn(
-                "ambassador {} already has a PENDING payout {}; skipping duplicate for driver approval {}",
-                ambassadorId, existing.id, driverId
+                "driver {} already has an ambassador commission payout {}; skipping duplicate",
+                driverId, existing.id
             )
             return null
         }

@@ -14,4 +14,5 @@ interface AmbassadorPayoutRepository : MongoRepository<AmbassadorPayout, String>
     fun findByCreatedDateBetween(fromDate: Date, toDate: Date): List<AmbassadorPayout>
     fun findByModifiedDateBetweenAndToId(fromDate: Date, toDate: Date, toId: String): List<AmbassadorPayout>
     fun findByModifiedDateBetween(fromDate: Date, toDate: Date): List<AmbassadorPayout>
+    fun findByTriggerDriverId(driverId: String): AmbassadorPayout?
 }

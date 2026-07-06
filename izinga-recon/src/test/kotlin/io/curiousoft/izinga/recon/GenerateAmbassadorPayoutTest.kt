@@ -80,7 +80,7 @@ class GenerateAmbassadorPayoutTest {
         val ambassador = makeAmbassador(ambassadorId)
         val driver = makeDriver(driverId)
 
-        every { ambassadorPayoutRepository.findByToIdAndPayoutStage(ambassadorId, PayoutStage.PENDING) } returns null
+        every { ambassadorPayoutRepository.findByTriggerDriverId(driverId) } returns null
         val capturedPayout = slot<AmbassadorPayout>()
         every { ambassadorPayoutRepository.save(capture(capturedPayout)) } answers {
             capturedPayout.captured.also { it.id = "PAY01" }
@@ -108,20 +108,46 @@ class GenerateAmbassadorPayoutTest {
     }
 
     @Test
-    fun `returns null and skips payout when PENDING AmbassadorPayout already exists for ambassador`() {
+    fun `returns null and skips payout when a commission for the same driver already exists`() {
         val ambassadorId = "amb-002"
+        val driverId = "driver-002"
         val ambassador = makeAmbassador(ambassadorId)
-        val driver = makeDriver("driver-002")
+        val driver = makeDriver(driverId)
 
         val existingPayout = mockk<AmbassadorPayout>()
         every { existingPayout.id } returns "EXIST"
-        every { ambassadorPayoutRepository.findByToIdAndPayoutStage(ambassadorId, PayoutStage.PENDING) } returns existingPayout
+        every { ambassadorPayoutRepository.findByTriggerDriverId(driverId) } returns existingPayout
 
         val result = sut.generatePayoutForAmbassadorAndApproval(driver, ambassador)
 
         assertNull(result)
         verify(exactly = 0) { ambassadorPayoutRepository.save(any()) }
         verify(exactly = 0) { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) }
+    }
+
+    @Test
+    fun `creates a second payout for same ambassador when a different driver is approved`() {
+        val ambassadorId = "amb-002"
+        val driver2Id = "driver-003"
+        val ambassador = makeAmbassador(ambassadorId)
+        val driver2 = makeDriver(driver2Id)
+
+        // driver-003 has no existing commission
+        every { ambassadorPayoutRepository.findByTriggerDriverId(driver2Id) } returns null
+        val capturedPayout = slot<AmbassadorPayout>()
+        every { ambassadorPayoutRepository.save(capture(capturedPayout)) } answers {
+            capturedPayout.captured.also { it.id = "PAY02" }
+        }
+        every { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) } just runs
+
+        val result = sut.generatePayoutForAmbassadorAndApproval(driver2, ambassador)
+
+        assertNotNull(result)
+        assertEquals(ambassadorId, result!!.toId)
+        assertEquals(driver2Id, result.triggerDriverId)
+        assertEquals(BigDecimal("70.00"), result.commissionAmount)
+        verify(exactly = 1) { ambassadorPayoutRepository.save(any()) }
+        verify(exactly = 1) { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) }
     }
 
     @Test
@@ -141,8 +167,6 @@ class GenerateAmbassadorPayoutTest {
         val ambassadorId = "amb-004"
         val ambassador = makeAmbassador(ambassadorId)
         val driver = makeDriver("driver-004").also { it.id = null }
-
-        every { ambassadorPayoutRepository.findByToIdAndPayoutStage(ambassadorId, PayoutStage.PENDING) } returns null
 
         val result = sut.generatePayoutForAmbassadorAndApproval(driver, ambassador)
 
