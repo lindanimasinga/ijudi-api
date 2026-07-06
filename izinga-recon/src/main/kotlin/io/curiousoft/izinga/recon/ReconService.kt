@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.recon
 
 import io.curiousoft.izinga.commons.model.Order
+import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent
 import io.curiousoft.izinga.recon.payout.*
 import java.util.*
@@ -10,6 +11,8 @@ interface ReconService {
     fun generatePayoutForShopAndOrder(order: Order): ShopPayout?
 
     fun generatePayoutForMessengerAndOrder(order: Order): MessengerPayout?
+
+    fun generatePayoutForAmbassadorAndOrder(order: Order, ambassador: UserProfile): AmbassadorPayout?
 
     fun updatePayoutStatus(bundleResponse: PayoutBundleResults)
 

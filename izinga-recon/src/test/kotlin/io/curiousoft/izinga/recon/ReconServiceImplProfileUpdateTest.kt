@@ -16,6 +16,7 @@ import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.payout.MessengerPayout
 import io.curiousoft.izinga.recon.payout.PayoutStage
 import io.curiousoft.izinga.recon.payout.ShopPayout
+import io.curiousoft.izinga.recon.ambassador.AmbassadorProperties
 import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
@@ -48,7 +49,8 @@ class ReconServiceImplProfileUpdateTest {
             shopPayoutRepo = shopPayoutRepository,
             messengerPayoutRepository = messengerPayoutRepository,
             ambassadorPayoutRepository = ambassadorPayoutRepository,
-            applicationEventPublisher = applicationEventPublisher
+            applicationEventPublisher = applicationEventPublisher,
+            ambassadorProperties = AmbassadorProperties()
         )
     }
 

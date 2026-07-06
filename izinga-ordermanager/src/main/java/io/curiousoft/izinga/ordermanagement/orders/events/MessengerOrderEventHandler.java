@@ -214,6 +214,35 @@ public class MessengerOrderEventHandler implements OrderEventHandler {
                 var payoutTotal = payout.getTotal().setScale(2, RoundingMode.HALF_UP);
                 smsNotificationService.sendDriverOrderCompletedMessage(messenger.get(), messengerOrder.getId(), BigDecimal.valueOf(messengerOrder.getShippingData().getFee()), payoutTotal);
             }
+
+            triggerAmbassadorCommissionIfEligible(order);
+        }
+    }
+
+    private void triggerAmbassadorCommissionIfEligible(Order order) {
+        try {
+            var messengerId = order.getShippingData() != null ? order.getShippingData().getMessengerId() : null;
+            if (messengerId == null) {
+                return;
+            }
+            var driver = userProfileService.find(messengerId);
+            if (driver == null) {
+                return;
+            }
+            if (driver.getAmbassadorId() == null || driver.getFirstDeliveryCompleted()) {
+                return;
+            }
+            var ambassador = userProfileService.find(driver.getAmbassadorId());
+            if (ambassador == null) {
+                log.warn("Ambassador {} not found for driver {}, skipping commission", driver.getAmbassadorId(), driver.getId());
+                return;
+            }
+            reconService.generatePayoutForAmbassadorAndOrder(order, ambassador);
+            driver.setFirstDeliveryCompleted(true);
+            userProfileService.update(driver.getId(), driver);
+            log.info("Ambassador commission triggered for ambassador {} on driver {} first delivery order {}", ambassador.getId(), driver.getId(), order.getId());
+        } catch (Exception e) {
+            log.warn("Failed to trigger ambassador commission for order {}: {}", order.getId(), e.getMessage());
         }
     }
 

@@ -7,10 +7,12 @@ import io.curiousoft.izinga.commons.model.Bank
 import io.curiousoft.izinga.commons.model.BankAccType
 import io.curiousoft.izinga.commons.model.StoreProfile
 import io.curiousoft.izinga.commons.model.UserProfile
+import io.curiousoft.izinga.commons.payout.events.AmbassadorPayoutEvent
 import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
 import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
+import io.curiousoft.izinga.recon.ambassador.AmbassadorProperties
 import io.curiousoft.izinga.recon.payout.*
 import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
@@ -32,7 +34,8 @@ class ReconServiceImpl(
     private val shopPayoutRepo: ShopPayoutRepository,
     private val messengerPayoutRepository: MessengerPayoutRepository,
     private val ambassadorPayoutRepository: AmbassadorPayoutRepository,
-    private val applicationEventPublisher: ApplicationEventPublisher
+    private val applicationEventPublisher: ApplicationEventPublisher,
+    private val ambassadorProperties: AmbassadorProperties
 ) : ReconService {
 
     private val logger = LoggerFactory.getLogger(ReconServiceImpl::class.java)
@@ -101,6 +104,59 @@ class ReconServiceImpl(
                 payout.emailSent = false
             }
         return messengerPayoutRepository.save(payout)
+    }
+
+    override fun generatePayoutForAmbassadorAndOrder(order: Order, ambassador: UserProfile): AmbassadorPayout? {
+        val ambassadorId = ambassador.id ?: run {
+            logger.warn("ambassador has no id, skipping payout generation")
+            return null
+        }
+        val driverId = order.shippingData?.messengerId ?: run {
+            logger.warn("order {} has no messengerId, skipping ambassador payout", order.id)
+            return null
+        }
+
+        val existing = ambassadorPayoutRepository.findByToIdAndPayoutStage(ambassadorId, PayoutStage.PENDING)
+        if (existing != null) {
+            logger.warn(
+                "ambassador {} already has a PENDING payout {}; skipping duplicate for driver first delivery order {}",
+                ambassadorId, existing.id, order.id
+            )
+            return null
+        }
+
+        val payout = AmbassadorPayout(
+            toId = ambassadorId,
+            toName = ambassador.name ?: "",
+            toBankName = ambassador.bank?.name ?: "",
+            toType = ambassador.bank?.type ?: BankAccType.CHEQUE,
+            toAccountNumber = getPayoutAccountNumber(ambassador.bank?.accountId, ambassador.bank?.type) ?: "",
+            toBranchCode = ambassador.bank?.branchCode ?: "",
+            fromReference = "Ambassador commission for ${ambassador.name}",
+            toReference = "iZinga pay",
+            emailNotify = "",
+            emailAddress = ambassador.emailAddress,
+            emailSubject = "iZinga Ambassador Commission",
+            orders = mutableSetOf(order),
+            commissionAmount = ambassadorProperties.commissionAmount,
+            driverFirstDeliveryOrderId = order.id!!,
+            payoutStage = PayoutStage.PENDING
+        )
+
+        val saved = ambassadorPayoutRepository.save(payout)
+        logger.info("created ambassador payout {} for ambassador {} on driver {} first delivery order {}", saved.id, ambassadorId, driverId, order.id)
+
+        applicationEventPublisher.publishEvent(
+            AmbassadorPayoutEvent(
+                source = this,
+                ambassadorId = ambassadorId,
+                driverId = driverId,
+                commissionAmount = ambassadorProperties.commissionAmount,
+                payoutId = saved.id!!
+            )
+        )
+
+        return saved
     }
 
     @Async

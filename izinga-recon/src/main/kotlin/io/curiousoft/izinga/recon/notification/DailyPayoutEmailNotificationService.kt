@@ -3,7 +3,11 @@ package io.curiousoft.izinga.recon.notification;
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.ReconService
+import io.curiousoft.izinga.recon.payout.AmbassadorPayout
 import io.curiousoft.izinga.recon.payout.Payout
+import io.curiousoft.izinga.recon.payout.PayoutStage
+import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
@@ -16,13 +20,14 @@ class DailyPayoutEmailNotificationService(
         val userProfileRepo: UserProfileRepo,
         val storeRepository: StoreRepository,
         val reconService: ReconService,
+        val ambassadorPayoutRepository: AmbassadorPayoutRepository,
         @Value("\${mailersend.apikey}") val apiKey: String,
         @Value("\${mailersend.template.daily-payout}") val dailyPayoutTemplate: String) {
 
-    //val Logger = LoggerFactory.getLogger(EmailNotificationService.javaClass)
+    private val logger = LoggerFactory.getLogger(DailyPayoutEmailNotificationService::class.java)
     private val restTemplate = RestTemplate()
 
-    @Scheduled(cron = "0 0 17 1/1 * ?") // every day at 7pm
+    @Scheduled(cron = "0 0 17 1/1 * ?") // every day at 5pm
     fun notifyDailyPayouts() {
         val shopPayouts = reconService.getCurrentPayoutBundleForShops()
         val messagerPayouts = reconService.getCurrentPayoutBundleForMessenger()
@@ -37,6 +42,31 @@ class DailyPayoutEmailNotificationService(
 
         reconService.updateBundle(shopPayouts)
         reconService.updateBundle(messagerPayouts)
+
+        processAmbassadorPayouts()
+    }
+
+    private fun processAmbassadorPayouts() {
+        val pendingAmbassadorPayouts = ambassadorPayoutRepository.findByPayoutStage(PayoutStage.PENDING)
+        pendingAmbassadorPayouts.forEach { payout ->
+            val ambassador = userProfileRepo.findById(payout.toId).orElse(null)
+            if (ambassador == null) {
+                logger.warn("ambassador profile {} not found, voiding payout {}", payout.toId, payout.id)
+                payout.payoutStage = PayoutStage.VOIDED
+                ambassadorPayoutRepository.save(payout)
+                return@forEach
+            }
+            if (!ambassador.profileApproved) {
+                logger.info("ambassador {} not approved, voiding ambassador payout {}", payout.toId, payout.id)
+                payout.payoutStage = PayoutStage.VOIDED
+                ambassadorPayoutRepository.save(payout)
+                return@forEach
+            }
+            if (!payout.emailSent) {
+                sendPayoutEmail(payout)
+                ambassadorPayoutRepository.save(payout)
+            }
+        }
     }
 
     private fun sendPayoutEmail(it: Payout) {
