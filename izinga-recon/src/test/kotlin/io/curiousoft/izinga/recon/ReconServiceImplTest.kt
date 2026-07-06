@@ -5,6 +5,7 @@ import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.payout.*
+import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
 import io.mockk.*
@@ -25,6 +26,7 @@ class ReconServiceTest {
     private val messengerRepo = mockk<UserProfileRepo>()
     private val shopPayoutRepository = mockk<ShopPayoutRepository>()
     private val messengerPayoutRepository = mockk<MessengerPayoutRepository>()
+    private val ambassadorPayoutRepository = mockk<AmbassadorPayoutRepository>()
     private val applicationEventPublisher = mockk<ApplicationEventPublisher>()
 
     @Before
@@ -34,6 +36,7 @@ class ReconServiceTest {
             userProfileRepo = messengerRepo,
             shopPayoutRepo = shopPayoutRepository,
             messengerPayoutRepository = messengerPayoutRepository,
+            ambassadorPayoutRepository = ambassadorPayoutRepository,
             applicationEventPublisher = applicationEventPublisher)
     }
 

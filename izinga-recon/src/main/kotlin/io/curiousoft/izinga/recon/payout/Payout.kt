@@ -85,8 +85,35 @@ class ShopPayout(
     override var paid: Boolean = false
 }
 
+class AmbassadorPayout(
+    toId: String,
+    toName: String,
+    toBankName: String,
+    toType: BankAccType,
+    toAccountNumber: String,
+    toBranchCode: String,
+    fromReference: String,
+    toReference: String,
+    emailNotify: String?,
+    emailAddress: String?,
+    emailSubject: String?,
+    orders: MutableSet<Order> = mutableSetOf(),
+    bundleId: String? = null,
+    payoutStage: PayoutStage = PayoutStage.PENDING,
+    var commissionAmount: BigDecimal,
+    var driverFirstDeliveryOrderId: String
+) : Payout(
+    toId = toId, toName = toName, toType = toType, toBankName = toBankName, toAccountNumber = toAccountNumber,
+    toBranchCode = toBranchCode, fromReference = fromReference, toReference = toReference, emailNotify = emailNotify,
+    emailAddress = emailAddress, emailSubject = emailSubject, orders = orders, bundleId = bundleId,
+    payoutStage = payoutStage
+) {
+    override var paid: Boolean = false
+    override val total: BigDecimal get() = commissionAmount
+}
+
 enum class PayoutStage {
-    PENDING, PROCESSING, COMPLETED
+    PENDING, PROCESSING, COMPLETED, VOIDED
 }
 
 fun generateId(): String {

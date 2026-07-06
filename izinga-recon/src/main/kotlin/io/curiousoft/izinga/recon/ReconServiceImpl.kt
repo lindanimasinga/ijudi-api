@@ -12,6 +12,7 @@ import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.payout.*
+import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
 import org.slf4j.LoggerFactory
@@ -30,6 +31,7 @@ class ReconServiceImpl(
     private val userProfileRepo: UserProfileRepo,
     private val shopPayoutRepo: ShopPayoutRepository,
     private val messengerPayoutRepository: MessengerPayoutRepository,
+    private val ambassadorPayoutRepository: AmbassadorPayoutRepository,
     private val applicationEventPublisher: ApplicationEventPublisher
 ) : ReconService {
 
@@ -198,6 +200,22 @@ class ReconServiceImpl(
                     isMessengerPaid = true)
                 applicationEventPublisher.publishEvent(event)
             }
+
+        bundleResponse.payoutItemResults
+            .filter { it.type == PayoutType.AMBASSADOR }
+            .mapNotNull {
+                ambassadorPayoutRepository.findByToIdAndPayoutStage(it.toId, PayoutStage.PROCESSING)
+                    ?.let { payout ->
+                        payout.paid = it.paid
+                        ambassadorPayoutRepository.save(payout)
+                        payout
+                    }
+            }
+            .filter { it.paid }
+            .onEach {
+                it.payoutStage = PayoutStage.COMPLETED
+                ambassadorPayoutRepository.save(it)
+            }
     }
 
     override fun updateBundle(bundle: PayoutBundle) {
@@ -206,6 +224,7 @@ class ReconServiceImpl(
                 when (it.key) {
                     ShopPayout::class.qualifiedName -> shopPayoutRepo.saveAll(it.value as List<ShopPayout>)
                     MessengerPayout::class.qualifiedName -> messengerPayoutRepository.saveAll(it.value as List<MessengerPayout>)
+                    AmbassadorPayout::class.qualifiedName -> ambassadorPayoutRepository.saveAll(it.value as List<AmbassadorPayout>)
                 }
         })
     }
@@ -221,6 +240,7 @@ class ReconServiceImpl(
         return when (payoutType) {
             PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetweenAndToId(from, toDate, toId)
             PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateBetweenAndToId(from, toDate, toId)
+            PayoutType.AMBASSADOR -> ambassadorPayoutRepository.findByModifiedDateBetweenAndToId(from, toDate, toId)
         }
     }
 
@@ -253,6 +273,7 @@ class ReconServiceImpl(
         return when (payoutType) {
             PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetween(from, toDate)
             PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateBetween(from, toDate)
+            PayoutType.AMBASSADOR -> ambassadorPayoutRepository.findByModifiedDateBetween(from, toDate)
         }
     }
 
