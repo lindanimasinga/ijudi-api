@@ -4,15 +4,26 @@ import io.curiousoft.izinga.commons.model.Profile
 import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.StoreType
 import io.curiousoft.izinga.commons.model.UserProfile
+import io.curiousoft.izinga.commons.repo.UserProfileRepo
+import io.curiousoft.izinga.qrcodegenerator.tips.QRCodeService
+import io.curiousoft.izinga.recon.payout.AmbassadorPayout
+import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
 import io.curiousoft.izinga.usermanagement.utils.IjudiUtils.isSAMobileNumber
 import org.slf4j.LoggerFactory
+import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import jakarta.validation.Valid
 
 @RestController
 @RequestMapping("/user")
-class UserController(private val profileService: UserProfileService) {
+class UserController(
+    private val profileService: UserProfileService,
+    private val userProfileRepo: UserProfileRepo,
+    private val qrCodeService: QRCodeService,
+    private val ambassadorPayoutRepo: AmbassadorPayoutRepository
+) {
 
     private val logger = LoggerFactory.getLogger(UserController::class.java)
 
@@ -79,6 +90,58 @@ class UserController(private val profileService: UserProfileService) {
         val pending = profileService.pendingAproval()
         logger.info("Found {} pending approvals", pending.size)
         return ResponseEntity.ok(pending)
+    }
+
+    @GetMapping(value = ["/{userId}/ambassador-qr"], produces = [MediaType.IMAGE_PNG_VALUE])
+    fun getAmbassadorQrCode(@PathVariable userId: String): ResponseEntity<ByteArray> {
+        logger.info("Ambassador QR code request for userId={}", userId)
+
+        val profile = userProfileRepo.findById(userId).orElse(null)
+            ?: return ResponseEntity.notFound().build<ByteArray>().also {
+                logger.warn("Ambassador QR request for unknown userId={}", userId)
+            }
+
+        if (profile.role != ProfileRoles.AMBASSADOR || profile.profileApproved != true) {
+            logger.warn("Ambassador QR denied: userId={} role={} approved={}", userId, profile.role, profile.profileApproved)
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        }
+
+        return try {
+            val qrContent = "https://onboarding.izinga.co.za/indivisuals?ref=$userId"
+            val label = profile.name ?: userId
+            val qrImage = qrCodeService.generateQRCodeImage("REFER A FRIEND", qrContent, label, 450, 450)
+            logger.info("Ambassador QR generated for userId={}", userId)
+            ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).body(qrImage)
+        } catch (e: Exception) {
+            logger.error("Failed to generate ambassador QR for userId={}", userId, e)
+            ResponseEntity.internalServerError().build()
+        }
+    }
+
+    @GetMapping(value = ["/{userId}/ambassador-drivers"], produces = ["application/json"])
+    fun getAmbassadorDrivers(@PathVariable userId: String): ResponseEntity<List<UserProfile>> {
+        logger.info("Ambassador drivers request for userId={}", userId)
+        val profile = userProfileRepo.findById(userId).orElse(null)
+            ?: return ResponseEntity.notFound().build()
+        if (profile.role != ProfileRoles.AMBASSADOR || profile.profileApproved != true) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        }
+        val drivers = userProfileRepo.findByAmbassadorId(userId)
+        logger.info("Found {} drivers for ambassadorId={}", drivers.size, userId)
+        return ResponseEntity.ok(drivers)
+    }
+
+    @GetMapping(value = ["/{userId}/ambassador-payouts"], produces = ["application/json"])
+    fun getAmbassadorPayouts(@PathVariable userId: String): ResponseEntity<List<AmbassadorPayout>> {
+        logger.info("Ambassador payouts request for userId={}", userId)
+        val profile = userProfileRepo.findById(userId).orElse(null)
+            ?: return ResponseEntity.notFound().build()
+        if (profile.role != ProfileRoles.AMBASSADOR || profile.profileApproved != true) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        }
+        val payouts = ambassadorPayoutRepo.findByToId(userId)
+        logger.info("Found {} payouts for ambassadorId={}", payouts.size, userId)
+        return ResponseEntity.ok(payouts)
     }
 
     @DeleteMapping(value = ["/{id}"], produces = ["application/json"])
