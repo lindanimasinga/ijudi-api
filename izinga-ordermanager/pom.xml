@@ -71,7 +71,7 @@
             <groupId>io.curiousoft.izinga</groupId>
             <artifactId>izinga-qrcode-generator</artifactId>
             <version>1.0</version>
-            <scope>runtime</scope>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>

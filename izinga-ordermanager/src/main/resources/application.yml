@@ -116,6 +116,8 @@ promocodes:
 izinga:
     api:
         url: http://localhost
+    ambassador:
+        commission-amount: 70.00
 
 client:
     config:

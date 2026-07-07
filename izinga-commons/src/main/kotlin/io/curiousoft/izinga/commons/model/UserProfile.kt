@@ -12,6 +12,7 @@ class UserProfile(
     imageUrl: @NotBlank(message = "profile image url not valid") String?,
     mobileNumber: @NotBlank(message = "profile mobile number not valid") String?,
     role: @NotNull(message = "role not valid") ProfileRoles?) : Profile(name, address, imageUrl, mobileNumber, role) {
+    var ambassadorId: String? = null
     var surname: String? = null
     var missingDocumentsReminderSent: Boolean? = null
     var welcomeMessageSent: Boolean = false

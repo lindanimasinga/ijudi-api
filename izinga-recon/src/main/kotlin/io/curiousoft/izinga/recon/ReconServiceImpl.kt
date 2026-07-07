@@ -7,11 +7,14 @@ import io.curiousoft.izinga.commons.model.Bank
 import io.curiousoft.izinga.commons.model.BankAccType
 import io.curiousoft.izinga.commons.model.StoreProfile
 import io.curiousoft.izinga.commons.model.UserProfile
+import io.curiousoft.izinga.commons.payout.events.AmbassadorPayoutEvent
 import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
 import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
+import io.curiousoft.izinga.recon.ambassador.AmbassadorProperties
 import io.curiousoft.izinga.recon.payout.*
+import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
 import org.slf4j.LoggerFactory
@@ -30,7 +33,9 @@ class ReconServiceImpl(
     private val userProfileRepo: UserProfileRepo,
     private val shopPayoutRepo: ShopPayoutRepository,
     private val messengerPayoutRepository: MessengerPayoutRepository,
-    private val applicationEventPublisher: ApplicationEventPublisher
+    private val ambassadorPayoutRepository: AmbassadorPayoutRepository,
+    private val applicationEventPublisher: ApplicationEventPublisher,
+    private val ambassadorProperties: AmbassadorProperties
 ) : ReconService {
 
     private val logger = LoggerFactory.getLogger(ReconServiceImpl::class.java)
@@ -99,6 +104,59 @@ class ReconServiceImpl(
                 payout.emailSent = false
             }
         return messengerPayoutRepository.save(payout)
+    }
+
+    override fun generatePayoutForAmbassadorAndApproval(driver: UserProfile, ambassador: UserProfile): AmbassadorPayout? {
+        val ambassadorId = ambassador.id ?: run {
+            logger.warn("ambassador has no id, skipping payout generation")
+            return null
+        }
+        val driverId = driver.id ?: run {
+            logger.warn("driver has no id, skipping ambassador payout")
+            return null
+        }
+
+        val existing = ambassadorPayoutRepository.findByTriggerDriverId(driverId)
+        if (existing != null) {
+            logger.warn(
+                "driver {} already has an ambassador commission payout {}; skipping duplicate",
+                driverId, existing.id
+            )
+            return null
+        }
+
+        val payout = AmbassadorPayout(
+            toId = ambassadorId,
+            toName = ambassador.name ?: "",
+            toBankName = ambassador.bank?.name ?: "",
+            toType = ambassador.bank?.type ?: BankAccType.CHEQUE,
+            toAccountNumber = getPayoutAccountNumber(ambassador.bank?.accountId, ambassador.bank?.type) ?: "",
+            toBranchCode = ambassador.bank?.branchCode ?: "",
+            fromReference = "Ambassador commission for ${ambassador.name}",
+            toReference = "iZinga pay",
+            emailNotify = "",
+            emailAddress = ambassador.emailAddress,
+            emailSubject = "iZinga Ambassador Commission",
+            orders = mutableSetOf(),
+            commissionAmount = ambassadorProperties.commissionAmount,
+            triggerDriverId = driverId,
+            payoutStage = PayoutStage.PENDING
+        )
+
+        val saved = ambassadorPayoutRepository.save(payout)
+        logger.info("created ambassador payout {} for ambassador {} on driver approval {}", saved.id, ambassadorId, driverId)
+
+        applicationEventPublisher.publishEvent(
+            AmbassadorPayoutEvent(
+                source = this,
+                ambassadorId = ambassadorId,
+                driverId = driverId,
+                commissionAmount = ambassadorProperties.commissionAmount,
+                payoutId = saved.id!!
+            )
+        )
+
+        return saved
     }
 
     @Async
@@ -198,6 +256,22 @@ class ReconServiceImpl(
                     isMessengerPaid = true)
                 applicationEventPublisher.publishEvent(event)
             }
+
+        bundleResponse.payoutItemResults
+            .filter { it.type == PayoutType.AMBASSADOR }
+            .mapNotNull {
+                ambassadorPayoutRepository.findByToIdAndPayoutStage(it.toId, PayoutStage.PROCESSING)
+                    ?.let { payout ->
+                        payout.paid = it.paid
+                        ambassadorPayoutRepository.save(payout)
+                        payout
+                    }
+            }
+            .filter { it.paid }
+            .onEach {
+                it.payoutStage = PayoutStage.COMPLETED
+                ambassadorPayoutRepository.save(it)
+            }
     }
 
     override fun updateBundle(bundle: PayoutBundle) {
@@ -206,6 +280,7 @@ class ReconServiceImpl(
                 when (it.key) {
                     ShopPayout::class.qualifiedName -> shopPayoutRepo.saveAll(it.value as List<ShopPayout>)
                     MessengerPayout::class.qualifiedName -> messengerPayoutRepository.saveAll(it.value as List<MessengerPayout>)
+                    AmbassadorPayout::class.qualifiedName -> ambassadorPayoutRepository.saveAll(it.value as List<AmbassadorPayout>)
                 }
         })
     }
@@ -221,6 +296,7 @@ class ReconServiceImpl(
         return when (payoutType) {
             PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetweenAndToId(from, toDate, toId)
             PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateBetweenAndToId(from, toDate, toId)
+            PayoutType.AMBASSADOR -> ambassadorPayoutRepository.findByModifiedDateBetweenAndToId(from, toDate, toId)
         }
     }
 
@@ -253,6 +329,7 @@ class ReconServiceImpl(
         return when (payoutType) {
             PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetween(from, toDate)
             PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateBetween(from, toDate)
+            PayoutType.AMBASSADOR -> ambassadorPayoutRepository.findByModifiedDateBetween(from, toDate)
         }
     }
 

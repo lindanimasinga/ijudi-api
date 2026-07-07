@@ -44,6 +44,11 @@
             <version>1.0.0</version>
         </dependency>
         <dependency>
+            <groupId>io.curiousoft.izinga</groupId>
+            <artifactId>izinga-qrcode-generator</artifactId>
+            <version>1.0</version>
+        </dependency>
+        <dependency>
             <groupId>de.brendamour</groupId>
             <artifactId>jpasskit</artifactId>
             <version>0.3.4</version>

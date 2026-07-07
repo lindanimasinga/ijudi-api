@@ -4,7 +4,9 @@ import io.curiousoft.izinga.commons.model.*
 import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
+import io.curiousoft.izinga.recon.ambassador.AmbassadorProperties
 import io.curiousoft.izinga.recon.payout.*
+import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
 import io.mockk.*
@@ -13,6 +15,7 @@ import org.junit.Before
 import org.junit.Test
 import org.springframework.context.ApplicationEvent
 import org.springframework.context.ApplicationEventPublisher
+import java.math.BigDecimal
 import java.time.DayOfWeek
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -25,6 +28,7 @@ class ReconServiceTest {
     private val messengerRepo = mockk<UserProfileRepo>()
     private val shopPayoutRepository = mockk<ShopPayoutRepository>()
     private val messengerPayoutRepository = mockk<MessengerPayoutRepository>()
+    private val ambassadorPayoutRepository = mockk<AmbassadorPayoutRepository>()
     private val applicationEventPublisher = mockk<ApplicationEventPublisher>()
 
     @Before
@@ -34,7 +38,9 @@ class ReconServiceTest {
             userProfileRepo = messengerRepo,
             shopPayoutRepo = shopPayoutRepository,
             messengerPayoutRepository = messengerPayoutRepository,
-            applicationEventPublisher = applicationEventPublisher)
+            ambassadorPayoutRepository = ambassadorPayoutRepository,
+            applicationEventPublisher = applicationEventPublisher,
+            ambassadorProperties = AmbassadorProperties())
     }
 
     @Test
@@ -585,5 +591,112 @@ class ReconServiceTest {
             emailAddress = "shop@email.com"
         }
         return storeProfile
+    }
+
+    // ---- generatePayoutForAmbassadorAndOrder tests ----
+
+    private fun makeAmbassador(id: String): UserProfile {
+        val bank = Bank().apply {
+            name = "FNB"; accountId = "0821234567"; type = BankAccType.EWALLET; branchCode = "250655"
+        }
+        return UserProfile(
+            "Ambassador Name",
+            UserProfile.SignUpReason.DELIVERY_DRIVER,
+            "20 Street",
+            "profile-img.jpg",
+            "0821234567",
+            ProfileRoles.AMBASSADOR
+        ).also {
+            it.id = id
+            it.emailAddress = "ambassador@mail.com"
+            it.bank = bank
+        }
+    }
+
+    private fun makeDriver(driverId: String): UserProfile {
+        return UserProfile(
+            "Driver One",
+            UserProfile.SignUpReason.DELIVERY_DRIVER,
+            "1 Driver Street",
+            "img.jpg",
+            "0831111111",
+            ProfileRoles.MESSENGER
+        ).also { it.id = driverId }
+    }
+
+    private fun makeOrderForAmbassador(orderId: String, messengerId: String): Order {
+        val shippingData = mockk<ShippingData>()
+        every { shippingData.messengerId } returns messengerId
+        val order = mockk<Order>()
+        every { order.id } returns orderId
+        every { order.shippingData } returns shippingData
+        every { order.stage } returns OrderStage.STAGE_7_ALL_PAID
+        return order
+    }
+
+    @Test
+    fun `generatePayoutForAmbassadorAndApproval - happy path creates payout and publishes event`() {
+        val ambassadorId = "amb-001"
+        val driverId = "driver-001"
+        val ambassador = makeAmbassador(ambassadorId)
+        val driver = makeDriver(driverId)
+
+        every { ambassadorPayoutRepository.findByToIdAndPayoutStage(ambassadorId, PayoutStage.PENDING) } returns null
+        val savedSlot = slot<AmbassadorPayout>()
+        every { ambassadorPayoutRepository.save(capture(savedSlot)) } answers { savedSlot.captured.also { it.id = "PAY01" } }
+        every { applicationEventPublisher.publishEvent(any<Any>()) } just runs
+
+        val result = sut.generatePayoutForAmbassadorAndApproval(driver, ambassador)
+
+        assertNotNull(result)
+        assertEquals(ambassadorId, result!!.toId)
+        assertEquals(BigDecimal("70.00"), result.commissionAmount)
+        assertEquals(driverId, result.triggerDriverId)
+        assertEquals(PayoutStage.PENDING, result.payoutStage)
+        assertTrue(result.orders.isEmpty())
+        verify { ambassadorPayoutRepository.save(any()) }
+        verify { applicationEventPublisher.publishEvent(any<Any>()) }
+    }
+
+    @Test
+    fun `generatePayoutForAmbassadorAndApproval - returns null when PENDING payout already exists`() {
+        val ambassadorId = "amb-002"
+        val ambassador = makeAmbassador(ambassadorId)
+        val driver = makeDriver("driver-002")
+
+        val existingPayout = mockk<AmbassadorPayout>()
+        every { existingPayout.id } returns "EXIST"
+        every { ambassadorPayoutRepository.findByToIdAndPayoutStage(ambassadorId, PayoutStage.PENDING) } returns existingPayout
+
+        val result = sut.generatePayoutForAmbassadorAndApproval(driver, ambassador)
+
+        assertNull(result)
+        verify(exactly = 0) { ambassadorPayoutRepository.save(any()) }
+        verify(exactly = 0) { applicationEventPublisher.publishEvent(any<Any>()) }
+    }
+
+    @Test
+    fun `generatePayoutForAmbassadorAndApproval - returns null when ambassador has no id`() {
+        val ambassador = makeAmbassador("amb-003").also { it.id = null }
+        val driver = makeDriver("driver-003")
+
+        val result = sut.generatePayoutForAmbassadorAndApproval(driver, ambassador)
+
+        assertNull(result)
+        verify(exactly = 0) { ambassadorPayoutRepository.save(any()) }
+    }
+
+    @Test
+    fun `generatePayoutForAmbassadorAndApproval - returns null when driver has no id`() {
+        val ambassadorId = "amb-004"
+        val ambassador = makeAmbassador(ambassadorId)
+        val driver = makeDriver("driver-004").also { it.id = null }
+
+        every { ambassadorPayoutRepository.findByToIdAndPayoutStage(ambassadorId, PayoutStage.PENDING) } returns null
+
+        val result = sut.generatePayoutForAmbassadorAndApproval(driver, ambassador)
+
+        assertNull(result)
+        verify(exactly = 0) { ambassadorPayoutRepository.save(any()) }
     }
 }

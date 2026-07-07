@@ -16,6 +16,8 @@ import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.payout.MessengerPayout
 import io.curiousoft.izinga.recon.payout.PayoutStage
 import io.curiousoft.izinga.recon.payout.ShopPayout
+import io.curiousoft.izinga.recon.ambassador.AmbassadorProperties
+import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
 import io.mockk.every
@@ -34,6 +36,7 @@ class ReconServiceImplProfileUpdateTest {
     private val userProfileRepo = mockk<UserProfileRepo>()
     private val shopPayoutRepository = mockk<ShopPayoutRepository>()
     private val messengerPayoutRepository = mockk<MessengerPayoutRepository>()
+    private val ambassadorPayoutRepository = mockk<AmbassadorPayoutRepository>()
     private val applicationEventPublisher = mockk<ApplicationEventPublisher>()
 
     private lateinit var sut: ReconServiceImpl
@@ -45,7 +48,9 @@ class ReconServiceImplProfileUpdateTest {
             userProfileRepo = userProfileRepo,
             shopPayoutRepo = shopPayoutRepository,
             messengerPayoutRepository = messengerPayoutRepository,
-            applicationEventPublisher = applicationEventPublisher
+            ambassadorPayoutRepository = ambassadorPayoutRepository,
+            applicationEventPublisher = applicationEventPublisher,
+            ambassadorProperties = AmbassadorProperties()
         )
     }
 
