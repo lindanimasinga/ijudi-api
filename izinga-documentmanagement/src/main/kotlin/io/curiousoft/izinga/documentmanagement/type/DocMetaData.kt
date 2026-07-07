@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.documentmanagement.type
 
 import com.fasterxml.jackson.databind.JsonNode
+import io.curiousoft.izinga.commons.model.ProfileRoles
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.mapping.Document
 import io.curiousoft.izinga.documentmanagement.type.JsonSchemaUtil
@@ -10,6 +11,7 @@ data class DocMetadata(
     @Id
     var name: String,
     var label: String,
+    var userRole: ProfileRoles? = null,
     var mandatoryFields: List<FieldSpec> = emptyList(),
     var optionalFields: List<FieldSpec> = emptyList()
 ) {
