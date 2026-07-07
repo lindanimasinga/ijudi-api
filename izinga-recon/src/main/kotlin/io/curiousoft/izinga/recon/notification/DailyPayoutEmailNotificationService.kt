@@ -3,7 +3,6 @@ package io.curiousoft.izinga.recon.notification;
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.ReconService
-import io.curiousoft.izinga.recon.payout.AmbassadorPayout
 import io.curiousoft.izinga.recon.payout.Payout
 import io.curiousoft.izinga.recon.payout.PayoutStage
 import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
@@ -49,19 +48,6 @@ class DailyPayoutEmailNotificationService(
     private fun processAmbassadorPayouts() {
         val pendingAmbassadorPayouts = ambassadorPayoutRepository.findByPayoutStage(PayoutStage.PENDING)
         pendingAmbassadorPayouts.forEach { payout ->
-            val ambassador = userProfileRepo.findById(payout.toId).orElse(null)
-            if (ambassador == null) {
-                logger.warn("ambassador profile {} not found, voiding payout {}", payout.toId, payout.id)
-                payout.payoutStage = PayoutStage.VOIDED
-                ambassadorPayoutRepository.save(payout)
-                return@forEach
-            }
-            if (!ambassador.profileApproved) {
-                logger.info("ambassador {} not approved, voiding ambassador payout {}", payout.toId, payout.id)
-                payout.payoutStage = PayoutStage.VOIDED
-                ambassadorPayoutRepository.save(payout)
-                return@forEach
-            }
             if (!payout.emailSent) {
                 sendPayoutEmail(payout)
                 ambassadorPayoutRepository.save(payout)
