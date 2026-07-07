@@ -8,6 +8,7 @@ import io.curiousoft.izinga.usermanagement.userconfig.FieldSpec
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfig
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService
 import lombok.extern.slf4j.Slf4j
+import org.slf4j.LoggerFactory
 import org.springframework.ai.tool.annotation.Tool
 import org.springframework.ai.tool.annotation.ToolParam
 import org.springframework.context.ApplicationEventPublisher
@@ -18,6 +19,7 @@ import java.util.stream.Stream
 @Service
 class UserProfileService(val userProfileRepo: UserProfileRepo, val eventPublisher: ApplicationEventPublisher, userConfigService: UserConfigService) : ProfileServiceImpl<UserProfileRepo, UserProfile>(userProfileRepo, eventPublisher) {
 
+    private val log = LoggerFactory.getLogger(UserProfileService::class.java)
     private lateinit var userConfig: MutableList<UserConfig?>
 
     init {
@@ -55,6 +57,20 @@ class UserProfileService(val userProfileRepo: UserProfileRepo, val eventPublishe
         //remove empty spaces and dashes from the mobile number
         profile.mobileNumber = fomatMobileNumber(profile.mobileNumber!!)
         if (profileRepo.existsByMobileNumber(profile.mobileNumber!!)) throw Exception("User with phone number " + profile.mobileNumber + " already exist.")
+
+        // T-09: validate ambassadorId if provided; clear it if not a valid active ambassador
+        val requestedAmbassadorId = profile.ambassadorId
+        if (!requestedAmbassadorId.isNullOrBlank()) {
+            val ambassador = profileRepo.findById(requestedAmbassadorId).orElse(null)
+            if (ambassador != null && ambassador.role == ProfileRoles.AMBASSADOR && ambassador.profileApproved == true) {
+                log.info("Valid ambassador referral: ambassadorId={} for new user mobileNumber={}", requestedAmbassadorId, profile.mobileNumber)
+                profile.ambassadorId = requestedAmbassadorId
+            } else {
+                log.warn("Invalid or inactive ambassador referral: ambassadorId={} — setting to null for mobileNumber={}", requestedAmbassadorId, profile.mobileNumber)
+                profile.ambassadorId = null
+            }
+        }
+
         return super.create(profile)
     }
 
