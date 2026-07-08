@@ -42,7 +42,8 @@ public class SecurityConfig {
                         .requestMatchers(GET, "/v2/promotion/**", "/v2/store/**").permitAll()
                         .requestMatchers(POST, "/v2/leads").permitAll()
                         .requestMatchers("/v2/**").authenticated()
-                        .requestMatchers(GET, "/user/*/ambassador-drivers", "/user/*/ambassador-payouts").authenticated()
+                        .requestMatchers(GET, "/user/*/ambassador-qr", "/user/*/ambassador-drivers", "/user/*/ambassador-payouts").authenticated()
+                        .requestMatchers(POST, "/ambassador").hasRole("ADMIN")
                         .anyRequest().permitAll()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2

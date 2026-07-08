@@ -1,13 +1,21 @@
 package io.curiousoft.izinga.recon.notification
 
 import io.curiousoft.izinga.commons.model.Order
+import io.curiousoft.izinga.recon.payout.AmbassadorPayout
 import io.curiousoft.izinga.recon.payout.Payout
 import java.text.SimpleDateFormat
 
 internal class Data(val payout: Payout) {
     val order: List<OrderReport> = payout.orders.map { OrderReport(it) }
     val date: String = SimpleDateFormat("YYYY/MM/dd HH:mm").format(payout.createdDate)
+}
 
+internal class AmbassadorData(val payout: AmbassadorPayout) {
+    val ambassadorName: String = payout.toName
+    val commissionAmount: String = "R${payout.commissionAmount}"
+    val triggerDriverId: String = payout.triggerDriverId
+    val bankAccount: String = payout.toAccountNumber
+    val date: String = SimpleDateFormat("yyyy/MM/dd HH:mm").format(payout.createdDate)
 }
 
 internal class OrderReport(order: Order) {
@@ -27,6 +35,7 @@ internal class From {
 }
 
 internal class Personalization(var email: String, var data: Data)
+internal class AmbassadorPersonalization(var email: String, var data: AmbassadorData)
 
 internal class EmailRequest (
     var from: From? = null,

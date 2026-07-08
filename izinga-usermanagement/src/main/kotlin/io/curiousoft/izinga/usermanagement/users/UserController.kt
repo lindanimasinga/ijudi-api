@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.*
 import jakarta.validation.Valid
 
@@ -93,6 +94,7 @@ class UserController(
     }
 
     @GetMapping(value = ["/{userId}/ambassador-qr"], produces = [MediaType.IMAGE_PNG_VALUE])
+    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.name")
     fun getAmbassadorQrCode(@PathVariable userId: String): ResponseEntity<ByteArray> {
         logger.info("Ambassador QR code request for userId={}", userId)
 
@@ -150,5 +152,55 @@ class UserController(
         profileService.delete(id!!)
         logger.info("Deleted user id={}", id)
         return ResponseEntity.ok().build<Any>()
+    }
+}
+
+@RestController
+@RequestMapping("/ambassador")
+class AmbassadorAdminController(
+    private val profileService: UserProfileService,
+    private val userProfileRepo: UserProfileRepo
+) {
+    private val logger = LoggerFactory.getLogger(AmbassadorAdminController::class.java)
+
+    data class CreateAmbassadorRequest(
+        val name: String,
+        val mobileNumber: String,
+        val emailAddress: String? = null
+    )
+
+    data class CreateAmbassadorResponse(
+        val userId: String,
+        val referralUrl: String
+    )
+
+    @PostMapping(consumes = ["application/json"], produces = ["application/json"])
+    @PreAuthorize("hasRole('ADMIN')")
+    fun createAmbassador(@RequestBody request: CreateAmbassadorRequest): ResponseEntity<*> {
+        logger.info("Admin creating ambassador for mobileNumber={}", request.mobileNumber)
+
+        if (userProfileRepo.findByMobileNumber(request.mobileNumber) != null) {
+            logger.warn("Ambassador creation failed — mobileNumber already exists: {}", request.mobileNumber)
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(mapOf("error" to "A user with this phone number already exists"))
+        }
+
+        val profile = UserProfile(
+            request.name,
+            UserProfile.SignUpReason.DELIVERY_DRIVER,
+            "",
+            "",
+            request.mobileNumber,
+            ProfileRoles.AMBASSADOR
+        ).apply {
+            profileApproved = true
+            emailAddress = request.emailAddress
+        }
+
+        val created = profileService.create(profile)
+        val referralUrl = "https://onboarding.izinga.co.za/indivisuals?ref=${created.id}"
+        logger.info("Ambassador created id={} referralUrl={}", created.id, referralUrl)
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(CreateAmbassadorResponse(userId = created.id!!, referralUrl = referralUrl))
     }
 }

@@ -24,6 +24,9 @@ class UserProfile(
     var dateOfBirth: String? = null
     var termsAccepted: Boolean? = null
     var termsAcceptedDate: Date? = null
+    var icaAccepted: Boolean? = null
+    var icaAcceptedDate: Date? = null
+    var icaVersion: String? = null
     var crminalCheckData: CriminalCheckData? = null
 
     enum class SignUpReason {

@@ -2,6 +2,7 @@ package io.curiousoft.izinga.usermanagement.users
 
 import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.UserProfile
+import io.curiousoft.izinga.commons.repo.IcaAcceptanceLogRepo
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService
 import org.junit.jupiter.api.Assertions.assertNull
@@ -31,12 +32,15 @@ class AmbassadorIdValidationTest {
     @Mock
     lateinit var userConfigService: UserConfigService
 
+    @Mock
+    lateinit var icaAcceptanceLogRepo: IcaAcceptanceLogRepo
+
     lateinit var profileService: UserProfileService
 
     @BeforeEach
     fun setUp() {
         `when`(userConfigService.findAll()).thenReturn(emptyList())
-        profileService = UserProfileService(userProfileRepo, eventPublisher, userConfigService)
+        profileService = UserProfileService(userProfileRepo, eventPublisher, userConfigService, icaAcceptanceLogRepo)
     }
 
     private fun buildNewUser(ambassadorId: String? = null): UserProfile {

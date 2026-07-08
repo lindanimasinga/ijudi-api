@@ -1,8 +1,10 @@
 package io.curiousoft.izinga.usermanagement.users
 
+import io.curiousoft.izinga.commons.model.IcaAcceptanceLog
 import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.StoreType
 import io.curiousoft.izinga.commons.model.UserProfile
+import io.curiousoft.izinga.commons.repo.IcaAcceptanceLogRepo
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.usermanagement.userconfig.FieldSpec
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfig
@@ -13,11 +15,17 @@ import org.springframework.ai.tool.annotation.Tool
 import org.springframework.ai.tool.annotation.ToolParam
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
+import java.util.Date
 import java.util.stream.Collectors
 import java.util.stream.Stream
 
 @Service
-class UserProfileService(val userProfileRepo: UserProfileRepo, val eventPublisher: ApplicationEventPublisher, userConfigService: UserConfigService) : ProfileServiceImpl<UserProfileRepo, UserProfile>(userProfileRepo, eventPublisher) {
+class UserProfileService(
+    val userProfileRepo: UserProfileRepo,
+    val eventPublisher: ApplicationEventPublisher,
+    userConfigService: UserConfigService,
+    private val icaAcceptanceLogRepo: IcaAcceptanceLogRepo
+) : ProfileServiceImpl<UserProfileRepo, UserProfile>(userProfileRepo, eventPublisher) {
 
     private val log = LoggerFactory.getLogger(UserProfileService::class.java)
     private lateinit var userConfig: MutableList<UserConfig?>
@@ -72,6 +80,28 @@ class UserProfileService(val userProfileRepo: UserProfileRepo, val eventPublishe
         }
 
         return super.create(profile)
+    }
+
+    @Throws(Exception::class)
+    override fun update(profileId: String, profile: UserProfile): UserProfile {
+        val persisted = userProfileRepo.findById(profileId).orElse(null)
+        val wasIcaAccepted = persisted?.icaAccepted == true
+        val updated = super.update(profileId, profile)
+        if (!wasIcaAccepted && updated.icaAccepted == true) {
+            val logEntry = IcaAcceptanceLog(
+                userId = updated.id ?: profileId,
+                mobileNumber = updated.mobileNumber ?: "",
+                icaVersion = updated.icaVersion ?: "unknown",
+                acceptedAt = updated.icaAcceptedDate ?: Date()
+            )
+            try {
+                icaAcceptanceLogRepo.insert(logEntry)
+                log.info("ICA acceptance logged for userId={} icaVersion={}", logEntry.userId, logEntry.icaVersion)
+            } catch (e: Exception) {
+                log.error("Failed to write ICA acceptance log for userId={}", profileId, e)
+            }
+        }
+        return updated
     }
 
     fun pendingAproval(): List<UserProfile> {
