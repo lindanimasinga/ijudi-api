@@ -1,9 +1,11 @@
 package io.curiousoft.izinga.usermanagement.users
 
+import io.curiousoft.izinga.commons.model.IcaAcceptanceLog
 import io.curiousoft.izinga.commons.model.Profile
 import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.StoreType
 import io.curiousoft.izinga.commons.model.UserProfile
+import io.curiousoft.izinga.commons.repo.IcaAcceptanceLogRepo
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService
 import org.junit.Assert
@@ -11,13 +13,15 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.Disabled
 import org.junit.runner.RunWith
+import org.mockito.ArgumentCaptor
 import org.mockito.Mock
 import org.mockito.Mockito
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
 import org.mockito.junit.MockitoJUnitRunner
 import org.springframework.context.ApplicationEventPublisher
 import java.util.*
 
-@Disabled
 @RunWith(MockitoJUnitRunner::class)
 class UserServiceTest {
 
@@ -30,10 +34,12 @@ class UserServiceTest {
     lateinit var profileRepo: UserProfileRepo
     @Mock
     lateinit var profileUpdatedEventPublisher: ApplicationEventPublisher
-    
+    @Mock
+    lateinit var icaAcceptanceLogRepo: IcaAcceptanceLogRepo
+
     @Before
     fun setUp() {
-        profileService = UserProfileService(profileRepo, profileUpdatedEventPublisher, userConfigService)
+        profileService = UserProfileService(profileRepo, profileUpdatedEventPublisher, userConfigService, icaAcceptanceLogRepo)
     }
 
     @Test
@@ -152,6 +158,94 @@ class UserServiceTest {
 
         //verify
         Mockito.verify(profileRepo).findByMobileNumber(phone)
+    }
+
+    @Test
+    fun `update - first time ICA acceptance writes audit log`() {
+        // given
+        val profileId = "icaUserId"
+        val persisted = UserProfile("name", UserProfile.SignUpReason.BUY, "address", "https://img.url", "+27821234567", ProfileRoles.CUSTOMER)
+        persisted.id = profileId
+        persisted.icaAccepted = null  // not yet accepted
+
+        val incoming = UserProfile("name", UserProfile.SignUpReason.BUY, "address", "https://img.url", "+27821234567", ProfileRoles.CUSTOMER)
+        incoming.icaAccepted = true
+        incoming.icaVersion = "v1"
+        incoming.icaAcceptedDate = Date()
+
+        val saved = UserProfile("name", UserProfile.SignUpReason.BUY, "address", "https://img.url", "+27821234567", ProfileRoles.CUSTOMER)
+        saved.id = profileId
+        saved.icaAccepted = true
+        saved.icaVersion = "v1"
+        saved.icaAcceptedDate = incoming.icaAcceptedDate
+        saved.mobileNumber = "+27821234567"
+
+        Mockito.`when`(profileRepo.findById(profileId)).thenReturn(Optional.of(persisted))
+        Mockito.`when`(profileRepo.save(persisted)).thenReturn(saved)
+
+        // when
+        profileService.update(profileId, incoming)
+
+        // verify audit log written
+        val captor = ArgumentCaptor.forClass(IcaAcceptanceLog::class.java)
+        verify(icaAcceptanceLogRepo).insert(captor.capture())
+        Assert.assertEquals(profileId, captor.value.userId)
+        Assert.assertEquals("v1", captor.value.icaVersion)
+        Assert.assertEquals("+27821234567", captor.value.mobileNumber)
+    }
+
+    @Test
+    fun `update - ICA already accepted does not write audit log`() {
+        // given
+        val profileId = "icaUserId2"
+        val persisted = UserProfile("name", UserProfile.SignUpReason.BUY, "address", "https://img.url", "+27821234567", ProfileRoles.CUSTOMER)
+        persisted.id = profileId
+        persisted.icaAccepted = true  // already accepted
+
+        val incoming = UserProfile("name", UserProfile.SignUpReason.BUY, "address", "https://img.url", "+27821234567", ProfileRoles.CUSTOMER)
+        incoming.icaAccepted = true
+        incoming.icaVersion = "v1"
+
+        val saved = UserProfile("name", UserProfile.SignUpReason.BUY, "address", "https://img.url", "+27821234567", ProfileRoles.CUSTOMER)
+        saved.id = profileId
+        saved.icaAccepted = true
+        saved.icaVersion = "v1"
+        saved.mobileNumber = "+27821234567"
+
+        Mockito.`when`(profileRepo.findById(profileId)).thenReturn(Optional.of(persisted))
+        Mockito.`when`(profileRepo.save(persisted)).thenReturn(saved)
+
+        // when
+        profileService.update(profileId, incoming)
+
+        // verify audit log NOT written
+        verify(icaAcceptanceLogRepo, never()).insert(Mockito.any(IcaAcceptanceLog::class.java))
+    }
+
+    @Test
+    fun `update - ICA not set in request does not write audit log`() {
+        // given
+        val profileId = "icaUserId3"
+        val persisted = UserProfile("name", UserProfile.SignUpReason.BUY, "address", "https://img.url", "+27821234567", ProfileRoles.CUSTOMER)
+        persisted.id = profileId
+        persisted.icaAccepted = null
+
+        val incoming = UserProfile("name", UserProfile.SignUpReason.BUY, "address", "https://img.url", "+27821234567", ProfileRoles.CUSTOMER)
+        incoming.icaAccepted = null
+
+        val saved = UserProfile("name", UserProfile.SignUpReason.BUY, "address", "https://img.url", "+27821234567", ProfileRoles.CUSTOMER)
+        saved.id = profileId
+        saved.icaAccepted = null
+        saved.mobileNumber = "+27821234567"
+
+        Mockito.`when`(profileRepo.findById(profileId)).thenReturn(Optional.of(persisted))
+        Mockito.`when`(profileRepo.save(persisted)).thenReturn(saved)
+
+        // when
+        profileService.update(profileId, incoming)
+
+        // verify audit log NOT written
+        verify(icaAcceptanceLogRepo, never()).insert(Mockito.any(IcaAcceptanceLog::class.java))
     }
 
     @Test

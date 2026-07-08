@@ -259,13 +259,10 @@ class ReconServiceImpl(
 
         bundleResponse.payoutItemResults
             .filter { it.type == PayoutType.AMBASSADOR }
-            .mapNotNull {
-                ambassadorPayoutRepository.findByToIdAndPayoutStage(it.toId, PayoutStage.PROCESSING)
-                    ?.let { payout ->
-                        payout.paid = it.paid
-                        ambassadorPayoutRepository.save(payout)
-                        payout
-                    }
+            .flatMap { result ->
+                ambassadorPayoutRepository.findAllByToIdAndPayoutStage(result.toId, PayoutStage.PROCESSING)
+                    .onEach { payout -> payout.paid = result.paid }
+                    .also { payouts -> ambassadorPayoutRepository.saveAll(payouts) }
             }
             .filter { it.paid }
             .onEach {
