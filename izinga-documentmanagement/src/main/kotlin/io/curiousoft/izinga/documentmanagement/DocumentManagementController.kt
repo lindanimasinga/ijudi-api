@@ -35,31 +35,38 @@ class DocumentManagementController(private val cloudBucketService: CloudBucketSe
 
         cloudBucketService.putObject(fileName, file.bytes)
         val fileUrl: URL = cloudBucketService.getUrl(fileName)
+        val baseResult = mapOf("fileName" to fileName, "url" to fileUrl.toString())
         if (metadata && documentType != null) {
-            val metadata = documentInfoService.analyzeImageWithResponsesApi(
-                fileUrl.toString(),
-                documentType.klass.simpleName!!,
-                generateJsonSchema(documentType.klass),
-            )
-            return mapOf("fileName" to fileName,
-                "url" to fileUrl.toString(),
-                "metadata" to metadata)
-        } else if (metadata && docMetadata != null) {
-            val extracted = documentInfoService.analyzeImageWithResponsesApi(
-                fileUrl.toString(),
-                docMetadata.name,
-                docMetadata.toJsonSchema(),
-            )
-            // Hidden fields were sent to the vision model (they're still part of the
-            // schema) but must never reach the frontend — strip them before returning.
-            if (extracted is ObjectNode) {
-                docMetadata.hiddenFieldNames().forEach { extracted.remove(it) }
+            return try {
+                val extracted = documentInfoService.analyzeImageWithResponsesApi(
+                    fileUrl.toString(),
+                    documentType.klass.simpleName!!,
+                    generateJsonSchema(documentType.klass),
+                )
+                mapOf("fileName" to fileName, "url" to fileUrl.toString(), "metadata" to extracted)
+            } catch (e: Exception) {
+                // Extraction failure (network error, rate limit, malformed response) must
+                // never surface as a 500 — file was uploaded successfully, return URL only.
+                baseResult
             }
-            return mapOf("fileName" to fileName,
-                "url" to fileUrl.toString(),
-                "metadata" to extracted)
+        } else if (metadata && docMetadata != null) {
+            return try {
+                val extracted = documentInfoService.analyzeImageWithResponsesApi(
+                    fileUrl.toString(),
+                    docMetadata.name,
+                    docMetadata.toJsonSchema(),
+                )
+                // Hidden fields were sent to the vision model (they're still part of the
+                // schema) but must never reach the frontend — strip them before returning.
+                if (extracted is ObjectNode) {
+                    docMetadata.hiddenFieldNames().forEach { extracted.remove(it) }
+                }
+                mapOf("fileName" to fileName, "url" to fileUrl.toString(), "metadata" to extracted)
+            } catch (e: Exception) {
+                baseResult
+            }
         }
-        return mapOf("fileName" to fileName, "url" to fileUrl.toString())
+        return baseResult
     }
 
     @DeleteMapping
