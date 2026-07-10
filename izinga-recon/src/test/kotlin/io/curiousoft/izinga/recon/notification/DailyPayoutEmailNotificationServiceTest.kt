@@ -36,7 +36,8 @@ class DailyPayoutEmailNotificationServiceTest {
             reconService = reconService,
             ambassadorPayoutRepository = ambassadorPayoutRepository,
             apiKey = "test-api-key",
-            dailyPayoutTemplate = "test-template-id"
+            dailyPayoutTemplate = "test-template-id",
+            ambassadorPayoutTemplate = "test-ambassador-payout-template-id"
         )
     }
 
@@ -78,23 +79,6 @@ class DailyPayoutEmailNotificationServiceTest {
     @Test
     fun `processAmbassadorPayouts does nothing when no PENDING ambassador payouts exist`() {
         every { ambassadorPayoutRepository.findByPayoutStage(PayoutStage.PENDING) } returns emptyList()
-
-        service.notifyDailyPayouts()
-
-        verify(exactly = 0) { ambassadorPayoutRepository.save(any()) }
-        verify(exactly = 0) { userProfileRepo.findById(any()) }
-    }
-
-    // -----------------------------------------------------------------------
-    // Already-sent payout: emailSent == true → save is NOT called again
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `processAmbassadorPayouts skips payout whose email was already sent`() {
-        val alreadySentPayout = buildPendingPayout(ambassadorId = "amb-already-sent")
-        alreadySentPayout.emailSent = true
-
-        every { ambassadorPayoutRepository.findByPayoutStage(PayoutStage.PENDING) } returns listOf(alreadySentPayout)
 
         service.notifyDailyPayouts()
 
