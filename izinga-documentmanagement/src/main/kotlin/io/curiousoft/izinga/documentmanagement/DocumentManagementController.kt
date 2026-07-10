@@ -45,14 +45,19 @@ class DocumentManagementController(private val cloudBucketService: CloudBucketSe
                 "url" to fileUrl.toString(),
                 "metadata" to metadata)
         } else if (metadata && docMetadata != null) {
-            val metadata = documentInfoService.analyzeImageWithResponsesApi(
+            val extracted = documentInfoService.analyzeImageWithResponsesApi(
                 fileUrl.toString(),
                 docMetadata.name,
                 docMetadata.toJsonSchema(),
             )
+            // Hidden fields were sent to the vision model (they're still part of the
+            // schema) but must never reach the frontend — strip them before returning.
+            if (extracted is ObjectNode) {
+                docMetadata.hiddenFieldNames().forEach { extracted.remove(it) }
+            }
             return mapOf("fileName" to fileName,
                 "url" to fileUrl.toString(),
-                "metadata" to metadata)
+                "metadata" to extracted)
         }
         return mapOf("fileName" to fileName, "url" to fileUrl.toString())
     }
