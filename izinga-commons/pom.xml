@@ -66,7 +66,7 @@
 
     <build>
         <sourceDirectory>src/main/kotlin</sourceDirectory>
-        <testSourceDirectory>src/test/java</testSourceDirectory>
+        <testSourceDirectory>src/test/kotlin</testSourceDirectory>
         <plugins>
             <plugin>
                 <groupId>org.jetbrains.kotlin</groupId>
@@ -92,6 +92,19 @@
                         <version>${kotlin.version}</version>
                     </dependency>
                 </dependencies>
+                <executions>
+                    <execution>
+                        <id>test-compile</id>
+                        <goals>
+                            <goal>test-compile</goal>
+                        </goals>
+                        <configuration>
+                            <sourceDirs>
+                                <sourceDir>src/test/kotlin</sourceDir>
+                            </sourceDirs>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -101,8 +114,12 @@
                     <argLine>
                         --add-opens java.base/java.lang=ALL-UNNAMED
                         --add-opens java.base/java.util=ALL-UNNAMED
-                        --add-opens java.base/java.base=ALL-UNNAMED
                     </argLine>
+                    <includes>
+                        <include>**/*Test.class</include>
+                        <include>**/*Tests.class</include>
+                        <include>**/*TestCase.class</include>
+                    </includes>
                 </configuration>
             </plugin>
         </plugins>
