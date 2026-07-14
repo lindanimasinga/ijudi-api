@@ -40,9 +40,13 @@ class ProfileRolesContractTest {
     /**
      * The canonical ordered list of ProfileRoles values.
      *
-     * Baseline established: RP-019, 2026-07-14 — 8 values.
-     * Note: REFERRAL_PARTNER was added by ticket #98 (already on develop at
-     * the time RP-019 branched). This test captures the full 8-value baseline.
+     * Baseline established: RP-019, 2026-07-14 — 7 values.
+     * This reflects the true state of develop at the time this branch was cut.
+     * REFERRAL_PARTNER (ticket #98 / PR #111) has NOT yet merged to develop.
+     *
+     * When #98 merges: update this list to include REFERRAL_PARTNER, but only
+     * after all frontend repos listed above have been updated and deployed first
+     * (per ADR-018).
      *
      * Do NOT change this list without updating all frontend repos listed above.
      */
@@ -53,8 +57,7 @@ class ProfileRolesContractTest {
         "MESSENGER",
         "MESSENGER_ADMIN",
         "ADMIN",
-        "AMBASSADOR",
-        "REFERRAL_PARTNER"
+        "AMBASSADOR"
     )
 
     @Test

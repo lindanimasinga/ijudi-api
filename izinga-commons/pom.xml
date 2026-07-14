@@ -62,6 +62,19 @@
             <version>${kotlin.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- Explicit JUnit 5 deps so izinga-commons tests run reliably in isolation.
+             kotlin-test 2.x pulls Jupiter transitively, but declaring it explicitly
+             guarantees Surefire picks up the platform engine regardless of reactor order. -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
