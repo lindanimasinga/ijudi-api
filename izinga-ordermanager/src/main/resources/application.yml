@@ -74,6 +74,7 @@ spring:
     data:
         mongodb:
             uri: mongodb+srv://onusmongouser:wfsuser@cluster0-7odiz.mongodb.net/ijudi?retryWrites=true&w=majority
+            auto-index-creation: true
     mvc:
         format:
             date: yyyy-MM-dd

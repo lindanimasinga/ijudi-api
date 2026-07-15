@@ -14,6 +14,12 @@ class UserProfile(
     role: @NotNull(message = "role not valid") ProfileRoles?) : Profile(name, address, imageUrl, mobileNumber, role) {
     var ambassadorId: String? = null
     var referralCode: String? = null
+    /**
+     * RP-004a: ID of the REFERRAL_PARTNER who referred this customer.
+     * Set at registration by resolving the inbound `ref` query param via ReferralCodeService.
+     * Never set directly by the client — the backend resolves the code to a partner ID.
+     */
+    var referredByPartnerId: String? = null
     var surname: String? = null
     var missingDocumentsReminderSent: Boolean? = null
     var welcomeMessageSent: Boolean = false

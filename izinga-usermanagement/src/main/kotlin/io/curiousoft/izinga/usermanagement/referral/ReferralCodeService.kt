@@ -18,7 +18,8 @@ import java.security.SecureRandom
  *   visual ambiguity), giving ~1.1 trillion possible values.
  * - Stored directly on UserProfile.referralCode (same pattern as ambassadorId).
  * - Indexed via UserProfileRepo.findByReferralCode for O(1) attribution lookup
- *   (MongoDB unique sparse index recommended — see docs/referral-partner-agreement.md).
+ *   (MongoDB unique sparse index recommended — see Schedule 1 of the Referral Partner
+ *   Agreement in the izinga-onboarding repo for commission rules and programme terms).
  *
  * One code works across all referral link formats:
  *   izinga.co.za/join?ref=CODE          (food/furniture customer referral)

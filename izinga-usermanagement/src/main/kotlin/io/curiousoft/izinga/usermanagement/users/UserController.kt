@@ -8,6 +8,7 @@ import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.qrcodegenerator.tips.QRCodeService
 import io.curiousoft.izinga.recon.payout.AmbassadorPayout
 import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
+import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService
 import io.curiousoft.izinga.usermanagement.utils.IjudiUtils.isSAMobileNumber
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -23,16 +24,27 @@ class UserController(
     private val profileService: UserProfileService,
     private val userProfileRepo: UserProfileRepo,
     private val qrCodeService: QRCodeService,
-    private val ambassadorPayoutRepo: AmbassadorPayoutRepository
+    private val ambassadorPayoutRepo: AmbassadorPayoutRepository,
+    private val referralCodeService: ReferralCodeService
 ) {
 
     private val logger = LoggerFactory.getLogger(UserController::class.java)
 
     @RequestMapping(method = [RequestMethod.POST], consumes = ["application/json"], produces = ["application/json"])
     @Throws(Exception::class)
-    fun create(@RequestBody profile: @Valid UserProfile): ResponseEntity<Profile> {
-        logger.info("Create user request for mobileNumber={}", profile.mobileNumber)
-        val created = profileService.create(profile)
+    fun create(
+        @RequestBody profile: @Valid UserProfile,
+        @RequestParam(required = false) ref: String?
+    ): ResponseEntity<Profile> {
+        // RP-004a: resolve referral code from query param (primary) or payload referralCode field (fallback).
+        // cs-lifestyle (RP-004b) ships with referralCode in the JSON payload; query param takes precedence
+        // if somehow both are present. After resolving, null out profile.referralCode so it is not
+        // persisted as the user's own code — that field is reserved for REFERRAL_PARTNER users assigned
+        // via POST /user/{userId}/referral-code.
+        val effectiveRef = if (!ref.isNullOrBlank()) ref else profile.referralCode
+        profile.referralCode = null
+        logger.info("Create user request for mobileNumber={} effectiveRef={}", profile.mobileNumber, effectiveRef)
+        val created = profileService.create(profile, effectiveRef)
         logger.info("User created with id={}", created.id)
         return ResponseEntity.ok(created)
     }
@@ -144,6 +156,33 @@ class UserController(
         val payouts = ambassadorPayoutRepo.findByToId(userId)
         logger.info("Found {} payouts for ambassadorId={}", payouts.size, userId)
         return ResponseEntity.ok(payouts)
+    }
+
+    /**
+     * RP-002/RP-003: Assigns a referral code to a REFERRAL_PARTNER user.
+     *
+     * Called by izinga-onboarding immediately after the Referral Partner accepts the ICA.
+     * Idempotent — if the partner already has a code this is a no-op and the existing
+     * code is returned. Returns 404 if the user does not exist, 400 if the user is not
+     * a REFERRAL_PARTNER.
+     *
+     * POST /user/{userId}/referral-code
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping(value = ["/{userId}/referral-code"], produces = ["application/json"])
+    fun assignReferralCode(@PathVariable userId: String): ResponseEntity<UserProfile> {
+        logger.info("Assign referral code request for userId={}", userId)
+        val profile = userProfileRepo.findById(userId).orElse(null)
+            ?: return ResponseEntity.notFound().build<UserProfile>().also {
+                logger.warn("assignReferralCode: userId={} not found", userId)
+            }
+        if (profile.role != ProfileRoles.REFERRAL_PARTNER) {
+            logger.warn("assignReferralCode denied: userId={} role={} is not REFERRAL_PARTNER", userId, profile.role)
+            return ResponseEntity.badRequest().build()
+        }
+        val updated = referralCodeService.assignReferralCode(profile)
+        logger.info("Referral code assigned/confirmed for userId={} code={}", userId, updated.referralCode)
+        return ResponseEntity.ok(updated)
     }
 
     @DeleteMapping(value = ["/{id}"], produces = ["application/json"])

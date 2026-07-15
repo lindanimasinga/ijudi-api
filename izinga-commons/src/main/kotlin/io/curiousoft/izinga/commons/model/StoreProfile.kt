@@ -66,6 +66,12 @@ class StoreProfile(
     var generateMissingImages: Boolean = false
     /** Whether a quote must be accepted by the customer before the order is confirmed. */
     var isQuoteRequired: Boolean = false
+    /**
+     * RP-005a: ID of the REFERRAL_PARTNER who referred this store partner.
+     * Set at store registration by resolving the inbound referral code via ReferralCodeService.
+     * Never set directly by the client — the backend resolves the code to a partner ID.
+     */
+    var referredByPartnerId: String? = null
 
     init {
         super.bank = bank

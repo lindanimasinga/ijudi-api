@@ -4,6 +4,7 @@ import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.repo.IcaAcceptanceLogRepo
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
+import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -30,12 +31,15 @@ class UserProfileServicePhoneGuardTest {
     @Mock
     private lateinit var icaAcceptanceLogRepo: IcaAcceptanceLogRepo
 
+    @Mock
+    private lateinit var referralCodeService: ReferralCodeService
+
     private lateinit var service: UserProfileService
 
     @BeforeEach
     fun setUp() {
         Mockito.`when`(userConfigService.findAll()).thenReturn(emptyList())
-        service = UserProfileService(userProfileRepo, eventPublisher, userConfigService, icaAcceptanceLogRepo)
+        service = UserProfileService(userProfileRepo, eventPublisher, userConfigService, icaAcceptanceLogRepo, referralCodeService)
     }
 
     @Test
