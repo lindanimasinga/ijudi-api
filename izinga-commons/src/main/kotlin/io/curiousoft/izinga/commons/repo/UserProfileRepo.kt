@@ -20,6 +20,7 @@ interface UserProfileRepo : ProfileRepo<UserProfile> {
     fun findByIdIn(inactiveCustomers45Days: MutableSet<String>): MutableList<UserProfile>
     fun findByProfileApproved(bool: Boolean): List<UserProfile>
     fun findByAmbassadorId(ambassadorId: String): List<UserProfile>
+    fun findByReferralCode(referralCode: String): UserProfile?
     fun findByRoleAndServiceTypeAndLatitudeBetweenAndLongitudeBetween(
         role: ProfileRoles,
         serviceType: StoreType,

@@ -41,12 +41,19 @@ class ProfileRolesContractTest {
      * The canonical ordered list of ProfileRoles values.
      *
      * Baseline established: RP-019, 2026-07-14 — 7 values.
-     * This reflects the true state of develop at the time this branch was cut.
-     * REFERRAL_PARTNER (ticket #98 / PR #111) has NOT yet merged to develop.
+     * Updated: RP-003, 2026-07-14 — 8 values. REFERRAL_PARTNER was added by
+     * RP-001 and merged to develop. Frontend repos must be updated per ADR-018
+     * before this role is accepted in production. The role is present in the
+     * enum now; this baseline is updated to match the actual develop state.
      *
-     * When #98 merges: update this list to include REFERRAL_PARTNER, but only
-     * after all frontend repos listed above have been updated and deployed first
-     * (per ADR-018).
+     * Frontends to update (per ADR-018, BEFORE production deploy of REFERRAL_PARTNER):
+     *   ijudi                  lib/model/profile.dart
+     *   izinga-onboarding      src/app/model/userProfile.ts, profile.ts,
+     *                          storeProfile.ts, store-summary.ts
+     *   cs-lifestyle           src/app/model/userProfile.ts, profile.ts,
+     *                          storeProfile.ts
+     *   furniture-delivery-app src/app/model/userProfile.ts, profile.ts,
+     *                          storeProfile.ts
      *
      * Do NOT change this list without updating all frontend repos listed above.
      */
@@ -57,7 +64,8 @@ class ProfileRolesContractTest {
         "MESSENGER",
         "MESSENGER_ADMIN",
         "ADMIN",
-        "AMBASSADOR"
+        "AMBASSADOR",
+        "REFERRAL_PARTNER"
     )
 
     @Test
