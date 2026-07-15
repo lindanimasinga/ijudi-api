@@ -2,6 +2,7 @@ package io.curiousoft.izinga.ordermanagement.events;
 
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent;
+import io.curiousoft.izinga.commons.referral.ReferralCommissionType;
 import io.curiousoft.izinga.commons.referral.StorePartnerStage1Commission;
 import io.curiousoft.izinga.commons.referral.StorePartnerStage1CommissionRepo;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
@@ -209,6 +210,36 @@ public class UserProfileEventHandlerTest {
         // should not throw
         assertDoesNotThrow(() -> handler.handleProfileUpdated(new ProfileUpdatedEvent(this, store)));
         verify(storeStage1CommissionRepo).insert(any(StorePartnerStage1Commission.class));
+    }
+
+    // -------------------------------------------------------------------------
+    // RP-009: Payout wiring — generatePayoutForReferralPartner called after insert
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void handleProfileUpdated_callsGeneratePayoutForReferralPartner_afterStage1CommissionInsert() {
+        StoreProfile store = foodStore("store-006", "partner-rp-6", true);
+
+        handler.handleProfileUpdated(new ProfileUpdatedEvent(this, store));
+
+        verify(reconService).generatePayoutForReferralPartner(
+                "partner-rp-6",
+                new java.math.BigDecimal("100.00"),
+                ReferralCommissionType.STORE_PARTNER_STAGE_1,
+                "store-006"
+        );
+    }
+
+    @Test
+    public void handleProfileUpdated_doesNotCallGeneratePayoutForReferralPartner_whenStage1InsertFails_DuplicateKey() {
+        StoreProfile store = foodStore("store-007", "partner-rp-7", true);
+        when(storeStage1CommissionRepo.insert(any(StorePartnerStage1Commission.class)))
+                .thenThrow(new DuplicateKeyException("duplicate"));
+
+        assertDoesNotThrow(() -> handler.handleProfileUpdated(new ProfileUpdatedEvent(this, store)));
+        verify(reconService, never()).generatePayoutForReferralPartner(
+                anyString(), any(java.math.BigDecimal.class),
+                eq(ReferralCommissionType.STORE_PARTNER_STAGE_1), anyString());
     }
 
     // -------------------------------------------------------------------------

@@ -12,5 +12,5 @@ class PayoutBundle(var type: PayoutType,
 }
 
 enum class PayoutType {
-    SHOP, MESSENGER, AMBASSADOR
+    SHOP, MESSENGER, AMBASSADOR, REFERRAL_PARTNER
 }

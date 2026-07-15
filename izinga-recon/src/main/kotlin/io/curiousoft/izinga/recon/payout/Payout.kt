@@ -4,6 +4,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import io.curiousoft.izinga.commons.model.BankAccType
 import io.curiousoft.izinga.commons.model.BaseModel
 import io.curiousoft.izinga.commons.model.Order
+import io.curiousoft.izinga.commons.referral.ReferralCommissionType
+import org.springframework.data.mongodb.core.index.CompoundIndex
+import org.springframework.data.mongodb.core.index.CompoundIndexes
+import org.springframework.data.mongodb.core.mapping.Document
 import java.lang.StringBuilder
 import java.math.BigDecimal
 import java.security.SecureRandom
@@ -102,6 +106,46 @@ class AmbassadorPayout(
     payoutStage: PayoutStage = PayoutStage.PENDING,
     var commissionAmount: BigDecimal,
     var triggerDriverId: String
+) : Payout(
+    toId = toId, toName = toName, toType = toType, toBankName = toBankName, toAccountNumber = toAccountNumber,
+    toBranchCode = toBranchCode, fromReference = fromReference, toReference = toReference, emailNotify = emailNotify,
+    emailAddress = emailAddress, emailSubject = emailSubject, orders = orders, bundleId = bundleId,
+    payoutStage = payoutStage
+) {
+    override var paid: Boolean = false
+    override val total: BigDecimal get() = commissionAmount
+}
+
+/**
+ * RP-009: Payout entity for all three Referral Partner commission types.
+ * A single entity (not three subclasses) discriminates via [commissionType].
+ *
+ * Deduplication is enforced by a compound unique index on (commissionType, triggerReferenceId).
+ * For RP-006 triggerReferenceId = customerId; for RP-007/RP-008 it is storeId.
+ */
+@Document(collection = "referral_partner_payouts")
+@CompoundIndexes(
+    CompoundIndex(name = "commission_trigger_uidx", def = "{'commissionType': 1, 'triggerReferenceId': 1}", unique = true)
+)
+class ReferralPartnerPayout(
+    toId: String,
+    toName: String,
+    toBankName: String,
+    toType: BankAccType,
+    toAccountNumber: String,
+    toBranchCode: String,
+    fromReference: String,
+    toReference: String,
+    emailNotify: String?,
+    emailAddress: String?,
+    emailSubject: String?,
+    orders: MutableSet<Order> = mutableSetOf(),
+    bundleId: String? = null,
+    payoutStage: PayoutStage = PayoutStage.PENDING,
+    var commissionAmount: BigDecimal,
+    var commissionType: ReferralCommissionType,
+    /** customerId (RP-006) or storeId (RP-007/RP-008) — forms part of compound unique index. */
+    var triggerReferenceId: String
 ) : Payout(
     toId = toId, toName = toName, toType = toType, toBankName = toBankName, toAccountNumber = toAccountNumber,
     toBranchCode = toBranchCode, fromReference = fromReference, toReference = toReference, emailNotify = emailNotify,

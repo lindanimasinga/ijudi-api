@@ -40,9 +40,12 @@ data class Billing(
 data class Output(
     val id: String,
     val type: String,
-    val status: String,
-    val content: List<Content>,
-    val role: String
+    val status: String?,
+    val content: List<Content>?,
+    val role: String?,
+    // present when type == "function_call"
+    val name: String? = null,
+    val arguments: String? = null
 )
 
 data class Content(

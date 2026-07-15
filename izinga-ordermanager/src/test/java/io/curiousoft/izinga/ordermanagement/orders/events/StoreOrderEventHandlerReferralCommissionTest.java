@@ -227,6 +227,69 @@ class StoreOrderEventHandlerReferralCommissionTest {
     }
 
     // -------------------------------------------------------------------------
+    // RP-009: Payout wiring — generatePayoutForReferralPartner called after insert
+    // -------------------------------------------------------------------------
+
+    @Test
+    void handleOrderUpdatedEvent_callsGeneratePayoutForReferralPartner_afterFoodCustomerCommissionInsert() {
+        var store = foodStore("store-011", null);
+        var order = completedOrder("order-011", "store-011", "customer-011");
+        var customer = customer("customer-011", "partner-rp-11");
+
+        when(userProfileRepo.findById("customer-011")).thenReturn(Optional.of(customer));
+        when(storeStage1CommissionRepo.findByStoreId("store-011")).thenReturn(null);
+
+        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store));
+
+        verify(reconService).generatePayoutForReferralPartner(
+                "partner-rp-11",
+                new BigDecimal("15.00"),
+                ReferralCommissionType.FOOD_CUSTOMER_REFERRAL,
+                "customer-011"
+        );
+    }
+
+    @Test
+    void handleOrderUpdatedEvent_doesNotCallGeneratePayoutForReferralPartner_whenCustomerCommissionInsertFails_DuplicateKey() {
+        // When DuplicateKeyException is thrown, the payout call must NOT happen
+        var store = foodStore("store-012", null);
+        var order = completedOrder("order-012", "store-012", "customer-012");
+        var customer = customer("customer-012", "partner-rp-12");
+
+        when(userProfileRepo.findById("customer-012")).thenReturn(Optional.of(customer));
+        when(storeStage1CommissionRepo.findByStoreId("store-012")).thenReturn(null);
+        when(foodCustomerCommissionRepo.insert(any(FoodCustomerReferralCommission.class)))
+                .thenThrow(new DuplicateKeyException("duplicate"));
+
+        assertDoesNotThrow(() -> handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store)));
+        verify(reconService, never()).generatePayoutForReferralPartner(
+                anyString(), any(BigDecimal.class), eq(ReferralCommissionType.FOOD_CUSTOMER_REFERRAL), anyString());
+    }
+
+    @Test
+    void handleOrderUpdatedEvent_callsGeneratePayoutForReferralPartner_afterStage2CommissionInsert() {
+        var store = foodStore("store-013", "partner-rp-13");
+        var order = completedOrder("order-013", "store-013", "customer-013");
+        var customer = customer("customer-013", null);
+        var stage1 = new StorePartnerStage1Commission(
+                UUID.randomUUID().toString(), "store-013", "partner-rp-13",
+                new BigDecimal("100.00"), ReferralCommissionStatus.PENDING, new Date()
+        );
+
+        when(userProfileRepo.findById("customer-013")).thenReturn(Optional.of(customer));
+        when(storeStage1CommissionRepo.findByStoreId("store-013")).thenReturn(stage1);
+
+        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store));
+
+        verify(reconService).generatePayoutForReferralPartner(
+                "partner-rp-13",
+                new BigDecimal("150.00"),
+                ReferralCommissionType.STORE_PARTNER_STAGE_2,
+                "store-013"
+        );
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
