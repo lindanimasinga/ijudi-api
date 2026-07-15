@@ -110,4 +110,27 @@ class UserProfileServiceReferralAttributionTest {
         assertNull(profile.referredByPartnerId)
         verify(referralCodeService).resolveCode("NOTFOUND")
     }
+
+    /**
+     * Payload fallback path: controller resolves effectiveRef from profile.referralCode when
+     * the `ref` query param is absent, nulls it out, then calls create(profile, effectiveRef).
+     * This test covers the service layer behaviour when the code arrives via that path.
+     */
+    @Test
+    fun `create with code passed as effectiveRef from payload fallback resolves partner and sets referredByPartnerId`() {
+        val profile = makeCustomer()
+        // Controller would have set profile.referralCode = null before calling the service,
+        // so here we simulate exactly what arrives: referralCode=null, effectiveRef="PAYLOAD01"
+        val partner = makePartner("partner-payload-1")
+        val saved = makeCustomer().also { it.id = "new-user-5"; it.referredByPartnerId = "partner-payload-1" }
+
+        `when`(referralCodeService.resolveCode("PAYLOAD01")).thenReturn(partner)
+        `when`(userProfileRepo.existsByMobileNumber(anyString())).thenReturn(false)
+        `when`(userProfileRepo.save(any())).thenReturn(saved)
+
+        service.create(profile, "PAYLOAD01")
+
+        assertEquals("partner-payload-1", profile.referredByPartnerId)
+        verify(referralCodeService).resolveCode("PAYLOAD01")
+    }
 }

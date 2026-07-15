@@ -5,6 +5,7 @@ import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.qrcodegenerator.tips.QRCodeService
 import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
+import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.Assertions.*
@@ -23,6 +24,7 @@ class UserControllerAmbassadorQrTest {
     @Mock lateinit var userProfileRepo: UserProfileRepo
     @Mock lateinit var qrCodeService: QRCodeService
     @Mock lateinit var ambassadorPayoutRepo: AmbassadorPayoutRepository
+    @Mock lateinit var referralCodeService: ReferralCodeService
 
     @InjectMocks
     lateinit var controller: UserController
