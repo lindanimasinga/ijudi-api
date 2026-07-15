@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import java.util.Date
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
+import org.springframework.data.mongodb.core.index.Indexed
 
 class UserProfile(
     name: @NotBlank(message = "profile name not valid") String?,
@@ -18,7 +19,11 @@ class UserProfile(
      * RP-004a: ID of the REFERRAL_PARTNER who referred this customer.
      * Set at registration by resolving the inbound `ref` query param via ReferralCodeService.
      * Never set directly by the client — the backend resolves the code to a partner ID.
+     *
+     * RP-010: Indexed (sparse) for efficient partner-scoped referral queries.
+     * Sparse index skips documents where referredByPartnerId is null, keeping index size small.
      */
+    @Indexed(sparse = true)
     var referredByPartnerId: String? = null
     var surname: String? = null
     var missingDocumentsReminderSent: Boolean? = null
