@@ -168,6 +168,7 @@ class UserController(
      *
      * POST /user/{userId}/referral-code
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping(value = ["/{userId}/referral-code"], produces = ["application/json"])
     fun assignReferralCode(@PathVariable userId: String): ResponseEntity<UserProfile> {
         logger.info("Assign referral code request for userId={}", userId)

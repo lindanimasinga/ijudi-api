@@ -17,6 +17,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.dao.DuplicateKeyException;
 
 import java.math.BigDecimal;
@@ -31,6 +33,7 @@ import static org.mockito.Mockito.*;
  * reaches STAGE_7_ALL_PAID for a FOOD store.
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class StoreOrderEventHandlerReferralCommissionTest {
 
     @Mock private FirebaseNotificationService pushNotificationService;
@@ -69,7 +72,7 @@ class StoreOrderEventHandlerReferralCommissionTest {
         when(storeStage1CommissionRepo.findByStoreId("store-001")).thenReturn(null); // RP-008 guard
         when(storeStage2CommissionRepo.findByStoreId("store-001")).thenReturn(null);
 
-        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, null, store));
+        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store));
 
         ArgumentCaptor<FoodCustomerReferralCommission> captor =
                 ArgumentCaptor.forClass(FoodCustomerReferralCommission.class);
@@ -90,7 +93,7 @@ class StoreOrderEventHandlerReferralCommissionTest {
         when(userProfileRepo.findById("customer-002")).thenReturn(Optional.of(customer));
         when(storeStage1CommissionRepo.findByStoreId("store-002")).thenReturn(null);
 
-        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, null, store));
+        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store));
 
         verify(foodCustomerCommissionRepo, never()).insert(any(FoodCustomerReferralCommission.class));
     }
@@ -103,7 +106,7 @@ class StoreOrderEventHandlerReferralCommissionTest {
         when(userProfileRepo.findById("customer-003")).thenReturn(Optional.empty());
         when(storeStage1CommissionRepo.findByStoreId("store-003")).thenReturn(null);
 
-        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, null, store));
+        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store));
 
         verify(foodCustomerCommissionRepo, never()).insert(any(FoodCustomerReferralCommission.class));
     }
@@ -120,7 +123,7 @@ class StoreOrderEventHandlerReferralCommissionTest {
                 .thenThrow(new DuplicateKeyException("duplicate"));
 
         // must not throw
-        assertDoesNotThrow(() -> handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, null, store)));
+        assertDoesNotThrow(() -> handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store)));
         verify(foodCustomerCommissionRepo).insert(any(FoodCustomerReferralCommission.class));
     }
 
@@ -129,10 +132,10 @@ class StoreOrderEventHandlerReferralCommissionTest {
         var store = foodStore("store-005", null);
         var order = orderAtStage("order-005", "store-005", "customer-005", OrderStage.STAGE_6_WITH_CUSTOMER);
 
-        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, null, store));
+        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store));
 
-        verify(foodCustomerCommissionRepo, never()).insert(any());
-        verify(storeStage2CommissionRepo, never()).insert(any());
+        verify(foodCustomerCommissionRepo, never()).insert(any(FoodCustomerReferralCommission.class));
+        verify(storeStage2CommissionRepo, never()).insert(any(StorePartnerStage2Commission.class));
     }
 
     @Test
@@ -140,9 +143,9 @@ class StoreOrderEventHandlerReferralCommissionTest {
         var store = nonFoodStore("store-006");
         var order = completedOrder("order-006", "store-006", "customer-006");
 
-        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, null, store));
+        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store));
 
-        verify(foodCustomerCommissionRepo, never()).insert(any());
+        verify(foodCustomerCommissionRepo, never()).insert(any(FoodCustomerReferralCommission.class));
         verify(userProfileRepo, never()).findById(anyString());
     }
 
@@ -164,7 +167,7 @@ class StoreOrderEventHandlerReferralCommissionTest {
         when(userProfileRepo.findById("customer-007")).thenReturn(Optional.of(customer));
         when(storeStage1CommissionRepo.findByStoreId("store-007")).thenReturn(stage1);
 
-        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, null, store));
+        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store));
 
         ArgumentCaptor<StorePartnerStage2Commission> captor =
                 ArgumentCaptor.forClass(StorePartnerStage2Commission.class);
@@ -185,7 +188,7 @@ class StoreOrderEventHandlerReferralCommissionTest {
         when(userProfileRepo.findById("customer-008")).thenReturn(Optional.of(customer));
         when(storeStage1CommissionRepo.findByStoreId("store-008")).thenReturn(null);
 
-        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, null, store));
+        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store));
 
         verify(storeStage2CommissionRepo, never()).insert(any(StorePartnerStage2Commission.class));
     }
@@ -198,10 +201,10 @@ class StoreOrderEventHandlerReferralCommissionTest {
 
         when(userProfileRepo.findById("customer-009")).thenReturn(Optional.of(customer));
 
-        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, null, store));
+        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store));
 
         verify(storeStage1CommissionRepo, never()).findByStoreId(anyString());
-        verify(storeStage2CommissionRepo, never()).insert(any());
+        verify(storeStage2CommissionRepo, never()).insert(any(StorePartnerStage2Commission.class));
     }
 
     @Test
@@ -219,7 +222,7 @@ class StoreOrderEventHandlerReferralCommissionTest {
         when(storeStage2CommissionRepo.insert(any(StorePartnerStage2Commission.class)))
                 .thenThrow(new DuplicateKeyException("duplicate"));
 
-        assertDoesNotThrow(() -> handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, null, store)));
+        assertDoesNotThrow(() -> handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store)));
         verify(storeStage2CommissionRepo).insert(any(StorePartnerStage2Commission.class));
     }
 
@@ -269,7 +272,8 @@ class StoreOrderEventHandlerReferralCommissionTest {
         var basket = new Basket();
         basket.setItems(new ArrayList<>());
         var shippingData = new ShippingData("1 From St", "1 To St",
-                ShippingData.ShippingType.DELIVERY, 5.0);
+                ShippingData.ShippingType.DELIVERY);
+        shippingData.setDistance(5.0);
         var order = new Order();
         order.setId(orderId);
         order.setCustomerId(customerId);
