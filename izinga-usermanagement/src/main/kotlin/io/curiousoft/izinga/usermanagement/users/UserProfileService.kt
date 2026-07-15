@@ -6,6 +6,7 @@ import io.curiousoft.izinga.commons.model.StoreType
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.repo.IcaAcceptanceLogRepo
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
+import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService
 import io.curiousoft.izinga.usermanagement.userconfig.FieldSpec
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfig
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService
@@ -24,7 +25,8 @@ class UserProfileService(
     val userProfileRepo: UserProfileRepo,
     val eventPublisher: ApplicationEventPublisher,
     userConfigService: UserConfigService,
-    private val icaAcceptanceLogRepo: IcaAcceptanceLogRepo
+    private val icaAcceptanceLogRepo: IcaAcceptanceLogRepo,
+    private val referralCodeService: ReferralCodeService
 ) : ProfileServiceImpl<UserProfileRepo, UserProfile>(userProfileRepo, eventPublisher) {
 
     private val log = LoggerFactory.getLogger(UserProfileService::class.java)
@@ -57,6 +59,29 @@ class UserProfileService(
         return profileRepo.findByRoleAndServiceTypeAndLatitudeBetweenAndLongitudeBetween(role, storeType, minLat,
             maxLat, minLong, maxLong
         )
+    }
+
+    /**
+     * RP-004a: Entry point called from UserController when a `ref` query param is present.
+     * Resolves the referral code to a REFERRAL_PARTNER and sets [UserProfile.referredByPartnerId]
+     * before delegating to the standard create flow.
+     *
+     * @param referralCode raw referral code string from the `ref` query param; null = no attribution.
+     */
+    @Throws(Exception::class)
+    fun create(profile: UserProfile, referralCode: String?): UserProfile {
+        if (!referralCode.isNullOrBlank()) {
+            val partner = referralCodeService.resolveCode(referralCode)
+            if (partner != null) {
+                log.info("Referral code {} resolved to partnerId={} for new user mobileNumber={}",
+                    referralCode, partner.id, profile.mobileNumber)
+                profile.referredByPartnerId = partner.id
+            } else {
+                log.warn("Referral code {} could not be resolved — no attribution set for mobileNumber={}",
+                    referralCode, profile.mobileNumber)
+            }
+        }
+        return create(profile)
     }
 
     @Tool(name = "create_user", description = "Creates a new user profile. It can be a normal customer or a driver or a store owner depending on the role specified in the profile object.")

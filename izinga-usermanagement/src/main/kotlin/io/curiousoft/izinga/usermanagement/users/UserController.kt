@@ -30,9 +30,12 @@ class UserController(
 
     @RequestMapping(method = [RequestMethod.POST], consumes = ["application/json"], produces = ["application/json"])
     @Throws(Exception::class)
-    fun create(@RequestBody profile: @Valid UserProfile): ResponseEntity<Profile> {
-        logger.info("Create user request for mobileNumber={}", profile.mobileNumber)
-        val created = profileService.create(profile)
+    fun create(
+        @RequestBody profile: @Valid UserProfile,
+        @RequestParam(required = false) ref: String?
+    ): ResponseEntity<Profile> {
+        logger.info("Create user request for mobileNumber={} ref={}", profile.mobileNumber, ref)
+        val created = profileService.create(profile, ref)
         logger.info("User created with id={}", created.id)
         return ResponseEntity.ok(created)
     }

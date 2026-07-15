@@ -7,6 +7,7 @@ import io.curiousoft.izinga.commons.model.StoreType
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.repo.IcaAcceptanceLogRepo
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
+import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService
 import org.junit.Assert
 import org.junit.Before
@@ -37,9 +38,12 @@ class UserServiceTest {
     @Mock
     lateinit var icaAcceptanceLogRepo: IcaAcceptanceLogRepo
 
+    @Mock
+    lateinit var referralCodeService: ReferralCodeService
+
     @Before
     fun setUp() {
-        profileService = UserProfileService(profileRepo, profileUpdatedEventPublisher, userConfigService, icaAcceptanceLogRepo)
+        profileService = UserProfileService(profileRepo, profileUpdatedEventPublisher, userConfigService, icaAcceptanceLogRepo, referralCodeService)
     }
 
     @Test
