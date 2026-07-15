@@ -7,6 +7,7 @@ import io.curiousoft.izinga.commons.order.events.OrderCancelledEvent;
 import io.curiousoft.izinga.commons.order.events.OrderUpdatedEvent;
 import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommission;
 import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommissionRepo;
+import io.curiousoft.izinga.commons.referral.ReferralCommissionType;
 import io.curiousoft.izinga.commons.referral.StorePartnerStage1CommissionRepo;
 import io.curiousoft.izinga.commons.referral.StorePartnerStage2Commission;
 import io.curiousoft.izinga.commons.referral.StorePartnerStage2CommissionRepo;
@@ -122,6 +123,13 @@ public class StoreOrderEventHandler implements OrderEventHandler {
             foodCustomerCommissionRepo.insert(commission);
             log.info("[rp-006] food customer commission created: customerId={} partnerId={} orderId={}",
                     customerId, partnerId, orderId);
+            // RP-009: wire the commission into a payout immediately
+            reconService.generatePayoutForReferralPartner(
+                    partnerId,
+                    new java.math.BigDecimal("15.00"),
+                    ReferralCommissionType.FOOD_CUSTOMER_REFERRAL,
+                    customerId
+            );
         } catch (DuplicateKeyException e) {
             log.info("[rp-006] commission already exists for customerId={}, skipping (idempotent)", customerId);
         } catch (Exception e) {
@@ -155,6 +163,13 @@ public class StoreOrderEventHandler implements OrderEventHandler {
             storeStage2CommissionRepo.insert(commission);
             log.info("[rp-008] store stage2 commission created: storeId={} partnerId={} orderId={}",
                     storeId, partnerId, orderId);
+            // RP-009: wire the commission into a payout immediately
+            reconService.generatePayoutForReferralPartner(
+                    partnerId,
+                    new java.math.BigDecimal("150.00"),
+                    ReferralCommissionType.STORE_PARTNER_STAGE_2,
+                    storeId
+            );
         } catch (DuplicateKeyException e) {
             log.info("[rp-008] stage2 commission already exists for storeId={}, skipping (idempotent)", storeId);
         } catch (Exception e) {

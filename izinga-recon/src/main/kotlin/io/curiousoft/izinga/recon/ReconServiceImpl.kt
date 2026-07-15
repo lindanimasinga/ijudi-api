@@ -9,22 +9,32 @@ import io.curiousoft.izinga.commons.model.StoreProfile
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.payout.events.AmbassadorPayoutEvent
 import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
+import io.curiousoft.izinga.commons.payout.events.ReferralPartnerPayoutEvent
 import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent
+import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommissionRepo
+import io.curiousoft.izinga.commons.referral.ReferralCommissionStatus
+import io.curiousoft.izinga.commons.referral.ReferralCommissionType
+import io.curiousoft.izinga.commons.referral.StorePartnerStage1CommissionRepo
+import io.curiousoft.izinga.commons.referral.StorePartnerStage2CommissionRepo
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.ambassador.AmbassadorProperties
 import io.curiousoft.izinga.recon.payout.*
 import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
+import io.curiousoft.izinga.recon.payout.repo.ReferralPartnerPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
 import org.slf4j.LoggerFactory
 import org.springframework.ai.tool.annotation.Tool
 import org.springframework.ai.tool.annotation.ToolParam
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.context.event.EventListener
+import org.springframework.dao.DuplicateKeyException
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.scheduling.annotation.Async
+import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
+import java.math.BigDecimal
 import java.util.*
 
 @Service
@@ -34,6 +44,10 @@ class ReconServiceImpl(
     private val shopPayoutRepo: ShopPayoutRepository,
     private val messengerPayoutRepository: MessengerPayoutRepository,
     private val ambassadorPayoutRepository: AmbassadorPayoutRepository,
+    private val referralPartnerPayoutRepository: ReferralPartnerPayoutRepository,
+    private val foodCustomerCommissionRepo: FoodCustomerReferralCommissionRepo,
+    private val storeStage1CommissionRepo: StorePartnerStage1CommissionRepo,
+    private val storeStage2CommissionRepo: StorePartnerStage2CommissionRepo,
     private val applicationEventPublisher: ApplicationEventPublisher,
     private val ambassadorProperties: AmbassadorProperties
 ) : ReconService {
@@ -269,6 +283,55 @@ class ReconServiceImpl(
                 it.payoutStage = PayoutStage.COMPLETED
                 ambassadorPayoutRepository.save(it)
             }
+
+        // RP-009: handle referral partner payout completions and sync commission status
+        bundleResponse.payoutItemResults
+            .filter { it.type == PayoutType.REFERRAL_PARTNER }
+            .flatMap { result ->
+                referralPartnerPayoutRepository.findAllByToIdAndPayoutStage(result.toId, PayoutStage.PROCESSING)
+                    .onEach { payout -> payout.paid = result.paid }
+                    .also { payouts -> referralPartnerPayoutRepository.saveAll(payouts) }
+            }
+            .filter { it.paid }
+            .onEach { payout ->
+                payout.payoutStage = PayoutStage.COMPLETED
+                referralPartnerPayoutRepository.save(payout)
+                syncCommissionStatusToPaid(payout)
+            }
+    }
+
+    /**
+     * RP-009: When a ReferralPartnerPayout is COMPLETED, update the corresponding commission
+     * record's status to PAID so the audit ledger reflects the settled state.
+     */
+    private fun syncCommissionStatusToPaid(payout: ReferralPartnerPayout) {
+        try {
+            when (payout.commissionType) {
+                ReferralCommissionType.FOOD_CUSTOMER_REFERRAL -> {
+                    val commission = foodCustomerCommissionRepo.findByCustomerId(payout.triggerReferenceId)
+                    if (commission != null) {
+                        foodCustomerCommissionRepo.save(commission.copy(status = ReferralCommissionStatus.PAID))
+                        logger.info("[rp-009] synced food customer commission to PAID for customerId={}", payout.triggerReferenceId)
+                    }
+                }
+                ReferralCommissionType.STORE_PARTNER_STAGE_1 -> {
+                    val commission = storeStage1CommissionRepo.findByStoreId(payout.triggerReferenceId)
+                    if (commission != null) {
+                        storeStage1CommissionRepo.save(commission.copy(status = ReferralCommissionStatus.PAID))
+                        logger.info("[rp-009] synced stage1 commission to PAID for storeId={}", payout.triggerReferenceId)
+                    }
+                }
+                ReferralCommissionType.STORE_PARTNER_STAGE_2 -> {
+                    val commission = storeStage2CommissionRepo.findByStoreId(payout.triggerReferenceId)
+                    if (commission != null) {
+                        storeStage2CommissionRepo.save(commission.copy(status = ReferralCommissionStatus.PAID))
+                        logger.info("[rp-009] synced stage2 commission to PAID for storeId={}", payout.triggerReferenceId)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            logger.error("[rp-009] failed to sync commission status to PAID for payout {}: {}", payout.id, e.message)
+        }
     }
 
     override fun updateBundle(bundle: PayoutBundle) {
@@ -278,6 +341,7 @@ class ReconServiceImpl(
                     ShopPayout::class.qualifiedName -> shopPayoutRepo.saveAll(it.value as List<ShopPayout>)
                     MessengerPayout::class.qualifiedName -> messengerPayoutRepository.saveAll(it.value as List<MessengerPayout>)
                     AmbassadorPayout::class.qualifiedName -> ambassadorPayoutRepository.saveAll(it.value as List<AmbassadorPayout>)
+                    ReferralPartnerPayout::class.qualifiedName -> referralPartnerPayoutRepository.saveAll(it.value as List<ReferralPartnerPayout>)
                 }
         })
     }
@@ -294,6 +358,7 @@ class ReconServiceImpl(
             PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetweenAndToId(from, toDate, toId)
             PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateBetweenAndToId(from, toDate, toId)
             PayoutType.AMBASSADOR -> ambassadorPayoutRepository.findByModifiedDateBetweenAndToId(from, toDate, toId)
+            PayoutType.REFERRAL_PARTNER -> referralPartnerPayoutRepository.findByModifiedDateBetweenAndToId(from, toDate, toId)
         }
     }
 
@@ -327,6 +392,7 @@ class ReconServiceImpl(
             PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetween(from, toDate)
             PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateBetween(from, toDate)
             PayoutType.AMBASSADOR -> ambassadorPayoutRepository.findByModifiedDateBetween(from, toDate)
+            PayoutType.REFERRAL_PARTNER -> referralPartnerPayoutRepository.findByModifiedDateBetween(from, toDate)
         }
     }
 
@@ -344,6 +410,153 @@ class ReconServiceImpl(
 
     override fun findPayout(bundleId: String, payoutId: String): Payout? = shopPayoutRepo.findByIdOrNull(payoutId)
         ?: messengerPayoutRepository.findByIdOrNull(payoutId)
+
+    // RP-009 ─────────────────────────────────────────────────────────────────
+
+    override fun generatePayoutForReferralPartner(
+        partnerId: String,
+        amount: BigDecimal,
+        commissionType: ReferralCommissionType,
+        triggerReferenceId: String
+    ): ReferralPartnerPayout? {
+        // Dedup: the compound index (commissionType, triggerReferenceId) is the authoritative guard,
+        // but we also check in-application to avoid the DuplicateKeyException round-trip on the hot path.
+        val existing = referralPartnerPayoutRepository.findByCommissionTypeAndTriggerReferenceId(commissionType, triggerReferenceId)
+        if (existing != null) {
+            logger.warn(
+                "[rp-009] payout already exists for commissionType={} triggerReferenceId={}; skipping duplicate",
+                commissionType, triggerReferenceId
+            )
+            return null
+        }
+
+        val partner = userProfileRepo.findByIdOrNull(partnerId)
+        if (partner == null) {
+            logger.warn("[rp-009] referral partner {} not found, skipping payout", partnerId)
+            return null
+        }
+
+        val bank = partner.bank
+        if (bank == null) {
+            logger.warn(
+                "[rp-009] referral partner {} has no bank details; skipping payout for commissionType={} triggerReferenceId={}. " +
+                "Reconciliation pass will retry once bank details are set.",
+                partnerId, commissionType, triggerReferenceId
+            )
+            return null
+        }
+
+        val payout = ReferralPartnerPayout(
+            toId = partnerId,
+            toName = partner.name ?: "",
+            toBankName = bank.name ?: "",
+            toType = bank.type ?: BankAccType.CHEQUE,
+            toAccountNumber = getPayoutAccountNumber(bank.accountId, bank.type) ?: "",
+            toBranchCode = bank.branchCode ?: "",
+            fromReference = "Referral commission for ${partner.name}",
+            toReference = "iZinga pay",
+            emailNotify = "",
+            emailAddress = partner.emailAddress,
+            emailSubject = "iZinga Referral Partner Commission",
+            commissionAmount = amount,
+            commissionType = commissionType,
+            triggerReferenceId = triggerReferenceId,
+            payoutStage = PayoutStage.PENDING
+        )
+
+        return try {
+            val saved = referralPartnerPayoutRepository.save(payout)
+            logger.info(
+                "[rp-009] created referral partner payout {} for partner={} commissionType={} triggerReferenceId={}",
+                saved.id, partnerId, commissionType, triggerReferenceId
+            )
+            applicationEventPublisher.publishEvent(
+                ReferralPartnerPayoutEvent(
+                    source = this,
+                    partnerId = partnerId,
+                    commissionType = commissionType,
+                    triggerReferenceId = triggerReferenceId,
+                    commissionAmount = amount,
+                    payoutId = saved.id!!
+                )
+            )
+            saved
+        } catch (e: DuplicateKeyException) {
+            logger.warn(
+                "[rp-009] duplicate key on save for commissionType={} triggerReferenceId={}; concurrent insert detected, skipping",
+                commissionType, triggerReferenceId
+            )
+            null
+        }
+    }
+
+    /**
+     * RP-009 fallback reconciliation: runs daily (and on-demand) to pick up any PENDING commission
+     * records that were never connected to a payout — including backfill for records created by PR #114.
+     * Partners without bank details are skipped; they will be retried on the next run.
+     */
+    @Scheduled(cron = "0 30 2 * * *") // 02:30 daily — runs after the nightly payout bundle
+    override fun reconcilePendingReferralCommissions() {
+        logger.info("[rp-009] starting referral commission reconciliation pass")
+        var created = 0
+        var skipped = 0
+
+        // RP-006: food customer referral commissions
+        foodCustomerCommissionRepo.findAll()
+            .filter { it.status == ReferralCommissionStatus.PENDING }
+            .forEach { commission ->
+                val existing = referralPartnerPayoutRepository.findByCommissionTypeAndTriggerReferenceId(
+                    ReferralCommissionType.FOOD_CUSTOMER_REFERRAL, commission.customerId
+                )
+                if (existing == null) {
+                    val result = generatePayoutForReferralPartner(
+                        partnerId = commission.referralPartnerId,
+                        amount = commission.amount,
+                        commissionType = ReferralCommissionType.FOOD_CUSTOMER_REFERRAL,
+                        triggerReferenceId = commission.customerId
+                    )
+                    if (result != null) created++ else skipped++
+                }
+            }
+
+        // RP-007: store partner stage 1 commissions
+        storeStage1CommissionRepo.findAll()
+            .filter { it.status == ReferralCommissionStatus.PENDING }
+            .forEach { commission ->
+                val existing = referralPartnerPayoutRepository.findByCommissionTypeAndTriggerReferenceId(
+                    ReferralCommissionType.STORE_PARTNER_STAGE_1, commission.storeId
+                )
+                if (existing == null) {
+                    val result = generatePayoutForReferralPartner(
+                        partnerId = commission.referralPartnerId,
+                        amount = commission.amount,
+                        commissionType = ReferralCommissionType.STORE_PARTNER_STAGE_1,
+                        triggerReferenceId = commission.storeId
+                    )
+                    if (result != null) created++ else skipped++
+                }
+            }
+
+        // RP-008: store partner stage 2 commissions
+        storeStage2CommissionRepo.findAll()
+            .filter { it.status == ReferralCommissionStatus.PENDING }
+            .forEach { commission ->
+                val existing = referralPartnerPayoutRepository.findByCommissionTypeAndTriggerReferenceId(
+                    ReferralCommissionType.STORE_PARTNER_STAGE_2, commission.storeId
+                )
+                if (existing == null) {
+                    val result = generatePayoutForReferralPartner(
+                        partnerId = commission.referralPartnerId,
+                        amount = commission.amount,
+                        commissionType = ReferralCommissionType.STORE_PARTNER_STAGE_2,
+                        triggerReferenceId = commission.storeId
+                    )
+                    if (result != null) created++ else skipped++
+                }
+            }
+
+        logger.info("[rp-009] reconciliation complete: created={} skipped={}", created, skipped)
+    }
 
     private fun normalizeBankAccountId(accountId: String?): String? = accountId?.replace("+27", "0")
 

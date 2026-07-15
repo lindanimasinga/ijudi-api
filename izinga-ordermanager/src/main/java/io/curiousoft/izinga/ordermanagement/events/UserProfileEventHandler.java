@@ -7,9 +7,10 @@ import io.curiousoft.izinga.commons.model.UserProfile;
 import io.curiousoft.izinga.commons.profile.events.ProfileCreatedEvent;
 import io.curiousoft.izinga.commons.profile.events.ProfileDeletedEvent;
 import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent;
+import io.curiousoft.izinga.commons.referral.ReferralCommissionStatus;
+import io.curiousoft.izinga.commons.referral.ReferralCommissionType;
 import io.curiousoft.izinga.commons.referral.StorePartnerStage1Commission;
 import io.curiousoft.izinga.commons.referral.StorePartnerStage1CommissionRepo;
-import io.curiousoft.izinga.commons.referral.ReferralCommissionStatus;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsappNotificationService;
 import io.curiousoft.izinga.recon.ReconService;
@@ -105,6 +106,13 @@ public class UserProfileEventHandler {
             );
             storeStage1CommissionRepo.insert(commission);
             LOG.info("[rp-007] store stage1 commission created: storeId={} partnerId={}", store.getId(), partnerId);
+            // RP-009: wire the commission into a payout immediately
+            reconService.generatePayoutForReferralPartner(
+                    partnerId,
+                    new java.math.BigDecimal("100.00"),
+                    ReferralCommissionType.STORE_PARTNER_STAGE_1,
+                    store.getId()
+            );
         } catch (DuplicateKeyException e) {
             LOG.info("[rp-007] stage1 commission already exists for storeId={}, skipping (idempotent)", store.getId());
         } catch (Exception e) {
