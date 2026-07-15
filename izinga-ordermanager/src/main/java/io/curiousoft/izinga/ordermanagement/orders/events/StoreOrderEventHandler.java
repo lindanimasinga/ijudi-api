@@ -126,7 +126,7 @@ public class StoreOrderEventHandler implements OrderEventHandler {
             // RP-009: wire the commission into a payout immediately
             reconService.generatePayoutForReferralPartner(
                     partnerId,
-                    new java.math.BigDecimal("15.00"),
+                    commission.getAmount(),
                     ReferralCommissionType.FOOD_CUSTOMER_REFERRAL,
                     customerId
             );
@@ -166,7 +166,7 @@ public class StoreOrderEventHandler implements OrderEventHandler {
             // RP-009: wire the commission into a payout immediately
             reconService.generatePayoutForReferralPartner(
                     partnerId,
-                    new java.math.BigDecimal("150.00"),
+                    commission.getAmount(),
                     ReferralCommissionType.STORE_PARTNER_STAGE_2,
                     storeId
             );

@@ -109,7 +109,7 @@ public class UserProfileEventHandler {
             // RP-009: wire the commission into a payout immediately
             reconService.generatePayoutForReferralPartner(
                     partnerId,
-                    new java.math.BigDecimal("100.00"),
+                    commission.getAmount(),
                     ReferralCommissionType.STORE_PARTNER_STAGE_1,
                     store.getId()
             );

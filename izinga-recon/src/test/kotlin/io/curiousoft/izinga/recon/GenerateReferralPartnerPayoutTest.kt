@@ -83,6 +83,40 @@ class GenerateReferralPartnerPayoutTest {
 
     // ─── generatePayoutForReferralPartner ────────────────────────────────────
 
+    /**
+     * QA contract test: UserProfile has NO enabled/deactivated/active field (confirmed against
+     * model as of RP-009). The only partner-blocking guards in generatePayoutForReferralPartner
+     * are: (a) partner not found in DB (hard-delete), and (b) partner has no bank details.
+     * A partner with profileApproved=false (the closest analog to "soft-disabled") MUST still
+     * receive payouts for commissions legitimately earned — deactivation stops future attribution,
+     * not payment of money already owed.
+     */
+    @Test
+    fun `partner with profileApproved=false but with bank details still receives payout`() {
+        val partnerId = "rp-deactivated"
+        val partner = makePartner(partnerId).also { it.profileApproved = false }
+        val triggerRef = "store-abc"
+        val amount = BigDecimal("100.00")
+        val type = ReferralCommissionType.STORE_PARTNER_STAGE_1
+
+        every { referralPartnerPayoutRepository.findByCommissionTypeAndTriggerReferenceId(type, triggerRef) } returns null
+        every { userProfileRepo.findById(partnerId) } returns java.util.Optional.of(partner)
+        val capturedPayout = slot<ReferralPartnerPayout>()
+        every { referralPartnerPayoutRepository.save(capture(capturedPayout)) } answers {
+            capturedPayout.captured.also { it.id = "RP-DEACT-001" }
+        }
+        every { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) } just runs
+
+        val result = sut.generatePayoutForReferralPartner(partnerId, amount, type, triggerRef)
+
+        assertNotNull(result, "Payout must be created even when partner's profileApproved is false")
+        assertEquals(partnerId, result!!.toId)
+        assertEquals(amount, result.commissionAmount)
+        assertEquals(PayoutStage.PENDING, result.payoutStage)
+        verify(exactly = 1) { referralPartnerPayoutRepository.save(any()) }
+        verify(exactly = 1) { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) }
+    }
+
     @Test
     fun `happy path - creates ReferralPartnerPayout and publishes event`() {
         val partnerId = "rp-001"
