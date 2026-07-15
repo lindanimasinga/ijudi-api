@@ -111,6 +111,22 @@ class UserProfileService(
     override fun update(profileId: String, profile: UserProfile): UserProfile {
         val persisted = userProfileRepo.findById(profileId).orElse(null)
         val wasIcaAccepted = persisted?.icaAccepted == true
+
+        // RP-011: resolve referral code on update — first-touch only (never re-attribute)
+        val submittedReferralCode = profile.referralCode
+        profile.referralCode = null  // never persist the raw code on the profile
+        if (!submittedReferralCode.isNullOrBlank() && persisted?.referredByPartnerId == null) {
+            val partner = referralCodeService.resolveCode(submittedReferralCode)
+            if (partner != null) {
+                log.info("Referral code {} resolved to partnerId={} for existing user id={}",
+                    submittedReferralCode, partner.id, profileId)
+                profile.referredByPartnerId = partner.id
+            } else {
+                log.warn("Referral code {} could not be resolved during update for userId={}",
+                    submittedReferralCode, profileId)
+            }
+        }
+
         val updated = super.update(profileId, profile)
         if (!wasIcaAccepted && updated.icaAccepted == true) {
             val logEntry = IcaAcceptanceLog(

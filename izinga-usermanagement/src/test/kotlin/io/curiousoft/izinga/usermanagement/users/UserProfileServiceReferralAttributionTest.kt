@@ -111,6 +111,76 @@ class UserProfileServiceReferralAttributionTest {
         verify(referralCodeService).resolveCode("NOTFOUND")
     }
 
+    // ─── update() referral attribution tests (RP-011) ────────────────────────────
+
+    @Test
+    fun `update - no prior attribution, valid code submitted - sets referredByPartnerId`() {
+        val profileId = "user-existing-1"
+        val persisted = makeCustomer().also { it.id = profileId; it.referredByPartnerId = null }
+        val partner = makePartner("partner-456")
+        val incoming = makeCustomer().also { it.referralCode = "ABC12345" }
+        val saved = makeCustomer().also { it.id = profileId; it.referredByPartnerId = "partner-456" }
+
+        `when`(userProfileRepo.findById(profileId)).thenReturn(java.util.Optional.of(persisted))
+        `when`(referralCodeService.resolveCode("ABC12345")).thenReturn(partner)
+        `when`(userProfileRepo.save(any())).thenReturn(saved)
+
+        val result = service.update(profileId, incoming)
+
+        assertEquals("partner-456", incoming.referredByPartnerId)
+        assertNull(incoming.referralCode)  // raw code must be cleared before save
+        verify(referralCodeService).resolveCode("ABC12345")
+    }
+
+    @Test
+    fun `update - no prior attribution, unknown code submitted - referredByPartnerId stays null`() {
+        val profileId = "user-existing-2"
+        val persisted = makeCustomer().also { it.id = profileId; it.referredByPartnerId = null }
+        val incoming = makeCustomer().also { it.referralCode = "NOTFOUND" }
+        val saved = makeCustomer().also { it.id = profileId }
+
+        `when`(userProfileRepo.findById(profileId)).thenReturn(java.util.Optional.of(persisted))
+        `when`(referralCodeService.resolveCode("NOTFOUND")).thenReturn(null)
+        `when`(userProfileRepo.save(any())).thenReturn(saved)
+
+        service.update(profileId, incoming)
+
+        assertNull(incoming.referredByPartnerId)
+        verify(referralCodeService).resolveCode("NOTFOUND")
+    }
+
+    @Test
+    fun `update - already attributed, code submitted - resolution NOT attempted, existing attribution untouched`() {
+        val profileId = "user-existing-3"
+        val persisted = makeCustomer().also { it.id = profileId; it.referredByPartnerId = "original-partner" }
+        val incoming = makeCustomer().also { it.referralCode = "NEWCODE1"; it.referredByPartnerId = "original-partner" }
+        val saved = makeCustomer().also { it.id = profileId; it.referredByPartnerId = "original-partner" }
+
+        `when`(userProfileRepo.findById(profileId)).thenReturn(java.util.Optional.of(persisted))
+        `when`(userProfileRepo.save(any())).thenReturn(saved)
+
+        service.update(profileId, incoming)
+
+        assertEquals("original-partner", incoming.referredByPartnerId)
+        verify(referralCodeService, never()).resolveCode(anyString())
+    }
+
+    @Test
+    fun `update - blank referralCode in payload - resolution NOT attempted`() {
+        val profileId = "user-existing-4"
+        val persisted = makeCustomer().also { it.id = profileId; it.referredByPartnerId = null }
+        val incoming = makeCustomer().also { it.referralCode = "   " }
+        val saved = makeCustomer().also { it.id = profileId }
+
+        `when`(userProfileRepo.findById(profileId)).thenReturn(java.util.Optional.of(persisted))
+        `when`(userProfileRepo.save(any())).thenReturn(saved)
+
+        service.update(profileId, incoming)
+
+        assertNull(incoming.referredByPartnerId)
+        verify(referralCodeService, never()).resolveCode(anyString())
+    }
+
     /**
      * Payload fallback path: controller resolves effectiveRef from profile.referralCode when
      * the `ref` query param is absent, nulls it out, then calls create(profile, effectiveRef).
