@@ -3,6 +3,8 @@ package io.curiousoft.izinga.recon.payout.repo
 import io.curiousoft.izinga.commons.referral.ReferralCommissionType
 import io.curiousoft.izinga.recon.payout.PayoutStage
 import io.curiousoft.izinga.recon.payout.ReferralPartnerPayout
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.data.mongodb.repository.MongoRepository
 import java.util.*
 
@@ -27,4 +29,10 @@ interface ReferralPartnerPayoutRepository : MongoRepository<ReferralPartnerPayou
      * matches a commission type but has no linked payout yet — used by the reconciliation scan.
      */
     fun findByCommissionType(commissionType: ReferralCommissionType): List<ReferralPartnerPayout>
+
+    /**
+     * RP-010: Paginated list of all payouts for a given referral partner, ordered by date descending.
+     * Used by GET /referral-partner/me/payouts.
+     */
+    fun findAllByToId(toId: String, pageable: Pageable): Page<ReferralPartnerPayout>
 }
