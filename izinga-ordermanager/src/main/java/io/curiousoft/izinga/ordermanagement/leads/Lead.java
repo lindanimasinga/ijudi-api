@@ -17,8 +17,8 @@ public class Lead extends BaseModel {
     private List<LeadItem> items;
     private String fromAddress;
     private String toAddress;
-    private double deliveryPrice;
-    private double totalPrice;
+    private Double deliveryPrice;
+    private Double totalPrice;
     private StoreType storeType;
     private String storeId;
     private LeadStatus status;
@@ -46,11 +46,11 @@ public class Lead extends BaseModel {
     public String getToAddress() { return toAddress; }
     public void setToAddress(String toAddress) { this.toAddress = toAddress; }
 
-    public double getDeliveryPrice() { return deliveryPrice; }
-    public void setDeliveryPrice(double deliveryPrice) { this.deliveryPrice = deliveryPrice; }
+    public Double getDeliveryPrice() { return deliveryPrice; }
+    public void setDeliveryPrice(Double deliveryPrice) { this.deliveryPrice = deliveryPrice; }
 
-    public double getTotalPrice() { return totalPrice; }
-    public void setTotalPrice(double totalPrice) { this.totalPrice = totalPrice; }
+    public Double getTotalPrice() { return totalPrice; }
+    public void setTotalPrice(Double totalPrice) { this.totalPrice = totalPrice; }
 
     public StoreType getStoreType() { return storeType; }
     public void setStoreType(StoreType storeType) { this.storeType = storeType; }
