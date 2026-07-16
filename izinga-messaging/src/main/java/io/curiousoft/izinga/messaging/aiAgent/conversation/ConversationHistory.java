@@ -33,7 +33,7 @@ public class ConversationHistory {
     /**
      * Driver's WhatsApp phone number (e.g., +27812345678)
      */
-    @Indexed(unique = true)
+    @Indexed(unique = false)
     private String driverPhoneNumber;
 
     /**

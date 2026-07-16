@@ -26,11 +26,11 @@ public class Lead extends BaseModel {
     private boolean consentGiven;
     private Instant consentTimestamp;
     private String category;
-    private double distanceKm;
-    private double estimatedDeliveryFee;
-    private double ratePerKm;
-    private double standardFee;
-    private double standardKm;
+    private Double distanceKm;
+    private Double estimatedDeliveryFee;
+    private Double ratePerKm;
+    private Double standardFee;
+    private Double standardKm;
 
     public Lead() {}
 
@@ -73,18 +73,18 @@ public class Lead extends BaseModel {
     public String getCategory() { return category; }
     public void setCategory(String category) { this.category = category; }
 
-    public double getDistanceKm() { return distanceKm; }
-    public void setDistanceKm(double distanceKm) { this.distanceKm = distanceKm; }
+    public Double getDistanceKm() { return distanceKm; }
+    public void setDistanceKm(Double distanceKm) { this.distanceKm = distanceKm; }
 
-    public double getEstimatedDeliveryFee() { return estimatedDeliveryFee; }
-    public void setEstimatedDeliveryFee(double estimatedDeliveryFee) { this.estimatedDeliveryFee = estimatedDeliveryFee; }
+    public Double getEstimatedDeliveryFee() { return estimatedDeliveryFee; }
+    public void setEstimatedDeliveryFee(Double estimatedDeliveryFee) { this.estimatedDeliveryFee = estimatedDeliveryFee; }
 
-    public double getRatePerKm() { return ratePerKm; }
-    public void setRatePerKm(double ratePerKm) { this.ratePerKm = ratePerKm; }
+    public Double getRatePerKm() { return ratePerKm; }
+    public void setRatePerKm(Double ratePerKm) { this.ratePerKm = ratePerKm; }
 
-    public double getStandardFee() { return standardFee; }
-    public void setStandardFee(double standardFee) { this.standardFee = standardFee; }
+    public Double getStandardFee() { return standardFee; }
+    public void setStandardFee(Double standardFee) { this.standardFee = standardFee; }
 
-    public double getStandardKm() { return standardKm; }
-    public void setStandardKm(double standardKm) { this.standardKm = standardKm; }
+    public Double getStandardKm() { return standardKm; }
+    public void setStandardKm(Double standardKm) { this.standardKm = standardKm; }
 }

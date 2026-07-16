@@ -36,8 +36,9 @@ public class LeadService {
                 lead.setItems(request.getItems());
                 lead.setFromAddress(request.getFromAddress());
                 lead.setToAddress(request.getToAddress());
-                lead.setEstimatedDeliveryFee(request.getEstimatedDeliveryFee() > 0
-                        ? request.getEstimatedDeliveryFee()
+                Double reqFeeUpdate = request.getEstimatedDeliveryFee();
+                lead.setEstimatedDeliveryFee(reqFeeUpdate != null && reqFeeUpdate > 0
+                        ? reqFeeUpdate
                         : request.getEstimatedPrice());
                 lead.setCategory(request.getCategory());
                 lead.setDistanceKm(request.getDistanceKm());
@@ -47,6 +48,7 @@ public class LeadService {
                 lead.setModifiedDate(new Date());
                 lead.setConsentGiven(request.isConsentGiven());
                 lead.setConsentTimestamp(request.getConsentTimestamp());
+                lead.setTotalPrice(request.getTotalPrice());
                 if (request.getStoreId() != null) {
                     lead.setStoreId(request.getStoreId());
                 }
@@ -60,8 +62,9 @@ public class LeadService {
         lead.setItems(request.getItems());
         lead.setFromAddress(request.getFromAddress());
         lead.setToAddress(request.getToAddress());
-        lead.setEstimatedDeliveryFee(request.getEstimatedDeliveryFee() > 0
-                ? request.getEstimatedDeliveryFee()
+        Double reqFeeNew = request.getEstimatedDeliveryFee();
+        lead.setEstimatedDeliveryFee(reqFeeNew != null && reqFeeNew > 0
+                ? reqFeeNew
                 : request.getEstimatedPrice());
         lead.setCategory(request.getCategory());
         lead.setDistanceKm(request.getDistanceKm());
@@ -73,6 +76,7 @@ public class LeadService {
         lead.setStatus(LeadStatus.CAPTURED);
         lead.setConsentGiven(request.isConsentGiven());
         lead.setConsentTimestamp(request.getConsentTimestamp());
+        lead.setTotalPrice(request.getTotalPrice());
         return leadRepository.save(lead);
     }
 
