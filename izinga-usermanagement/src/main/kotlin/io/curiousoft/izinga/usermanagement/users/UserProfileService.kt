@@ -1,9 +1,12 @@
 package io.curiousoft.izinga.usermanagement.users
 
+import io.curiousoft.izinga.commons.model.IcaAcceptanceLog
 import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.StoreType
 import io.curiousoft.izinga.commons.model.UserProfile
+import io.curiousoft.izinga.commons.repo.IcaAcceptanceLogRepo
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
+import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService
 import io.curiousoft.izinga.usermanagement.userconfig.FieldSpec
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfig
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService
@@ -13,11 +16,18 @@ import org.springframework.ai.tool.annotation.Tool
 import org.springframework.ai.tool.annotation.ToolParam
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
+import java.util.Date
 import java.util.stream.Collectors
 import java.util.stream.Stream
 
 @Service
-class UserProfileService(val userProfileRepo: UserProfileRepo, val eventPublisher: ApplicationEventPublisher, userConfigService: UserConfigService) : ProfileServiceImpl<UserProfileRepo, UserProfile>(userProfileRepo, eventPublisher) {
+class UserProfileService(
+    val userProfileRepo: UserProfileRepo,
+    val eventPublisher: ApplicationEventPublisher,
+    userConfigService: UserConfigService,
+    private val icaAcceptanceLogRepo: IcaAcceptanceLogRepo,
+    private val referralCodeService: ReferralCodeService
+) : ProfileServiceImpl<UserProfileRepo, UserProfile>(userProfileRepo, eventPublisher) {
 
     private val log = LoggerFactory.getLogger(UserProfileService::class.java)
     private lateinit var userConfig: MutableList<UserConfig?>
@@ -51,6 +61,29 @@ class UserProfileService(val userProfileRepo: UserProfileRepo, val eventPublishe
         )
     }
 
+    /**
+     * RP-004a: Entry point called from UserController when a `ref` query param is present.
+     * Resolves the referral code to a REFERRAL_PARTNER and sets [UserProfile.referredByPartnerId]
+     * before delegating to the standard create flow.
+     *
+     * @param referralCode raw referral code string from the `ref` query param; null = no attribution.
+     */
+    @Throws(Exception::class)
+    fun create(profile: UserProfile, referralCode: String?): UserProfile {
+        if (!referralCode.isNullOrBlank()) {
+            val partner = referralCodeService.resolveCode(referralCode)
+            if (partner != null) {
+                log.info("Referral code {} resolved to partnerId={} for new user mobileNumber={}",
+                    referralCode, partner.id, profile.mobileNumber)
+                profile.referredByPartnerId = partner.id
+            } else {
+                log.warn("Referral code {} could not be resolved — no attribution set for mobileNumber={}",
+                    referralCode, profile.mobileNumber)
+            }
+        }
+        return create(profile)
+    }
+
     @Tool(name = "create_user", description = "Creates a new user profile. It can be a normal customer or a driver or a store owner depending on the role specified in the profile object.")
     @Throws(Exception::class)
     override fun create(profile: UserProfile): UserProfile {
@@ -72,6 +105,44 @@ class UserProfileService(val userProfileRepo: UserProfileRepo, val eventPublishe
         }
 
         return super.create(profile)
+    }
+
+    @Throws(Exception::class)
+    override fun update(profileId: String, profile: UserProfile): UserProfile {
+        val persisted = userProfileRepo.findById(profileId).orElse(null)
+        val wasIcaAccepted = persisted?.icaAccepted == true
+
+        // RP-011: resolve referral code on update — first-touch only (never re-attribute)
+        val submittedReferralCode = profile.referralCode
+        profile.referralCode = null  // never persist the raw code on the profile
+        if (!submittedReferralCode.isNullOrBlank() && persisted?.referredByPartnerId == null) {
+            val partner = referralCodeService.resolveCode(submittedReferralCode)
+            if (partner != null) {
+                log.info("Referral code {} resolved to partnerId={} for existing user id={}",
+                    submittedReferralCode, partner.id, profileId)
+                profile.referredByPartnerId = partner.id
+            } else {
+                log.warn("Referral code {} could not be resolved during update for userId={}",
+                    submittedReferralCode, profileId)
+            }
+        }
+
+        val updated = super.update(profileId, profile)
+        if (!wasIcaAccepted && updated.icaAccepted == true) {
+            val logEntry = IcaAcceptanceLog(
+                userId = updated.id ?: profileId,
+                mobileNumber = updated.mobileNumber ?: "",
+                icaVersion = updated.icaVersion ?: "unknown",
+                acceptedAt = updated.icaAcceptedDate ?: Date()
+            )
+            try {
+                icaAcceptanceLogRepo.insert(logEntry)
+                log.info("ICA acceptance logged for userId={} icaVersion={}", logEntry.userId, logEntry.icaVersion)
+            } catch (e: Exception) {
+                log.error("Failed to write ICA acceptance log for userId={}", profileId, e)
+            }
+        }
+        return updated
     }
 
     fun pendingAproval(): List<UserProfile> {

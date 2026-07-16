@@ -46,7 +46,7 @@ public class LeadServiceTest {
 
         assertEquals("Cape Town", result.getFromAddress());
         assertEquals("Johannesburg", result.getToAddress());
-        assertEquals(500.0, result.getEstimatedPrice(), 0.001);
+        assertEquals(500.0, result.getEstimatedDeliveryFee(), 0.001);
         verify(leadRepository).findByPhone("+27821234567");
         verify(leadRepository).save(existing);
     }
@@ -239,5 +239,187 @@ public class LeadServiceTest {
         leadService.convertLeadByPhone(null);
 
         verify(leadRepository, never()).findByPhone(any());
+    }
+
+    // --- ADR-018 Step 1: new fields round-trip tests ---
+
+    @Test
+    public void upsertLead_newFields_newLead_allMapped() {
+        LeadRequest request = new LeadRequest();
+        request.setPhone("+27821111111");
+        request.setCategory("Bakkie Delivery Driver");
+        request.setDistanceKm(12.5);
+        request.setStandardFee(85.0);
+        request.setStandardKm(5.0);
+        request.setRatePerKm(10.0);
+        request.setEstimatedDeliveryFee(200.0);
+
+        when(leadRepository.findByPhone("+27821111111")).thenReturn(Optional.empty());
+        when(leadRepository.save(any(Lead.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Lead result = leadService.upsertLead(request);
+
+        assertEquals("Bakkie Delivery Driver", result.getCategory());
+        assertEquals(12.5, result.getDistanceKm(), 0.001);
+        assertEquals(85.0, result.getStandardFee(), 0.001);
+        assertEquals(5.0, result.getStandardKm(), 0.001);
+        assertEquals(10.0, result.getRatePerKm(), 0.001);
+        assertEquals(200.0, result.getEstimatedDeliveryFee(), 0.001);
+    }
+
+    @Test
+    public void upsertLead_newFields_existingLead_allMapped() {
+        LeadRequest request = new LeadRequest();
+        request.setPhone("+27822222222");
+        request.setCategory("Bike Delivery Driver");
+        request.setDistanceKm(3.0);
+        request.setStandardFee(50.0);
+        request.setStandardKm(2.0);
+        request.setRatePerKm(8.0);
+        request.setEstimatedDeliveryFee(75.0);
+
+        Lead existing = new Lead();
+        existing.setId("lead-x");
+        existing.setPhone("+27822222222");
+        existing.setStatus(LeadStatus.CAPTURED);
+
+        when(leadRepository.findByPhone("+27822222222")).thenReturn(Optional.of(existing));
+        when(leadRepository.save(any(Lead.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Lead result = leadService.upsertLead(request);
+
+        assertEquals("Bike Delivery Driver", result.getCategory());
+        assertEquals(3.0, result.getDistanceKm(), 0.001);
+        assertEquals(50.0, result.getStandardFee(), 0.001);
+        assertEquals(2.0, result.getStandardKm(), 0.001);
+        assertEquals(8.0, result.getRatePerKm(), 0.001);
+        assertEquals(75.0, result.getEstimatedDeliveryFee(), 0.001);
+    }
+
+    @Test
+    public void upsertLead_estimatedDeliveryFeeZero_fallsBackToEstimatedPrice_newLead() {
+        LeadRequest request = new LeadRequest();
+        request.setEstimatedPrice(350.0);
+        request.setEstimatedDeliveryFee(0.0);  // zero — use legacy field
+
+        when(leadRepository.save(any(Lead.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Lead result = leadService.upsertLead(request);
+
+        assertEquals(350.0, result.getEstimatedDeliveryFee(), 0.001);
+    }
+
+    @Test
+    public void upsertLead_estimatedDeliveryFeeZero_fallsBackToEstimatedPrice_existingLead() {
+        LeadRequest request = new LeadRequest();
+        request.setPhone("+27823333333");
+        request.setEstimatedPrice(420.0);
+        request.setEstimatedDeliveryFee(0.0);
+
+        Lead existing = new Lead();
+        existing.setId("lead-y");
+        existing.setPhone("+27823333333");
+        existing.setStatus(LeadStatus.CAPTURED);
+
+        when(leadRepository.findByPhone("+27823333333")).thenReturn(Optional.of(existing));
+        when(leadRepository.save(any(Lead.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Lead result = leadService.upsertLead(request);
+
+        assertEquals(420.0, result.getEstimatedDeliveryFee(), 0.001);
+    }
+
+    @Test
+    public void upsertLead_estimatedDeliveryFeePositive_doesNotFallBack_newLead() {
+        LeadRequest request = new LeadRequest();
+        request.setEstimatedPrice(100.0);
+        request.setEstimatedDeliveryFee(250.0);  // explicit value wins
+
+        when(leadRepository.save(any(Lead.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Lead result = leadService.upsertLead(request);
+
+        assertEquals(250.0, result.getEstimatedDeliveryFee(), 0.001);
+    }
+
+    // --- Boxed-null propagation tests (fix for primitive double boxing bug) ---
+
+    @Test
+    public void upsertLead_enrichmentFieldsAbsent_newLead_entityFieldsAreNull() {
+        // Simulates a request that does not set any enrichment fields.
+        // With boxed Double in LeadRequest, absent fields are null → entity gets null →
+        // NON_NULL serialisation omits them (frontend *ngIf != null guards work correctly).
+        LeadRequest request = new LeadRequest();
+        request.setPhone("+27829000001");
+        request.setStoreType(StoreType.MOVERS);
+        // distanceKm, estimatedDeliveryFee, ratePerKm, standardFee, standardKm intentionally NOT set
+
+        when(leadRepository.findByPhone("+27829000001")).thenReturn(Optional.empty());
+        when(leadRepository.save(any(Lead.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Lead result = leadService.upsertLead(request);
+
+        assertNull(result.getDistanceKm(), "distanceKm must be null, not 0.0, for legacy leads");
+        assertNull(result.getRatePerKm(), "ratePerKm must be null, not 0.0, for legacy leads");
+        assertNull(result.getStandardFee(), "standardFee must be null, not 0.0, for legacy leads");
+        assertNull(result.getStandardKm(), "standardKm must be null, not 0.0, for legacy leads");
+    }
+
+    @Test
+    public void upsertLead_enrichmentFieldsAbsent_existingLead_entityFieldsAreNull() {
+        // Simulates updating an existing lead without providing enrichment fields.
+        LeadRequest request = new LeadRequest();
+        request.setPhone("+27829000002");
+        // distanceKm etc. intentionally NOT set — all remain null
+
+        Lead existing = new Lead();
+        existing.setId("lead-legacy");
+        existing.setPhone("+27829000002");
+        existing.setStatus(LeadStatus.CAPTURED);
+
+        when(leadRepository.findByPhone("+27829000002")).thenReturn(Optional.of(existing));
+        when(leadRepository.save(any(Lead.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Lead result = leadService.upsertLead(request);
+
+        assertNull(result.getDistanceKm(), "distanceKm must be null, not 0.0, on legacy update path");
+        assertNull(result.getRatePerKm(), "ratePerKm must be null, not 0.0, on legacy update path");
+        assertNull(result.getStandardFee(), "standardFee must be null, not 0.0, on legacy update path");
+        assertNull(result.getStandardKm(), "standardKm must be null, not 0.0, on legacy update path");
+    }
+
+    @Test
+    public void upsertLead_estimatedDeliveryFeeNull_fallsBackToEstimatedPrice_newLead() {
+        // estimatedDeliveryFee absent from request (null) — must fall back to estimatedPrice.
+        LeadRequest request = new LeadRequest();
+        request.setEstimatedPrice(320.0);
+        // estimatedDeliveryFee intentionally NOT set — null
+
+        when(leadRepository.save(any(Lead.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Lead result = leadService.upsertLead(request);
+
+        // null fee → fallback to estimatedPrice
+        assertEquals(320.0, result.getEstimatedDeliveryFee(), 0.001);
+    }
+
+    @Test
+    public void upsertLead_estimatedDeliveryFeeNull_fallsBackToEstimatedPrice_existingLead() {
+        LeadRequest request = new LeadRequest();
+        request.setPhone("+27829000003");
+        request.setEstimatedPrice(480.0);
+        // estimatedDeliveryFee intentionally NOT set — null
+
+        Lead existing = new Lead();
+        existing.setId("lead-z");
+        existing.setPhone("+27829000003");
+        existing.setStatus(LeadStatus.CAPTURED);
+
+        when(leadRepository.findByPhone("+27829000003")).thenReturn(Optional.of(existing));
+        when(leadRepository.save(any(Lead.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Lead result = leadService.upsertLead(request);
+
+        assertEquals(480.0, result.getEstimatedDeliveryFee(), 0.001);
     }
 }

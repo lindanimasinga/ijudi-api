@@ -62,11 +62,24 @@
             <version>${kotlin.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- Explicit JUnit 5 deps so izinga-commons tests run reliably in isolation.
+             kotlin-test 2.x pulls Jupiter transitively, but declaring it explicitly
+             guarantees Surefire picks up the platform engine regardless of reactor order. -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
         <sourceDirectory>src/main/kotlin</sourceDirectory>
-        <testSourceDirectory>src/test/java</testSourceDirectory>
+        <testSourceDirectory>src/test/kotlin</testSourceDirectory>
         <plugins>
             <plugin>
                 <groupId>org.jetbrains.kotlin</groupId>
@@ -92,6 +105,19 @@
                         <version>${kotlin.version}</version>
                     </dependency>
                 </dependencies>
+                <executions>
+                    <execution>
+                        <id>test-compile</id>
+                        <goals>
+                            <goal>test-compile</goal>
+                        </goals>
+                        <configuration>
+                            <sourceDirs>
+                                <sourceDir>src/test/kotlin</sourceDir>
+                            </sourceDirs>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -101,8 +127,12 @@
                     <argLine>
                         --add-opens java.base/java.lang=ALL-UNNAMED
                         --add-opens java.base/java.util=ALL-UNNAMED
-                        --add-opens java.base/java.base=ALL-UNNAMED
                     </argLine>
+                    <includes>
+                        <include>**/*Test.class</include>
+                        <include>**/*Tests.class</include>
+                        <include>**/*TestCase.class</include>
+                    </includes>
                 </configuration>
             </plugin>
         </plugins>

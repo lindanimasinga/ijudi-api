@@ -4,6 +4,7 @@ import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.ordermanagement.stores.StoreService;
+import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -33,10 +34,12 @@ public class StoreServiceTest {
     UserProfileRepo userProfileRepo;
     @Mock
     private ApplicationEventPublisher applicationEventPublisher;
+    @Mock
+    private ReferralCodeService referralCodeService;
 
     @Before
     public void setUp() {
-        storeService = new StoreService(storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, 0.1, applicationEventPublisher);
+        storeService = new StoreService(storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, 0.1, applicationEventPublisher, referralCodeService);
     }
 
     @Test

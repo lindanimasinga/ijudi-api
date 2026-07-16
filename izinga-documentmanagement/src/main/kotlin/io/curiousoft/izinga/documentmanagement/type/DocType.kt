@@ -38,17 +38,22 @@ class ProofOfAddress(
 ) : DocType
 
 class DriverID(
-    val documentType: String,
-    val country: String,
-    val name: String,
-    val idNumber: String,
-    val dateOfBirth: String,
-    val expiryDate: String,
-    val addressLine1: String,
-    val addressLine2: String,
-    val city: String,
-    val postalCode: String,
-    val licenceNumber: String
+    val documentType: String,         // GREEN_ID_BOOK | SMART_ID_CARD | DRIVERS_LICENCE | UNKNOWN
+    val country: String,              // ISO3 e.g. ZAF
+    val nationality: String,          // ISO3 e.g. ZAF
+    val idNumber: String,             // 13-digit SA ID number
+    val surname: String,
+    val firstNames: String,
+    val dateOfBirth: String,          // YYYY-MM-DD
+    val citizenshipStatus: String,    // CITIZEN | PERMANENT_RESIDENT | UNKNOWN
+    val licenceNumber: String?,       // driver's licence only
+    val licenceCodes: List<String>?,  // driver's licence only e.g. [B, EB]
+    val validUntil: String?,          // expiry date YYYY-MM-DD (smart ID or licence)
+    val pdpPresent: Boolean?,         // professional driving permit
+    val idNumberValid: Boolean,       // 13-digit Luhn check passed
+    val idNumberMatchesDob: Boolean,  // digits 1-6 match dateOfBirth
+    val isExpired: Boolean,           // validUntil is in the past
+    val validationErrors: List<String> // list of specific failures
 ) : DocType
 
 class InsuranceCertificate(

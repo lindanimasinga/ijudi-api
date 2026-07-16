@@ -17,8 +17,12 @@ import io.curiousoft.izinga.recon.payout.MessengerPayout
 import io.curiousoft.izinga.recon.payout.PayoutStage
 import io.curiousoft.izinga.recon.payout.ShopPayout
 import io.curiousoft.izinga.recon.ambassador.AmbassadorProperties
+import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommissionRepo
+import io.curiousoft.izinga.commons.referral.StorePartnerStage1CommissionRepo
+import io.curiousoft.izinga.commons.referral.StorePartnerStage2CommissionRepo
 import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
+import io.curiousoft.izinga.recon.payout.repo.ReferralPartnerPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
 import io.mockk.every
 import io.mockk.mockk
@@ -37,6 +41,10 @@ class ReconServiceImplProfileUpdateTest {
     private val shopPayoutRepository = mockk<ShopPayoutRepository>()
     private val messengerPayoutRepository = mockk<MessengerPayoutRepository>()
     private val ambassadorPayoutRepository = mockk<AmbassadorPayoutRepository>()
+    private val referralPartnerPayoutRepository = mockk<ReferralPartnerPayoutRepository>()
+    private val foodCustomerCommissionRepo = mockk<FoodCustomerReferralCommissionRepo>()
+    private val storeStage1CommissionRepo = mockk<StorePartnerStage1CommissionRepo>()
+    private val storeStage2CommissionRepo = mockk<StorePartnerStage2CommissionRepo>()
     private val applicationEventPublisher = mockk<ApplicationEventPublisher>()
 
     private lateinit var sut: ReconServiceImpl
@@ -49,6 +57,10 @@ class ReconServiceImplProfileUpdateTest {
             shopPayoutRepo = shopPayoutRepository,
             messengerPayoutRepository = messengerPayoutRepository,
             ambassadorPayoutRepository = ambassadorPayoutRepository,
+            referralPartnerPayoutRepository = referralPartnerPayoutRepository,
+            foodCustomerCommissionRepo = foodCustomerCommissionRepo,
+            storeStage1CommissionRepo = storeStage1CommissionRepo,
+            storeStage2CommissionRepo = storeStage2CommissionRepo,
             applicationEventPublisher = applicationEventPublisher,
             ambassadorProperties = AmbassadorProperties()
         )

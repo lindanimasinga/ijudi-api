@@ -2,11 +2,13 @@ package io.curiousoft.izinga.ordermanagement.mcp;
 
 import io.curiousoft.izinga.commons.model.ProfileRoles;
 import io.curiousoft.izinga.commons.model.UserProfile;
+import io.curiousoft.izinga.commons.repo.IcaAcceptanceLogRepo;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.ordermanagement.McpConfig;
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
 import io.curiousoft.izinga.ordermanagement.stores.StoreService;
 import io.curiousoft.izinga.recon.ReconServiceImpl;
+import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService;
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService;
 import io.curiousoft.izinga.usermanagement.users.DocumentUploadMcpService;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
@@ -76,11 +78,15 @@ class McpToolRegistrationTest {
     @Mock
     private UserConfigService userConfig;
     @Mock
+    private IcaAcceptanceLogRepo icaAcceptanceLogRepo;
+    @Mock
+    private ReferralCodeService referralCodeService;
+    @Mock
     private DocumentUploadMcpService documentUploadMcpService;
 
     @BeforeEach
     void setUp() {
-        userProfileService = new UserProfileService(userProfileRepo, eventPublisher, userConfig);
+        userProfileService = new UserProfileService(userProfileRepo, eventPublisher, userConfig, icaAcceptanceLogRepo, referralCodeService);
         mcpConfig = new McpConfig();
     }
 

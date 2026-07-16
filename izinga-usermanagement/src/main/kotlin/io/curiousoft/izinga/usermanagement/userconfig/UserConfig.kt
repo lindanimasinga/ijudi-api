@@ -13,6 +13,10 @@ data class UserConfig(
     var userRole: ProfileRoles? = null,
     var mandatoryFields: List<FieldSpec> = emptyList(),
     var optionalFields: List<FieldSpec> = emptyList(),
+    /** Fields that are never rendered on the onboarding form but still travel with the
+     *  profile payload — e.g. set programmatically from document extraction rather than
+     *  typed by the user. */
+    var hiddenFields: List<FieldSpec> = emptyList(),
 )
 
 /**

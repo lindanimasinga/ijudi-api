@@ -4,11 +4,15 @@ import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.ordermanagement.service.ProfileServiceImpl;
+import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.DayOfWeek;
 import java.util.*;
@@ -17,19 +21,46 @@ import java.util.stream.Collectors;
 @Service
 public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfile> {
 
+    private static final Logger LOG = LoggerFactory.getLogger(StoreService.class);
+
     private final UserProfileRepo userProfileRepo;
     private final String mainPayAccount;
     private final double markupPercentage;
+    private final ReferralCodeService referralCodeService;
 
     public  StoreService(StoreRepository storeRepository,
                         UserProfileRepo userProfileRepo,
                         @Value("${ukheshe.main.account}") String mainPayAccount,
                         @Value("${service.markup.perc}") double markupPercentage,
-                        ApplicationEventPublisher applicationEventPublisher) {
+                        ApplicationEventPublisher applicationEventPublisher,
+                        ReferralCodeService referralCodeService) {
         super(storeRepository, applicationEventPublisher);
         this.userProfileRepo = userProfileRepo;
         this.mainPayAccount = mainPayAccount;
         this.markupPercentage = markupPercentage;
+        this.referralCodeService = referralCodeService;
+    }
+
+    /**
+     * RP-005a: Store creation with optional referral attribution.
+     * If [referralCode] is non-null and resolves to a REFERRAL_PARTNER, sets
+     * [StoreProfile.referredByPartnerId] before persisting.
+     *
+     * Called from StoreControler when a `referralCode` query param is present.
+     */
+    public StoreProfile create(StoreProfile profile, String referralCode) throws Exception {
+        if (StringUtils.hasText(referralCode)) {
+            var partner = referralCodeService.resolveCode(referralCode);
+            if (partner != null) {
+                LOG.info("Referral code {} resolved to partnerId={} for new store ownerId={}",
+                        referralCode, partner.getId(), profile.getOwnerId());
+                profile.setReferredByPartnerId(partner.getId());
+            } else {
+                LOG.warn("Referral code {} could not be resolved — no attribution set for store ownerId={}",
+                        referralCode, profile.getOwnerId());
+            }
+        }
+        return create(profile);
     }
 
     @Override

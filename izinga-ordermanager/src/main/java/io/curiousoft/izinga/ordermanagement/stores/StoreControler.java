@@ -26,8 +26,10 @@ public class StoreControler {
     }
 
     @RequestMapping(method = RequestMethod.POST, consumes = "application/json", produces = "application/json")
-    public ResponseEntity<StoreProfile> create(@Valid @RequestBody StoreProfile profile) throws Exception {
-        return ResponseEntity.ok(storeService.create(profile));
+    public ResponseEntity<StoreProfile> create(
+            @Valid @RequestBody StoreProfile profile,
+            @RequestParam(required = false) String referralCode) throws Exception {
+        return ResponseEntity.ok(storeService.create(profile, referralCode));
     }
 
     @PatchMapping(value = "/{id}", consumes = "application/json", produces = "application/json")

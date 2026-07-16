@@ -9,6 +9,7 @@ import com.github.victools.jsonschema.generator.SchemaGeneratorConfigBuilder
 import com.github.victools.jsonschema.generator.SchemaVersion
 import io.curiousoft.izinga.documentmanagement.type.DocMetadata
 import io.curiousoft.izinga.documentmanagement.type.DocTypesEnum
+import org.slf4j.LoggerFactory
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
@@ -21,40 +22,74 @@ import kotlin.reflect.KClass
 @RequestMapping("/document")
 class DocumentManagementController(private val cloudBucketService: CloudBucketService, private val documentInfoService: DocumentInfoService) {
 
+    private val logger = LoggerFactory.getLogger(DocumentManagementController::class.java)
+
     @PostMapping
     fun uploadFile(@RequestParam("file") file: MultipartFile,
                    @RequestParam("metadata") metadata: Boolean = false,
                    @RequestParam("docData", required = false) docMetadataStr: String?,
                    @RequestParam("docType", required = false) documentType: DocTypesEnum?): Map<String, Any?> {
         val fileName = UUID.randomUUID().toString() + "_" + file.originalFilename
-        var docMetadata : DocMetadata? = null
-        if (docMetadataStr != null) {
-            val mapper: ObjectMapper = jacksonObjectMapper()
-            docMetadata = mapper.readValue(docMetadataStr, DocMetadata::class.java)
-        }
+        val docMetadata: DocMetadata? = if (docMetadataStr != null) {
+            try {
+                jacksonObjectMapper().readValue(docMetadataStr, DocMetadata::class.java)
+            } catch (e: Exception) {
+                // Malformed docData must not fail the upload — skip extraction, same as if
+                // no docData had been sent at all.
+                logger.warn("Malformed docData param; skipping extraction for file={}", fileName, e)
+                null
+            }
+        } else null
 
         cloudBucketService.putObject(fileName, file.bytes)
         val fileUrl: URL = cloudBucketService.getUrl(fileName)
+        val baseResult = mapOf("fileName" to fileName, "url" to fileUrl.toString())
         if (metadata && documentType != null) {
-            val metadata = documentInfoService.analyzeImageWithResponsesApi(
-                fileUrl.toString(),
-                documentType.klass.simpleName!!,
-                generateJsonSchema(documentType.klass),
-            )
-            return mapOf("fileName" to fileName,
-                "url" to fileUrl.toString(),
-                "metadata" to metadata)
+            return try {
+                val extracted = documentInfoService.analyzeImageWithResponsesApi(
+                    fileUrl.toString(),
+                    documentType.klass.simpleName!!,
+                    generateJsonSchema(documentType.klass),
+                )
+                mapOf("fileName" to fileName, "url" to fileUrl.toString(), "metadata" to extracted)
+            } catch (e: Exception) {
+                // Extraction failure (network error, rate limit, malformed response) must
+                // never surface as a 500 — file was uploaded successfully, return URL only.
+                logger.warn("Document extraction failed (docType={}) for file={}; returning URL only", documentType, fileName, e)
+                baseResult
+            }
         } else if (metadata && docMetadata != null) {
-            val metadata = documentInfoService.analyzeImageWithResponsesApi(
-                fileUrl.toString(),
-                docMetadata.name,
-                docMetadata.toJsonSchema(),
-            )
-            return mapOf("fileName" to fileName,
-                "url" to fileUrl.toString(),
-                "metadata" to metadata)
+            return try {
+                val extracted = documentInfoService.analyzeImageWithResponsesApi(
+                    fileUrl.toString(),
+                    docMetadata.name,
+                    docMetadata.toJsonSchema(),
+                )
+                // Hidden fields were sent to the vision model (they're still part of the
+                // schema) but must never reach the frontend — strip them before returning.
+                // Any response shape other than an ObjectNode (or null) is treated as a
+                // failure rather than passed through, so a hidden field can never leak
+                // through an unexpected extraction result.
+                val safeMetadata = when {
+                    extracted == null -> null
+                    extracted is ObjectNode -> extracted.also { node ->
+                        docMetadata.hiddenFieldNames().forEach { node.remove(it) }
+                    }
+                    else -> {
+                        logger.warn(
+                            "Unexpected extraction response shape ({}) for docMetadata={}; discarding to avoid leaking hidden fields",
+                            extracted.nodeType, docMetadata.name
+                        )
+                        null
+                    }
+                }
+                mapOf("fileName" to fileName, "url" to fileUrl.toString(), "metadata" to safeMetadata)
+            } catch (e: Exception) {
+                logger.warn("Document extraction failed (docMetadata={}) for file={}; returning URL only", docMetadata.name, fileName, e)
+                baseResult
+            }
         }
-        return mapOf("fileName" to fileName, "url" to fileUrl.toString())
+        return baseResult
     }
 
     @DeleteMapping

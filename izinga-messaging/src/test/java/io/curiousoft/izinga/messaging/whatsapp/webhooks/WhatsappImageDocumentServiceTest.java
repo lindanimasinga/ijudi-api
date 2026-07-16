@@ -141,7 +141,7 @@ class WhatsappImageDocumentServiceTest {
         var user = testUser("+27812345678");
         when(userProfileRepo.findByMobileNumber("0812345678")).thenReturn(user);
         when(userConfigService.findAll()).thenReturn(java.util.List.of(
-                new UserConfig("driver", "Driver", ProfileRoles.MESSENGER, java.util.List.of(), java.util.List.of())
+                new UserConfig("driver", "Driver", ProfileRoles.MESSENGER, java.util.List.of(), java.util.List.of(), java.util.List.of())
         ));
 
         var image = new WhatsappWebhookPayload.Value.Message.Image();
@@ -190,6 +190,7 @@ class WhatsappImageDocumentServiceTest {
                         new FieldSpec("vehicleSpeedometerPhoto", "Speedometer Photo", FieldDataType.DOCUMENT_URL),
                         new FieldSpec("loadCapacity", "Load Capacity (kg)", FieldDataType.NUMBER)
                 ),
+                java.util.List.of(),
                 java.util.List.of()
         );
     }
