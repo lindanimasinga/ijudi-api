@@ -17,13 +17,20 @@ public class Lead extends BaseModel {
     private List<LeadItem> items;
     private String fromAddress;
     private String toAddress;
-    private double estimatedPrice;
+    private double deliveryPrice;
+    private double totalPrice;
     private StoreType storeType;
     private String storeId;
     private LeadStatus status;
     private boolean anonymous;
     private boolean consentGiven;
     private Instant consentTimestamp;
+    private String category;
+    private double distanceKm;
+    private double estimatedDeliveryFee;
+    private double ratePerKm;
+    private double standardFee;
+    private double standardKm;
 
     public Lead() {}
 
@@ -39,8 +46,11 @@ public class Lead extends BaseModel {
     public String getToAddress() { return toAddress; }
     public void setToAddress(String toAddress) { this.toAddress = toAddress; }
 
-    public double getEstimatedPrice() { return estimatedPrice; }
-    public void setEstimatedPrice(double estimatedPrice) { this.estimatedPrice = estimatedPrice; }
+    public double getDeliveryPrice() { return deliveryPrice; }
+    public void setDeliveryPrice(double deliveryPrice) { this.deliveryPrice = deliveryPrice; }
+
+    public double getTotalPrice() { return totalPrice; }
+    public void setTotalPrice(double totalPrice) { this.totalPrice = totalPrice; }
 
     public StoreType getStoreType() { return storeType; }
     public void setStoreType(StoreType storeType) { this.storeType = storeType; }
@@ -59,4 +69,22 @@ public class Lead extends BaseModel {
 
     public Instant getConsentTimestamp() { return consentTimestamp; }
     public void setConsentTimestamp(Instant consentTimestamp) { this.consentTimestamp = consentTimestamp; }
+
+    public String getCategory() { return category; }
+    public void setCategory(String category) { this.category = category; }
+
+    public double getDistanceKm() { return distanceKm; }
+    public void setDistanceKm(double distanceKm) { this.distanceKm = distanceKm; }
+
+    public double getEstimatedDeliveryFee() { return estimatedDeliveryFee; }
+    public void setEstimatedDeliveryFee(double estimatedDeliveryFee) { this.estimatedDeliveryFee = estimatedDeliveryFee; }
+
+    public double getRatePerKm() { return ratePerKm; }
+    public void setRatePerKm(double ratePerKm) { this.ratePerKm = ratePerKm; }
+
+    public double getStandardFee() { return standardFee; }
+    public void setStandardFee(double standardFee) { this.standardFee = standardFee; }
+
+    public double getStandardKm() { return standardKm; }
+    public void setStandardKm(double standardKm) { this.standardKm = standardKm; }
 }

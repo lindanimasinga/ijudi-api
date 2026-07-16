@@ -36,7 +36,14 @@ public class LeadService {
                 lead.setItems(request.getItems());
                 lead.setFromAddress(request.getFromAddress());
                 lead.setToAddress(request.getToAddress());
-                lead.setEstimatedPrice(request.getEstimatedPrice());
+                lead.setEstimatedDeliveryFee(request.getEstimatedDeliveryFee() > 0
+                        ? request.getEstimatedDeliveryFee()
+                        : request.getEstimatedPrice());
+                lead.setCategory(request.getCategory());
+                lead.setDistanceKm(request.getDistanceKm());
+                lead.setStandardFee(request.getStandardFee());
+                lead.setStandardKm(request.getStandardKm());
+                lead.setRatePerKm(request.getRatePerKm());
                 lead.setModifiedDate(new Date());
                 lead.setConsentGiven(request.isConsentGiven());
                 lead.setConsentTimestamp(request.getConsentTimestamp());
@@ -53,7 +60,14 @@ public class LeadService {
         lead.setItems(request.getItems());
         lead.setFromAddress(request.getFromAddress());
         lead.setToAddress(request.getToAddress());
-        lead.setEstimatedPrice(request.getEstimatedPrice());
+        lead.setEstimatedDeliveryFee(request.getEstimatedDeliveryFee() > 0
+                ? request.getEstimatedDeliveryFee()
+                : request.getEstimatedPrice());
+        lead.setCategory(request.getCategory());
+        lead.setDistanceKm(request.getDistanceKm());
+        lead.setStandardFee(request.getStandardFee());
+        lead.setStandardKm(request.getStandardKm());
+        lead.setRatePerKm(request.getRatePerKm());
         lead.setStoreType(request.getStoreType());
         lead.setStoreId(request.getStoreId());
         lead.setStatus(LeadStatus.CAPTURED);
