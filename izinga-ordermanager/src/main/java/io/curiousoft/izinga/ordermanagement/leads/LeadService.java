@@ -48,6 +48,7 @@ public class LeadService {
                 lead.setModifiedDate(new Date());
                 lead.setConsentGiven(request.isConsentGiven());
                 lead.setConsentTimestamp(request.getConsentTimestamp());
+                lead.setTotalPrice(request.getTotalPrice());
                 if (request.getStoreId() != null) {
                     lead.setStoreId(request.getStoreId());
                 }
@@ -75,6 +76,7 @@ public class LeadService {
         lead.setStatus(LeadStatus.CAPTURED);
         lead.setConsentGiven(request.isConsentGiven());
         lead.setConsentTimestamp(request.getConsentTimestamp());
+        lead.setTotalPrice(request.getTotalPrice());
         return leadRepository.save(lead);
     }
 

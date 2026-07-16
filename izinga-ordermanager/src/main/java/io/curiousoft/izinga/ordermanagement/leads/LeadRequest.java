@@ -21,6 +21,7 @@ public class LeadRequest {
     private Double standardKm;
     private Double ratePerKm;
     private Double estimatedDeliveryFee;
+    private Double totalPrice;
 
     public LeadRequest() {}
 
@@ -68,4 +69,12 @@ public class LeadRequest {
 
     public Double getEstimatedDeliveryFee() { return estimatedDeliveryFee; }
     public void setEstimatedDeliveryFee(Double estimatedDeliveryFee) { this.estimatedDeliveryFee = estimatedDeliveryFee; }
+
+    public Double getTotalPrice() {
+        return totalPrice;
+    }
+
+    public void setTotalPrice(Double totalPrice) {
+        this.totalPrice = totalPrice;
+    }
 }
