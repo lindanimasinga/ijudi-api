@@ -2,6 +2,8 @@ package io.curiousoft.izinga.recon
 
 import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommission
 import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommissionRepo
+import io.curiousoft.izinga.commons.referral.FurnitureCustomerReferralCommission
+import io.curiousoft.izinga.commons.referral.FurnitureCustomerReferralCommissionRepo
 import io.curiousoft.izinga.commons.referral.ReferralCommissionStatus
 import io.curiousoft.izinga.commons.referral.ReferralCommissionType
 import io.curiousoft.izinga.commons.referral.StorePartnerStage1Commission
@@ -37,6 +39,7 @@ class ReferralPartnerPayoutStatusSyncTest {
     private val ambassadorPayoutRepository = mockk<AmbassadorPayoutRepository>()
     private val referralPartnerPayoutRepository = mockk<ReferralPartnerPayoutRepository>()
     private val foodCustomerCommissionRepo = mockk<FoodCustomerReferralCommissionRepo>()
+    private val furnitureCustomerCommissionRepo = mockk<FurnitureCustomerReferralCommissionRepo>()
     private val storeStage1CommissionRepo = mockk<StorePartnerStage1CommissionRepo>()
     private val storeStage2CommissionRepo = mockk<StorePartnerStage2CommissionRepo>()
     private val applicationEventPublisher = mockk<ApplicationEventPublisher>(relaxed = true)
@@ -53,6 +56,7 @@ class ReferralPartnerPayoutStatusSyncTest {
             ambassadorPayoutRepository = ambassadorPayoutRepository,
             referralPartnerPayoutRepository = referralPartnerPayoutRepository,
             foodCustomerCommissionRepo = foodCustomerCommissionRepo,
+            furnitureCustomerCommissionRepo = furnitureCustomerCommissionRepo,
             storeStage1CommissionRepo = storeStage1CommissionRepo,
             storeStage2CommissionRepo = storeStage2CommissionRepo,
             applicationEventPublisher = applicationEventPublisher,
@@ -206,5 +210,39 @@ class ReferralPartnerPayoutStatusSyncTest {
         verify(exactly = 0) { foodCustomerCommissionRepo.findByCustomerId(any()) }
         verify(exactly = 0) { foodCustomerCommissionRepo.save(any()) }
         verify(exactly = 0) { referralPartnerPayoutRepository.save(any()) }
+    }
+
+    @Test
+    fun `RP-012 updatePayoutStatus syncs furniture customer commission to PAID when payout completes`() {
+        val partnerId = "rp-005"
+        val customerId = "cust-furn-005"
+        val payout = makeReferralPayout(partnerId, ReferralCommissionType.FURNITURE_CUSTOMER_REFERRAL, customerId, paid = true)
+
+        val bundleResult = PayoutBundleResults(
+            bundleId = "BND05",
+            payoutItemResults = listOf(PayoutItemResults(toId = partnerId, paid = true, type = PayoutType.REFERRAL_PARTNER))
+        )
+
+        every { shopPayoutRepository.findByToIdAndPayoutStage(any(), any()) } returns null
+        every { messengerPayoutRepository.findByToIdAndPayoutStage(any(), any()) } returns null
+        every { ambassadorPayoutRepository.findAllByToIdAndPayoutStage(any(), any()) } returns emptyList()
+        every { referralPartnerPayoutRepository.findAllByToIdAndPayoutStage(partnerId, PayoutStage.PROCESSING) } returns listOf(payout)
+        every { referralPartnerPayoutRepository.saveAll(any<Iterable<ReferralPartnerPayout>>()) } returns emptyList()
+        val savedPayoutSlot = slot<ReferralPartnerPayout>()
+        every { referralPartnerPayoutRepository.save(capture(savedPayoutSlot)) } answers { savedPayoutSlot.captured }
+
+        val commission = FurnitureCustomerReferralCommission(
+            id = "furn-005", customerId = customerId, referralPartnerId = partnerId,
+            triggeringOrderId = "ord-furn-005", amount = BigDecimal("26.63"),
+            status = ReferralCommissionStatus.PENDING, createdAt = Date()
+        )
+        every { furnitureCustomerCommissionRepo.findByCustomerId(customerId) } returns commission
+        val savedCommissionSlot = slot<FurnitureCustomerReferralCommission>()
+        every { furnitureCustomerCommissionRepo.save(capture(savedCommissionSlot)) } answers { savedCommissionSlot.captured }
+
+        sut.updatePayoutStatus(bundleResult)
+
+        assertEquals(PayoutStage.COMPLETED, savedPayoutSlot.captured.payoutStage)
+        assertEquals(ReferralCommissionStatus.PAID, savedCommissionSlot.captured.status)
     }
 }
