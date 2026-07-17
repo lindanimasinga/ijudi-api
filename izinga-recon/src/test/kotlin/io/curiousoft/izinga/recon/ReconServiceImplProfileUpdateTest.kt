@@ -18,6 +18,7 @@ import io.curiousoft.izinga.recon.payout.PayoutStage
 import io.curiousoft.izinga.recon.payout.ShopPayout
 import io.curiousoft.izinga.recon.ambassador.AmbassadorProperties
 import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommissionRepo
+import io.curiousoft.izinga.commons.referral.FurnitureCustomerReferralCommissionRepo
 import io.curiousoft.izinga.commons.referral.StorePartnerStage1CommissionRepo
 import io.curiousoft.izinga.commons.referral.StorePartnerStage2CommissionRepo
 import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
@@ -43,6 +44,7 @@ class ReconServiceImplProfileUpdateTest {
     private val ambassadorPayoutRepository = mockk<AmbassadorPayoutRepository>()
     private val referralPartnerPayoutRepository = mockk<ReferralPartnerPayoutRepository>()
     private val foodCustomerCommissionRepo = mockk<FoodCustomerReferralCommissionRepo>()
+    private val furnitureCustomerCommissionRepo = mockk<FurnitureCustomerReferralCommissionRepo>()
     private val storeStage1CommissionRepo = mockk<StorePartnerStage1CommissionRepo>()
     private val storeStage2CommissionRepo = mockk<StorePartnerStage2CommissionRepo>()
     private val applicationEventPublisher = mockk<ApplicationEventPublisher>()
@@ -59,6 +61,7 @@ class ReconServiceImplProfileUpdateTest {
             ambassadorPayoutRepository = ambassadorPayoutRepository,
             referralPartnerPayoutRepository = referralPartnerPayoutRepository,
             foodCustomerCommissionRepo = foodCustomerCommissionRepo,
+            furnitureCustomerCommissionRepo = furnitureCustomerCommissionRepo,
             storeStage1CommissionRepo = storeStage1CommissionRepo,
             storeStage2CommissionRepo = storeStage2CommissionRepo,
             applicationEventPublisher = applicationEventPublisher,
