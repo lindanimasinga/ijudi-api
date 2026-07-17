@@ -4,6 +4,8 @@ import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommission
 import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommissionRepo
+import io.curiousoft.izinga.commons.referral.FurnitureCustomerReferralCommission
+import io.curiousoft.izinga.commons.referral.FurnitureCustomerReferralCommissionRepo
 import io.curiousoft.izinga.commons.referral.ReferralCommissionStatus
 import io.curiousoft.izinga.commons.referral.ReferralCommissionType
 import io.curiousoft.izinga.commons.referral.StorePartnerStage1Commission
@@ -30,6 +32,7 @@ class ReferralPartnerDashboardServiceTest {
 
     @Mock lateinit var userProfileRepo: UserProfileRepo
     @Mock lateinit var foodCommissionRepo: FoodCustomerReferralCommissionRepo
+    @Mock lateinit var furnitureCommissionRepo: FurnitureCustomerReferralCommissionRepo
     @Mock lateinit var stage1CommissionRepo: StorePartnerStage1CommissionRepo
     @Mock lateinit var stage2CommissionRepo: StorePartnerStage2CommissionRepo
 
@@ -48,6 +51,7 @@ class ReferralPartnerDashboardServiceTest {
         `when`(userProfileRepo.findById(partnerId)).thenReturn(Optional.of(partner))
         `when`(userProfileRepo.findByReferredByPartnerId(partnerId)).thenReturn(listOf(customer1, store1))
         `when`(foodCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(listOf(foodCommission("c-1")))
+        `when`(furnitureCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
         `when`(stage1CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(listOf(stage1Commission("s-1")))
         `when`(stage2CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
 
@@ -56,10 +60,10 @@ class ReferralPartnerDashboardServiceTest {
         assertEquals(partnerId, summary.partnerId)
         assertEquals("REFCODE1", summary.referralCode)
         assertEquals(1, summary.referralCounts.foodCustomers)
-        assertEquals(0, summary.referralCounts.furnitureCustomers)   // RP-012 not built
+        assertEquals(0, summary.referralCounts.furnitureCustomers)
         assertEquals(1, summary.referralCounts.storePartners)
         assertEquals(1, summary.conversionCounts.foodCustomers)
-        assertEquals(0, summary.conversionCounts.furnitureCustomers) // RP-012 not built
+        assertEquals(0, summary.conversionCounts.furnitureCustomers)
         assertEquals(1, summary.conversionCounts.storePartnersStage1)
         assertEquals(0, summary.conversionCounts.storePartnersStage2)
     }
@@ -70,14 +74,17 @@ class ReferralPartnerDashboardServiceTest {
         `when`(userProfileRepo.findById(partnerId)).thenReturn(Optional.of(partner))
         `when`(userProfileRepo.findByReferredByPartnerId(partnerId)).thenReturn(emptyList())
         `when`(foodCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+        `when`(furnitureCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
         `when`(stage1CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
         `when`(stage2CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
 
         val summary = service.getSummary(partnerId)
 
         assertEquals(0, summary.referralCounts.foodCustomers)
+        assertEquals(0, summary.referralCounts.furnitureCustomers)
         assertEquals(0, summary.referralCounts.storePartners)
         assertEquals(0, summary.conversionCounts.foodCustomers)
+        assertEquals(0, summary.conversionCounts.furnitureCustomers)
         assertEquals(0, summary.conversionCounts.storePartnersStage1)
         assertEquals(0, summary.conversionCounts.storePartnersStage2)
     }
@@ -109,6 +116,7 @@ class ReferralPartnerDashboardServiceTest {
         `when`(userProfileRepo.findById(partnerId)).thenReturn(Optional.of(partner))
         `when`(userProfileRepo.findByReferredByPartnerId(partnerId)).thenReturn(emptyList())
         `when`(foodCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+        `when`(furnitureCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
         `when`(stage1CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
         `when`(stage2CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
 
@@ -117,9 +125,52 @@ class ReferralPartnerDashboardServiceTest {
         // Must never query another partner's data
         verify(userProfileRepo).findByReferredByPartnerId(partnerId)
         verify(foodCommissionRepo).findByReferralPartnerId(partnerId)
+        verify(furnitureCommissionRepo).findByReferralPartnerId(partnerId)
         verify(stage1CommissionRepo).findByReferralPartnerId(partnerId)
         verify(stage2CommissionRepo).findByReferralPartnerId(partnerId)
         verify(userProfileRepo, never()).findByReferredByPartnerId("rp-other")
+        verify(furnitureCommissionRepo, never()).findByReferralPartnerId("rp-other")
+    }
+
+    @Test
+    fun `getSummary returns correct non-zero furniture counts when furniture commissions exist`() {
+        val partner = referralPartner(partnerId)
+        val customer1 = customer("c-1")
+
+        `when`(userProfileRepo.findById(partnerId)).thenReturn(Optional.of(partner))
+        `when`(userProfileRepo.findByReferredByPartnerId(partnerId)).thenReturn(listOf(customer1))
+        `when`(foodCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+        `when`(furnitureCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(
+            listOf(furnitureCommission("c-1"), furnitureCommission("c-2"))
+        )
+        `when`(stage1CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+        `when`(stage2CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+
+        val summary = service.getSummary(partnerId)
+
+        assertEquals(2, summary.referralCounts.furnitureCustomers)
+        assertEquals(2, summary.conversionCounts.furnitureCustomers)
+    }
+
+    @Test
+    fun `getSummary furniture counts are independent of food customer counts`() {
+        val partner = referralPartner(partnerId)
+        val customer1 = customer("c-1")
+        val customer2 = customer("c-2")
+
+        `when`(userProfileRepo.findById(partnerId)).thenReturn(Optional.of(partner))
+        `when`(userProfileRepo.findByReferredByPartnerId(partnerId)).thenReturn(listOf(customer1, customer2))
+        `when`(foodCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(listOf(foodCommission("c-1")))
+        `when`(furnitureCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(listOf(furnitureCommission("c-2")))
+        `when`(stage1CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+        `when`(stage2CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+
+        val summary = service.getSummary(partnerId)
+
+        assertEquals(2, summary.referralCounts.foodCustomers)  // all referred CUSTOMER profiles
+        assertEquals(1, summary.referralCounts.furnitureCustomers)
+        assertEquals(1, summary.conversionCounts.foodCustomers)
+        assertEquals(1, summary.conversionCounts.furnitureCustomers)
     }
 
     // ─── getReferrals ──────────────────────────────────────────────────────────
@@ -193,22 +244,24 @@ class ReferralPartnerDashboardServiceTest {
     // ─── getCommissions ────────────────────────────────────────────────────────
 
     @Test
-    fun `getCommissions returns correct totals across all commission types`() {
+    fun `getCommissions returns correct totals across all commission types including furniture`() {
         `when`(foodCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(listOf(foodCommission("c-1")))
+        `when`(furnitureCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(listOf(furnitureCommission("c-2")))
         `when`(stage1CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(listOf(stage1Commission("s-1")))
         `when`(stage2CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(listOf(stage2Commission("s-1")))
 
         val result = service.getCommissions(partnerId)
 
-        // R15 + R100 + R150 = R265 pending
-        assertEquals(BigDecimal("265.00"), result.totals.pending)
+        // R15 (food) + R25 (furniture) + R100 (stage1) + R150 (stage2) = R290 pending
+        assertEquals(BigDecimal("290.00"), result.totals.pending)
         assertEquals(BigDecimal.ZERO, result.totals.paid)
-        assertEquals(3, result.lineItems.size)
+        assertEquals(4, result.lineItems.size)
     }
 
     @Test
     fun `getCommissions returns zero totals when no commissions exist`() {
         `when`(foodCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+        `when`(furnitureCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
         `when`(stage1CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
         `when`(stage2CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
 
@@ -225,6 +278,7 @@ class ReferralPartnerDashboardServiceTest {
         val newer = foodCommission("c-2").copy(createdAt = Date(2000), customerId = "c-2")
 
         `when`(foodCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(listOf(older, newer))
+        `when`(furnitureCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
         `when`(stage1CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
         `when`(stage2CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
 
@@ -237,20 +291,24 @@ class ReferralPartnerDashboardServiceTest {
     @Test
     fun `getCommissions auth scoping - only queries data for the given partnerId`() {
         `when`(foodCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+        `when`(furnitureCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
         `when`(stage1CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
         `when`(stage2CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
 
         service.getCommissions(partnerId)
 
         verify(foodCommissionRepo).findByReferralPartnerId(partnerId)
+        verify(furnitureCommissionRepo).findByReferralPartnerId(partnerId)
         verify(stage1CommissionRepo).findByReferralPartnerId(partnerId)
         verify(stage2CommissionRepo).findByReferralPartnerId(partnerId)
         verify(foodCommissionRepo, never()).findByReferralPartnerId("rp-other")
+        verify(furnitureCommissionRepo, never()).findByReferralPartnerId("rp-other")
     }
 
     @Test
-    fun `getCommissions line item types map to correct ReferralCommissionType`() {
+    fun `getCommissions line item types map to correct ReferralCommissionType including furniture`() {
         `when`(foodCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(listOf(foodCommission("c-1")))
+        `when`(furnitureCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(listOf(furnitureCommission("c-2")))
         `when`(stage1CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(listOf(stage1Commission("s-1")))
         `when`(stage2CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(listOf(stage2Commission("s-1")))
 
@@ -258,6 +316,7 @@ class ReferralPartnerDashboardServiceTest {
 
         val types = result.lineItems.map { it.commissionType }.toSet()
         assertTrue(types.contains(ReferralCommissionType.FOOD_CUSTOMER_REFERRAL))
+        assertTrue(types.contains(ReferralCommissionType.FURNITURE_CUSTOMER_REFERRAL))
         assertTrue(types.contains(ReferralCommissionType.STORE_PARTNER_STAGE_1))
         assertTrue(types.contains(ReferralCommissionType.STORE_PARTNER_STAGE_2))
     }
@@ -313,6 +372,16 @@ class ReferralPartnerDashboardServiceTest {
         referralPartnerId = partnerId,
         triggeringOrderId = "order-2",
         amount = BigDecimal("150.00"),
+        status = ReferralCommissionStatus.PENDING,
+        createdAt = Date()
+    )
+
+    private fun furnitureCommission(customerId: String) = FurnitureCustomerReferralCommission(
+        id = "fc-furn-$customerId",
+        customerId = customerId,
+        referralPartnerId = partnerId,
+        triggeringOrderId = "order-furn-1",
+        amount = BigDecimal("25.00"),
         status = ReferralCommissionStatus.PENDING,
         createdAt = Date()
     )
