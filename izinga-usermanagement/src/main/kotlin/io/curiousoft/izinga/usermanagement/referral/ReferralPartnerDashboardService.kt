@@ -108,6 +108,9 @@ class ReferralPartnerDashboardService(
             .toSet()
 
         return referralPage.map { profile ->
+            // TODO(RP-follow-up): furniture customers are misclassified as FOOD_CUSTOMER here —
+            // ReferralType has no FURNITURE_CUSTOMER value yet. Adding one is additive but is a
+            // frontend contract change, so it's deferred to a separate ticket. See fix/rp-dashboard-furniture-count.
             val type = if (profile.role == ProfileRoles.STORE) ReferralType.STORE_PARTNER else ReferralType.FOOD_CUSTOMER
             val converted = when (type) {
                 ReferralType.FOOD_CUSTOMER -> profile.id != null && foodCommissionCustomerIds.contains(profile.id)
