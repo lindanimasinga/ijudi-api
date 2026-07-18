@@ -33,20 +33,22 @@ public class FirebaseJwtAuthenticationConverter implements Converter<Jwt, Abstra
 
         Collection<org.springframework.security.core.GrantedAuthority> authorities;
 
+        UserProfile profile = null;
         if (phone != null && !phone.isBlank()) {
-            UserProfile profile = userProfileService.findUserByPhone(phone);
+            profile = userProfileService.findUserByPhone(phone);
             log.info("[jwt-converter] profile={} role={}", profile != null ? profile.getId() : "NOT_FOUND", profile != null ? profile.getRole() : "null");
-
-            if (profile != null && profile.getRole() == ProfileRoles.ADMIN) {
-                authorities = List.of(() -> "ROLE_ADMIN");
-            } else {
-                authorities = List.of(() -> "ROLE_USER");
-            }
         } else {
-            log.warn("[jwt-converter] no phone_number claim in JWT for uid={} — granting ROLE_USER", uid);
-            authorities = List.of(() -> "ROLE_USER");
+            log.warn("[jwt-converter] no phone_number claim in JWT for uid={} — granting no authorities", uid);
         }
 
-        return new JwtAuthenticationToken(jwt, authorities, uid);
+        ProfileRoles role = (profile != null) ? profile.getRole() : null;
+        if (role != null) {
+            authorities = List.of(() -> "ROLE_" + role.name());
+        } else {
+            authorities = List.of();
+        }
+
+        String principalName = (profile != null && profile.getId() != null) ? profile.getId() : uid;
+        return new JwtAuthenticationToken(jwt, authorities, principalName);
     }
 }
