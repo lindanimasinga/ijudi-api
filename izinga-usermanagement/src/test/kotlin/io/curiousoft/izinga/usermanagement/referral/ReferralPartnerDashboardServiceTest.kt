@@ -321,6 +321,26 @@ class ReferralPartnerDashboardServiceTest {
         assertTrue(types.contains(ReferralCommissionType.STORE_PARTNER_STAGE_2))
     }
 
+    @Test
+    fun `getCommissions buckets furniture PENDING and PAID into separate totals`() {
+        val pending = furnitureCommission("c-1")  // R25.00 PENDING
+        val paid = furnitureCommission("c-2").copy(
+            id = "fc-furn-c-2",
+            customerId = "c-2",
+            status = ReferralCommissionStatus.PAID
+        )
+        `when`(foodCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+        `when`(furnitureCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(listOf(pending, paid))
+        `when`(stage1CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+        `when`(stage2CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+
+        val result = service.getCommissions(partnerId)
+
+        assertEquals(BigDecimal("25.00"), result.totals.pending)
+        assertEquals(BigDecimal("25.00"), result.totals.paid)
+        assertEquals(2, result.lineItems.size)
+    }
+
     // ─── Helpers ───────────────────────────────────────────────────────────────
 
     private fun referralPartner(id: String): UserProfile {
