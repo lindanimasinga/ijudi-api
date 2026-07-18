@@ -3,11 +3,11 @@ package io.curiousoft.izinga.ordermanagement.security;
 import io.curiousoft.izinga.commons.model.ProfileRoles;
 import io.curiousoft.izinga.commons.model.UserProfile;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
@@ -15,7 +15,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
@@ -31,7 +31,7 @@ import static org.mockito.Mockito.*;
  *   - izinga-usermanagement: ReferralPartnerControllerSecurityTest — verifies @PreAuthorize SpEL via @WithMockUser
  *   - izinga-recon: ReconControllerSecurityTest — verifies @PreAuthorize SpEL via @WithMockUser
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class FirebaseJwtAuthenticationConverterTest {
 
     private static final String FIREBASE_UID = "firebase-uid-abc123";
@@ -86,10 +86,10 @@ public class FirebaseJwtAuthenticationConverterTest {
         Jwt jwt = buildJwt(FIREBASE_UID, PHONE);
         JwtAuthenticationToken token = (JwtAuthenticationToken) converter.convert(jwt);
 
-        assertEquals("principal name must be MongoDB profile id, not Firebase uid", MONGO_ID, token.getName());
+        assertEquals(MONGO_ID, token.getName(), "principal name must be MongoDB profile id, not Firebase uid");
         java.util.Set<String> authorities = authorityNames(token);
-        assertEquals("exactly one authority", 1, authorities.size());
-        assertTrue("must contain ROLE_REFERRAL_PARTNER", authorities.contains("ROLE_REFERRAL_PARTNER"));
+        assertEquals(1, authorities.size(), "exactly one authority");
+        assertTrue(authorities.contains("ROLE_REFERRAL_PARTNER"), "must contain ROLE_REFERRAL_PARTNER");
     }
 
     // -----------------------------------------------------------------------
@@ -137,8 +137,8 @@ public class FirebaseJwtAuthenticationConverterTest {
         Jwt jwt = buildJwt(FIREBASE_UID, PHONE);
         JwtAuthenticationToken token = (JwtAuthenticationToken) converter.convert(jwt);
 
-        assertEquals("must fall back to Firebase uid when no profile found", FIREBASE_UID, token.getName());
-        assertTrue("authorities must be empty when no profile found", token.getAuthorities().isEmpty());
+        assertEquals(FIREBASE_UID, token.getName(), "must fall back to Firebase uid when no profile found");
+        assertTrue(token.getAuthorities().isEmpty(), "authorities must be empty when no profile found");
     }
 
     // -----------------------------------------------------------------------
@@ -151,8 +151,8 @@ public class FirebaseJwtAuthenticationConverterTest {
 
         JwtAuthenticationToken token = (JwtAuthenticationToken) converter.convert(jwt);
 
-        assertEquals("must use Firebase uid when no phone claim", FIREBASE_UID, token.getName());
-        assertTrue("authorities must be empty when no phone claim", token.getAuthorities().isEmpty());
+        assertEquals(FIREBASE_UID, token.getName(), "must use Firebase uid when no phone claim");
+        assertTrue(token.getAuthorities().isEmpty(), "authorities must be empty when no phone claim");
         verify(userProfileService, never()).findUserByPhone(any());
     }
 
@@ -170,7 +170,7 @@ public class FirebaseJwtAuthenticationConverterTest {
 
         // Principal should still be the profile id
         assertEquals(MONGO_ID, token.getName());
-        assertTrue("authorities must be empty when role is null", token.getAuthorities().isEmpty());
+        assertTrue(token.getAuthorities().isEmpty(), "authorities must be empty when role is null");
         // Explicit guard: no "ROLE_null" must appear
         assertFalse(authorityNames(token).contains("ROLE_null"));
     }
