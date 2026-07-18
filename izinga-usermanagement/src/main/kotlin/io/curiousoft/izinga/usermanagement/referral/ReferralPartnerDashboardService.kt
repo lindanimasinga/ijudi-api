@@ -3,6 +3,7 @@ package io.curiousoft.izinga.usermanagement.referral
 import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommissionRepo
+import io.curiousoft.izinga.commons.referral.FurnitureCustomerReferralCommissionRepo
 import io.curiousoft.izinga.commons.referral.ReferralCommissionStatus
 import io.curiousoft.izinga.commons.referral.ReferralCommissionType
 import io.curiousoft.izinga.commons.referral.StorePartnerStage1CommissionRepo
@@ -29,6 +30,7 @@ import java.util.Date
 class ReferralPartnerDashboardService(
     private val userProfileRepo: UserProfileRepo,
     private val foodCommissionRepo: FoodCustomerReferralCommissionRepo,
+    private val furnitureCommissionRepo: FurnitureCustomerReferralCommissionRepo,
     private val stage1CommissionRepo: StorePartnerStage1CommissionRepo,
     private val stage2CommissionRepo: StorePartnerStage2CommissionRepo
 ) {
@@ -38,9 +40,10 @@ class ReferralPartnerDashboardService(
     /**
      * Returns the summary payload for GET /referral-partner/me/summary.
      *
-     * furnitureCustomers counts are 0 — RP-012 is not built yet. The fields exist
-     * so the API shape is stable and frontends can render them without a contract break
-     * when RP-012 ships.
+     * furnitureCustomers referral count equals the number of referred customers who have
+     * triggered a furniture commission (RP-012). Because furniture vs food distinction only
+     * becomes known at first-order time, the commission repo is the authoritative source for
+     * both the referral count and the conversion count for furniture customers.
      */
     fun getSummary(partnerId: String): ReferralPartnerSummary {
         val partner = userProfileRepo.findById(partnerId).orElseThrow {
@@ -55,17 +58,19 @@ class ReferralPartnerDashboardService(
         val storePartnerCount = referrals.count { it.role == ProfileRoles.STORE }
 
         val foodCommissions = foodCommissionRepo.findByReferralPartnerId(partnerId)
+        val furnitureCommissions = furnitureCommissionRepo.findByReferralPartnerId(partnerId)
         val stage1Commissions = stage1CommissionRepo.findByReferralPartnerId(partnerId)
         val stage2Commissions = stage2CommissionRepo.findByReferralPartnerId(partnerId)
 
         // Conversion = a commission record exists for that customer / store
         val convertedFoodCustomers = foodCommissions.size
+        val furnitureCustomerCount = furnitureCommissions.size
         val convertedStoreStage1 = stage1Commissions.size
         val convertedStoreStage2 = stage2Commissions.size
 
         log.debug(
-            "Dashboard summary partnerId={} foodCustomers={} storePartners={} convertedFood={} stage1={} stage2={}",
-            partnerId, foodCustomerCount, storePartnerCount, convertedFoodCustomers, convertedStoreStage1, convertedStoreStage2
+            "Dashboard summary partnerId={} foodCustomers={} furnitureCustomers={} storePartners={} convertedFood={} stage1={} stage2={}",
+            partnerId, foodCustomerCount, furnitureCustomerCount, storePartnerCount, convertedFoodCustomers, convertedStoreStage1, convertedStoreStage2
         )
 
         return ReferralPartnerSummary(
@@ -73,12 +78,12 @@ class ReferralPartnerDashboardService(
             referralCode = partner.referralCode,
             referralCounts = ReferralCounts(
                 foodCustomers = foodCustomerCount,
-                furnitureCustomers = 0,   // RP-012 not built yet
+                furnitureCustomers = furnitureCustomerCount,
                 storePartners = storePartnerCount
             ),
             conversionCounts = ConversionCounts(
                 foodCustomers = convertedFoodCustomers,
-                furnitureCustomers = 0,   // RP-012 not built yet
+                furnitureCustomers = furnitureCustomerCount,
                 storePartnersStage1 = convertedStoreStage1,
                 storePartnersStage2 = convertedStoreStage2
             )
@@ -103,6 +108,9 @@ class ReferralPartnerDashboardService(
             .toSet()
 
         return referralPage.map { profile ->
+            // TODO(RP-follow-up): furniture customers are misclassified as FOOD_CUSTOMER here —
+            // ReferralType has no FURNITURE_CUSTOMER value yet. Adding one is additive but is a
+            // frontend contract change, so it's deferred to a separate ticket. See fix/rp-dashboard-furniture-count.
             val type = if (profile.role == ProfileRoles.STORE) ReferralType.STORE_PARTNER else ReferralType.FOOD_CUSTOMER
             val converted = when (type) {
                 ReferralType.FOOD_CUSTOMER -> profile.id != null && foodCommissionCustomerIds.contains(profile.id)
@@ -124,6 +132,7 @@ class ReferralPartnerDashboardService(
      */
     fun getCommissions(partnerId: String): CommissionSummary {
         val foodCommissions = foodCommissionRepo.findByReferralPartnerId(partnerId)
+        val furnitureCommissions = furnitureCommissionRepo.findByReferralPartnerId(partnerId)
         val stage1Commissions = stage1CommissionRepo.findByReferralPartnerId(partnerId)
         val stage2Commissions = stage2CommissionRepo.findByReferralPartnerId(partnerId)
 
@@ -132,6 +141,15 @@ class ReferralPartnerDashboardService(
         foodCommissions.forEach { c ->
             lineItems += CommissionLineItem(
                 commissionType = ReferralCommissionType.FOOD_CUSTOMER_REFERRAL,
+                amount = c.amount,
+                status = c.status,
+                triggerReferenceId = c.customerId,
+                createdAt = c.createdAt
+            )
+        }
+        furnitureCommissions.forEach { c ->
+            lineItems += CommissionLineItem(
+                commissionType = ReferralCommissionType.FURNITURE_CUSTOMER_REFERRAL,
                 amount = c.amount,
                 status = c.status,
                 triggerReferenceId = c.customerId,
