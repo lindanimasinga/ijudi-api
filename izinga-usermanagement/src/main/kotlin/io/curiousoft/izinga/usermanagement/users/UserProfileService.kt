@@ -115,6 +115,8 @@ class UserProfileService(
         // RP-011: resolve referral code on update — first-touch only (never re-attribute)
         val submittedReferralCode = profile.referralCode
         profile.referralCode = null  // never persist the raw code on the profile
+        // Restore the server-assigned referral code so BeanUtils.copyProperties does not wipe it
+        profile.referralCode = persisted?.referralCode
         if (!submittedReferralCode.isNullOrBlank() && persisted?.referredByPartnerId == null) {
             val partner = referralCodeService.resolveCode(submittedReferralCode)
             if (partner != null) {
