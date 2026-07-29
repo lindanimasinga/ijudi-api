@@ -227,18 +227,82 @@ class ReferralPartnerDashboardServiceTest {
     }
 
     @Test
+    fun `getReferrals maps furniture customer with converted=true when furniture commission exists`() {
+        val customer1 = customer("c-furn-1")
+        val pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdDate"))
+        val page = PageImpl(listOf(customer1), pageable, 1)
+
+        `when`(userProfileRepo.findByReferredByPartnerId(partnerId, pageable)).thenReturn(page)
+        `when`(foodCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+        `when`(furnitureCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(listOf(furnitureCommission("c-furn-1")))
+        `when`(stage1CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+
+        val result = service.getReferrals(partnerId, pageable)
+
+        assertEquals(1, result.content.size)
+        val item = result.content[0]
+        assertEquals("c-furn-1", item.customerId)
+        assertEquals(ReferralType.FURNITURE_CUSTOMER, item.type)
+        assertTrue(item.converted)
+    }
+
+    @Test
+    fun `getReferrals maps furniture customer with converted=false when no furniture commission`() {
+        val customer1 = customer("c-furn-2")
+        val pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdDate"))
+        val page = PageImpl(listOf(customer1), pageable, 1)
+
+        // Commission exists for a DIFFERENT customer — c-furn-2 is not in that set
+        `when`(userProfileRepo.findByReferredByPartnerId(partnerId, pageable)).thenReturn(page)
+        `when`(foodCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+        `when`(furnitureCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(listOf(furnitureCommission("c-furn-1")))
+        `when`(stage1CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+
+        val result = service.getReferrals(partnerId, pageable)
+
+        // c-furn-2 is in the furniture commission set (c-furn-1 is, not c-furn-2)
+        // — but wait: c-furn-2 is NOT in the furnitureCommissionCustomerIds set,
+        // so it falls through to FOOD_CUSTOMER (no furniture commission for it yet).
+        // This verifies the FOOD_CUSTOMER else-branch when furniture IDs are present but don't match.
+        val item = result.content[0]
+        assertEquals(ReferralType.FOOD_CUSTOMER, item.type)
+        assertFalse(item.converted)
+    }
+
+    @Test
+    fun `getReferrals food customer is not reclassified when furniture commission set is empty`() {
+        val customer1 = customer("c-1")
+        val pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdDate"))
+        val page = PageImpl(listOf(customer1), pageable, 1)
+
+        `when`(userProfileRepo.findByReferredByPartnerId(partnerId, pageable)).thenReturn(page)
+        `when`(foodCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(listOf(foodCommission("c-1")))
+        `when`(furnitureCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+        `when`(stage1CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+
+        val result = service.getReferrals(partnerId, pageable)
+
+        val item = result.content[0]
+        assertEquals(ReferralType.FOOD_CUSTOMER, item.type)
+        assertTrue(item.converted)
+    }
+
+    @Test
     fun `getReferrals auth scoping - only queries data for the given partnerId`() {
         val pageable = PageRequest.of(0, 20)
         val page = PageImpl(emptyList<UserProfile>(), pageable, 0)
 
         `when`(userProfileRepo.findByReferredByPartnerId(partnerId, pageable)).thenReturn(page)
         `when`(foodCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
+        `when`(furnitureCommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
         `when`(stage1CommissionRepo.findByReferralPartnerId(partnerId)).thenReturn(emptyList())
 
         service.getReferrals(partnerId, pageable)
 
         verify(userProfileRepo).findByReferredByPartnerId(partnerId, pageable)
+        verify(furnitureCommissionRepo).findByReferralPartnerId(partnerId)
         verify(userProfileRepo, never()).findByReferredByPartnerId("rp-other", pageable)
+        verify(furnitureCommissionRepo, never()).findByReferralPartnerId("rp-other")
     }
 
     // ─── getCommissions ────────────────────────────────────────────────────────

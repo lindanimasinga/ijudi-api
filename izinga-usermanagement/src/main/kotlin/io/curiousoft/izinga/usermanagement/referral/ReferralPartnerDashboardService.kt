@@ -102,18 +102,25 @@ class ReferralPartnerDashboardService(
             .map { it.customerId }
             .toSet()
 
+        val furnitureCommissionCustomerIds = furnitureCommissionRepo
+            .findByReferralPartnerId(partnerId)
+            .map { it.customerId }
+            .toSet()
+
         val stage1StoreIds = stage1CommissionRepo
             .findByReferralPartnerId(partnerId)
             .map { it.storeId }
             .toSet()
 
         return referralPage.map { profile ->
-            // TODO(RP-follow-up): furniture customers are misclassified as FOOD_CUSTOMER here —
-            // ReferralType has no FURNITURE_CUSTOMER value yet. Adding one is additive but is a
-            // frontend contract change, so it's deferred to a separate ticket. See fix/rp-dashboard-furniture-count.
-            val type = if (profile.role == ProfileRoles.STORE) ReferralType.STORE_PARTNER else ReferralType.FOOD_CUSTOMER
+            val type = when {
+                profile.role == ProfileRoles.STORE -> ReferralType.STORE_PARTNER
+                profile.id != null && furnitureCommissionCustomerIds.contains(profile.id) -> ReferralType.FURNITURE_CUSTOMER
+                else -> ReferralType.FOOD_CUSTOMER
+            }
             val converted = when (type) {
                 ReferralType.FOOD_CUSTOMER -> profile.id != null && foodCommissionCustomerIds.contains(profile.id)
+                ReferralType.FURNITURE_CUSTOMER -> profile.id != null && furnitureCommissionCustomerIds.contains(profile.id)
                 ReferralType.STORE_PARTNER -> profile.id != null && stage1StoreIds.contains(profile.id)
             }
             ReferralItem(
@@ -224,6 +231,7 @@ data class ReferralItem(
 
 enum class ReferralType {
     FOOD_CUSTOMER,
+    FURNITURE_CUSTOMER,
     STORE_PARTNER
 }
 
