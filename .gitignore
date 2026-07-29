@@ -37,3 +37,12 @@ izinga-usermanagement/src/test/kotlin/io/curiousoft/izinga/usermanagement/wallet
 izinga-usermanagement/mypass1.pkpass
 izinga-usermanagement/src/test/kotlin/io/curiousoft/izinga/usermanagement/walletpass/google/GooglePassGeneratorTest.kt
 store-menu-to-izinga-menu/pom.xml
+.DS_Store
+izinga-commons/.DS_Store
+izinga-documentmanagement/.DS_Store
+izinga-messaging/.DS_Store
+izinga-ordermanager/.DS_Store
+izinga-qrcode-generator/.DS_Store
+izinga-recon/.DS_Store
+izinga-usermanagement/.DS_Store
+izinga-yoco-pay/.DS_Store

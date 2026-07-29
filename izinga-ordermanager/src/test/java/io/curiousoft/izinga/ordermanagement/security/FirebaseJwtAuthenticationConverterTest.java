@@ -174,4 +174,42 @@ public class FirebaseJwtAuthenticationConverterTest {
         // Explicit guard: no "ROLE_null" must appear
         assertFalse(authorityNames(token).contains("ROLE_null"));
     }
+
+    // -----------------------------------------------------------------------
+    // Test 7: non-null but blank phone_number claim — treated same as no phone
+    // Covers the !phone.isBlank() branch in: if (phone != null && !phone.isBlank())
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void convert_blankPhoneNumberClaim_grantsEmptyAuthoritiesAndFirebaseUidAsName() {
+        // phone_number claim is present in the JWT but is an empty string
+        Jwt jwt = buildJwt(FIREBASE_UID, "");
+
+        JwtAuthenticationToken token = (JwtAuthenticationToken) converter.convert(jwt);
+
+        assertEquals(FIREBASE_UID, token.getName(), "must use Firebase uid when phone claim is blank");
+        assertTrue(token.getAuthorities().isEmpty(), "authorities must be empty when phone claim is blank");
+        // Blank phone must not trigger a profile lookup
+        verify(userProfileService, never()).findUserByPhone(any());
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 8: profile found but getId() returns null — falls back to Firebase uid
+    // Covers the null-id branch in: (profile != null && profile.getId() != null) ? profile.getId() : uid
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void convert_profileFoundButNullId_usesFirebaseUidAsPrincipal() {
+        // Profile exists (e.g. phone matched) but id has not been assigned yet
+        UserProfile profile = profileWith(null, ProfileRoles.CUSTOMER);
+        when(userProfileService.findUserByPhone(PHONE)).thenReturn(profile);
+
+        Jwt jwt = buildJwt(FIREBASE_UID, PHONE);
+        JwtAuthenticationToken token = (JwtAuthenticationToken) converter.convert(jwt);
+
+        assertEquals(FIREBASE_UID, token.getName(),
+                "must fall back to Firebase uid when profile id is null");
+        // Role is still resolved from the profile
+        assertTrue(authorityNames(token).contains("ROLE_CUSTOMER"));
+    }
 }
