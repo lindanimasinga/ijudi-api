@@ -7,6 +7,8 @@ import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.payout.events.ReferralPartnerPayoutEvent
 import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommission
 import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommissionRepo
+import io.curiousoft.izinga.commons.referral.FurnitureCustomerReferralCommission
+import io.curiousoft.izinga.commons.referral.FurnitureCustomerReferralCommissionRepo
 import io.curiousoft.izinga.commons.referral.ReferralCommissionStatus
 import io.curiousoft.izinga.commons.referral.ReferralCommissionType
 import io.curiousoft.izinga.commons.referral.StorePartnerStage1Commission
@@ -40,6 +42,7 @@ class GenerateReferralPartnerPayoutTest {
     private val ambassadorPayoutRepository = mockk<AmbassadorPayoutRepository>()
     private val referralPartnerPayoutRepository = mockk<ReferralPartnerPayoutRepository>()
     private val foodCustomerCommissionRepo = mockk<FoodCustomerReferralCommissionRepo>()
+    private val furnitureCustomerCommissionRepo = mockk<FurnitureCustomerReferralCommissionRepo>()
     private val storeStage1CommissionRepo = mockk<StorePartnerStage1CommissionRepo>()
     private val storeStage2CommissionRepo = mockk<StorePartnerStage2CommissionRepo>()
     private val applicationEventPublisher = mockk<ApplicationEventPublisher>()
@@ -56,6 +59,7 @@ class GenerateReferralPartnerPayoutTest {
             ambassadorPayoutRepository = ambassadorPayoutRepository,
             referralPartnerPayoutRepository = referralPartnerPayoutRepository,
             foodCustomerCommissionRepo = foodCustomerCommissionRepo,
+            furnitureCustomerCommissionRepo = furnitureCustomerCommissionRepo,
             storeStage1CommissionRepo = storeStage1CommissionRepo,
             storeStage2CommissionRepo = storeStage2CommissionRepo,
             applicationEventPublisher = applicationEventPublisher,
@@ -243,6 +247,7 @@ class GenerateReferralPartnerPayoutTest {
         )
 
         every { foodCustomerCommissionRepo.findAll() } returns listOf(foodCommission)
+        every { furnitureCustomerCommissionRepo.findAll() } returns emptyList()
         every { storeStage1CommissionRepo.findAll() } returns listOf(stage1Commission)
         every { storeStage2CommissionRepo.findAll() } returns listOf(stage2Commission)
 
@@ -275,6 +280,7 @@ class GenerateReferralPartnerPayoutTest {
         )
 
         every { foodCustomerCommissionRepo.findAll() } returns listOf(foodCommission)
+        every { furnitureCustomerCommissionRepo.findAll() } returns emptyList()
         every { storeStage1CommissionRepo.findAll() } returns emptyList()
         every { storeStage2CommissionRepo.findAll() } returns emptyList()
         every { referralPartnerPayoutRepository.findByCommissionTypeAndTriggerReferenceId(ReferralCommissionType.FOOD_CUSTOMER_REFERRAL, "cust-2") } returns existingPayout
@@ -293,6 +299,7 @@ class GenerateReferralPartnerPayoutTest {
         )
 
         every { foodCustomerCommissionRepo.findAll() } returns listOf(paidCommission)
+        every { furnitureCustomerCommissionRepo.findAll() } returns emptyList()
         every { storeStage1CommissionRepo.findAll() } returns emptyList()
         every { storeStage2CommissionRepo.findAll() } returns emptyList()
 
@@ -318,6 +325,7 @@ class GenerateReferralPartnerPayoutTest {
         )
 
         every { foodCustomerCommissionRepo.findAll() } returns listOf(commissionNoBank)
+        every { furnitureCustomerCommissionRepo.findAll() } returns emptyList()
         every { storeStage1CommissionRepo.findAll() } returns listOf(commissionWithBank)
         every { storeStage2CommissionRepo.findAll() } returns emptyList()
 
@@ -338,5 +346,82 @@ class GenerateReferralPartnerPayoutTest {
         // only the one with bank details should produce a payout
         verify(exactly = 1) { referralPartnerPayoutRepository.save(any()) }
         verify(exactly = 1) { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) }
+    }
+
+    // ─── RP-012: furniture customer referral reconciliation ──────────────────
+
+    /**
+     * RP-012: Reconciliation picks up a PENDING furniture commission with no linked payout
+     * and creates one, using the stored amount (not recomputed).
+     * Stored amount is R26.63 (pre-computed at trigger time per Schedule 1 Clause 2).
+     */
+    @Test
+    fun `RP-012 reconcile creates payout for PENDING furniture commission with no existing payout`() {
+        val partnerId = "rp-furn-1"
+        val partner = makePartner(partnerId)
+        val storedAmount = BigDecimal("26.63") // persisted at trigger time — must not be recomputed
+
+        val furnitureCommission = FurnitureCustomerReferralCommission(
+            id = "furn-1", customerId = "cust-furn-1", referralPartnerId = partnerId,
+            triggeringOrderId = "ord-furn-1", amount = storedAmount,
+            status = ReferralCommissionStatus.PENDING, createdAt = Date()
+        )
+
+        every { foodCustomerCommissionRepo.findAll() } returns emptyList()
+        every { furnitureCustomerCommissionRepo.findAll() } returns listOf(furnitureCommission)
+        every { storeStage1CommissionRepo.findAll() } returns emptyList()
+        every { storeStage2CommissionRepo.findAll() } returns emptyList()
+
+        every {
+            referralPartnerPayoutRepository.findByCommissionTypeAndTriggerReferenceId(
+                ReferralCommissionType.FURNITURE_CUSTOMER_REFERRAL, "cust-furn-1"
+            )
+        } returns null
+
+        every { userProfileRepo.findById(partnerId) } returns java.util.Optional.of(partner)
+        val capturedPayout = slot<ReferralPartnerPayout>()
+        every { referralPartnerPayoutRepository.save(capture(capturedPayout)) } answers {
+            capturedPayout.captured.also { it.id = "FURN-PAY-1" }
+        }
+        every { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) } just runs
+
+        sut.reconcilePendingReferralCommissions()
+
+        verify(exactly = 1) { referralPartnerPayoutRepository.save(any()) }
+        assertEquals(storedAmount, capturedPayout.captured.commissionAmount)
+        assertEquals(ReferralCommissionType.FURNITURE_CUSTOMER_REFERRAL, capturedPayout.captured.commissionType)
+        assertEquals("cust-furn-1", capturedPayout.captured.triggerReferenceId)
+        verify(exactly = 1) { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) }
+    }
+
+    /**
+     * RP-012: Reconciliation skips a furniture commission that already has a linked payout.
+     */
+    @Test
+    fun `RP-012 reconcile skips furniture commission that already has a payout`() {
+        val partnerId = "rp-furn-2"
+        val existingPayout = mockk<ReferralPartnerPayout> { every { id } returns "FURN-PAY-EXIST" }
+
+        val furnitureCommission = FurnitureCustomerReferralCommission(
+            id = "furn-2", customerId = "cust-furn-2", referralPartnerId = partnerId,
+            triggeringOrderId = "ord-furn-2", amount = BigDecimal("26.63"),
+            status = ReferralCommissionStatus.PENDING, createdAt = Date()
+        )
+
+        every { foodCustomerCommissionRepo.findAll() } returns emptyList()
+        every { furnitureCustomerCommissionRepo.findAll() } returns listOf(furnitureCommission)
+        every { storeStage1CommissionRepo.findAll() } returns emptyList()
+        every { storeStage2CommissionRepo.findAll() } returns emptyList()
+
+        every {
+            referralPartnerPayoutRepository.findByCommissionTypeAndTriggerReferenceId(
+                ReferralCommissionType.FURNITURE_CUSTOMER_REFERRAL, "cust-furn-2"
+            )
+        } returns existingPayout
+
+        sut.reconcilePendingReferralCommissions()
+
+        verify(exactly = 0) { referralPartnerPayoutRepository.save(any()) }
+        verify(exactly = 0) { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) }
     }
 }

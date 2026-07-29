@@ -7,6 +7,8 @@ import io.curiousoft.izinga.commons.order.events.OrderCancelledEvent;
 import io.curiousoft.izinga.commons.order.events.OrderUpdatedEvent;
 import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommission;
 import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommissionRepo;
+import io.curiousoft.izinga.commons.referral.FurnitureCustomerReferralCommission;
+import io.curiousoft.izinga.commons.referral.FurnitureCustomerReferralCommissionRepo;
 import io.curiousoft.izinga.commons.referral.ReferralCommissionType;
 import io.curiousoft.izinga.commons.referral.StorePartnerStage1CommissionRepo;
 import io.curiousoft.izinga.commons.referral.StorePartnerStage2Commission;
@@ -21,12 +23,15 @@ import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Slf4j
@@ -42,8 +47,16 @@ public class StoreOrderEventHandler implements OrderEventHandler {
     private final ReconService reconService;
     private final UserProfileRepo userProfileRepo;
     private final FoodCustomerReferralCommissionRepo foodCustomerCommissionRepo;
+    private final FurnitureCustomerReferralCommissionRepo furnitureCustomerCommissionRepo;
     private final StorePartnerStage1CommissionRepo storeStage1CommissionRepo;
     private final StorePartnerStage2CommissionRepo storeStage2CommissionRepo;
+
+    /**
+     * RP-012: The service fee percentage applied to the base delivery fee to arrive at the
+     * Total Delivery Charge. Must match the same property injected in OrderServiceImpl.
+     */
+    @Value("${service.fee.perc}")
+    private double serviceFeePerc;
 
     @Async
     @Override
@@ -90,6 +103,10 @@ public class StoreOrderEventHandler implements OrderEventHandler {
                 triggerFoodCustomerCommissionIfEligible(order.getId(), order.getCustomerId());
                 // RP-008: store partner stage 2 commission (store's first completed order, R150 flat)
                 triggerStoreStage2CommissionIfEligible(order.getId(), store.getId(), store.getReferredByPartnerId());
+            }
+            // RP-012: furniture customer referral commission (first order only, 5% of Total Delivery Charge)
+            if (store.getStoreType() == StoreType.MOVERS) {
+                triggerFurnitureCustomerCommissionIfEligible(order, order.getCustomerId());
             }
         }
     }
@@ -174,6 +191,76 @@ public class StoreOrderEventHandler implements OrderEventHandler {
             log.info("[rp-008] stage2 commission already exists for storeId={}, skipping (idempotent)", storeId);
         } catch (Exception e) {
             log.error("[rp-008] failed to create stage2 commission for storeId={}: {}", storeId, e.getMessage());
+        }
+    }
+
+    /**
+     * RP-012: Creates a FurnitureCustomerReferralCommission the first time a referred furniture
+     * customer completes a MOVERS order (STAGE_7_ALL_PAID).
+     *
+     * Commission = Total Delivery Charge × 0.05, where:
+     *   Total Delivery Charge = shippingData.fee × (1 + serviceFeePerc)
+     *
+     * ROUNDING NOTE: RoundingMode.HALF_UP is used here intentionally, not the codebase's usual
+     * HALF_EVEN. This is a deliberate, scoped exception required by Schedule 1 Clause 2 of the
+     * signed Referral Partner Agreement. The agreement's worked example (R500 base → R532.50 total
+     * → R26.625 → R26.63) mandates HALF_UP. HALF_EVEN would produce R26.62, underpaying by one
+     * cent versus the contract.
+     *
+     * Idempotency is enforced by the unique index on customerId — a DuplicateKeyException is caught
+     * and logged rather than propagated.
+     */
+    private void triggerFurnitureCustomerCommissionIfEligible(
+            io.curiousoft.izinga.commons.model.Order order, String customerId) {
+
+        if (!StringUtils.hasText(customerId)) return;
+
+        if (order.getShippingData() == null) {
+            log.warn("[rp-012] order {} has null shippingData, skipping furniture commission", order.getId());
+            return;
+        }
+
+        var customerOpt = userProfileRepo.findById(customerId);
+        if (customerOpt.isEmpty()) {
+            log.warn("[rp-012] customer {} not found, skipping furniture commission", customerId);
+            return;
+        }
+        var customer = customerOpt.get();
+        var partnerId = customer.getReferredByPartnerId();
+        if (!StringUtils.hasText(partnerId)) return; // no referral attribution
+
+        // Compute commission: (baseFee × (1 + serviceFeePerc)) × 0.05
+        // HALF_UP required by Schedule 1 Clause 2 of the Referral Partner Agreement — see method Javadoc.
+        var baseFee = BigDecimal.valueOf(order.getShippingData().getFee());
+        var totalDeliveryCharge = baseFee.multiply(BigDecimal.valueOf(1.0 + serviceFeePerc));
+        var commissionAmount = totalDeliveryCharge
+                .multiply(new BigDecimal("0.05"))
+                .setScale(2, RoundingMode.HALF_UP);
+
+        try {
+            var commission = new FurnitureCustomerReferralCommission(
+                    java.util.UUID.randomUUID().toString(),
+                    customerId,
+                    partnerId,
+                    order.getId(),
+                    commissionAmount,
+                    io.curiousoft.izinga.commons.referral.ReferralCommissionStatus.PENDING,
+                    new java.util.Date()
+            );
+            furnitureCustomerCommissionRepo.insert(commission);
+            log.info("[rp-012] furniture customer commission created: customerId={} partnerId={} orderId={} amount={}",
+                    customerId, partnerId, order.getId(), commissionAmount);
+            // RP-012: wire the commission into a payout immediately
+            reconService.generatePayoutForReferralPartner(
+                    partnerId,
+                    commission.getAmount(),
+                    ReferralCommissionType.FURNITURE_CUSTOMER_REFERRAL,
+                    customerId
+            );
+        } catch (DuplicateKeyException e) {
+            log.info("[rp-012] commission already exists for customerId={}, skipping (idempotent)", customerId);
+        } catch (Exception e) {
+            log.error("[rp-012] failed to create furniture commission for customerId={}: {}", customerId, e.getMessage());
         }
     }
 

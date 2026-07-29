@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
@@ -44,18 +45,25 @@ class StoreOrderEventHandlerReferralCommissionTest {
     @Mock private ReconService reconService;
     @Mock private UserProfileRepo userProfileRepo;
     @Mock private FoodCustomerReferralCommissionRepo foodCustomerCommissionRepo;
+    @Mock private FurnitureCustomerReferralCommissionRepo furnitureCustomerCommissionRepo;
     @Mock private StorePartnerStage1CommissionRepo storeStage1CommissionRepo;
     @Mock private StorePartnerStage2CommissionRepo storeStage2CommissionRepo;
 
     private StoreOrderEventHandler handler;
+
+    /** Service fee percentage matching application.properties: 6.5% → 0.065 */
+    private static final double SERVICE_FEE_PERC = 0.065;
 
     @BeforeEach
     void setUp() {
         handler = new StoreOrderEventHandler(
                 pushNotificationService, adminOnlyNotificationService, emailNotificationService,
                 deviceService, userProfileService, reconService,
-                userProfileRepo, foodCustomerCommissionRepo, storeStage1CommissionRepo, storeStage2CommissionRepo
+                userProfileRepo, foodCustomerCommissionRepo, furnitureCustomerCommissionRepo,
+                storeStage1CommissionRepo, storeStage2CommissionRepo
         );
+        // @Value field — must be set via reflection in unit tests (Spring not in context)
+        ReflectionTestUtils.setField(handler, "serviceFeePerc", SERVICE_FEE_PERC);
     }
 
     // -------------------------------------------------------------------------
@@ -290,6 +298,145 @@ class StoreOrderEventHandlerReferralCommissionTest {
     }
 
     // -------------------------------------------------------------------------
+    // RP-012: Furniture customer referral commission (5% of Total Delivery Charge)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Worked example from Schedule 1 Clause 2:
+     *   R500.00 base fee × 1.065 = R532.50 total → × 0.05 = R26.625 → HALF_UP → R26.63
+     */
+    @Test
+    void handleOrderUpdatedEvent_createsFurnitureCommission_correctAmount_workedExample() {
+        var store = moversStore("mstore-001");
+        var order = completedMoversOrder("morder-001", "mstore-001", "mcustomer-001", 500.00);
+        var customer = customer("mcustomer-001", "partner-rp-m1");
+
+        when(userProfileRepo.findById("mcustomer-001")).thenReturn(Optional.of(customer));
+
+        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store));
+
+        ArgumentCaptor<FurnitureCustomerReferralCommission> captor =
+                ArgumentCaptor.forClass(FurnitureCustomerReferralCommission.class);
+        verify(furnitureCustomerCommissionRepo).insert(captor.capture());
+        var commission = captor.getValue();
+        assertEquals("mcustomer-001", commission.getCustomerId());
+        assertEquals("partner-rp-m1", commission.getReferralPartnerId());
+        assertEquals("morder-001", commission.getTriggeringOrderId());
+        // R500 × 1.065 × 0.05 = R26.625 → HALF_UP → R26.63 (NOT R26.62 which HALF_EVEN would give)
+        assertEquals(new BigDecimal("26.63"), commission.getAmount());
+        assertEquals(ReferralCommissionStatus.PENDING, commission.getStatus());
+    }
+
+    /**
+     * Edge case: R0 base delivery fee — commission is R0.00 but the record is still persisted.
+     */
+    @Test
+    void handleOrderUpdatedEvent_createsFurnitureCommission_zeroBaseFee_persistsZeroAmount() {
+        var store = moversStore("mstore-002");
+        var order = completedMoversOrder("morder-002", "mstore-002", "mcustomer-002", 0.00);
+        var customer = customer("mcustomer-002", "partner-rp-m2");
+
+        when(userProfileRepo.findById("mcustomer-002")).thenReturn(Optional.of(customer));
+
+        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store));
+
+        ArgumentCaptor<FurnitureCustomerReferralCommission> captor =
+                ArgumentCaptor.forClass(FurnitureCustomerReferralCommission.class);
+        verify(furnitureCustomerCommissionRepo).insert(captor.capture());
+        assertEquals(new BigDecimal("0.00"), captor.getValue().getAmount());
+    }
+
+    /**
+     * Duplicate STAGE_7_ALL_PAID event for the same customer — DuplicateKeyException must be
+     * caught and logged as INFO; no exception propagates and no second payout is created.
+     */
+    @Test
+    void handleOrderUpdatedEvent_handlesFornitureCommissionDuplicateKeyGracefully_noExceptionNoSecondPayout() {
+        var store = moversStore("mstore-003");
+        var order = completedMoversOrder("morder-003", "mstore-003", "mcustomer-003", 500.00);
+        var customer = customer("mcustomer-003", "partner-rp-m3");
+
+        when(userProfileRepo.findById("mcustomer-003")).thenReturn(Optional.of(customer));
+        when(furnitureCustomerCommissionRepo.insert(any(FurnitureCustomerReferralCommission.class)))
+                .thenThrow(new DuplicateKeyException("duplicate"));
+
+        assertDoesNotThrow(() -> handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store)));
+        verify(furnitureCustomerCommissionRepo).insert(any(FurnitureCustomerReferralCommission.class));
+        // payout must not be called when insert throws DuplicateKeyException
+        verify(reconService, never()).generatePayoutForReferralPartner(
+                anyString(), any(BigDecimal.class), eq(ReferralCommissionType.FURNITURE_CUSTOMER_REFERRAL), anyString());
+    }
+
+    /**
+     * Null shippingData — log warn and skip; no insert, no exception.
+     */
+    @Test
+    void handleOrderUpdatedEvent_skipsFurnitureCommission_whenShippingDataIsNull() {
+        var store = moversStore("mstore-004");
+        var order = completedMoversOrderNullShipping("morder-004", "mstore-004", "mcustomer-004");
+        var customer = customer("mcustomer-004", "partner-rp-m4");
+
+        when(userProfileRepo.findById("mcustomer-004")).thenReturn(Optional.of(customer));
+
+        assertDoesNotThrow(() -> handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store)));
+        verify(furnitureCustomerCommissionRepo, never()).insert(any(FurnitureCustomerReferralCommission.class));
+    }
+
+    /**
+     * Customer has no referredByPartnerId — skip silently, no commission, no payout.
+     */
+    @Test
+    void handleOrderUpdatedEvent_skipsFurnitureCommission_whenCustomerHasNoReferral() {
+        var store = moversStore("mstore-005");
+        var order = completedMoversOrder("morder-005", "mstore-005", "mcustomer-005", 500.00);
+        var customer = customer("mcustomer-005", null); // no referral
+
+        when(userProfileRepo.findById("mcustomer-005")).thenReturn(Optional.of(customer));
+
+        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store));
+
+        verify(furnitureCustomerCommissionRepo, never()).insert(any(FurnitureCustomerReferralCommission.class));
+        verify(reconService, never()).generatePayoutForReferralPartner(
+                anyString(), any(BigDecimal.class), eq(ReferralCommissionType.FURNITURE_CUSTOMER_REFERRAL), anyString());
+    }
+
+    /**
+     * Customer not found in DB — log warn and skip; no commission, no exception.
+     */
+    @Test
+    void handleOrderUpdatedEvent_skipsFurnitureCommission_whenCustomerNotFound() {
+        var store = moversStore("mstore-006");
+        var order = completedMoversOrder("morder-006", "mstore-006", "mcustomer-006", 500.00);
+
+        when(userProfileRepo.findById("mcustomer-006")).thenReturn(Optional.empty());
+
+        assertDoesNotThrow(() -> handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store)));
+        verify(furnitureCustomerCommissionRepo, never()).insert(any(FurnitureCustomerReferralCommission.class));
+    }
+
+    /**
+     * Happy path: after successful insert, generatePayoutForReferralPartner is called with
+     * FURNITURE_CUSTOMER_REFERRAL type and the computed amount.
+     */
+    @Test
+    void handleOrderUpdatedEvent_callsGeneratePayoutForReferralPartner_afterFurnitureCommissionInsert() {
+        var store = moversStore("mstore-007");
+        var order = completedMoversOrder("morder-007", "mstore-007", "mcustomer-007", 500.00);
+        var customer = customer("mcustomer-007", "partner-rp-m7");
+
+        when(userProfileRepo.findById("mcustomer-007")).thenReturn(Optional.of(customer));
+
+        handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store));
+
+        verify(reconService).generatePayoutForReferralPartner(
+                "partner-rp-m7",
+                new BigDecimal("26.63"),
+                ReferralCommissionType.FURNITURE_CUSTOMER_REFERRAL,
+                "mcustomer-007"
+        );
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
@@ -354,5 +501,54 @@ class StoreOrderEventHandlerReferralCommissionTest {
         p.setId(customerId);
         p.setReferredByPartnerId(referredByPartnerId);
         return p;
+    }
+
+    private StoreProfile moversStore(String storeId) {
+        Bank bank = new Bank();
+        bank.setAccountId("acc-m");
+        ArrayList<BusinessHours> hours = new ArrayList<>();
+        hours.add(new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date()));
+        ArrayList<String> tags = new ArrayList<>();
+        tags.add("movers");
+        var store = new StoreProfile(
+                StoreType.MOVERS, "Movers Store", "movers-" + storeId,
+                "1 Mover St", "https://img.test/m.png", "0844444444",
+                tags, hours, "owner-m", bank
+        );
+        store.setId(storeId);
+        store.setProfileApproved(true);
+        return store;
+    }
+
+    private Order completedMoversOrder(String orderId, String storeId, String customerId, double baseFee) {
+        var basket = new Basket();
+        basket.setItems(new ArrayList<>());
+        var shippingData = new ShippingData("1 From St", "1 To St",
+                ShippingData.ShippingType.DELIVERY);
+        shippingData.setDistance(10.0);
+        shippingData.setDeliveryFee(baseFee); // fee = deliveryFee + weigthFee + volumeFee + labourFee
+        var order = new Order();
+        order.setId(orderId);
+        order.setCustomerId(customerId);
+        order.setShopId(storeId);
+        order.setBasket(basket);
+        order.setShippingData(shippingData);
+        order.setStage(OrderStage.STAGE_7_ALL_PAID);
+        order.addStatusHistory(OrderStage.STAGE_7_ALL_PAID);
+        return order;
+    }
+
+    private Order completedMoversOrderNullShipping(String orderId, String storeId, String customerId) {
+        var basket = new Basket();
+        basket.setItems(new ArrayList<>());
+        var order = new Order();
+        order.setId(orderId);
+        order.setCustomerId(customerId);
+        order.setShopId(storeId);
+        order.setBasket(basket);
+        order.setShippingData(null);
+        order.setStage(OrderStage.STAGE_7_ALL_PAID);
+        order.addStatusHistory(OrderStage.STAGE_7_ALL_PAID);
+        return order;
     }
 }

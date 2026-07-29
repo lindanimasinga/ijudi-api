@@ -16,7 +16,7 @@ import java.security.Principal
  * RP-010: Read-only dashboard endpoints for authenticated Referral Partners.
  *
  * All endpoints are scoped to the authenticated partner. The partnerId is always
- * derived from the JWT principal (authentication.name = Firebase UID = profile id).
+ * derived from the JWT principal (authentication.name = MongoDB profile UUID).
  * It is NEVER accepted as a request parameter — this is the primary auth scoping
  * invariant enforced here.
  *

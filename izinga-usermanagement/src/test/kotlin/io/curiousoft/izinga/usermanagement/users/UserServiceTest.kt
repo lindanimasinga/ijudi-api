@@ -284,4 +284,53 @@ class UserServiceTest {
             latitude - range, latitude + range, longitude - range, longitude + range
         )
     }
+
+    @Test
+    fun `update - referral code is preserved when request payload has null referralCode`() {
+        // given — an RP with an existing server-assigned code
+        val profileId = "rpUserId"
+        val persisted = UserProfile("RP Name", UserProfile.SignUpReason.BUY, "address", "https://img.url", "+27821234567", ProfileRoles.CUSTOMER)
+        persisted.id = profileId
+        persisted.referralCode = "SERVER-ASSIGNED-CODE"
+
+        // incoming request carries no referralCode (null — the normal client behaviour)
+        val incoming = UserProfile("RP Name Updated", UserProfile.SignUpReason.BUY, "address", "https://img.url", "+27821234567", ProfileRoles.CUSTOMER)
+        incoming.referralCode = null
+
+        Mockito.`when`(profileRepo.findById(profileId)).thenReturn(Optional.of(persisted))
+        Mockito.`when`(profileRepo.save(persisted)).thenReturn(persisted)
+
+        // when
+        profileService.update(profileId, incoming)
+
+        // then — the persisted entity still has the original referral code (not null)
+        val captor = ArgumentCaptor.forClass(UserProfile::class.java)
+        verify(profileRepo).save(captor.capture())
+        Assert.assertEquals("SERVER-ASSIGNED-CODE", captor.value.referralCode)
+    }
+
+    @Test
+    fun `update - client-submitted referralCode in request is not used to overwrite server-assigned code`() {
+        // given — an RP with an existing server-assigned code
+        val profileId = "rpUserId2"
+        val persisted = UserProfile("RP Name", UserProfile.SignUpReason.BUY, "address", "https://img.url", "+27821234567", ProfileRoles.CUSTOMER)
+        persisted.id = profileId
+        persisted.referralCode = "SERVER-ASSIGNED-CODE"
+
+        // attacker or mistaken client submits a different referral code
+        val incoming = UserProfile("RP Name", UserProfile.SignUpReason.BUY, "address", "https://img.url", "+27821234567", ProfileRoles.CUSTOMER)
+        incoming.referralCode = "CLIENT-SUBMITTED-CODE"
+
+        Mockito.`when`(profileRepo.findById(profileId)).thenReturn(Optional.of(persisted))
+        Mockito.`when`(profileRepo.save(persisted)).thenReturn(persisted)
+
+        // when
+        profileService.update(profileId, incoming)
+
+        // then — the server-assigned code wins; the client-submitted code is never persisted
+        val captor = ArgumentCaptor.forClass(UserProfile::class.java)
+        verify(profileRepo).save(captor.capture())
+        Assert.assertEquals("SERVER-ASSIGNED-CODE", captor.value.referralCode)
+        Assert.assertNotEquals("CLIENT-SUBMITTED-CODE", captor.value.referralCode)
+    }
 }

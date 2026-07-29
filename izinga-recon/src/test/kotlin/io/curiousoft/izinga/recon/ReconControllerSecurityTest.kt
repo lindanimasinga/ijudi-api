@@ -25,6 +25,11 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
  * Direct controller instantiation in ReconControllerReferralPartnerPayoutsTest bypasses
  * the Spring Security AOP proxy entirely -- these tests do not.
  *
+ * NOTE: @WithMockUser injects a pre-built Authentication object and completely bypasses
+ * FirebaseJwtAuthenticationConverter. These tests verify @PreAuthorize SpEL enforcement
+ * in isolation — they do NOT verify the real JWT-to-Authentication conversion path.
+ * See FirebaseJwtAuthenticationConverterTest (izinga-ordermanager) for that coverage.
+ *
  * Exact stub values are used for the 200 path (not matchers) to avoid the Kotlin
  * non-null NullPointerException that Mockito any() triggers on non-nullable params.
  * The stub matches exactly what the controller will call: partnerId from the principal

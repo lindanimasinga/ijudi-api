@@ -28,6 +28,11 @@ import java.util.Date
  * Pattern: one 403-test per endpoint (non-REFERRAL_PARTNER caller) + one 200-test per
  * endpoint (REFERRAL_PARTNER caller). Three endpoints = 6 tests.
  *
+ * NOTE: @WithMockUser injects a pre-built Authentication object and completely bypasses
+ * FirebaseJwtAuthenticationConverter. These tests verify @PreAuthorize SpEL enforcement
+ * in isolation — they do NOT verify the real JWT-to-Authentication conversion path.
+ * See FirebaseJwtAuthenticationConverterTest (izinga-ordermanager) for that coverage.
+ *
  * Exact stub values are used for the 200 paths (not Mockito matchers) to avoid the
  * NullPointerException that Mockito's any() causes on Kotlin non-null parameters.
  * The stubs match exactly what the controller constructs from principal.name ("rp-001")

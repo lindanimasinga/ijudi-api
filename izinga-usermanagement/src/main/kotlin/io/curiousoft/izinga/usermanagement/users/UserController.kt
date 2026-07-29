@@ -166,9 +166,13 @@ class UserController(
      * code is returned. Returns 404 if the user does not exist, 400 if the user is not
      * a REFERRAL_PARTNER.
      *
+     * Accessible to the partner themselves (self-service after enrollment) and to admins
+     * for manual assignment. Uses the same self-or-admin pattern as other user endpoints
+     * in this controller.
+     *
      * POST /user/{userId}/referral-code
      */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.name")
     @PostMapping(value = ["/{userId}/referral-code"], produces = ["application/json"])
     fun assignReferralCode(@PathVariable userId: String): ResponseEntity<UserProfile> {
         logger.info("Assign referral code request for userId={}", userId)

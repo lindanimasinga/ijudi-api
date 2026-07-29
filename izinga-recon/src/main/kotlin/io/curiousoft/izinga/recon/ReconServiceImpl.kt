@@ -12,6 +12,7 @@ import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
 import io.curiousoft.izinga.commons.payout.events.ReferralPartnerPayoutEvent
 import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent
 import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommissionRepo
+import io.curiousoft.izinga.commons.referral.FurnitureCustomerReferralCommissionRepo
 import io.curiousoft.izinga.commons.referral.ReferralCommissionStatus
 import io.curiousoft.izinga.commons.referral.ReferralCommissionType
 import io.curiousoft.izinga.commons.referral.StorePartnerStage1CommissionRepo
@@ -46,6 +47,7 @@ class ReconServiceImpl(
     private val ambassadorPayoutRepository: AmbassadorPayoutRepository,
     private val referralPartnerPayoutRepository: ReferralPartnerPayoutRepository,
     private val foodCustomerCommissionRepo: FoodCustomerReferralCommissionRepo,
+    private val furnitureCustomerCommissionRepo: FurnitureCustomerReferralCommissionRepo,
     private val storeStage1CommissionRepo: StorePartnerStage1CommissionRepo,
     private val storeStage2CommissionRepo: StorePartnerStage2CommissionRepo,
     private val applicationEventPublisher: ApplicationEventPublisher,
@@ -328,6 +330,13 @@ class ReconServiceImpl(
                         logger.info("[rp-009] synced stage2 commission to PAID for storeId={}", payout.triggerReferenceId)
                     }
                 }
+                ReferralCommissionType.FURNITURE_CUSTOMER_REFERRAL -> {
+                    val commission = furnitureCustomerCommissionRepo.findByCustomerId(payout.triggerReferenceId)
+                    if (commission != null) {
+                        furnitureCustomerCommissionRepo.save(commission.copy(status = ReferralCommissionStatus.PAID))
+                        logger.info("[rp-012] synced furniture customer commission to PAID for customerId={}", payout.triggerReferenceId)
+                    }
+                }
             }
         } catch (e: Exception) {
             logger.error("[rp-009] failed to sync commission status to PAID for payout {}: {}", payout.id, e.message)
@@ -550,6 +559,26 @@ class ReconServiceImpl(
                         amount = commission.amount,
                         commissionType = ReferralCommissionType.STORE_PARTNER_STAGE_2,
                         triggerReferenceId = commission.storeId
+                    )
+                    if (result != null) created++ else skipped++
+                }
+            }
+
+        // RP-012: furniture customer referral commissions
+        furnitureCustomerCommissionRepo.findAll()
+            .filter { it.status == ReferralCommissionStatus.PENDING }
+            .forEach { commission ->
+                val existing = referralPartnerPayoutRepository.findByCommissionTypeAndTriggerReferenceId(
+                    ReferralCommissionType.FURNITURE_CUSTOMER_REFERRAL, commission.customerId
+                )
+                if (existing == null) {
+                    // Use the persisted amount — do NOT recompute at reconciliation time.
+                    // The amount was calculated and stored by StoreOrderEventHandler at trigger time.
+                    val result = generatePayoutForReferralPartner(
+                        partnerId = commission.referralPartnerId,
+                        amount = commission.amount,
+                        commissionType = ReferralCommissionType.FURNITURE_CUSTOMER_REFERRAL,
+                        triggerReferenceId = commission.customerId
                     )
                     if (result != null) created++ else skipped++
                 }
