@@ -65,6 +65,8 @@ feign:
     okhttp:
         enabled: true
 spring:
+    config:
+        import: aws-secretsmanager:izinga-prod
     security:
         oauth2:
             resourceserver:
