@@ -121,7 +121,7 @@ class UserController(
         }
 
         return try {
-            val qrContent = "https://onboarding.izinga.co.za/indivisuals?ref=$userId"
+            val qrContent = "https://driver.izinga.co.za/indivisuals?ref=$userId"
             val label = profile.name ?: userId
             val qrImage = qrCodeService.generateQRCodeImage("REFER A FRIEND", qrContent, label, 450, 450)
             logger.info("Ambassador QR generated for userId={}", userId)
@@ -241,7 +241,7 @@ class AmbassadorAdminController(
         }
 
         val created = profileService.create(profile)
-        val referralUrl = "https://onboarding.izinga.co.za/indivisuals?ref=${created.id}"
+        val referralUrl = "https://driver.izinga.co.za/indivisuals?ref=${created.id}"
         logger.info("Ambassador created id={} referralUrl={}", created.id, referralUrl)
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(CreateAmbassadorResponse(userId = created.id!!, referralUrl = referralUrl))

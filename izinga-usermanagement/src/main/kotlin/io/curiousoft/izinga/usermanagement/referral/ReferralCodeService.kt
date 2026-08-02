@@ -22,7 +22,8 @@ import java.security.SecureRandom
  *   Agreement in the izinga-onboarding repo for commission rules and programme terms).
  *
  * One code works across all referral link formats:
- *   izinga.co.za/join?ref=CODE          (food/furniture customer referral)
+ *   shop.izinga.co.za/?ref=CODE         (food customer referral)
+ *   delivery.izinga.co.za/?ref=CODE     (furniture/parcel customer referral)
  *   biz.izinga.co.za/register?ref=CODE  (store partner referral)
  */
 @Service
