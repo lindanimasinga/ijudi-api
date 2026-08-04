@@ -80,4 +80,54 @@ class CsvReconControllerSecurityTest {
         mockMvc.perform(get("/reconcsv/messenger-payout-bundle"))
             .andExpect(status().isOk)
     }
+
+    // --- RECON-PHASE2: ambassador-payout-bundle CSV endpoint ---------------------
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `GET ambassador-payout-bundle returns 403 for non-ADMIN`() {
+        mockMvc.perform(get("/reconcsv/ambassador-payout-bundle"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `GET ambassador-payout-bundle returns 403 for unauthenticated`() {
+        mockMvc.perform(get("/reconcsv/ambassador-payout-bundle"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    @WithMockUser(roles = ["ADMIN"])
+    fun `GET ambassador-payout-bundle returns 200 for ADMIN`() {
+        val bundle = PayoutBundle(PayoutType.AMBASSADOR, emptyList<Payout>(), "admin")
+        given(reconService.getCurrentPayoutBundleForAmbassadors()).willReturn(bundle)
+
+        mockMvc.perform(get("/reconcsv/ambassador-payout-bundle"))
+            .andExpect(status().isOk)
+    }
+
+    // --- RECON-PHASE2: referral-partner-payout-bundle CSV endpoint ---------------
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `GET referral-partner-payout-bundle returns 403 for non-ADMIN`() {
+        mockMvc.perform(get("/reconcsv/referral-partner-payout-bundle"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `GET referral-partner-payout-bundle returns 403 for unauthenticated`() {
+        mockMvc.perform(get("/reconcsv/referral-partner-payout-bundle"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    @WithMockUser(roles = ["ADMIN"])
+    fun `GET referral-partner-payout-bundle returns 200 for ADMIN`() {
+        val bundle = PayoutBundle(PayoutType.REFERRAL_PARTNER, emptyList<Payout>(), "admin")
+        given(reconService.getCurrentPayoutBundleForReferralPartners()).willReturn(bundle)
+
+        mockMvc.perform(get("/reconcsv/referral-partner-payout-bundle"))
+            .andExpect(status().isOk)
+    }
 }
