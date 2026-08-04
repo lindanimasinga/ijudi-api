@@ -1,9 +1,13 @@
 package io.curiousoft.izinga.recon
 
+import io.curiousoft.izinga.recon.payout.Payout
+import io.curiousoft.izinga.recon.payout.PayoutBundle
+import io.curiousoft.izinga.recon.payout.PayoutType
 import io.curiousoft.izinga.recon.payout.ReferralPartnerPayout
 import io.curiousoft.izinga.recon.payout.repo.ReferralPartnerPayoutRepository
 import org.junit.jupiter.api.Test
 import org.mockito.BDDMockito.given
+import org.mockito.BDDMockito.willDoNothing
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.boot.test.mock.mockito.MockBean
@@ -13,7 +17,9 @@ import org.springframework.data.domain.Sort
 import org.springframework.security.test.context.support.WithMockUser
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.http.MediaType
 
 /**
  * RP-010 BLOCKING-1 fix: Spring Security integration tests for ReconController.
@@ -66,5 +72,181 @@ class ReconControllerSecurityTest {
 
         mockMvc.perform(get("/recon/referral-partner/me/payouts"))
             .andExpect(status().isOk)
+    }
+
+    // --- Admin-only recon endpoints: non-admin gets 403 -------------------------
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `GET shopPayoutBundle returns 403 for non-ADMIN`() {
+        mockMvc.perform(get("/recon/shopPayoutBundle"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `GET shopPayoutBundle returns 403 for unauthenticated`() {
+        mockMvc.perform(get("/recon/shopPayoutBundle"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `GET messengerPayoutBundle returns 403 for non-ADMIN`() {
+        mockMvc.perform(get("/recon/messengerPayoutBundle"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `PATCH shopPayoutBundle returns 403 for non-ADMIN`() {
+        mockMvc.perform(
+            patch("/recon/shopPayoutBundle")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"bundleId":"b1","payoutItemResults":[]}""")
+        ).andExpect(status().isForbidden)
+    }
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `PATCH messengerPayoutBundle returns 403 for non-ADMIN`() {
+        mockMvc.perform(
+            patch("/recon/messengerPayoutBundle")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"bundleId":"b1","payoutItemResults":[]}""")
+        ).andExpect(status().isForbidden)
+    }
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `GET payoutBundle returns 403 for non-ADMIN`() {
+        mockMvc.perform(get("/recon/payoutBundle")
+            .param("payoutType", "SHOP")
+            .param("fromDate", "2025-01-01T00:00:00.000Z")
+            .param("toDate", "2025-12-31T00:00:00.000Z"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `GET payout returns 403 for non-ADMIN`() {
+        mockMvc.perform(get("/recon/payout")
+            .param("payoutType", "SHOP")
+            .param("fromDate", "2025-01-01T00:00:00.000Z")
+            .param("toDate", "2025-12-31T00:00:00.000Z")
+            .param("toId", "store-001"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `GET payoutBundle bundleId payout payoutId returns 403 for non-ADMIN`() {
+        mockMvc.perform(get("/recon/payoutBundle/bundle-1/payout/payout-1"))
+            .andExpect(status().isForbidden)
+    }
+
+    // --- Admin-only recon endpoints: ADMIN role gets 200 -------------------------
+
+    /**
+     * Kotlin-safe any() helper: ArgumentMatchers.any() returns null at runtime,
+     * which triggers a Kotlin null-safety check on non-nullable params before the
+     * mock can intercept the call. The unchecked cast to T suppresses that check so
+     * Mockito sees its own null sentinel and matches any argument correctly.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> anyKt(): T = org.mockito.ArgumentMatchers.any<T>() as T
+
+    @Test
+    @WithMockUser(roles = ["ADMIN"])
+    fun `GET shopPayoutBundle returns 200 for ADMIN`() {
+        val bundle = PayoutBundle(PayoutType.SHOP, emptyList<Payout>(), "admin")
+        given(reconService.getCurrentPayoutBundleForShops()).willReturn(bundle)
+
+        mockMvc.perform(get("/recon/shopPayoutBundle"))
+            .andExpect(status().isOk)
+    }
+
+    @Test
+    @WithMockUser(roles = ["ADMIN"])
+    fun `PATCH shopPayoutBundle returns 200 for ADMIN`() {
+        // updatePayoutStatus returns Unit; the mock does nothing by default — no stub needed.
+        mockMvc.perform(
+            patch("/recon/shopPayoutBundle")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"bundleId":"b1","payoutItemResults":[]}""")
+        ).andExpect(status().isOk)
+    }
+
+    @Test
+    @WithMockUser(roles = ["ADMIN"])
+    fun `GET messengerPayoutBundle returns 200 for ADMIN`() {
+        val bundle = PayoutBundle(PayoutType.MESSENGER, emptyList<Payout>(), "admin")
+        given(reconService.getCurrentPayoutBundleForMessenger()).willReturn(bundle)
+
+        mockMvc.perform(get("/recon/messengerPayoutBundle"))
+            .andExpect(status().isOk)
+    }
+
+    @Test
+    @WithMockUser(roles = ["ADMIN"])
+    fun `PATCH messengerPayoutBundle returns 200 for ADMIN`() {
+        // updatePayoutStatus returns Unit; the mock does nothing by default — no stub needed.
+        mockMvc.perform(
+            patch("/recon/messengerPayoutBundle")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"bundleId":"b1","payoutItemResults":[]}""")
+        ).andExpect(status().isOk)
+    }
+
+    @Test
+    @WithMockUser(roles = ["ADMIN"])
+    fun `GET payoutBundle returns 200 for ADMIN`() {
+        given(reconService.getAllPayoutBundles(anyKt(), anyKt(), anyKt()))
+            .willReturn(emptyList())
+
+        mockMvc.perform(get("/recon/payoutBundle")
+            .param("payoutType", "SHOP")
+            .param("fromDate", "2025-01-01T00:00:00.000Z")
+            .param("toDate", "2025-12-31T00:00:00.000Z"))
+            .andExpect(status().isOk)
+    }
+
+    @Test
+    @WithMockUser(roles = ["ADMIN"])
+    fun `GET payout returns 200 for ADMIN`() {
+        given(reconService.getAllPayouts(anyKt(), anyKt(), anyKt(), anyKt()))
+            .willReturn(emptyList())
+
+        mockMvc.perform(get("/recon/payout")
+            .param("payoutType", "SHOP")
+            .param("fromDate", "2025-01-01T00:00:00.000Z")
+            .param("toDate", "2025-12-31T00:00:00.000Z")
+            .param("toId", "store-001"))
+            .andExpect(status().isOk)
+    }
+
+    @Test
+    @WithMockUser(roles = ["ADMIN"])
+    fun `GET payoutBundle bundleId payout payoutId returns 200 for ADMIN`() {
+        given(reconService.findPayout("bundle-1", "payout-1")).willReturn(null)
+
+        mockMvc.perform(get("/recon/payoutBundle/bundle-1/payout/payout-1"))
+            .andExpect(status().isOk)
+    }
+
+    // --- NOTE-01: unauthenticated 403 for messengerPayoutBundle ------------------
+
+    @Test
+    fun `GET messengerPayoutBundle returns 403 for unauthenticated`() {
+        mockMvc.perform(get("/recon/messengerPayoutBundle"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `PATCH messengerPayoutBundle returns 403 for unauthenticated`() {
+        mockMvc.perform(
+            patch("/recon/messengerPayoutBundle")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"bundleId":"b1","payoutItemResults":[]}""")
+        ).andExpect(status().isForbidden)
     }
 }

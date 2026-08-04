@@ -21,23 +21,29 @@ class ReconController(
     val referralPartnerPayoutRepository: ReferralPartnerPayoutRepository
 ) {
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/shopPayoutBundle")
     fun shopPayoutBundle() = reconService.getCurrentPayoutBundleForShops()
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/shopPayoutBundle")
     fun shopPayoutBundle(@RequestBody payoutResults: PayoutBundleResults) = reconService.updatePayoutStatus(payoutResults)
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/messengerPayoutBundle")
     fun messengerPayoutBundle() = reconService.getCurrentPayoutBundleForMessenger()
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/messengerPayoutBundle")
     fun messengerPayoutBundle(@RequestBody payoutResults: PayoutBundleResults) = reconService.updatePayoutStatus(payoutResults)
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/payoutBundle")
     fun getAllPayoutBundles(@RequestParam payoutType: PayoutType,
                             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) fromDate: Date,
                             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) toDate: Date): List<Payout> = reconService.getAllPayoutBundles(payoutType, fromDate, toDate)
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/payout")
     fun getAllPayouts(@RequestParam payoutType: PayoutType,
                       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) fromDate: Date,
@@ -55,6 +61,7 @@ class ReconController(
         }
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/payoutBundle/{bundleId}/payout/{payoutId}")
     fun getPayouts(@PathVariable bundleId: String, @PathVariable payoutId: String): Payout? = reconService.findPayout(bundleId, payoutId)
 
