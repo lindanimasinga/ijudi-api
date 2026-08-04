@@ -13,7 +13,9 @@ import org.springframework.data.domain.Sort
 import org.springframework.security.test.context.support.WithMockUser
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.http.MediaType
 
 /**
  * RP-010 BLOCKING-1 fix: Spring Security integration tests for ReconController.
@@ -66,5 +68,75 @@ class ReconControllerSecurityTest {
 
         mockMvc.perform(get("/recon/referral-partner/me/payouts"))
             .andExpect(status().isOk)
+    }
+
+    // --- Admin-only recon endpoints: non-admin gets 403 -------------------------
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `GET shopPayoutBundle returns 403 for non-ADMIN`() {
+        mockMvc.perform(get("/recon/shopPayoutBundle"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `GET shopPayoutBundle returns 403 for unauthenticated`() {
+        mockMvc.perform(get("/recon/shopPayoutBundle"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `GET messengerPayoutBundle returns 403 for non-ADMIN`() {
+        mockMvc.perform(get("/recon/messengerPayoutBundle"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `PATCH shopPayoutBundle returns 403 for non-ADMIN`() {
+        mockMvc.perform(
+            patch("/recon/shopPayoutBundle")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"bundleId":"b1","payoutItemResults":[]}""")
+        ).andExpect(status().isForbidden)
+    }
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `PATCH messengerPayoutBundle returns 403 for non-ADMIN`() {
+        mockMvc.perform(
+            patch("/recon/messengerPayoutBundle")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"bundleId":"b1","payoutItemResults":[]}""")
+        ).andExpect(status().isForbidden)
+    }
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `GET payoutBundle returns 403 for non-ADMIN`() {
+        mockMvc.perform(get("/recon/payoutBundle")
+            .param("payoutType", "SHOP")
+            .param("fromDate", "2025-01-01T00:00:00.000Z")
+            .param("toDate", "2025-12-31T00:00:00.000Z"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `GET payout returns 403 for non-ADMIN`() {
+        mockMvc.perform(get("/recon/payout")
+            .param("payoutType", "SHOP")
+            .param("fromDate", "2025-01-01T00:00:00.000Z")
+            .param("toDate", "2025-12-31T00:00:00.000Z")
+            .param("toId", "store-001"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `GET payoutBundle bundleId payout payoutId returns 403 for non-ADMIN`() {
+        mockMvc.perform(get("/recon/payoutBundle/bundle-1/payout/payout-1"))
+            .andExpect(status().isForbidden)
     }
 }
