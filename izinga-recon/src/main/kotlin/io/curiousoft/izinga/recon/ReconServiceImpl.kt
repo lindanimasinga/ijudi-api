@@ -417,6 +417,18 @@ class ReconServiceImpl(
             createdBy = "izinga-system")
     }
 
+    override fun getCurrentPayoutBundleForAmbassadors(): PayoutBundle {
+        return PayoutBundle(payouts = ambassadorPayoutRepository.findByPayoutStage(),
+            type = PayoutType.AMBASSADOR,
+            createdBy = "izinga-system")
+    }
+
+    override fun getCurrentPayoutBundleForReferralPartners(): PayoutBundle {
+        return PayoutBundle(payouts = referralPartnerPayoutRepository.findByPayoutStage(),
+            type = PayoutType.REFERRAL_PARTNER,
+            createdBy = "izinga-system")
+    }
+
     override fun findPayout(bundleId: String, payoutId: String): Payout? = shopPayoutRepo.findByIdOrNull(payoutId)
         ?: messengerPayoutRepository.findByIdOrNull(payoutId)
 

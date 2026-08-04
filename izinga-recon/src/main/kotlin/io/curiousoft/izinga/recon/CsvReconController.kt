@@ -36,4 +36,30 @@ class CsvReconController(val reconService: ReconService) {
             reconService.updateBundle(it)
         }
     }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping(value = ["/ambassador-payout-bundle"], produces = ["application/csv"])
+    fun ambassadorPayoutBundle(response: HttpServletResponse) {
+        reconService.getCurrentPayoutBundleForAmbassadors().let {
+            response.contentType = "application/csv"
+            val fileName = "ambassador-payout-bundle-${it.createdDate}.csv"
+            response.addHeader("Content-Disposition", "attachment; filename=\"${fileName}\"")
+            payoutBundleToCsv(response.writer, it)
+            it.payouts.forEach { it.payoutStage = PayoutStage.PROCESSING }
+            reconService.updateBundle(it)
+        }
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping(value = ["/referral-partner-payout-bundle"], produces = ["application/csv"])
+    fun referralPartnerPayoutBundle(response: HttpServletResponse) {
+        reconService.getCurrentPayoutBundleForReferralPartners().let {
+            response.contentType = "application/csv"
+            val fileName = "referral-partner-payout-bundle-${it.createdDate}.csv"
+            response.addHeader("Content-Disposition", "attachment; filename=\"${fileName}\"")
+            payoutBundleToCsv(response.writer, it)
+            it.payouts.forEach { it.payoutStage = PayoutStage.PROCESSING }
+            reconService.updateBundle(it)
+        }
+    }
 }

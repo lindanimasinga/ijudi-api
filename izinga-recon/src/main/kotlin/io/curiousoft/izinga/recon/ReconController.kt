@@ -38,6 +38,22 @@ class ReconController(
     fun messengerPayoutBundle(@RequestBody payoutResults: PayoutBundleResults) = reconService.updatePayoutStatus(payoutResults)
 
     @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/ambassadorPayoutBundle")
+    fun ambassadorPayoutBundle() = reconService.getCurrentPayoutBundleForAmbassadors()
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/ambassadorPayoutBundle")
+    fun ambassadorPayoutBundle(@RequestBody payoutResults: PayoutBundleResults) = reconService.updatePayoutStatus(payoutResults)
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/referralPartnerPayoutBundle")
+    fun referralPartnerPayoutBundle() = reconService.getCurrentPayoutBundleForReferralPartners()
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/referralPartnerPayoutBundle")
+    fun referralPartnerPayoutBundle(@RequestBody payoutResults: PayoutBundleResults) = reconService.updatePayoutStatus(payoutResults)
+
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/payoutBundle")
     fun getAllPayoutBundles(@RequestParam payoutType: PayoutType,
                             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) fromDate: Date,

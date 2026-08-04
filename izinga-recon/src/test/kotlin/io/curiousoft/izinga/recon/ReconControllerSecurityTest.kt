@@ -249,4 +249,94 @@ class ReconControllerSecurityTest {
                 .content("""{"bundleId":"b1","payoutItemResults":[]}""")
         ).andExpect(status().isForbidden)
     }
+
+    // --- RECON-PHASE2: ambassadorPayoutBundle endpoints --------------------------
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `GET ambassadorPayoutBundle returns 403 for non-ADMIN`() {
+        mockMvc.perform(get("/recon/ambassadorPayoutBundle"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `GET ambassadorPayoutBundle returns 403 for unauthenticated`() {
+        mockMvc.perform(get("/recon/ambassadorPayoutBundle"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    @WithMockUser(roles = ["ADMIN"])
+    fun `GET ambassadorPayoutBundle returns 200 for ADMIN`() {
+        val bundle = PayoutBundle(PayoutType.AMBASSADOR, emptyList<Payout>(), "admin")
+        given(reconService.getCurrentPayoutBundleForAmbassadors()).willReturn(bundle)
+
+        mockMvc.perform(get("/recon/ambassadorPayoutBundle"))
+            .andExpect(status().isOk)
+    }
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `PATCH ambassadorPayoutBundle returns 403 for non-ADMIN`() {
+        mockMvc.perform(
+            patch("/recon/ambassadorPayoutBundle")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"bundleId":"b1","payoutItemResults":[]}""")
+        ).andExpect(status().isForbidden)
+    }
+
+    @Test
+    @WithMockUser(roles = ["ADMIN"])
+    fun `PATCH ambassadorPayoutBundle returns 200 for ADMIN`() {
+        mockMvc.perform(
+            patch("/recon/ambassadorPayoutBundle")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"bundleId":"b1","payoutItemResults":[]}""")
+        ).andExpect(status().isOk)
+    }
+
+    // --- RECON-PHASE2: referralPartnerPayoutBundle endpoints ---------------------
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `GET referralPartnerPayoutBundle returns 403 for non-ADMIN`() {
+        mockMvc.perform(get("/recon/referralPartnerPayoutBundle"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `GET referralPartnerPayoutBundle returns 403 for unauthenticated`() {
+        mockMvc.perform(get("/recon/referralPartnerPayoutBundle"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    @WithMockUser(roles = ["ADMIN"])
+    fun `GET referralPartnerPayoutBundle returns 200 for ADMIN`() {
+        val bundle = PayoutBundle(PayoutType.REFERRAL_PARTNER, emptyList<Payout>(), "admin")
+        given(reconService.getCurrentPayoutBundleForReferralPartners()).willReturn(bundle)
+
+        mockMvc.perform(get("/recon/referralPartnerPayoutBundle"))
+            .andExpect(status().isOk)
+    }
+
+    @Test
+    @WithMockUser(roles = ["CUSTOMER"])
+    fun `PATCH referralPartnerPayoutBundle returns 403 for non-ADMIN`() {
+        mockMvc.perform(
+            patch("/recon/referralPartnerPayoutBundle")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"bundleId":"b1","payoutItemResults":[]}""")
+        ).andExpect(status().isForbidden)
+    }
+
+    @Test
+    @WithMockUser(roles = ["ADMIN"])
+    fun `PATCH referralPartnerPayoutBundle returns 200 for ADMIN`() {
+        mockMvc.perform(
+            patch("/recon/referralPartnerPayoutBundle")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"bundleId":"b1","payoutItemResults":[]}""")
+        ).andExpect(status().isOk)
+    }
 }
