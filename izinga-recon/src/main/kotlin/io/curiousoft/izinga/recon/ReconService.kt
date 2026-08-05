@@ -24,6 +24,10 @@ interface ReconService {
 
     fun getCurrentPayoutBundleForMessenger(): PayoutBundle
 
+    fun getCurrentPayoutBundleForAmbassadors(): PayoutBundle
+
+    fun getCurrentPayoutBundleForReferralPartners(): PayoutBundle
+
     fun getAllPayouts(payoutType: PayoutType, from: Date, toDate: Date, toId: String): List<Payout>
 
     fun getAllPayoutsForMessengerAdmin(from: Date, toDate: Date, messengerAdminId: String, messengerId: String? = null): List<Payout>

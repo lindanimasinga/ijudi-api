@@ -12,6 +12,7 @@ import io.curiousoft.izinga.commons.referral.StorePartnerStage1CommissionRepo
 import io.curiousoft.izinga.commons.referral.StorePartnerStage2CommissionRepo
 import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
+import io.curiousoft.izinga.recon.payout.repo.PayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ReferralPartnerPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
 import io.mockk.*
@@ -22,6 +23,7 @@ import org.springframework.context.ApplicationEvent
 import org.springframework.context.ApplicationEventPublisher
 import java.math.BigDecimal
 import java.time.DayOfWeek
+import java.util.Optional
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.*
@@ -35,6 +37,7 @@ class ReconServiceTest {
     private val messengerPayoutRepository = mockk<MessengerPayoutRepository>()
     private val ambassadorPayoutRepository = mockk<AmbassadorPayoutRepository>()
     private val referralPartnerPayoutRepository = mockk<ReferralPartnerPayoutRepository>()
+    private val payoutBundleRepository = mockk<PayoutRepository>()
     private val foodCustomerCommissionRepo = mockk<FoodCustomerReferralCommissionRepo>()
     private val furnitureCustomerCommissionRepo = mockk<FurnitureCustomerReferralCommissionRepo>()
     private val storeStage1CommissionRepo = mockk<StorePartnerStage1CommissionRepo>()
@@ -50,6 +53,7 @@ class ReconServiceTest {
             messengerPayoutRepository = messengerPayoutRepository,
             ambassadorPayoutRepository = ambassadorPayoutRepository,
             referralPartnerPayoutRepository = referralPartnerPayoutRepository,
+            payoutBundleRepository = payoutBundleRepository,
             foodCustomerCommissionRepo = foodCustomerCommissionRepo,
             furnitureCustomerCommissionRepo = furnitureCustomerCommissionRepo,
             storeStage1CommissionRepo = storeStage1CommissionRepo,
@@ -713,5 +717,161 @@ class ReconServiceTest {
 
         assertNull(result)
         verify(exactly = 0) { ambassadorPayoutRepository.save(any()) }
+    }
+
+    // ─── findPayout tests ────────────────────────────────────────────────────
+
+    private fun makeShopPayout(id: String) = ShopPayout(
+        toId = "store-1", toName = "Test Store", toBankName = "FNB",
+        toType = BankAccType.CHEQUE, toAccountNumber = "123456", toBranchCode = "250655",
+        fromReference = "ref", toReference = "iZinga", emailNotify = null,
+        emailAddress = null, emailSubject = null, orders = mutableSetOf(),
+        payoutStage = PayoutStage.PENDING
+    ).also { it.id = id }
+
+    private fun makeMessengerPayout(id: String) = MessengerPayout(
+        toId = "messenger-1", toName = "Test Driver", toBankName = "FNB",
+        toType = BankAccType.CHEQUE, toAccountNumber = "654321", toBranchCode = "250655",
+        fromReference = "ref", toReference = "iZinga", emailNotify = null,
+        emailAddress = null, emailSubject = null, orders = mutableSetOf(),
+        payoutStage = PayoutStage.PENDING
+    ).also { it.id = id }
+
+    private fun makeAmbassadorPayout(id: String) = AmbassadorPayout(
+        toId = "ambassador-1", toName = "Test Ambassador", toBankName = "FNB",
+        toType = BankAccType.CHEQUE, toAccountNumber = "111111", toBranchCode = "250655",
+        fromReference = "ref", toReference = "iZinga", emailNotify = null,
+        emailAddress = null, emailSubject = null, orders = mutableSetOf(),
+        payoutStage = PayoutStage.PENDING, commissionAmount = BigDecimal("50.00"),
+        triggerDriverId = "driver-1"
+    ).also { it.id = id }
+
+    private fun makeReferralPartnerPayout(id: String) = ReferralPartnerPayout(
+        toId = "partner-1", toName = "Test Partner", toBankName = "FNB",
+        toType = BankAccType.CHEQUE, toAccountNumber = "222222", toBranchCode = "250655",
+        fromReference = "ref", toReference = "iZinga", emailNotify = null,
+        emailAddress = null, emailSubject = null, orders = mutableSetOf(),
+        payoutStage = PayoutStage.PENDING, commissionAmount = BigDecimal("75.00"),
+        commissionType = io.curiousoft.izinga.commons.referral.ReferralCommissionType.FOOD_CUSTOMER_REFERRAL,
+        triggerReferenceId = "customer-1"
+    ).also { it.id = id }
+
+    private fun makeBundleOf(type: PayoutType, bundleId: String): PayoutBundle =
+        PayoutBundle(type = type, payouts = emptyList(), createdBy = "test").also { it.id = bundleId }
+
+    @Test
+    fun `findPayout - returns ShopPayout for SHOP bundle type`() {
+        val bundleId = "BNDL1"
+        val payoutId = "PAY01"
+        val expected = makeShopPayout(payoutId)
+        every { payoutBundleRepository.findById(bundleId) } returns Optional.of(makeBundleOf(PayoutType.SHOP, bundleId))
+        every { shopPayoutRepository.findById(payoutId) } returns Optional.of(expected)
+
+        val result = sut.findPayout(bundleId, payoutId)
+
+        assertEquals(expected, result)
+        verify(exactly = 1) { shopPayoutRepository.findById(payoutId) }
+        verify(exactly = 0) { messengerPayoutRepository.findById(any()) }
+        verify(exactly = 0) { ambassadorPayoutRepository.findById(any()) }
+        verify(exactly = 0) { referralPartnerPayoutRepository.findById(any()) }
+    }
+
+    @Test
+    fun `findPayout - returns MessengerPayout for MESSENGER bundle type`() {
+        val bundleId = "BNDL2"
+        val payoutId = "PAY02"
+        val expected = makeMessengerPayout(payoutId)
+        every { payoutBundleRepository.findById(bundleId) } returns Optional.of(makeBundleOf(PayoutType.MESSENGER, bundleId))
+        every { messengerPayoutRepository.findById(payoutId) } returns Optional.of(expected)
+
+        val result = sut.findPayout(bundleId, payoutId)
+
+        assertEquals(expected, result)
+        verify(exactly = 0) { shopPayoutRepository.findById(any()) }
+        verify(exactly = 1) { messengerPayoutRepository.findById(payoutId) }
+        verify(exactly = 0) { ambassadorPayoutRepository.findById(any()) }
+        verify(exactly = 0) { referralPartnerPayoutRepository.findById(any()) }
+    }
+
+    @Test
+    fun `findPayout - returns AmbassadorPayout for AMBASSADOR bundle type`() {
+        val bundleId = "BNDL3"
+        val payoutId = "PAY03"
+        val expected = makeAmbassadorPayout(payoutId)
+        every { payoutBundleRepository.findById(bundleId) } returns Optional.of(makeBundleOf(PayoutType.AMBASSADOR, bundleId))
+        every { ambassadorPayoutRepository.findById(payoutId) } returns Optional.of(expected)
+
+        val result = sut.findPayout(bundleId, payoutId)
+
+        assertEquals(expected, result)
+        verify(exactly = 0) { shopPayoutRepository.findById(any()) }
+        verify(exactly = 0) { messengerPayoutRepository.findById(any()) }
+        verify(exactly = 1) { ambassadorPayoutRepository.findById(payoutId) }
+        verify(exactly = 0) { referralPartnerPayoutRepository.findById(any()) }
+    }
+
+    @Test
+    fun `findPayout - returns ReferralPartnerPayout for REFERRAL_PARTNER bundle type`() {
+        val bundleId = "BNDL4"
+        val payoutId = "PAY04"
+        val expected = makeReferralPartnerPayout(payoutId)
+        every { payoutBundleRepository.findById(bundleId) } returns Optional.of(makeBundleOf(PayoutType.REFERRAL_PARTNER, bundleId))
+        every { referralPartnerPayoutRepository.findById(payoutId) } returns Optional.of(expected)
+
+        val result = sut.findPayout(bundleId, payoutId)
+
+        assertEquals(expected, result)
+        verify(exactly = 0) { shopPayoutRepository.findById(any()) }
+        verify(exactly = 0) { messengerPayoutRepository.findById(any()) }
+        verify(exactly = 0) { ambassadorPayoutRepository.findById(any()) }
+        verify(exactly = 1) { referralPartnerPayoutRepository.findById(payoutId) }
+    }
+
+    @Test
+    fun `findPayout - returns null when payout not found in correct repo`() {
+        val bundleId = "BNDL5"
+        val payoutId = "NOPE1"
+        every { payoutBundleRepository.findById(bundleId) } returns Optional.of(makeBundleOf(PayoutType.SHOP, bundleId))
+        every { shopPayoutRepository.findById(payoutId) } returns Optional.empty()
+
+        val result = sut.findPayout(bundleId, payoutId)
+
+        assertNull(result)
+    }
+
+    @Test
+    fun `findPayout - falls back to cross-repo scan when bundle not found`() {
+        val bundleId = "BNDLX"
+        val payoutId = "PAY09"
+        val expected = makeAmbassadorPayout(payoutId)
+        every { payoutBundleRepository.findById(bundleId) } returns Optional.empty()
+        every { shopPayoutRepository.findById(payoutId) } returns Optional.empty()
+        every { messengerPayoutRepository.findById(payoutId) } returns Optional.empty()
+        every { ambassadorPayoutRepository.findById(payoutId) } returns Optional.of(expected)
+
+        val result = sut.findPayout(bundleId, payoutId)
+
+        assertEquals(expected, result)
+        verify(exactly = 1) { shopPayoutRepository.findById(payoutId) }
+        verify(exactly = 1) { messengerPayoutRepository.findById(payoutId) }
+        verify(exactly = 1) { ambassadorPayoutRepository.findById(payoutId) }
+        // ambassadorPayoutRepository found it, so referral repo should not be queried
+        verify(exactly = 0) { referralPartnerPayoutRepository.findById(any()) }
+    }
+
+    @Test
+    fun `findPayout - cross-repo fallback returns null when payout not in any repo`() {
+        val bundleId = "BNDLY"
+        val payoutId = "MISS1"
+        every { payoutBundleRepository.findById(bundleId) } returns Optional.empty()
+        every { shopPayoutRepository.findById(payoutId) } returns Optional.empty()
+        every { messengerPayoutRepository.findById(payoutId) } returns Optional.empty()
+        every { ambassadorPayoutRepository.findById(payoutId) } returns Optional.empty()
+        every { referralPartnerPayoutRepository.findById(payoutId) } returns Optional.empty()
+
+        val result = sut.findPayout(bundleId, payoutId)
+
+        assertNull(result)
+        verify(exactly = 1) { referralPartnerPayoutRepository.findById(payoutId) }
     }
 }

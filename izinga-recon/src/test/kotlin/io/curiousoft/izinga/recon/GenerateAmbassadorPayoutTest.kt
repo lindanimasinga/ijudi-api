@@ -14,6 +14,7 @@ import io.curiousoft.izinga.commons.referral.StorePartnerStage1CommissionRepo
 import io.curiousoft.izinga.commons.referral.StorePartnerStage2CommissionRepo
 import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
+import io.curiousoft.izinga.recon.payout.repo.PayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ReferralPartnerPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
 import io.mockk.*
@@ -31,6 +32,7 @@ class GenerateAmbassadorPayoutTest {
     private val messengerPayoutRepository = mockk<MessengerPayoutRepository>()
     private val ambassadorPayoutRepository = mockk<AmbassadorPayoutRepository>()
     private val referralPartnerPayoutRepository = mockk<ReferralPartnerPayoutRepository>()
+    private val payoutBundleRepository = mockk<PayoutRepository>()
     private val foodCustomerCommissionRepo = mockk<FoodCustomerReferralCommissionRepo>()
     private val furnitureCustomerCommissionRepo = mockk<FurnitureCustomerReferralCommissionRepo>()
     private val storeStage1CommissionRepo = mockk<StorePartnerStage1CommissionRepo>()
@@ -48,6 +50,7 @@ class GenerateAmbassadorPayoutTest {
             messengerPayoutRepository = messengerPayoutRepository,
             ambassadorPayoutRepository = ambassadorPayoutRepository,
             referralPartnerPayoutRepository = referralPartnerPayoutRepository,
+            payoutBundleRepository = payoutBundleRepository,
             foodCustomerCommissionRepo = foodCustomerCommissionRepo,
             furnitureCustomerCommissionRepo = furnitureCustomerCommissionRepo,
             storeStage1CommissionRepo = storeStage1CommissionRepo,
