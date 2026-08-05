@@ -23,6 +23,7 @@ import io.curiousoft.izinga.recon.ambassador.AmbassadorProperties
 import io.curiousoft.izinga.recon.payout.*
 import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
+import io.curiousoft.izinga.recon.payout.repo.PayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ReferralPartnerPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
 import org.slf4j.LoggerFactory
@@ -46,6 +47,7 @@ class ReconServiceImpl(
     private val messengerPayoutRepository: MessengerPayoutRepository,
     private val ambassadorPayoutRepository: AmbassadorPayoutRepository,
     private val referralPartnerPayoutRepository: ReferralPartnerPayoutRepository,
+    private val payoutBundleRepository: PayoutRepository,
     private val foodCustomerCommissionRepo: FoodCustomerReferralCommissionRepo,
     private val furnitureCustomerCommissionRepo: FurnitureCustomerReferralCommissionRepo,
     private val storeStage1CommissionRepo: StorePartnerStage1CommissionRepo,
@@ -429,8 +431,22 @@ class ReconServiceImpl(
             createdBy = "izinga-system")
     }
 
-    override fun findPayout(bundleId: String, payoutId: String): Payout? = shopPayoutRepo.findByIdOrNull(payoutId)
-        ?: messengerPayoutRepository.findByIdOrNull(payoutId)
+    override fun findPayout(bundleId: String, payoutId: String): Payout? {
+        val bundle = payoutBundleRepository.findByIdOrNull(bundleId)
+        return when (bundle?.type) {
+            PayoutType.SHOP -> shopPayoutRepo.findByIdOrNull(payoutId)
+            PayoutType.MESSENGER -> messengerPayoutRepository.findByIdOrNull(payoutId)
+            PayoutType.AMBASSADOR -> ambassadorPayoutRepository.findByIdOrNull(payoutId)
+            PayoutType.REFERRAL_PARTNER -> referralPartnerPayoutRepository.findByIdOrNull(payoutId)
+            null -> {
+                logger.warn("[findPayout] bundle {} not found; falling back to cross-repo scan for payout {}", bundleId, payoutId)
+                shopPayoutRepo.findByIdOrNull(payoutId)
+                    ?: messengerPayoutRepository.findByIdOrNull(payoutId)
+                    ?: ambassadorPayoutRepository.findByIdOrNull(payoutId)
+                    ?: referralPartnerPayoutRepository.findByIdOrNull(payoutId)
+            }
+        }
+    }
 
     // RP-009 ─────────────────────────────────────────────────────────────────
 
