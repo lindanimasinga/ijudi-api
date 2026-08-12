@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.reflect.Field;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
@@ -265,5 +266,107 @@ class CancellationFeeCalculationServiceTest {
         assertEquals(10.55, CancellationFeeCalculationService.roundToTwoDecimals(10.554), 0.0001);
         assertEquals(10.56, CancellationFeeCalculationService.roundToTwoDecimals(10.555), 0.0001);
         assertEquals(0.0,  CancellationFeeCalculationService.roundToTwoDecimals(0.0),   0.0001);
+    }
+
+    // -------------------------------------------------------------------------
+    // QA gap 1: null createdDate → calculateNoticePeriodMinutes returns 0L (line 98)
+    // Simulates a MongoDB document that was written without a createdDate field.
+    // The Kotlin setter enforces non-null, so we bypass it via reflection.
+    // -------------------------------------------------------------------------
+
+    @Test
+    void calculate_nullCreatedDate_noticePeriodIsZero_penaltyApplied() throws Exception {
+        CancellationPolicy policy = defaultZeroPolicy();
+        policy.setNoticePeriodThresholdsMinutes(new int[]{60});
+        policy.setNoticePeriodPenaltiesZAR(new double[]{50.0});
+        Map<String, Double> ceilings = new HashMap<>();
+        ceilings.put(OrderStage.STAGE_1_WAITING_STORE_CONFIRM.name(), 100.0);
+        policy.setStageCeilings(ceilings);
+        when(policyCache.getPolicy()).thenReturn(policy);
+
+        Order order = new Order();
+        order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        // Bypass Kotlin non-null setter to simulate a MongoDB doc with no createdDate field
+        Field createdDateField = order.getClass().getSuperclass().getDeclaredField("createdDate");
+        createdDateField.setAccessible(true);
+        createdDateField.set(order, null);
+
+        // calculateNoticePeriodMinutes receives null → returns 0L → 0 < 60 → penalty[0] = 50.0
+        CancellationFeeResult result = sut.calculate(order, Instant.now());
+
+        assertEquals(50.0, result.getCalculatedFeeZAR(), 0.01);
+    }
+
+    // -------------------------------------------------------------------------
+    // QA gap 2: null thresholds array → null check at line 108 returns 0.0
+    // -------------------------------------------------------------------------
+
+    @Test
+    void calculate_nullThresholds_returnsZeroPenalty() {
+        CancellationPolicy policy = new CancellationPolicy();
+        policy.setNoticePeriodThresholdsMinutes(null);  // explicitly null — not empty
+        policy.setNoticePeriodPenaltiesZAR(new double[]{50.0});
+        policy.setStageCeilings(new HashMap<>());
+        policy.setIndustryRateFloor(0.0);
+        when(policyCache.getPolicy()).thenReturn(policy);
+
+        Order order = orderWithStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+
+        CancellationFeeResult result = sut.calculate(order, Instant.now());
+
+        // thresholds == null → early return 0.0 → no penalty regardless of notice period
+        assertEquals(0.0, result.getCalculatedFeeZAR(), 0.0001);
+    }
+
+    // -------------------------------------------------------------------------
+    // QA gap 3: mismatched array lengths — i >= penalties.length path (line 114)
+    // thresholds has entries but penalties is shorter (empty) → (i < penalties.length) == false
+    // -------------------------------------------------------------------------
+
+    @Test
+    void calculate_mismatchedArrayLengths_returnsZeroForExceededPenalties() {
+        CancellationPolicy policy = new CancellationPolicy();
+        // thresholds length=1, penalties length=0 → mismatch
+        policy.setNoticePeriodThresholdsMinutes(new int[]{60});
+        policy.setNoticePeriodPenaltiesZAR(new double[0]);  // empty, not null (null case is gap 2)
+        Map<String, Double> ceilings = new HashMap<>();
+        ceilings.put(OrderStage.STAGE_1_WAITING_STORE_CONFIRM.name(), 100.0);
+        policy.setStageCeilings(ceilings);
+        policy.setIndustryRateFloor(0.0);
+        when(policyCache.getPolicy()).thenReturn(policy);
+
+        Order order = new Order();
+        order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        order.setCreatedDate(new Date()); // very recent → notice ≈ 0 < 60 → enters body at i=0
+
+        CancellationFeeResult result = sut.calculate(order, Instant.now());
+
+        // i=0, penalties.length=0 → i >= penalties.length → return 0.0; raw 0.0 capped at 100.0 → 0.0
+        assertEquals(0.0, result.getCalculatedFeeZAR(), 0.0001);
+    }
+
+    // -------------------------------------------------------------------------
+    // QA gap 4: null getStageCeilings() map → null-ceilings branch at line 141
+    // (null-stage is already covered; this covers the null-map path specifically)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void calculate_nullStageCeilings_treatedAsZeroCeiling() {
+        CancellationPolicy policy = new CancellationPolicy();
+        policy.setNoticePeriodThresholdsMinutes(new int[]{60});
+        policy.setNoticePeriodPenaltiesZAR(new double[]{100.0});
+        policy.setStageCeilings(null);   // null map → ceiling = 0.0 regardless of stage
+        policy.setIndustryRateFloor(0.0);
+        policy.setReBookDefaultAvailable(false);
+        when(policyCache.getPolicy()).thenReturn(policy);
+
+        Order order = new Order();
+        order.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        order.setCreatedDate(new Date()); // very recent → notice ≈ 0 < 60 → penalty = 100.0
+
+        CancellationFeeResult result = sut.calculate(order, Instant.now());
+
+        // rawFee = 100.0; getStageCeilings() == null → stageCeiling = 0.0 → cappedFee = 0.0
+        assertEquals(0.0, result.getCalculatedFeeZAR(), 0.0001);
     }
 }

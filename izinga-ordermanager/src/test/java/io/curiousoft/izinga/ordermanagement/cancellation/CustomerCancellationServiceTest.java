@@ -107,6 +107,8 @@ class CustomerCancellationServiceTest {
         verify(feeCalculationService, times(1)).calculate(eq(order), any(Instant.class));
         // Must NOT save, change stage, or fire notifications
         verify(orderRepository, never()).save(any());
+        // QA assertion gap: preview must NEVER write an audit entry — asserted explicitly
+        verify(auditService, never()).insert(any(), any(), anyDouble(), anyDouble(), any(), any(), any(), any());
     }
 
     @Test
@@ -360,6 +362,41 @@ class CustomerCancellationServiceTest {
     // -------------------------------------------------------------------------
     // buildToken / computeHmac internals
     // -------------------------------------------------------------------------
+
+    // -------------------------------------------------------------------------
+    // QA gap 5: null PaymentType → "UNKNOWN" branch in audit call (line 205)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void confirmCustomerCancelOrder_nullPaymentType_usesUnknownInAudit() {
+        Order order = cancelableOrder("ord-17", OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
+        order.setPaymentType(null);  // PaymentType? is nullable in Kotlin — setter accepts null
+        when(orderRepository.findById("ord-17")).thenReturn(Optional.of(order));
+        when(policyCache.getPolicy()).thenReturn(defaultPolicy());
+        when(feeCalculationService.calculate(any(Order.class)))
+                .thenReturn(feeResult(0.0, OrderStage.STAGE_1_WAITING_STORE_CONFIRM));
+        when(paymentHandler.handle(any(), anyDouble(), anyDouble())).thenReturn(paymentResult());
+
+        CancellationAuditLog auditLog = new CancellationAuditLog();
+        auditLog.setId("audit-003");
+        when(auditService.insert(any(), any(), anyDouble(), anyDouble(),
+                any(), any(), any(), any())).thenReturn(auditLog);
+
+        Order saved = new Order();
+        saved.setId("ord-17");
+        saved.setStage(OrderStage.CANCELLED);
+        saved.setBasket(new Basket());
+        when(orderRepository.save(any())).thenReturn(saved);
+
+        String token = sut.buildToken("ord-17", 0.0,
+                Instant.now().plus(15, ChronoUnit.MINUTES).getEpochSecond());
+
+        sut.confirmCustomerCancelOrder("ord-17", token);
+
+        // paymentType == null → ternary returns "UNKNOWN" — must be passed to audit service
+        verify(auditService).insert(any(), any(), anyDouble(), anyDouble(),
+                any(), any(), eq("UNKNOWN"), any());
+    }
 
     @Test
     void buildToken_deterministic() {

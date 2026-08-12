@@ -189,7 +189,14 @@ public class CustomerCancellationService {
         double calculatedFeeZAR = freshFeeResult.getCalculatedFeeZAR();
         double netRefundDueZAR  = freshFeeResult.netRefundZAR(order.getTotalAmount());
 
-        // --- Payment handler: get result BEFORE audit so we can record the handler name ---
+        // --- Payment handler: get result BEFORE audit so we can record the handler name.
+        // PHASE 2 ORDERING CONSTRAINT (architectural note for future implementors):
+        // ManualReconciliationPaymentHandler has zero external side effects — no Yoco call,
+        // no money moved — so this ordering (payment handler before audit write) is safe for
+        // Phase 1. If a future payment handler (Phase 2 / Option B) makes real Yoco API calls,
+        // this ordering MUST be reversed: (1) write audit first, then (2) invoke payment action.
+        // Running payment before audit in that scenario would leave a completed charge with no
+        // CPA-compliant record if the audit write fails. ---
         CancellationPaymentResult paymentResult = paymentHandler.handle(order, calculatedFeeZAR, netRefundDueZAR);
 
         // --- Audit log FIRST — abort if it fails (CPA compliance requires this) ---
