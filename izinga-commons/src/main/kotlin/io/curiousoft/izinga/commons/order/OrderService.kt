@@ -36,4 +36,10 @@ interface OrderService {
 
     fun cancelOrder(id: String?): Order?
     fun acceptQuote(orderId: String, quoteApproval: QouteApproval): Order?
+
+    // ADR-019: CPA-compliant customer cancellation — read-only preview; does NOT change order state
+    fun previewCancellationFee(orderId: String): CancellationPreviewResponse
+
+    // ADR-019: Confirm customer-initiated cancellation after token validation
+    fun confirmCustomerCancelOrder(orderId: String, feeToken: String): Order
 }

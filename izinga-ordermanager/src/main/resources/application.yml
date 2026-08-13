@@ -123,6 +123,13 @@ izinga:
     ambassador:
         commission-amount: 70.00
 
+cancellation:
+    fee:
+        # HMAC-SHA256 key for signing fee tokens. Override via AWS Secrets Manager in production.
+        hmac-secret: ${CANCELLATION_FEE_HMAC_SECRET:change-me-in-production-replace-before-launch}
+        # How long the cached cancellation policy document is considered fresh (minutes).
+        policy-cache-ttl-minutes: 5
+
 client:
     config:
         default:

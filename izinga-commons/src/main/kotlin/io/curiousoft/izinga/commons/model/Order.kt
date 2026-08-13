@@ -43,6 +43,11 @@ open class Order : BaseModel() {
     var documents: Set<DocumentAttachment>? = null
     var statusHistory: MutableList<OrderStatusHistory>? = mutableListOf()
 
+    // ADR-019: CPA-compliant customer cancellation fields — nullable so existing documents are unaffected
+    var cancellationFee: Double? = null
+    var cancellationConfirmedAt: Date? = null
+    var cancellationAuditId: String? = null
+
     fun addStatusHistory(stage: OrderStage?, lati: Double? = null, longi: Double? = null) {
         if (stage == null) {
             return
