@@ -106,6 +106,54 @@ class StoreServiceSecurityTest {
         verify(storeRepository, never()).save(any());
     }
 
+    /**
+     * GAP-3a: proves the ownership check reads the PERSISTED store's ownerId, not the incoming body.
+     *
+     * Setup: persisted.ownerId = OWNER_ID; incoming body ownerId is deliberately different ("spoofed-id").
+     * Auth principal = OWNER_ID (matches persisted, not incoming body).
+     *
+     * If the code accidentally used incoming.getOwnerId() it would compare OWNER_ID vs "spoofed-id"
+     * and throw FORBIDDEN.  Since it uses persisted.getOwnerId() the check passes and save is called.
+     */
+    @Test
+    void update_persistedOwnerMatchesAuth_succeedsEvenWhenIncomingBodyOwnerIdDiffers() throws Exception {
+        StoreProfile persisted = makeStore(STORE_ID, OWNER_ID);
+        StoreProfile incoming = makeStore(STORE_ID, "spoofed-id"); // deliberately different from persisted
+        Authentication auth = mockAuth(OWNER_ID, false); // auth principal matches PERSISTED ownerId
+
+        when(storeRepository.findById(STORE_ID)).thenReturn(Optional.of(persisted));
+        when(storeRepository.save(any(StoreProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        StoreProfile result = storeService.update(STORE_ID, incoming, auth);
+
+        assertNotNull(result, "Caller whose id matches persisted ownerId must be allowed even when the request body carries a different ownerId");
+        verify(storeRepository, atLeastOnce()).save(any(StoreProfile.class));
+    }
+
+    /**
+     * GAP-3b: proves that spoofing the incoming body's ownerId to match the auth principal does not
+     * bypass the persisted-record check.
+     *
+     * Setup: persisted.ownerId = OWNER_ID (the real owner).
+     * Attacker sends request with their own id in the body AND as the auth principal, but the
+     * persisted record still has OWNER_ID.  The check must use persisted.getOwnerId() and reject.
+     */
+    @Test
+    void update_spoofedIncomingOwnerIdMatchingAuth_doesNotBypassPersistedCheck() {
+        StoreProfile persisted = makeStore(STORE_ID, OWNER_ID); // real owner in DB
+        StoreProfile incoming = makeStore(STORE_ID, OTHER_USER_ID); // attacker puts their own id in body
+        Authentication auth = mockAuth(OTHER_USER_ID, false); // attacker's auth token
+
+        when(storeRepository.findById(STORE_ID)).thenReturn(Optional.of(persisted));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> storeService.update(STORE_ID, incoming, auth));
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode(),
+                "Spoofing incoming body ownerId to match auth must still be FORBIDDEN when it differs from the persisted ownerId");
+        verify(storeRepository, never()).save(any());
+    }
+
     @Test
     void update_storeNotFoundThrowsException() {
         Authentication auth = mockAuth(OWNER_ID, false);
