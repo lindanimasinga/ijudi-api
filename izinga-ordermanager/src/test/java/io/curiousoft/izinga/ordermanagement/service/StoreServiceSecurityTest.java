@@ -107,6 +107,44 @@ class StoreServiceSecurityTest {
     }
 
     /**
+     * NOTE-01: ownerId in the PATCH body must be silently ignored — the persisted ownerId is always
+     * preserved after update, even when the owner sends a different ownerId in the request body.
+     */
+    @Test
+    void update_ownerIdInBodyIsIgnored_persistedOwnerIdPreserved() throws Exception {
+        StoreProfile persisted = makeStore(STORE_ID, OWNER_ID);
+        StoreProfile incoming = makeStore(STORE_ID, "attempted-new-owner-id");
+        Authentication auth = mockAuth(OWNER_ID, false);
+
+        when(storeRepository.findById(STORE_ID)).thenReturn(Optional.of(persisted));
+        when(storeRepository.save(any(StoreProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        StoreProfile result = storeService.update(STORE_ID, incoming, auth);
+
+        assertEquals(OWNER_ID, result.getOwnerId(),
+                "ownerId must remain the persisted value — ownership transfer via PATCH is not allowed");
+    }
+
+    /**
+     * NOTE-01: same guarantee applies when an admin is the caller — even ROLE_ADMIN cannot transfer
+     * ownership via the PATCH body.
+     */
+    @Test
+    void update_adminCannotTransferOwnershipViaBody() throws Exception {
+        StoreProfile persisted = makeStore(STORE_ID, OWNER_ID);
+        StoreProfile incoming = makeStore(STORE_ID, "new-owner-attempted-by-admin");
+        Authentication auth = mockAuth(OTHER_USER_ID, true);
+
+        when(storeRepository.findById(STORE_ID)).thenReturn(Optional.of(persisted));
+        when(storeRepository.save(any(StoreProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        StoreProfile result = storeService.update(STORE_ID, incoming, auth);
+
+        assertEquals(OWNER_ID, result.getOwnerId(),
+                "Admin PATCH must also preserve persisted ownerId — no ownership transfer via this endpoint");
+    }
+
+    /**
      * GAP-3a: proves the ownership check reads the PERSISTED store's ownerId, not the incoming body.
      *
      * Setup: persisted.ownerId = OWNER_ID; incoming body ownerId is deliberately different ("spoofed-id").

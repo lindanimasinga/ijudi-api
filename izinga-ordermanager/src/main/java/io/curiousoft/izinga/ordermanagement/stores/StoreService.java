@@ -147,6 +147,10 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "You do not have permission to update this store");
         }
+        // NOTE-01: ownership transfer via PATCH /store/{id} is not permitted — strip any ownerId
+        // the caller supplied in the body and restore the persisted value before delegating to the
+        // base update so that BeanUtils.copyProperties cannot overwrite it.
+        incoming.setOwnerId(persisted.getOwnerId());
         return update(storeId, incoming);
     }
 
