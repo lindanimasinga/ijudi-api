@@ -17,7 +17,9 @@ import org.springframework.security.web.firewall.StrictHttpFirewall;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import static org.springframework.http.HttpMethod.DELETE;
 import static org.springframework.http.HttpMethod.GET;
+import static org.springframework.http.HttpMethod.PATCH;
 import static org.springframework.http.HttpMethod.POST;
 
 @Configuration
@@ -44,6 +46,10 @@ public class SecurityConfig {
                         .requestMatchers("/v2/**").authenticated()
                         .requestMatchers(GET, "/user/*/ambassador-qr", "/user/*/ambassador-drivers", "/user/*/ambassador-payouts").authenticated()
                         .requestMatchers(POST, "/ambassador").hasRole("ADMIN")
+                        // SEC-01: store write endpoints require authentication; DELETE restricted to ADMIN
+                        .requestMatchers(POST, "/store").authenticated()
+                        .requestMatchers(PATCH, "/store/*", "/store/*/stock").authenticated()
+                        .requestMatchers(DELETE, "/store/*").hasRole("ADMIN")
                         .anyRequest().permitAll()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
