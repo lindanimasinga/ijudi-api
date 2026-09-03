@@ -124,6 +124,19 @@
             <artifactId>jpasskit</artifactId>
             <version>0.3.4</version>
         </dependency>
+        <!-- Firebase Admin SDK — custom token minting for WhatsApp OTP login -->
+        <dependency>
+            <groupId>com.google.firebase</groupId>
+            <artifactId>firebase-admin</artifactId>
+            <version>9.3.0</version>
+            <exclusions>
+                <!-- exclude grpc transports not needed for Auth-only usage -->
+                <exclusion>
+                    <groupId>io.grpc</groupId>
+                    <artifactId>grpc-netty-shaded</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
     </dependencies>
 
     <build>
