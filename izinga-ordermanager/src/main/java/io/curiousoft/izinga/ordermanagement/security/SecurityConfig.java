@@ -41,6 +41,10 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/sse", "/mcp/message", "/mcp/**").permitAll()
+                        // WhatsApp OTP login endpoints — explicit POST-only, intentionally unauthenticated
+                        // Rate-limited inside WhatsAppOtpService (per-phone + per-IP). SEC-01.
+                        .requestMatchers(POST, "/auth/whatsapp/otp/send").permitAll()
+                        .requestMatchers(POST, "/auth/whatsapp/otp/verify").permitAll()
                         .requestMatchers(GET, "/v2/promotion/**", "/v2/store/**").permitAll()
                         .requestMatchers(POST, "/v2/leads").permitAll()
                         .requestMatchers("/v2/**").authenticated()
