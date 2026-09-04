@@ -1,10 +1,12 @@
 package io.curiousoft.izinga.ordermanagement.orders;
 
 import io.curiousoft.izinga.commons.model.*;
+import io.curiousoft.izinga.commons.order.CancellationPreviewResponse;
 import io.curiousoft.izinga.commons.order.DeliveryPriceEstimateDto;
 import io.curiousoft.izinga.commons.order.MessengerOrderDto;
 import io.curiousoft.izinga.commons.order.OrderService;
 import io.curiousoft.izinga.commons.order.events.*;
+import io.curiousoft.izinga.ordermanagement.cancellation.CustomerCancellationService;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
@@ -66,6 +68,10 @@ public class OrderServiceImpl implements OrderService {
     private final RestrictedRegionService restrictedRegionService;
     private final OrderQuoteRepository quoteRepository;
     private final LeadService leadService;
+
+    // ADR-019: injected via field to avoid disrupting the existing constructor
+    @Autowired
+    private CustomerCancellationService customerCancellationService;
 
     @Autowired
     public OrderServiceImpl(@Value("${service.delivery.standardFee}") double starndardDeliveryFee,
@@ -731,5 +737,19 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return saved;
+    }
+
+    // -------------------------------------------------------------------------
+    // ADR-019: CPA-compliant customer cancellation — delegates to CustomerCancellationService
+    // -------------------------------------------------------------------------
+
+    @Override
+    public CancellationPreviewResponse previewCancellationFee(String orderId) {
+        return customerCancellationService.previewCancellationFee(orderId);
+    }
+
+    @Override
+    public Order confirmCustomerCancelOrder(String orderId, String feeToken) {
+        return customerCancellationService.confirmCustomerCancelOrder(orderId, feeToken);
     }
 }

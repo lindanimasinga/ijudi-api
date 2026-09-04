@@ -11,8 +11,11 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.DayOfWeek;
 import java.util.*;
@@ -130,6 +133,42 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         );
     }
 
+
+    /**
+     * SEC-01: authenticated update — enforces that the caller either owns the store or holds ROLE_ADMIN.
+     * The ownership check is performed against the PERSISTED record's ownerId, not the request body.
+     */
+    public StoreProfile update(String storeId, StoreProfile incoming, Authentication authentication) throws Exception {
+        StoreProfile persisted = profileRepo.findById(storeId)
+                .orElseThrow(() -> new Exception("Profile not found"));
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (!isAdmin && !authentication.getName().equals(persisted.getOwnerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You do not have permission to update this store");
+        }
+        // NOTE-01: ownership transfer via PATCH /store/{id} is not permitted — strip any ownerId
+        // the caller supplied in the body and restore the persisted value before delegating to the
+        // base update so that BeanUtils.copyProperties cannot overwrite it.
+        incoming.setOwnerId(persisted.getOwnerId());
+        return update(storeId, incoming);
+    }
+
+    /**
+     * SEC-01: authenticated stock update — enforces that the caller either owns the store or holds ROLE_ADMIN.
+     * The ownership check is performed against the PERSISTED record's ownerId.
+     */
+    public void addStockForShop(String profileId, Stock stock, Authentication authentication) throws Exception {
+        StoreProfile persisted = profileRepo.findById(profileId)
+                .orElseThrow(() -> new Exception("Profile not found"));
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (!isAdmin && !authentication.getName().equals(persisted.getOwnerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You do not have permission to update stock for this store");
+        }
+        addStockForShop(profileId, stock);
+    }
 
     @Tool(name = "find_stores_by_owner", description = "Find all store profiles owned by a specific user ID.")
     public List<StoreProfile> findByOwner(String ownerId) {

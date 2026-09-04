@@ -3,6 +3,8 @@ package io.curiousoft.izinga.ordermanagement.stores;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import io.curiousoft.izinga.commons.model.*;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,16 +27,25 @@ public class StoreControler {
         this.userProfileService = userProfileService;
     }
 
+    @PreAuthorize("isAuthenticated()")
     @RequestMapping(method = RequestMethod.POST, consumes = "application/json", produces = "application/json")
     public ResponseEntity<StoreProfile> create(
             @Valid @RequestBody StoreProfile profile,
-            @RequestParam(required = false) String referralCode) throws Exception {
+            @RequestParam(required = false) String referralCode,
+            Authentication authentication) throws Exception {
+        // Derive ownerId from the authenticated principal — never trust the request body.
+        profile.setOwnerId(authentication.getName());
         return ResponseEntity.ok(storeService.create(profile, referralCode));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PatchMapping(value = "/{id}", consumes = "application/json", produces = "application/json")
-    public ResponseEntity<StoreProfile> update(@PathVariable String id, @Valid @RequestBody StoreProfile profile) throws Exception {
-        return !id.equals(profile.getId())? ResponseEntity.badRequest().build() : ResponseEntity.ok(storeService.update(id, profile));
+    public ResponseEntity<StoreProfile> update(
+            @PathVariable String id,
+            @Valid @RequestBody StoreProfile profile,
+            Authentication authentication) throws Exception {
+        if (!id.equals(profile.getId())) return ResponseEntity.badRequest().build();
+        return ResponseEntity.ok(storeService.update(id, profile, authentication));
     }
 
     @GetMapping(value = "/{id}", produces = "application/json")
@@ -49,12 +60,17 @@ public class StoreControler {
         return stock != null ? ResponseEntity.ok(stock) : ResponseEntity.notFound().build();
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PatchMapping(value = "/{id}/stock", produces = "application/json")
-    public ResponseEntity findStockForStore(@Valid @RequestBody Stock stock, @PathVariable String id) throws Exception {
-        storeService.addStockForShop(id, stock);
+    public ResponseEntity findStockForStore(
+            @Valid @RequestBody Stock stock,
+            @PathVariable String id,
+            Authentication authentication) throws Exception {
+        storeService.addStockForShop(id, stock, authentication);
         return ResponseEntity.ok().build();
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping(value = "/{id}", produces = "application/json")
     public ResponseEntity deleteStore(@PathVariable String id) {
         storeService.delete(id);
