@@ -2,18 +2,24 @@ package io.curiousoft.izinga.messaging.whatsapp;
 
 import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistoryService;
 import io.curiousoft.izinga.messaging.firebase.FirestoreService;
+import io.curiousoft.izinga.messaging.repo.WhatsappSessionRepo;
+import io.curiousoft.izinga.messaging.whatsapp.lines.WhatsappSenderResolver;
+import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTextRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+/** SEC-05: /forward/** requires ADMIN or STORE_ADMIN Bearer JWT. */
 @RestController
 @RequestMapping("/forward")
+@PreAuthorize("hasRole('ADMIN') or hasRole('STORE_ADMIN')")
 public class FirestoreToWhatsappController {
 
     private static final Logger LOG = LoggerFactory.getLogger(FirestoreToWhatsappController.class);
@@ -22,14 +28,21 @@ public class FirestoreToWhatsappController {
     private final WhatsAppService whatsAppService;
     private final WhatsappConfig whatsappConfig;
     private final ConversationHistoryService conversationHistoryService;
+    /** REQ-08: resolver for outbound phone line; used when session has no phoneNumberId (legacy). */
+    private final WhatsappSenderResolver senderResolver;
+    private final WhatsappSessionRepo whatsappSessionRepo;
 
     public FirestoreToWhatsappController(FirestoreService firestoreService, WhatsAppService whatsAppService,
                                          WhatsappConfig whatsappConfig,
-                                         ConversationHistoryService conversationHistoryService) {
+                                         ConversationHistoryService conversationHistoryService,
+                                         WhatsappSenderResolver senderResolver,
+                                         WhatsappSessionRepo whatsappSessionRepo) {
         this.firestoreService = firestoreService;
         this.whatsAppService = whatsAppService;
         this.whatsappConfig = whatsappConfig;
         this.conversationHistoryService = conversationHistoryService;
+        this.senderResolver = senderResolver;
+        this.whatsappSessionRepo = whatsappSessionRepo;
     }
 
     /**
@@ -69,8 +82,10 @@ public class FirestoreToWhatsappController {
             t.setBody(msg.getMessage());
             req.setText(t);
 
-            LOG.info("Sending WhatsApp message to {} via phoneId={}", normalizedTo, whatsappConfig.phoneId());
-            var resp = whatsAppService.sendTextMessage(whatsappConfig.phoneId(), req).execute();
+            // REQ-08: resolve phoneId from session's recorded line; fallback to CUSTOMER resolver
+            String phoneId = resolvePhoneIdForSession(session.getCustomerMobileNumber());
+            LOG.info("Sending WhatsApp message to {} via phoneId={}", normalizedTo, phoneId);
+            var resp = whatsAppService.sendTextMessage(phoneId, req).execute();
             if (!resp.isSuccessful()) {
                 LOG.error("Failed to forward message: {} {}", resp.code(),
                         resp.errorBody() != null ? resp.errorBody().string() : "");
@@ -91,6 +106,18 @@ public class FirestoreToWhatsappController {
             LOG.error("Error forwarding message to WhatsApp", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
+    }
+
+    /** REQ-08: resolve outbound phoneId using the WA session's stored phoneNumberId, falling back to resolver. */
+    private String resolvePhoneIdForSession(String customerMobileNumber) {
+        if (customerMobileNumber != null) {
+            var sessionOpt = whatsappSessionRepo.findByFrom(normalizePhone(customerMobileNumber));
+            if (sessionOpt.isPresent() && sessionOpt.get().getPhoneNumberId() != null) {
+                return sessionOpt.get().getPhoneNumberId();
+            }
+        }
+        // REQ-16: human handoff sends from the same line the person wrote to
+        return senderResolver.resolve(Audience.CUSTOMER, null);
     }
 
     private static String normalizePhone(String phone) {
