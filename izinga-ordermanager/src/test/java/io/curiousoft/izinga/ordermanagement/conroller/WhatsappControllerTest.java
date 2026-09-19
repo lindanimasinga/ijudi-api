@@ -1,8 +1,14 @@
 package io.curiousoft.izinga.ordermanagement.conroller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.curiousoft.izinga.messaging.whatsapp.WhatsappConfig;
 import io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsAppWebhookController;
 import io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsappWebhookPayload;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.util.HexFormat;
 import io.curiousoft.izinga.ordermanagement.IjudiApplication;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -28,6 +34,9 @@ public class WhatsappControllerTest {
 
     @MockBean
     private ApplicationEventPublisher eventPublisher;
+
+    @MockBean
+    private WhatsappConfig whatsappConfig;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -74,7 +83,13 @@ public class WhatsappControllerTest {
                 "  ]\n" +
                 "}", WhatsappWebhookPayload.class);
 
-        mockMvc.receiveWebhook(payload);
+        // Build a valid HMAC signature using the test secret so the controller accepts the request
+        byte[] rawBody = objectMapper.writeValueAsBytes(payload);
+        String secret = "test-secret";
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        String sig = "sha256=" + HexFormat.of().formatHex(mac.doFinal(rawBody));
+        mockMvc.receiveWebhook(sig, rawBody);
 
         // verify that the controller published an inbound event for other components to consume
         verify(eventPublisher, times(1)).publishEvent(any());
