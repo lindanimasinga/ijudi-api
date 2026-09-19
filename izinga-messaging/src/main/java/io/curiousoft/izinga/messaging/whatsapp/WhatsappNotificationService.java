@@ -2,6 +2,8 @@ package io.curiousoft.izinga.messaging.whatsapp;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.izinga.commons.model.*;
+import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
+import io.curiousoft.izinga.messaging.whatsapp.lines.WhatsappSenderResolver;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateRequest;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTextRequest;
 import org.jetbrains.annotations.Nullable;
@@ -30,14 +32,18 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
     private final WhatsappConfig whatsappConfig;
     private final ObjectMapper mapper;
     private final String driverWelcomeVideoUrl;
+    /** REQ-08/SA-7: outbound phone line resolver — replaces all direct whatsappConfig.phoneId() call sites. */
+    private final WhatsappSenderResolver senderResolver;
 
     public WhatsappNotificationService(WhatsAppService whatsAppService,
                                        io.curiousoft.izinga.messaging.whatsapp.WhatsappConfig whatsappConfig, ObjectMapper mapper,
-                                       @Value("${whatsapp.driver.welcome.videoUrl:https://izinga-aut.s3.af-south-1.amazonaws.com/output.mp4}") String driverWelcomeVideoUrl) {
+                                       @Value("${whatsapp.driver.welcome.videoUrl:https://izinga-aut.s3.af-south-1.amazonaws.com/output.mp4}") String driverWelcomeVideoUrl,
+                                       WhatsappSenderResolver senderResolver) {
         this.whatsAppService = whatsAppService;
         this.whatsappConfig = whatsappConfig;
         this.mapper = mapper;
         this.driverWelcomeVideoUrl = driverWelcomeVideoUrl;
+        this.senderResolver = senderResolver;
     }
 
     @Override
@@ -50,7 +56,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
             var waMessage = new WhatsappTextRequest.Text();
             waMessage.setBody(message);
             request.setText(waMessage);
-            whatsAppService.sendTextMessage(whatsappConfig.phoneId(), request).execute();
+            whatsAppService.sendTextMessage(senderResolver.resolve(Audience.CUSTOMER, null), request).execute();
             LOGGER.info("Sent text message to {}: {}", to, message);
         } catch (IOException e) {
             LOGGER.error("Failed to send text message to {}: {}", mobileNumber, message, e);
@@ -98,7 +104,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
 
             var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
             request.setTemplate(template);
-            whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+            whatsAppService.sendMessage(senderResolver.resolve(Audience.DRIVER, null), request).execute();
             LOGGER.info("Sent driver welcome message to {}", to);
         } catch (IOException e) {
             LOGGER.error("Failed to send welcome message to driver {}", mobileNumber, e);
@@ -133,7 +139,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
 
             var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
             request.setTemplate(template);
-            whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+            whatsAppService.sendMessage(senderResolver.resolve(Audience.DRIVER, null), request).execute();
             LOGGER.info("Sent driver approved message to {}", to);
         } catch (IOException e) {
             LOGGER.error("Failed to send driver approved message to {}", mobileNumber, e);
@@ -166,7 +172,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 .replaceAll("#name", store.getName());
         var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
         request.setTemplate(template);
-        whatsAppService.sendMessage(whatsappConfig.phoneId(), request)
+        whatsAppService.sendMessage(senderResolver.resolve(Audience.CUSTOMER, null), request)
                 .execute();
     }
 
@@ -218,7 +224,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 .replaceAll("#shop", shop.getName());
         var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
         request.setTemplate(template);
-        whatsAppService.sendMessage(whatsappConfig.phoneId(), request)
+        whatsAppService.sendMessage(senderResolver.resolve(Audience.DRIVER, null), request)
                 .execute();
     }
 
@@ -248,7 +254,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 .replaceAll("#balance", payoutTotal.setScale(2, RoundingMode.HALF_EVEN).toString());
         var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
         request.setTemplate(template);
-        whatsAppService.sendMessage(whatsappConfig.phoneId(), request)
+        whatsAppService.sendMessage(senderResolver.resolve(Audience.DRIVER, null), request)
                 .execute();
     }
 
@@ -283,7 +289,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 .replaceAll("#payoutTotal", payoutTotal.setScale(2, RoundingMode.HALF_EVEN).toString());
         var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
         request.setTemplate(template);
-        whatsAppService.sendMessage(whatsappConfig.phoneId(), request)
+        whatsAppService.sendMessage(senderResolver.resolve(Audience.DRIVER, null), request)
                 .execute();
     }
 
@@ -315,7 +321,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 .replaceAll("#balance", payoutTotal.setScale(2, RoundingMode.HALF_EVEN).toString());
         var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
         request.setTemplate(template);
-        whatsAppService.sendMessage(whatsappConfig.phoneId(), request)
+        whatsAppService.sendMessage(senderResolver.resolve(Audience.DRIVER, null), request)
                 .execute();
     }
 
@@ -353,7 +359,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 .replaceAll("#name", userProfile.getName());
         var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
         request.setTemplate(template);
-        whatsAppService.sendMessage(whatsappConfig.phoneId(), request)
+        whatsAppService.sendMessage(senderResolver.resolve(Audience.CUSTOMER, null), request)
                 .execute();
     }
 
@@ -393,7 +399,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
 
         var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
         request.setTemplate(template);
-        whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+        whatsAppService.sendMessage(senderResolver.resolve(Audience.CUSTOMER, null), request).execute();
     }
 
     public void notifyShoppingListRun(UserProfile customer, StoreProfile shop, String shoppingListName, BigDecimal shoppingListTotalAmount, String shoppingListId) throws IOException {
@@ -446,7 +452,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 .replaceAll("#headerImage", shop.getImageUrl());
         var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
         request.setTemplate(template);
-        whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+        whatsAppService.sendMessage(senderResolver.resolve(Audience.CUSTOMER, null), request).execute();
     }
 
     // java
@@ -511,7 +517,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
         request.setTemplate(template);
 
         try {
-            whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+            whatsAppService.sendMessage(senderResolver.resolve(Audience.DRIVER, null), request).execute();
         } catch (IOException e) {
             LOGGER.error("Failed to send messenger quote available notification for order {} to {}",
                     order.getId(), (messenger != null ? messenger.getMobileNumber() : null), e);
@@ -547,7 +553,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
 
              var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
              request.setTemplate(template);
-             whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+             whatsAppService.sendMessage(senderResolver.resolve(Audience.CUSTOMER, null), request).execute();
              LOGGER.info("Sent landing options to {}", to);
          } catch (IOException e) {
              LOGGER.error("Failed to send landing options to {}", mobileNumber, e);
@@ -591,7 +597,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
 
             var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
             request.setTemplate(template);
-            whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+            whatsAppService.sendMessage(senderResolver.resolve(Audience.DRIVER, null), request).execute();
             LOGGER.info("Sent criminal check consent request to {}", to);
         } catch (IOException e) {
             LOGGER.error("Failed to send criminal check consent to {}", mobileNumber, e);
@@ -631,7 +637,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
 
             var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
             request.setTemplate(template);
-            whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+            whatsAppService.sendMessage(senderResolver.resolve(Audience.DRIVER, null), request).execute();
             LOGGER.info("Sent missing document reminder to {}", to);
         } catch (IOException e) {
             LOGGER.error("Failed to send missing document reminder to {}", mobileNumber, e);
@@ -647,7 +653,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 : mobileNumber);
         String displayName = customer.getName() != null ? customer.getName() : "Customer";
       request.setTemplate(buildNameOrderIdTemplate("driver_arrived_pickup", displayName, order.getId(), true, "en_US"));
-        whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+        whatsAppService.sendMessage(senderResolver.resolve(Audience.CUSTOMER, null), request).execute();
         LOGGER.info("Sent driver arrived for pickup notification to {}", mobileNumber);
     }
 
@@ -660,7 +666,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                 : mobileNumber);
         String displayName = customer.getName() != null ? customer.getName() : "Customer";
       request.setTemplate(buildNameOrderIdTemplate("driver_arrived_dropoff", displayName, order.getId(), false, "en"));
-        whatsAppService.sendMessage(whatsappConfig.phoneId(), request).execute();
+        whatsAppService.sendMessage(senderResolver.resolve(Audience.CUSTOMER, null), request).execute();
         LOGGER.info("Sent driver arrived for drop-off notification to {}", mobileNumber);
     }
 

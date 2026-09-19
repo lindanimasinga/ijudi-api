@@ -240,5 +240,50 @@ class ConversationHistoryServiceTest {
         assertEquals(42L, count);
         verify(repository, times(1)).countByArchivedFalse();
     }
+
+    /**
+     * Per-agent history isolation (REQ-11).
+     * Same driverPhoneNumber + two different agentNames must result in independent
+     * ConversationHistory documents — the compound lookup
+     * (driverPhoneNumber, agentName) must be respected.
+     */
+    @Test
+    void samePhone_twoAgents_isolatedHistories() {
+        String phone = "+27821234567";
+        String agentA = "driver_support";
+        String agentB = "customer_support";
+
+        ConversationHistory historyA = ConversationHistory.builder()
+                .id("conv-a")
+                .driverPhoneNumber(phone)
+                .agentName(agentA)
+                .messages(new ArrayList<>())
+                .archived(false)
+                .build();
+
+        ConversationHistory historyB = ConversationHistory.builder()
+                .id("conv-b")
+                .driverPhoneNumber(phone)
+                .agentName(agentB)
+                .messages(new ArrayList<>())
+                .archived(false)
+                .build();
+
+        // Per-agent compound lookup (new overload added in WA-LINES-01)
+        when(repository.findByDriverPhoneNumberAndAgentNameAndArchivedFalse(phone, agentA))
+                .thenReturn(Optional.of(historyA));
+        when(repository.findByDriverPhoneNumberAndAgentNameAndArchivedFalse(phone, agentB))
+                .thenReturn(Optional.of(historyB));
+
+        ConversationHistory resultA = service.getOrCreateConversation(phone, "Driver A", agentA);
+        ConversationHistory resultB = service.getOrCreateConversation(phone, "Driver A", agentB);
+
+        assertEquals("conv-a", resultA.getId());
+        assertEquals("conv-b", resultB.getId());
+        assertNotSame(resultA, resultB);
+
+        verify(repository).findByDriverPhoneNumberAndAgentNameAndArchivedFalse(phone, agentA);
+        verify(repository).findByDriverPhoneNumberAndAgentNameAndArchivedFalse(phone, agentB);
+    }
 }
 

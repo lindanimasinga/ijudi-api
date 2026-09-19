@@ -18,8 +18,9 @@ public class AiAgentConfigInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        // Initialize driver support agent if it doesn't exist
+        // REQ-19: idempotent upsert on startup for both default agents
         initializeDriverSupportAgent();
+        initializeCustomerSupportAgent();
     }
 
     private void initializeDriverSupportAgent() {
@@ -147,6 +148,45 @@ public class AiAgentConfigInitializer implements CommandLineRunner {
         String description = "AI agent for driver support and onboarding via WhatsApp";
 
         configService.saveAgentConfig(agentName, systemPrompt, description);
+    }
+
+    /** REQ-19: idempotent seed for customer_support agent. */
+    private void initializeCustomerSupportAgent() {
+        String agentName = "customer_support";
+        if (configService.getAgentConfig(agentName).isPresent()) {
+            return;
+        }
+        String systemPrompt = """
+                # Customer Support Agent for iZinga Customers
+
+                ## Primary Role
+                You are a professional customer service agent for iZinga customers (buyers and recipients of deliveries).
+
+                Your job is to help customers with:
+                - Order status and tracking
+                - Delivery ETAs and delays
+                - Payment and checkout queries
+                - Refunds and cancellations
+                - How to place or re-order
+                - How to use the iZinga app or website
+
+                ## Tone and Style
+                - Warm, professional, and reassuring.
+                - Use simple, non-technical language.
+                - Keep responses short and suitable for WhatsApp.
+
+                ## What You Should Not Do
+                - Do not discuss driver pay, driver approval, or driver onboarding.
+                - Do not access or share personal data of other customers.
+                - Do not promise refunds you cannot confirm.
+
+                ## Customer Portal
+                Customers can track and manage orders at: https://shop.izinga.co.za
+
+                ## Escalation
+                If you cannot resolve the issue, direct the customer to contact iZinga support at support@izinga.co.za or visit https://shop.izinga.co.za
+                """;
+        configService.saveAgentConfig(agentName, systemPrompt, "AI agent for customer support via WhatsApp");
     }
 }
 

@@ -8,6 +8,8 @@ import io.curiousoft.izinga.commons.model.UserProfile;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsAppService;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsappConfig;
+import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
+import io.curiousoft.izinga.messaging.whatsapp.lines.WhatsappSenderResolver;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateRequest;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import org.slf4j.Logger;
@@ -66,6 +68,8 @@ public class WhatsAppOtpService {
     private final FirebaseAuth firebaseAuth;
     private final UserProfileService userProfileService;
     private final UserProfileRepo userProfileRepo;
+    /** REQ-08/SA-7: outbound phone line resolver for OTP sends. */
+    private final WhatsappSenderResolver senderResolver;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public WhatsAppOtpService(
@@ -74,13 +78,15 @@ public class WhatsAppOtpService {
             WhatsappConfig whatsappConfig,
             FirebaseAuth firebaseAuth,
             UserProfileService userProfileService,
-            UserProfileRepo userProfileRepo) {
+            UserProfileRepo userProfileRepo,
+            WhatsappSenderResolver senderResolver) {
         this.otpRepository = otpRepository;
         this.whatsAppService = whatsAppService;
         this.whatsappConfig = whatsappConfig;
         this.firebaseAuth = firebaseAuth;
         this.userProfileService = userProfileService;
         this.userProfileRepo = userProfileRepo;
+        this.senderResolver = senderResolver;
     }
 
     /**
@@ -299,7 +305,7 @@ public class WhatsAppOtpService {
         req.setTemplate(template);
 
         try {
-            var call = whatsAppService.sendMessage(whatsappConfig.phoneId(), req);
+            var call = whatsAppService.sendMessage(senderResolver.resolve(Audience.OTP, null), req);
             var response = call.execute();
             if (!response.isSuccessful()) {
                 String errorBody = response.errorBody() != null

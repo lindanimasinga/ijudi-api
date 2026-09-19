@@ -4,6 +4,41 @@ All notable changes to ijudi-api are documented here.
 
 ---
 
+## [Unreleased] — WA-LINES-01 WhatsApp multi-line support
+
+**Feature Brief:** docs/feature-briefs/WA-LINES-01-feature-brief.md
+**Pre-deploy runbook:** docs/feature-briefs/WA-LINES-01-runbook.md
+
+### Changes
+
+- [NEW] **WA-LINES-01: WhatsApp multi-line support** — introduces a `WhatsappLine` document and repository, enabling the backend to manage multiple WhatsApp Business phone numbers (lines) mapped to different audiences (CUSTOMER, DRIVER, MERCHANT).
+- [NEW] **WhatsappSenderResolver** — resolves the correct outbound phone number ID for a given context, replacing the previous single-line global config.
+- [NEW] **LineContext record** — threads explicit pipeline context (phoneNumberId, agentName, storeId) through the entire inbound event handler pipeline (REQ-10).
+- [NEW] **WhatsappLineBootstrap** — idempotent startup seeding that registers configured lines in MongoDB on application start.
+- [NEW] **WhatsappLineAdminController** — `/admin/whatsapp-lines` CRUD endpoints secured to ADMIN role with full audit logging (SEC-06).
+- [NEW] **WhatsappLineAuditRecord** — append-only audit log for all line configuration mutations (SEC-06).
+- [NEW] **Compound session lookup** — `WhatsappSession` extended with `phoneNumberId` and `agentName`; compound-key index `findByFromAndPhoneNumberId` added (SEC-02).
+- [NEW] **Per-agent conversation cache** — single-entry Caffeine cache replaced with `ConcurrentHashMap` keyed per agent name.
+- [NEW] **Per-agent `handleWhatsappQueryForAgent` overloads** — `AiAgentConfigService` exposes named-agent dispatch (REQ-20).
+- [NEW] **HMAC-SHA256 webhook signature verification** — inbound webhook requests are verified against `X-Hub-Signature-256`; configurable via `whatsapp.cloud.appSecret` (SEC-01).
+- [NEW] **HumanCorrectionSanitizer** — strips prompt-injection attempts from human-correction payloads before they reach the AI pipeline (SEC-04).
+- [NEW] **PhoneNumberUtil** — normalises `0`-prefix South African numbers to E.164 format with null-safety guards.
+- [NEW] **Audience enum** — `CUSTOMER`, `DRIVER`, `MERCHANT` categorisation on `WhatsappLine`.
+- [NEW] **Security rules** — Spring Security extended with `/forward/**` (authenticated) and `/admin/whatsapp-lines/**` (ADMIN) path rules (SEC-05/SEC-06).
+- [IMPROVED] **WhatsappConfig** — extended with `multiLineEnabled` flag and `appSecret` field for HMAC verification.
+
+### Breaking changes
+
+None — additive only. Existing single-line deployments continue to work with `multiLineEnabled=false` (default). The feature is production-gated: it activates only when `whatsapp.cloud.driverPhoneId` and `whatsapp.cloud.appSecret` are provisioned in Secrets Manager `izinga-prod` and the pre-deploy MongoDB runbook is executed.
+
+### Production deployment prerequisites (NOT YET MET — deferred by Lindani)
+
+1. Lindani provisions `whatsapp.cloud.driverPhoneId` and `whatsapp.cloud.appSecret` in Secrets Manager `izinga-prod`.
+2. Lindani executes the MongoDB runbook at `docs/feature-briefs/WA-LINES-01-runbook.md` against the production database.
+3. Lindani gives explicit go-ahead for the production release.
+
+---
+
 ## [1.7.0] — 2026-09-04
 
 **Release type:** Feature

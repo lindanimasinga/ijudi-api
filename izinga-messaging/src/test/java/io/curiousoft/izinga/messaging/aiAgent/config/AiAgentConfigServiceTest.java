@@ -194,5 +194,63 @@ class AiAgentConfigServiceTest {
         assertTrue(config.getActive());
         verify(repository, times(1)).save(config);
     }
+
+    /**
+     * Multi-agent cache isolation (REQ-11 / Map<String, AiAgentConfig> cache).
+     * Two calls to getAgentConfig with different agent names must return
+     * distinct config objects — each agent's config is cached under its own key.
+     */
+    @Test
+    void twoAgents_cacheReturnsDifferentConfigs() {
+        String agentA = "driver_support";
+        String agentB = "customer_support";
+
+        AiAgentConfig configA = AiAgentConfig.builder()
+            .id("a1").agentName(agentA).systemPrompt("Driver prompt").active(true).build();
+        AiAgentConfig configB = AiAgentConfig.builder()
+            .id("b1").agentName(agentB).systemPrompt("Customer prompt").active(true).build();
+
+        when(repository.findByAgentNameAndActiveTrue(agentA)).thenReturn(Optional.of(configA));
+        when(repository.findByAgentNameAndActiveTrue(agentB)).thenReturn(Optional.of(configB));
+
+        Optional<AiAgentConfig> resultA = service.getAgentConfig(agentA);
+        Optional<AiAgentConfig> resultB = service.getAgentConfig(agentB);
+
+        assertTrue(resultA.isPresent());
+        assertTrue(resultB.isPresent());
+        assertEquals("Driver prompt", resultA.get().getSystemPrompt());
+        assertEquals("Customer prompt", resultB.get().getSystemPrompt());
+        assertNotSame(resultA.get(), resultB.get());
+    }
+
+    /**
+     * Cache invalidation on save: after saveAgentConfig, the next call to
+     * getAgentConfig must return the updated config from the cache, without
+     * hitting the repository again.
+     */
+    @Test
+    void cacheInvalidatedOnSave() {
+        AiAgentConfig v1 = AiAgentConfig.builder()
+            .id("1").agentName(AGENT_NAME).systemPrompt("Old").active(true).version(1).build();
+        AiAgentConfig v2 = AiAgentConfig.builder()
+            .id("1").agentName(AGENT_NAME).systemPrompt("New").active(true).version(2).build();
+
+        // Initial load
+        when(repository.findByAgentNameAndActiveTrue(AGENT_NAME)).thenReturn(Optional.of(v1));
+        service.getAgentConfig(AGENT_NAME);  // populates cache
+
+        // Save triggers cache update
+        when(repository.findByAgentName(AGENT_NAME)).thenReturn(Optional.of(v1));
+        when(repository.save(any())).thenReturn(v2);
+        service.saveAgentConfig(AGENT_NAME, "New", DESCRIPTION);
+
+        // Next get must return v2 from cache (repository.findByAgentNameAndActiveTrue NOT called again)
+        Optional<AiAgentConfig> result = service.getAgentConfig(AGENT_NAME);
+        assertTrue(result.isPresent());
+        assertEquals("New", result.get().getSystemPrompt());
+
+        // findByAgentNameAndActiveTrue must have been called exactly once (initial load only)
+        verify(repository, times(1)).findByAgentNameAndActiveTrue(AGENT_NAME);
+    }
 }
 

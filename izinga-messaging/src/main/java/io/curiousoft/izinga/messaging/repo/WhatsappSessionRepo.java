@@ -9,6 +9,9 @@ import java.util.Optional;
 public interface WhatsappSessionRepo extends MongoRepository<WhatsappSession, String> {
     Optional<WhatsappSession> findByFrom(String from);
 
+    /** SEC-02: compound key lookup — session scoped to (from, phoneNumberId). REQ-14 / SEC-02 */
+    Optional<WhatsappSession> findByFromAndPhoneNumberId(String from, String phoneNumberId);
+
     List<WhatsappSession> findByLastMessageDateBetween(LocalDate start, LocalDate end);
 }
 

@@ -37,6 +37,13 @@ public class ConversationHistory {
     private String driverPhoneNumber;
 
     /**
+     * REQ-15: AI agent name this conversation belongs to (e.g. "driver_support", "customer_support").
+     * Indexed together with driverPhoneNumber for per-(phone, agent) isolation.
+     */
+    @Indexed(unique = false)
+    private String agentName;
+
+    /**
      * Driver's name (for context in responses)
      */
     private String driverName;

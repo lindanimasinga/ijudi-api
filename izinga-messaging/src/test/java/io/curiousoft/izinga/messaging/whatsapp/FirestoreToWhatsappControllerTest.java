@@ -2,6 +2,9 @@ package io.curiousoft.izinga.messaging.whatsapp;
 
 import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistoryService;
 import io.curiousoft.izinga.messaging.firebase.FirestoreService;
+import io.curiousoft.izinga.messaging.repo.WhatsappSessionRepo;
+import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
+import io.curiousoft.izinga.messaging.whatsapp.lines.WhatsappSenderResolver;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTextRequest;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTextResponse;
 import okhttp3.MediaType;
@@ -17,6 +20,8 @@ import org.springframework.http.ResponseEntity;
 import retrofit2.Call;
 import retrofit2.Response;
 
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -28,6 +33,8 @@ class FirestoreToWhatsappControllerTest {
     @Mock private WhatsAppService whatsAppService;
     @Mock private WhatsappConfig whatsappConfig;
     @Mock private ConversationHistoryService conversationHistoryService;
+    @Mock private WhatsappSenderResolver senderResolver;
+    @Mock private WhatsappSessionRepo whatsappSessionRepo;
 
     @SuppressWarnings("unchecked")
     private final Call<WhatsappTextResponse> callMock = mock(Call.class);
@@ -44,8 +51,11 @@ class FirestoreToWhatsappControllerTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(senderResolver.resolve(Audience.CUSTOMER, null)).thenReturn(PHONE_ID);
+        lenient().when(whatsappSessionRepo.findByFrom(any())).thenReturn(java.util.Optional.empty());
         controller = new FirestoreToWhatsappController(
-                firestoreService, whatsAppService, whatsappConfig, conversationHistoryService);
+                firestoreService, whatsAppService, whatsappConfig, conversationHistoryService,
+                senderResolver, whatsappSessionRepo);
     }
 
     // ─── guard: session not found ────────────────────────────────────────────
@@ -97,7 +107,6 @@ class FirestoreToWhatsappControllerTest {
         FireStoreMessage msg = message(FireStoreMessage.MessageType.TEXT, MSG_TEXT);
         when(firestoreService.getChatSessionById(SESSION_ID)).thenReturn(session);
         when(firestoreService.getMessageForSession(SESSION_ID, MSG_ID)).thenReturn(msg);
-        when(whatsappConfig.phoneId()).thenReturn(PHONE_ID);
         when(whatsAppService.sendTextMessage(eq(PHONE_ID), any())).thenReturn(callMock);
         when(callMock.execute()).thenReturn(Response.error(500,
                 ResponseBody.create(MediaType.get("application/json"), "")));
@@ -116,14 +125,14 @@ class FirestoreToWhatsappControllerTest {
         FireStoreMessage msg = message(FireStoreMessage.MessageType.TEXT, MSG_TEXT);
         when(firestoreService.getChatSessionById(SESSION_ID)).thenReturn(session);
         when(firestoreService.getMessageForSession(SESSION_ID, MSG_ID)).thenReturn(msg);
-        when(whatsappConfig.phoneId()).thenReturn(PHONE_ID);
         when(whatsAppService.sendTextMessage(eq(PHONE_ID), any())).thenReturn(callMock);
         when(callMock.execute()).thenReturn(Response.success(new WhatsappTextResponse()));
 
         ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(conversationHistoryService).recordHumanCorrection(NORM_PHONE, CUST_NAME, MSG_TEXT);
+        // SA-6: agentName resolved from session; session mock returns empty so agentName = null
+        verify(conversationHistoryService).recordHumanCorrection(eq(NORM_PHONE), eq(CUST_NAME), eq(MSG_TEXT), isNull());
 
         ArgumentCaptor<WhatsappTextRequest> reqCaptor = ArgumentCaptor.forClass(WhatsappTextRequest.class);
         verify(whatsAppService).sendTextMessage(eq(PHONE_ID), reqCaptor.capture());
@@ -139,14 +148,13 @@ class FirestoreToWhatsappControllerTest {
         FireStoreMessage msg = message(null, MSG_TEXT);
         when(firestoreService.getChatSessionById(SESSION_ID)).thenReturn(session);
         when(firestoreService.getMessageForSession(SESSION_ID, MSG_ID)).thenReturn(msg);
-        when(whatsappConfig.phoneId()).thenReturn(PHONE_ID);
         when(whatsAppService.sendTextMessage(eq(PHONE_ID), any())).thenReturn(callMock);
         when(callMock.execute()).thenReturn(Response.success(new WhatsappTextResponse()));
 
         ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(conversationHistoryService).recordHumanCorrection(NORM_PHONE, CUST_NAME, MSG_TEXT);
+        verify(conversationHistoryService).recordHumanCorrection(eq(NORM_PHONE), eq(CUST_NAME), eq(MSG_TEXT), isNull());
     }
 
     // ─── post-send non-blocking: history service throws ──────────────────────
@@ -157,11 +165,10 @@ class FirestoreToWhatsappControllerTest {
         FireStoreMessage msg = message(FireStoreMessage.MessageType.TEXT, MSG_TEXT);
         when(firestoreService.getChatSessionById(SESSION_ID)).thenReturn(session);
         when(firestoreService.getMessageForSession(SESSION_ID, MSG_ID)).thenReturn(msg);
-        when(whatsappConfig.phoneId()).thenReturn(PHONE_ID);
         when(whatsAppService.sendTextMessage(eq(PHONE_ID), any())).thenReturn(callMock);
         when(callMock.execute()).thenReturn(Response.success(new WhatsappTextResponse()));
         doThrow(new RuntimeException("DB error")).when(conversationHistoryService)
-                .recordHumanCorrection(anyString(), anyString(), anyString());
+                .recordHumanCorrection(anyString(), anyString(), anyString(), any());
 
 
         ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
