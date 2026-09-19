@@ -31,22 +31,36 @@ public class ConversationHistoryService {
     }
 
     /**
-     * Get or create a conversation for a driver
+     * Get or create a conversation for a driver (legacy — no agentName scoping).
      */
     @Transactional
     public ConversationHistory getOrCreateConversation(String driverPhoneNumber, String driverName) {
-        Optional<ConversationHistory> existing = repository
-            .findByDriverPhoneNumberAndArchivedFalse(driverPhoneNumber);
+        return getOrCreateConversation(driverPhoneNumber, driverName, null);
+    }
+
+    /**
+     * REQ-15: Get or create a conversation scoped to (driverPhoneNumber, agentName).
+     * When agentName is null, falls back to phone-only lookup for backward compatibility.
+     */
+    @Transactional
+    public ConversationHistory getOrCreateConversation(String driverPhoneNumber, String driverName, String agentName) {
+        Optional<ConversationHistory> existing;
+        if (agentName != null && !agentName.isBlank()) {
+            existing = repository.findByDriverPhoneNumberAndAgentNameAndArchivedFalse(driverPhoneNumber, agentName);
+        } else {
+            existing = repository.findByDriverPhoneNumberAndArchivedFalse(driverPhoneNumber);
+        }
 
         if (existing.isPresent()) {
-            LOG.debug("Found existing conversation for driver {}", driverPhoneNumber);
+            LOG.debug("Found existing conversation for driver {} agentName={}", driverPhoneNumber, agentName);
             return existing.get();
         }
 
-        LOG.info("Creating new conversation for driver {}", driverPhoneNumber);
+        LOG.info("Creating new conversation for driver {} agentName={}", driverPhoneNumber, agentName);
         ConversationHistory history = ConversationHistory.builder()
             .driverPhoneNumber(driverPhoneNumber)
             .driverName(driverName)
+            .agentName(agentName)
             .messages(new java.util.ArrayList<>())
             .createdAt(Instant.now())
             .lastMessageAt(Instant.now())

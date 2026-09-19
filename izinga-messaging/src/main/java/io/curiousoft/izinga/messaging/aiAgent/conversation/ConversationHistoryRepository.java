@@ -15,9 +15,15 @@ import java.util.Optional;
 public interface ConversationHistoryRepository extends MongoRepository<ConversationHistory, String> {
 
     /**
-     * Find conversation by driver phone number
+     * Find conversation by driver phone number (legacy — returns first match regardless of agent)
      */
     Optional<ConversationHistory> findByDriverPhoneNumberAndArchivedFalse(String driverPhoneNumber);
+
+    /**
+     * REQ-15: find conversation scoped to (driverPhoneNumber, agentName).
+     * Ensures per-agent history isolation.
+     */
+    Optional<ConversationHistory> findByDriverPhoneNumberAndAgentNameAndArchivedFalse(String driverPhoneNumber, String agentName);
 
     /**
      * Find all active conversations
