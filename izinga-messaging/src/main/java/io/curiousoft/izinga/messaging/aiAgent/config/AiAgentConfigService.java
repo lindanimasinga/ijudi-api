@@ -4,13 +4,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import io.curiousoft.izinga.messaging.whatsapp.HumanCorrectionSanitizer;
+
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Service for managing AI agent configurations.
  * Loads system prompts from MongoDB instead of hardcoding them.
+ *
+ * REQ-18: per-agent cache (Map<String, AiAgentConfig>) replaces single-entry Optional.
  */
 @Service
 public class AiAgentConfigService {
@@ -18,7 +24,8 @@ public class AiAgentConfigService {
     private static final Logger LOG = LoggerFactory.getLogger(AiAgentConfigService.class);
 
     private final AiAgentConfigRepository repository;
-    Optional<AiAgentConfig> config;
+    /** REQ-18: keyed by agentName */
+    private final Map<String, AiAgentConfig> configCache = new ConcurrentHashMap<>();
 
     public AiAgentConfigService(AiAgentConfigRepository repository) {
         this.repository = repository;
@@ -38,13 +45,15 @@ public class AiAgentConfigService {
     }
 
     /**
-     * Get full agent config by name
+     * Get full agent config by name.
+     * REQ-18: backed by per-agent map cache.
      */
     public Optional<AiAgentConfig> getAgentConfig(String agentName) {
-        if (config == null || config.isEmpty() || !config.get().getAgentName().equals(agentName)) {
-            config = repository.findByAgentNameAndActiveTrue(agentName);
+        if (!configCache.containsKey(agentName)) {
+            repository.findByAgentNameAndActiveTrue(agentName)
+                    .ifPresent(c -> configCache.put(agentName, c));
         }
-        return config;
+        return Optional.ofNullable(configCache.get(agentName));
     }
 
     /**
@@ -72,8 +81,10 @@ public class AiAgentConfigService {
                 .build();
             LOG.info("Created new agent config: {}", agentName);
         }
-        this.config  = Optional.of(repository.save(config));
-        return config;
+        AiAgentConfig saved = repository.save(config);
+        // REQ-18: invalidate cache entry so next read re-fetches
+        configCache.put(agentName, saved);
+        return saved;
     }
 
     /**
@@ -118,8 +129,14 @@ public class AiAgentConfigService {
             LOG.warn("No active agent config for {} — skipping correction append", agentName);
             return;
         }
+        // SEC-04: sanitize before appending to prompt
+        String sanitized = HumanCorrectionSanitizer.sanitize(messageText);
+        if (sanitized == null) {
+            LOG.warn("Human correction for agentName={} phone={} was rejected by sanitizer — skipping", agentName, phone);
+            return;
+        }
         String currentPrompt = agentConfig.getSystemPrompt() != null ? agentConfig.getSystemPrompt() : "";
-        String entry = "\n- [" + Instant.now() + "] Customer " + phone + ": " + messageText;
+        String entry = "\n- [" + Instant.now() + "] Customer " + phone + ": " + sanitized;
         String updatedPrompt = currentPrompt.contains("## Human Correction Log")
                 ? currentPrompt + entry
                 : currentPrompt
