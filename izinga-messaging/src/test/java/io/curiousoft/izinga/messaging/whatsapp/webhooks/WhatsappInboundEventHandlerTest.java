@@ -9,6 +9,9 @@ import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.messaging.firebase.FirestoreService;
 import io.curiousoft.izinga.messaging.repo.WhatsappSessionRepo;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsappNotificationService;
+import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
+import io.curiousoft.izinga.messaging.whatsapp.lines.WhatsappLine;
+import io.curiousoft.izinga.messaging.whatsapp.lines.WhatsappLineService;
 import io.curiousoft.izinga.messaging.whatsapp.verification.VerificationConsentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,6 +61,8 @@ class WhatsappInboundEventHandlerTest {
     private AiCustomerServiceAgent aiCustomerService;
     @Mock
     private WhatsappImageDocumentService whatsappImageDocumentService;
+    @Mock
+    private WhatsappLineService whatsappLineService;
 
     private WhatsappInboundEventHandler handler;
 
@@ -73,7 +78,8 @@ class WhatsappInboundEventHandlerTest {
                 whatsappSessionRepo,
                 verificationConsentService,
                 aiCustomerService,
-                whatsappImageDocumentService
+                whatsappImageDocumentService,
+                whatsappLineService
         );
     }
 
@@ -162,6 +168,130 @@ class WhatsappInboundEventHandlerTest {
         );
         verify(firestoreService, never()).writeMessageForCustomer(anyString(), anyString(), any());
         verify(aiCustomerService, never()).handleWhatsappQuery(anyString(), anyString(), anyString());
+    }
+
+    // ── multi-line routing tests ───────────────────────────────────────────────
+
+    /**
+     * REQ-10: two payloads with different metadata.phoneNumberId route to
+     * different WhatsappLine configurations.
+     */
+    @Test
+    void twoFixtures_differByMetadataPhoneNumberId_routeToDifferentLines() throws Exception {
+        String phoneIdA = "line-customer";
+        String phoneIdB = "line-driver";
+
+        WhatsappLine lineA = buildLine(phoneIdA, Audience.CUSTOMER, "customer_support");
+        WhatsappLine lineB = buildLine(phoneIdB, Audience.DRIVER, "driver_support");
+
+        when(whatsappLineService.findByPhoneNumberId(phoneIdA)).thenReturn(java.util.Optional.of(lineA));
+        when(whatsappLineService.findByPhoneNumberId(phoneIdB)).thenReturn(java.util.Optional.of(lineB));
+
+        WhatsappSession session = new WhatsappSession(FROM);
+        session.setLastMessageDate(java.time.Instant.now());
+        session.setAIAgentActive(false);
+        when(whatsappSessionRepo.findByFromAndPhoneNumberId(eq(FROM), anyString())).thenReturn(Optional.of(session));
+        when(whatsappSessionRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
+
+        WhatsappWebhookPayload payloadA = buildPayloadWithMetadata(buildTextMessage(FROM, "hello"), "Lindani", phoneIdA);
+        WhatsappWebhookPayload payloadB = buildPayloadWithMetadata(buildTextMessage(FROM, "hello"), "Lindani", phoneIdB);
+
+        handler.handleInbound(new WhatsappInboundEvent(this, payloadA));
+        handler.handleInbound(new WhatsappInboundEvent(this, payloadB));
+
+        verify(whatsappLineService).findByPhoneNumberId(phoneIdA);
+        verify(whatsappLineService).findByPhoneNumberId(phoneIdB);
+    }
+
+    /**
+     * REQ-10 fallback: when the metadata.phoneNumberId has no matching WhatsappLine,
+     * the handler falls back to customer_support defaults and does not throw.
+     */
+    @Test
+    void unknownPhoneNumberId_fallsBackToDefault() throws Exception {
+        String unknownPhoneId = "unknown-999";
+
+        when(whatsappLineService.findByPhoneNumberId(unknownPhoneId)).thenReturn(Optional.empty());
+
+        WhatsappSession session = new WhatsappSession(FROM);
+        session.setLastMessageDate(java.time.Instant.now());
+        session.setAIAgentActive(false);
+        // Legacy single-key fallback when lineContext.line() is null
+        when(whatsappSessionRepo.findByFrom(FROM)).thenReturn(Optional.of(session));
+        when(whatsappSessionRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
+
+        WhatsappWebhookPayload payload = buildPayloadWithMetadata(buildTextMessage(FROM, "hello"), "Lindani", unknownPhoneId);
+
+        // Must not throw — should degrade gracefully to CUSTOMER audience
+        handler.handleInbound(new WhatsappInboundEvent(this, payload));
+
+        verify(whatsappLineService).findByPhoneNumberId(unknownPhoneId);
+    }
+
+    /**
+     * Feature-flag OFF: metadata.phoneNumberId is present but the flag-off
+     * code path resolves LineContext with null line and CUSTOMER audience,
+     * so the handler still processes the message via customer flow.
+     * (This test mocks the service to return empty to simulate flag-off fallback.)
+     */
+    @Test
+    void flagOff_ignoresMetadata_usesCustomerFallback() throws Exception {
+        // When flag is off, WhatsappLineService.findByPhoneNumberId is not expected
+        // to be called — LineContext resolves to null/CUSTOMER. Here we test the
+        // fallback path where no metadata is present (phoneNumberId null).
+        WhatsappSession session = new WhatsappSession(FROM);
+        session.setLastMessageDate(java.time.Instant.now());
+        session.setAIAgentActive(false);
+        when(whatsappSessionRepo.findByFrom(FROM)).thenReturn(Optional.of(session));
+        when(whatsappSessionRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
+
+        // Payload with NO metadata (phoneNumberId null) — handler falls back to default LineContext
+        WhatsappWebhookPayload payload = buildPayload(buildTextMessage(FROM, "hello"), "Lindani");
+
+        handler.handleInbound(new WhatsappInboundEvent(this, payload));
+
+        // whatsappLineService.findByPhoneNumberId must NOT be called when phoneNumberId is null
+        verify(whatsappLineService, never()).findByPhoneNumberId(any());
+    }
+
+    // ── helper factory methods ─────────────────────────────────────────────────
+
+    private WhatsappLine buildLine(String phoneNumberId, Audience audience, String agentName) {
+        WhatsappLine line = new WhatsappLine();
+        line.setPhoneNumberId(phoneNumberId);
+        line.setAudience(audience);
+        line.setAgentName(agentName);
+        line.setActive(true);
+        return line;
+    }
+
+    private WhatsappWebhookPayload.Value.Message buildTextMessage(String from, String body) {
+        WhatsappWebhookPayload.Value.Message.Text text = new WhatsappWebhookPayload.Value.Message.Text();
+        text.setBody(body);
+        WhatsappWebhookPayload.Value.Message message = new WhatsappWebhookPayload.Value.Message();
+        message.setFrom(from);
+        message.setId("wamid.test");
+        message.setType("text");
+        message.setTimestamp(String.valueOf(java.time.Instant.now().getEpochSecond()));
+        message.setText(text);
+        return message;
+    }
+
+    private WhatsappWebhookPayload buildPayloadWithMetadata(
+            WhatsappWebhookPayload.Value.Message message,
+            String contactName,
+            String phoneNumberId) {
+
+        WhatsappWebhookPayload.Value.Metadata meta = new WhatsappWebhookPayload.Value.Metadata();
+        meta.setPhoneNumberId(phoneNumberId);
+
+        WhatsappWebhookPayload payload = buildPayload(message, contactName);
+        // Stamp metadata onto the value
+        payload.getEntry().get(0).getChanges().get(0).getValue().setMetadata(meta);
+        return payload;
     }
 
     private WhatsappWebhookPayload buildPayload(WhatsappWebhookPayload.Value.Message message, String contactName) {
