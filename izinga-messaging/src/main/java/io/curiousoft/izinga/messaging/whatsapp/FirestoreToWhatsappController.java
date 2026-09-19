@@ -94,8 +94,14 @@ public class FirestoreToWhatsappController {
             }
 
             // Post-send: record correction in conversation history (non-blocking)
+            // SA-6/REQ-21: resolve agentName from the session (from, phoneNumberId), never a constant
             try {
-                conversationHistoryService.recordHumanCorrection(normalizedTo, session.getCustomerName(), msg.getMessage());
+                String sessionAgentName = null;
+                var sessionOpt2 = whatsappSessionRepo.findByFrom(normalizedTo);
+                if (sessionOpt2.isPresent()) {
+                    sessionAgentName = sessionOpt2.get().getAgentName();
+                }
+                conversationHistoryService.recordHumanCorrection(normalizedTo, session.getCustomerName(), msg.getMessage(), sessionAgentName);
             } catch (Exception ex) {
                 LOG.warn("Could not update conversation history with correction: {}", ex.getMessage());
             }

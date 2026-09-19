@@ -131,7 +131,8 @@ class FirestoreToWhatsappControllerTest {
         ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(conversationHistoryService).recordHumanCorrection(NORM_PHONE, CUST_NAME, MSG_TEXT);
+        // SA-6: agentName resolved from session; session mock returns empty so agentName = null
+        verify(conversationHistoryService).recordHumanCorrection(eq(NORM_PHONE), eq(CUST_NAME), eq(MSG_TEXT), isNull());
 
         ArgumentCaptor<WhatsappTextRequest> reqCaptor = ArgumentCaptor.forClass(WhatsappTextRequest.class);
         verify(whatsAppService).sendTextMessage(eq(PHONE_ID), reqCaptor.capture());
@@ -153,7 +154,7 @@ class FirestoreToWhatsappControllerTest {
         ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(conversationHistoryService).recordHumanCorrection(NORM_PHONE, CUST_NAME, MSG_TEXT);
+        verify(conversationHistoryService).recordHumanCorrection(eq(NORM_PHONE), eq(CUST_NAME), eq(MSG_TEXT), isNull());
     }
 
     // ─── post-send non-blocking: history service throws ──────────────────────
@@ -167,7 +168,7 @@ class FirestoreToWhatsappControllerTest {
         when(whatsAppService.sendTextMessage(eq(PHONE_ID), any())).thenReturn(callMock);
         when(callMock.execute()).thenReturn(Response.success(new WhatsappTextResponse()));
         doThrow(new RuntimeException("DB error")).when(conversationHistoryService)
-                .recordHumanCorrection(anyString(), anyString(), anyString());
+                .recordHumanCorrection(anyString(), anyString(), anyString(), any());
 
 
         ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);

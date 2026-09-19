@@ -96,9 +96,18 @@ public class ConversationHistoryService {
      */
     @Transactional
     public void recordHumanCorrection(String phone, String name, String messageText) {
-        ConversationHistory history = getOrCreateConversation(phone, name);
+        recordHumanCorrection(phone, name, messageText, null);
+    }
+
+    /**
+     * SA-6/REQ-21: record a human correction scoped to the agent that handled the session.
+     * agentName comes from the session's (from, phoneNumberId) lookup — never a constant.
+     */
+    @Transactional
+    public void recordHumanCorrection(String phone, String name, String messageText, String agentName) {
+        ConversationHistory history = getOrCreateConversation(phone, name, agentName);
         addAssistantMessage(history, "[HUMAN CORRECTION] " + messageText);
-        LOG.info("Recorded human correction in conversation history for {}", phone);
+        LOG.info("Recorded human correction in conversation history for {} agentName={}", phone, agentName);
     }
 
     /**

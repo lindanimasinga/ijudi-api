@@ -228,7 +228,7 @@ public class WhatsappInboundEventHandler {
             return;
         }
         if ("image".equals(type) || message.getImage() != null) {
-            handleImageMessage(message, contacts);
+            handleImageMessage(message, contacts, lineContext);
             return;
         }
 
@@ -442,8 +442,10 @@ public class WhatsappInboundEventHandler {
         return contact.getProfile().getName();
     }
 
+    /** REQ-20: lineContext threaded to select the correct agent when handling image uploads. */
     private void handleImageMessage(WhatsappWebhookPayload.Value.Message message,
-                                    List<WhatsappWebhookPayload.Value.Contact> contacts) {
+                                    List<WhatsappWebhookPayload.Value.Contact> contacts,
+                                    LineContext lineContext) {
         String from = message.getFrom();
         try {
             var img = message.getImage();
@@ -488,7 +490,8 @@ public class WhatsappInboundEventHandler {
                             processResult.mediaId(),
                             processResult.mimeType()
                     );
-                    aiReply = aiCustomerService.handleWhatsappQuery(aiEventMessage, from, customerName);
+                    // REQ-20: use agent-aware handler so image responses use the correct agent
+                    aiReply = aiCustomerService.handleWhatsappQueryForAgent(aiEventMessage, from, customerName, lineContext.agentName());
                 }
 
                 whatsappNotificationService.sendMessage(

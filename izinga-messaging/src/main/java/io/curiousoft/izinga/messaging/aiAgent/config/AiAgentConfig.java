@@ -8,6 +8,8 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * MongoDB document for storing AI agent system prompts.
@@ -65,5 +67,26 @@ public class AiAgentConfig {
      * Whether the agent is allowed to use mcp tools (e.g., external APIs)
      */
     private boolean useTools = true;
+
+    /**
+     * SEC-04: structured human correction entries. Stored as a list of {text, by, at},
+     * never concatenated into the raw systemPrompt string.
+     * Rendered as a clearly delimited block when building the prompt at inference time.
+     */
+    @Builder.Default
+    private List<HumanCorrection> corrections = new ArrayList<>();
+
+    /** SEC-04: immutable correction entry persisted on AiAgentConfig. */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class HumanCorrection {
+        /** Sanitized correction text (max 500 chars, injection-stripped). */
+        private String text;
+        /** Phone or user identifier of the human agent who submitted the correction. */
+        private String by;
+        /** UTC timestamp when the correction was recorded. */
+        private Instant at;
+    }
 }
 

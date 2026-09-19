@@ -111,7 +111,8 @@ class WhatsappInboundEventHandlerTest {
         when(firestoreService.writeMessageForCustomer(eq(FROM), anyString(), any())).thenReturn("msg-1");
 
         when(aiCustomerService.isEnabled()).thenReturn(true);
-        when(aiCustomerService.handleWhatsappQuery(anyString(), eq(FROM), eq("Lindani")))
+        // REQ-20: image handler now uses agent-aware handleWhatsappQueryForAgent
+        when(aiCustomerService.handleWhatsappQueryForAgent(anyString(), eq(FROM), eq("Lindani"), anyString()))
                 .thenReturn("Thanks. Your driver's license document is linked.");
 
         handler.handleInbound(new WhatsappInboundEvent(this, payload));
@@ -128,10 +129,11 @@ class WhatsappInboundEventHandlerTest {
         assertEquals("wa-media-1", storedMessage.getMeta().get("mediaId"));
         assertEquals("image/jpeg", storedMessage.getMeta().get("mimeType"));
 
-        verify(aiCustomerService).handleWhatsappQuery(
+        verify(aiCustomerService).handleWhatsappQueryForAgent(
                 contains("Field: driverLicenseDocument"),
                 eq(FROM),
-                eq("Lindani")
+                eq("Lindani"),
+                anyString()
         );
         verify(whatsappNotificationService).sendMessage(
                 FROM,
