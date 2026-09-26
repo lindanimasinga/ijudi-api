@@ -1,6 +1,7 @@
 package io.curiousoft.izinga.ordermanagement.security;
 
 import io.curiousoft.izinga.messaging.security.StoreScopeJwtService;
+import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -40,6 +41,22 @@ public class StoreScopeValidationFilter extends OncePerRequestFilter {
         this.jwtService = jwtService;
     }
 
+    /**
+     * Parse the audience string from JWT claims to the typed {@link Audience} enum.
+     * Returns null when the value is absent or does not match a known enum constant.
+     * Null means no audience restriction is set for this request.
+     */
+    private static Audience parseAudience(String audienceStr) {
+        if (audienceStr == null || audienceStr.isBlank()) {
+            return null;
+        }
+        try {
+            return Audience.valueOf(audienceStr);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
@@ -55,7 +72,10 @@ public class StoreScopeValidationFilter extends OncePerRequestFilter {
                 try {
                     Map<String, String> claims = jwtService.validateAndExtract(scopeParam);
                     String storeId = claims.get("storeId");
-                    String audience = claims.get("audience");
+                    // SA-021-13/NOTE-02: parse audience string to typed Audience enum.
+                    // A null or unrecognised value produces null (no restriction set), not an error.
+                    String audienceStr = claims.get("audience");
+                    Audience audience = parseAudience(audienceStr);
                     StoreScopeContext.setPermittedStoreId(storeId);
                     StoreScopeContext.setAudience(audience);
                     LOG.debug("Scope token accepted: storeId={} audience={}", storeId, audience);

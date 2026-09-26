@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.ordermanagement.security;
 
+import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -128,7 +129,7 @@ public class StoreScopedMcpToolTest {
         assertNull(StoreScopeContext.getAudience());
 
         try {
-            StoreScopeValidator.validateAudience("STORE");
+            StoreScopeValidator.validateAudience(Audience.STORE);
             fail("Expected AudienceViolationException when audience is null");
         } catch (AudienceViolationException e) {
             // expected: reject-by-default
@@ -138,17 +139,17 @@ public class StoreScopedMcpToolTest {
 
     @Test
     public void validateAudience_matchingAudience_passes() {
-        StoreScopeContext.setAudience("STORE");
+        StoreScopeContext.setAudience(Audience.STORE);
 
-        StoreScopeValidator.validateAudience("STORE"); // must not throw
+        StoreScopeValidator.validateAudience(Audience.STORE); // must not throw
     }
 
     @Test
     public void validateAudience_nonMatchingAudience_throwsViolation() {
-        StoreScopeContext.setAudience("DRIVER");
+        StoreScopeContext.setAudience(Audience.DRIVER);
 
         try {
-            StoreScopeValidator.validateAudience("STORE");
+            StoreScopeValidator.validateAudience(Audience.STORE);
             fail("Expected AudienceViolationException for DRIVER calling a STORE-only tool");
         } catch (AudienceViolationException e) {
             // expected
@@ -160,10 +161,10 @@ public class StoreScopedMcpToolTest {
 
     @Test
     public void validateAudience_customerAudience_rejectsStoreOnlyTool() {
-        StoreScopeContext.setAudience("CUSTOMER");
+        StoreScopeContext.setAudience(Audience.CUSTOMER);
 
         try {
-            StoreScopeValidator.validateAudience("STORE");
+            StoreScopeValidator.validateAudience(Audience.STORE);
             fail("Expected AudienceViolationException for CUSTOMER calling a STORE-only tool");
         } catch (AudienceViolationException e) {
             // expected
@@ -172,9 +173,11 @@ public class StoreScopedMcpToolTest {
 
     @Test
     public void validateAudience_multiplePermitted_matchingAudience_passes() {
-        StoreScopeContext.setAudience("ADMIN");
+        // NOTE-02: Audience enum does not have ADMIN — use DRIVER as the second permitted value
+        // (tests that varargs still work with multiple Audience values)
+        StoreScopeContext.setAudience(Audience.DRIVER);
 
-        // An admin-or-store tool permits both
-        StoreScopeValidator.validateAudience("STORE", "ADMIN"); // must not throw
+        // A driver-or-store tool permits both
+        StoreScopeValidator.validateAudience(Audience.STORE, Audience.DRIVER); // must not throw
     }
 }

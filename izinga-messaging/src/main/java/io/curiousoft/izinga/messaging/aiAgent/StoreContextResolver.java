@@ -33,11 +33,15 @@ public class StoreContextResolver {
     private static final Logger LOG = LoggerFactory.getLogger(StoreContextResolver.class);
     private static final SimpleDateFormat TIME_FMT = new SimpleDateFormat("HH:mm");
 
-    /** SA-021-13: cap on menu items injected per prompt. Configurable via application.properties. */
+    /**
+     * SA-021-7 / NOTE-04: cap on menu items injected per prompt.
+     * Configurable via {@code ai.agent.store.productCap} in application.properties
+     * (renamed from the original {@code store.context.max-items} to match ADR-021 SA-021-7).
+     */
     private final int maxItems;
 
     public StoreContextResolver(
-            @Value("${store.context.max-items:50}") int maxItems) {
+            @Value("${ai.agent.store.productCap:50}") int maxItems) {
         this.maxItems = maxItems;
     }
 
@@ -98,8 +102,10 @@ public class StoreContextResolver {
                     .collect(Collectors.toList());
             for (Stock s : sorted) {
                 String itemName = StoreContentSanitizer.sanitizeField(s.getName());
+                // NOTE-05: descriptions use sanitizeDescription() capped at 500 chars, not
+                // sanitizeField() capped at 200 chars — descriptions are legitimately longer.
                 String desc = s.getDescription() != null
-                        ? StoreContentSanitizer.sanitizeField(s.getDescription())
+                        ? StoreContentSanitizer.sanitizeDescription(s.getDescription())
                         : "";
                 double price = s.getPrice();
                 sb.append("  - ").append(itemName);

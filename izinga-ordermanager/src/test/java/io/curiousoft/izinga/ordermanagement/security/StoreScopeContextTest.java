@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.ordermanagement.security;
 
+import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.junit.MockitoJUnitRunner;
@@ -29,7 +30,7 @@ public class StoreScopeContextTest {
 
     @Test
     public void clear_removesAudience() {
-        StoreScopeContext.setAudience("STORE");
+        StoreScopeContext.setAudience(Audience.STORE);
         StoreScopeContext.clear();
         assertNull("audience must be null after clear()",
                 StoreScopeContext.getAudience());
@@ -38,7 +39,7 @@ public class StoreScopeContextTest {
     @Test
     public void clear_removesBothFields_simultaneously() {
         StoreScopeContext.setPermittedStoreId("store-xyz");
-        StoreScopeContext.setAudience("STORE");
+        StoreScopeContext.setAudience(Audience.STORE);
         StoreScopeContext.clear();
         assertNull("permittedStoreId must be null after clear()", StoreScopeContext.getPermittedStoreId());
         assertNull("audience must be null after clear()", StoreScopeContext.getAudience());
@@ -52,19 +53,19 @@ public class StoreScopeContextTest {
     public void noResidualState_acrossTwoRequestsOnSameThread() throws Exception {
         // Simulate two sequential requests on the same thread
         var executor = Executors.newSingleThreadExecutor();
-        AtomicReference<String> storeIdAfterFirstRequest = new AtomicReference<>();
-        AtomicReference<String> audienceAfterFirstRequest = new AtomicReference<>();
+        AtomicReference<String>   storeIdAfterFirstRequest    = new AtomicReference<>();
+        AtomicReference<Audience> audienceAfterFirstRequest = new AtomicReference<>();
 
         CountDownLatch firstRequestDone = new CountDownLatch(1);
 
         executor.execute(() -> {
             // --- Request 1: set context, do work, call finally-clear ---
             StoreScopeContext.setPermittedStoreId("store-r1");
-            StoreScopeContext.setAudience("STORE");
+            StoreScopeContext.setAudience(Audience.STORE);
             try {
                 // simulate request processing
                 assertEquals("store-r1", StoreScopeContext.getPermittedStoreId());
-                assertEquals("STORE", StoreScopeContext.getAudience());
+                assertEquals(Audience.STORE, StoreScopeContext.getAudience());
             } finally {
                 // SEC-WA02-01-C: unconditional finally block
                 StoreScopeContext.clear();
@@ -94,7 +95,7 @@ public class StoreScopeContextTest {
         executor.execute(() -> {
             // Request 1
             StoreScopeContext.setPermittedStoreId("store-req1");
-            StoreScopeContext.setAudience("STORE");
+            StoreScopeContext.setAudience(Audience.STORE);
             try {
                 // work...
             } finally {

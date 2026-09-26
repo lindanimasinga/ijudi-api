@@ -25,7 +25,7 @@ import org.springframework.context.annotation.Configuration;
  * <h3>SA-021-18: Store-modification tool rule</h3>
  * <p>Any future {@code @Tool} method that modifies store data (hours, stock, settings, etc.)
  * MUST be annotated with
- * {@code @io.curiousoft.izinga.ordermanagement.security.RequiresAudience("STORE")}
+ * {@code @io.curiousoft.izinga.ordermanagement.security.RequiresAudience(io.curiousoft.izinga.messaging.whatsapp.lines.Audience.STORE)}
  * AND MUST call
  * {@code io.curiousoft.izinga.ordermanagement.security.StoreScopeValidator.validate(storeId)}
  * as its FIRST statement before any data access or mutation.

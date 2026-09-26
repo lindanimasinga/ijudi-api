@@ -1,8 +1,10 @@
 package io.curiousoft.izinga.ordermanagement.security;
 
+import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -58,22 +60,37 @@ public final class StoreScopeValidator {
      * @param permitted one or more audience values that are allowed to call this tool
      * @throws AudienceViolationException if the caller's audience is absent or not in {@code permitted}
      */
-    public static void validateAudience(String... permitted) {
-        String caller = StoreScopeContext.getAudience();
+    /**
+     * ADR-021 Decision 1 Extension: validate that the current request's audience claim
+     * matches one of the {@code permitted} values.
+     *
+     * <p>Unlike {@link #validate(String)}, a null audience is NOT a pass-through — it is
+     * rejected immediately (reject-by-default). This ensures unauthenticated or no-token
+     * callers cannot invoke audience-restricted {@code @Tool} methods.
+     *
+     * <p>SA-021-15 / NOTE-02: parameter type is {@code Audience...} (typed enum, not {@code String...})
+     * for compile-time safety, consistent with ADR-021 Decision 1 Extension and
+     * {@link RequiresAudience#value()}.
+     *
+     * @param permitted one or more audience values that are allowed to call this tool
+     * @throws AudienceViolationException if the caller's audience is absent or not in {@code permitted}
+     */
+    public static void validateAudience(Audience... permitted) {
+        Audience caller = StoreScopeContext.getAudience();
         if (caller == null) {
             // No JWT present — reject-by-default for all audience-restricted tools
             LOG.warn("AudienceViolation: no audience claim in scope token — rejecting audience-restricted tool call");
             throw new AudienceViolationException(
                     "Audience required but no scope token is present on this request");
         }
-        for (String allowed : permitted) {
-            if (allowed.equals(caller)) {
+        for (Audience allowed : permitted) {
+            if (allowed == caller) {
                 return;
             }
         }
-        LOG.warn("AudienceViolation: callerAudience={} requiredAudiences={}", caller, java.util.Arrays.toString(permitted));
+        LOG.warn("AudienceViolation: callerAudience={} requiredAudiences={}", caller, Arrays.toString(permitted));
         throw new AudienceViolationException(
                 "Audience violation: caller audience '" + caller + "' is not in permitted set " +
-                        java.util.Arrays.toString(permitted));
+                        Arrays.toString(permitted));
     }
 }

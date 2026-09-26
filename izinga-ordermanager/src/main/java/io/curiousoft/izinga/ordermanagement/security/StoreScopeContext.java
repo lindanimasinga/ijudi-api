@@ -1,5 +1,7 @@
 package io.curiousoft.izinga.ordermanagement.security;
 
+import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
+
 /**
  * ThreadLocal holder for the per-request store scope extracted from the
  * X-Agent-Scope JWT (query param "scope") by {@link StoreScopeValidationFilter}.
@@ -7,13 +9,16 @@ package io.curiousoft.izinga.ordermanagement.security;
  * SEC-WA02-01-C/E: {@link #clear()} MUST be called in an unconditional finally block
  * in the filter to ensure no residual state leaks across requests on a reused thread.
  * Both fields are cleared unconditionally.
+ *
+ * SA-021-13 / NOTE-02: {@code AUDIENCE} is typed as {@code ThreadLocal<Audience>}
+ * for compile-time safety, consistent with ADR-021 Decision 1 Extension.
  */
 public final class StoreScopeContext {
 
     private StoreScopeContext() { /* utility class */ }
 
-    private static final ThreadLocal<String> PERMITTED_STORE_ID = new ThreadLocal<>();
-    private static final ThreadLocal<String> AUDIENCE = new ThreadLocal<>();
+    private static final ThreadLocal<String>   PERMITTED_STORE_ID = new ThreadLocal<>();
+    private static final ThreadLocal<Audience> AUDIENCE           = new ThreadLocal<>();
 
     /**
      * Set the permitted store ID for the current request.
@@ -25,9 +30,10 @@ public final class StoreScopeContext {
 
     /**
      * Set the audience for the current request.
+     * SA-021-13: typed as {@link Audience} for compile-time safety.
      * Only the filter may call this.
      */
-    public static void setAudience(String audience) {
+    public static void setAudience(Audience audience) {
         AUDIENCE.set(audience);
     }
 
@@ -41,8 +47,9 @@ public final class StoreScopeContext {
 
     /**
      * Get the audience for the current request.
+     * SA-021-13: returns typed {@link Audience} for compile-time safety.
      */
-    public static String getAudience() {
+    public static Audience getAudience() {
         return AUDIENCE.get();
     }
 

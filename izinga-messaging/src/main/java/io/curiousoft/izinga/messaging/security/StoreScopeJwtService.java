@@ -64,7 +64,7 @@ public class StoreScopeJwtService {
     public String generateScopeToken(String storeId, Audience audience) {
         var now = Instant.now();
         var builder = JWT.create()
-                .withIssuer("izinga-ai-agent")
+                .withIssuer("izinga-agent-scope")
                 .withIssuedAt(Date.from(now))
                 .withExpiresAt(Date.from(now.plus(TOKEN_TTL_MINUTES, ChronoUnit.MINUTES)))
                 .withClaim(CLAIM_AUDIENCE_KEY, audience != null ? audience.name() : null);
@@ -85,7 +85,7 @@ public class StoreScopeJwtService {
      */
     public Map<String, String> validateAndExtract(String token) {
         DecodedJWT decoded = JWT.require(algorithm)
-                .withIssuer("izinga-ai-agent")
+                .withIssuer("izinga-agent-scope")
                 .build()
                 .verify(token);
         Map<String, String> claims = new HashMap<>();

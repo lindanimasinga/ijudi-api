@@ -188,10 +188,28 @@ public class StoreAiAgent {
     }
 
     /**
-     * Fill the system prompt's {storeName}, {storeLocation}, {businessHours}, {storeMenu}
-     * placeholders with sanitized live store data from MongoDB.
+     * Fill the system prompt's store context block with sanitized live store data from MongoDB.
      *
-     * SEC-WA02-04-B: all store content goes through StoreContentSanitizer inside StoreContextResolver.
+     * SEC-WA02-04-B: ALL four store-sourced values ({storeName}, {storeLocation},
+     * {businessHours}, {storeMenu}) reach the prompt exclusively through
+     * {@link StoreContextResolver#buildContextBlock(StoreProfile)}, which internally routes
+     * every field through {@link io.curiousoft.izinga.messaging.whatsapp.StoreContentSanitizer}.
+     * No value is injected via a sanitizer-bypassing path.
+     *
+     * FIX-01: the prior implementation replaced the four placeholders individually (steps 1-4)
+     * before step 5 attempted to replace the whole delimited block. Steps 1-4 consumed the
+     * placeholders, so step 5 never matched and the sanitized context was silently discarded.
+     * The fix removes steps 1-4 entirely and replaces only the whole delimited block so all
+     * values flow through StoreContextResolver/StoreContentSanitizer without exception.
+     *
+     * Template format (AiAgentConfigInitializer lines 287-293, text-block stripped):
+     *   === Store Context Begin ===
+     *   Store: {storeName}
+     *   Location: {storeLocation}
+     *   Hours: {businessHours}
+     *   Menu:
+     *   {storeMenu}
+     *   === Store Context End ===
      */
     private String buildPromptWithStoreContext(AiAgentConfig config, String storeId) {
         String base = agentConfigService.buildPromptWithCorrections(config);
@@ -201,20 +219,19 @@ public class StoreAiAgent {
             return base;
         }
         var store = storeOpt.get();
+        // All four values are resolved and sanitized by StoreContextResolver/StoreContentSanitizer
         String contextBlock = storeContextResolver.buildContextBlock(store);
-        // Replace placeholders defined in SEC-WA02-04-B template
-        return base
-                .replace("{storeName}", safe(store.getName()))
-                .replace("{storeLocation}", safe(store.getAddress()))
-                .replace("{businessHours}", "see context")
-                .replace("{storeMenu}", "see context")
-                // Inject the full resolved context block after the placeholder block
-                .replace("=== Store Context Begin ===\nStore: {storeName}\nLocation: {storeLocation}\nHours:\n{businessHours}\nMenu:\n{storeMenu}\n=== Store Context End ===",
-                        "=== Store Context Begin ===\n" + contextBlock + "\n=== Store Context End ===");
-    }
-
-    private static String safe(String v) {
-        return v != null ? v : "";
+        // Replace the ENTIRE delimited block. Search string matches the exact template format.
+        // "Hours: {businessHours}" is a single line (not "Hours:\n{businessHours}") per the template.
+        return base.replace(
+                "=== Store Context Begin ===\n" +
+                "Store: {storeName}\n" +
+                "Location: {storeLocation}\n" +
+                "Hours: {businessHours}\n" +
+                "Menu:\n" +
+                "{storeMenu}\n" +
+                "=== Store Context End ===",
+                "=== Store Context Begin ===\n" + contextBlock + "\n=== Store Context End ===");
     }
 
     /** SA-021-17: attach scope JWT to each MCP server URL. SA-021-8: filter to allowedTools. */
