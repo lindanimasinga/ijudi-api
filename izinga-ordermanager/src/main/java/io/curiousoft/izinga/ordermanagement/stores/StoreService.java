@@ -96,6 +96,9 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
     @Tool(name = "find_store_or_shops_by_id", description = "Find a store profile by its ID. If the store has no business hours set, default hours will be added.")
     @Override
     public StoreProfile find(String id) {
+        // SA-021-8: enforce store scope — throws StoreScopeViolationException if this
+        // request's scope token is locked to a different store.
+        io.curiousoft.izinga.ordermanagement.security.StoreScopeValidator.validate(id);
         StoreProfile store = profileRepo.findById(id).orElse(null);
         if (store != null && store.getBusinessHours() == null) {
             ArrayList<BusinessHours> hours = new ArrayList<>();

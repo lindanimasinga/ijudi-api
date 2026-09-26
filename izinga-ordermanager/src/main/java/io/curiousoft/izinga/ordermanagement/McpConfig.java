@@ -21,6 +21,16 @@ import org.springframework.context.annotation.Configuration;
  *
  * <p>Each bean of type {@link ToolCallbackProvider} is automatically picked up by
  * {@code McpServerAutoConfiguration} and registered as a set of MCP tools.</p>
+ *
+ * <h3>SA-021-18: Store-modification tool rule</h3>
+ * <p>Any future {@code @Tool} method that modifies store data (hours, stock, settings, etc.)
+ * MUST be annotated with
+ * {@code @io.curiousoft.izinga.ordermanagement.security.RequiresAudience("STORE")}
+ * AND MUST call
+ * {@code io.curiousoft.izinga.ordermanagement.security.StoreScopeValidator.validate(storeId)}
+ * as its FIRST statement before any data access or mutation.
+ * Omitting either guard on a store-modifying tool is a security defect that MUST be caught
+ * at code-review and rejected before merge.</p>
  */
 @Configuration
 public class McpConfig {
