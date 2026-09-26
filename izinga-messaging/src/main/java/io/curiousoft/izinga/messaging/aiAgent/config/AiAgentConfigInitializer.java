@@ -177,9 +177,13 @@ public class AiAgentConfigInitializer implements CommandLineRunner {
 
         String description = "AI agent for driver support and onboarding via WhatsApp";
         var saved = configService.saveAgentConfig(agentName, systemPrompt, description);
-        // Set audience and mcpServers on the newly created config
+        // Set audience, mcpServers, and useTools on the newly created config.
+        // useTools must be set explicitly: AiAgentConfig.builder() defaults the primitive
+        // boolean to false (no @Builder.Default), so saveAgentConfig() returns useTools=false
+        // unless we override it here.
         saved.setAudience(Audience.DRIVER);
         saved.setMcpServers(List.of(AiAgentConfigService.DEFAULT_MCP_SERVER));
+        saved.setUseTools(true);
         repository.save(saved);
         configService.invalidateCache(agentName);
     }
@@ -413,8 +417,12 @@ public class AiAgentConfigInitializer implements CommandLineRunner {
                 - If asked for something you cannot confirm: "I don't have that information, but I can help you with..." or direct to support.
                 """;
         var saved = configService.saveAgentConfig(agentName, systemPrompt, "AI agent for customer support via WhatsApp");
+        // useTools must be set explicitly: AiAgentConfig.builder() defaults the primitive
+        // boolean to false (no @Builder.Default), so saveAgentConfig() returns useTools=false
+        // unless we override it here.
         saved.setAudience(Audience.CUSTOMER);
         saved.setMcpServers(List.of(AiAgentConfigService.DEFAULT_MCP_SERVER));
+        saved.setUseTools(true);
         repository.save(saved);
         configService.invalidateCache(agentName);
     }
