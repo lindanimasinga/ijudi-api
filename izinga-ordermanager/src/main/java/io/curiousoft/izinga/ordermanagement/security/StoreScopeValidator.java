@@ -42,4 +42,38 @@ public final class StoreScopeValidator {
                     "Store scope violation: access to store '" + storeId + "' is not permitted by this token");
         }
     }
+
+    /**
+     * ADR-021 Decision 1 Extension: validate that the current request's audience claim
+     * matches one of the {@code permitted} values.
+     *
+     * <p>Unlike {@link #validate(String)}, a null audience is NOT a pass-through — it is
+     * rejected immediately (reject-by-default). This ensures unauthenticated or no-token
+     * callers cannot invoke audience-restricted {@code @Tool} methods.
+     *
+     * <p>SA-021-16 / SEC-WA02-01-E: both permittedStoreId and audience ThreadLocals are
+     * managed by {@link StoreScopeContext}; both are cleared together in the filter's
+     * {@code finally} block.
+     *
+     * @param permitted one or more audience values that are allowed to call this tool
+     * @throws AudienceViolationException if the caller's audience is absent or not in {@code permitted}
+     */
+    public static void validateAudience(String... permitted) {
+        String caller = StoreScopeContext.getAudience();
+        if (caller == null) {
+            // No JWT present — reject-by-default for all audience-restricted tools
+            LOG.warn("AudienceViolation: no audience claim in scope token — rejecting audience-restricted tool call");
+            throw new AudienceViolationException(
+                    "Audience required but no scope token is present on this request");
+        }
+        for (String allowed : permitted) {
+            if (allowed.equals(caller)) {
+                return;
+            }
+        }
+        LOG.warn("AudienceViolation: callerAudience={} requiredAudiences={}", caller, java.util.Arrays.toString(permitted));
+        throw new AudienceViolationException(
+                "Audience violation: caller audience '" + caller + "' is not in permitted set " +
+                        java.util.Arrays.toString(permitted));
+    }
 }

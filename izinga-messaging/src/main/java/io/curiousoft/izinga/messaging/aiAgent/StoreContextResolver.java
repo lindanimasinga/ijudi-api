@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
@@ -79,8 +80,15 @@ public class StoreContextResolver {
         sb.append("Menu:\n");
         Set<Stock> stockSet = store.getStockList();
         if (stockSet != null && !stockSet.isEmpty()) {
-            List<Stock> sorted = stockSet.stream()
+            List<Stock> eligible = stockSet.stream()
                     .filter(s -> s != null && s.getName() != null)
+                    .collect(Collectors.toList());
+            // REQ-16: log when the cap is applied so omissions are traceable in CloudWatch
+            if (eligible.size() > maxItems) {
+                LOG.debug("StoreContextResolver: product cap applied — store={} eligible={} showing={} omitted={}",
+                        store.getId(), eligible.size(), maxItems, eligible.size() - maxItems);
+            }
+            List<Stock> sorted = eligible.stream()
                     .sorted(Comparator.comparingInt(s -> {
                         // Stock.position defaults to 10000 (from Kotlin default)
                         int pos = s.getPosition();
@@ -98,7 +106,8 @@ public class StoreContextResolver {
                 if (!desc.isEmpty()) {
                     sb.append(": ").append(desc);
                 }
-                sb.append(" (R").append(String.format("%.2f", price)).append(")\n");
+                // Use Locale.US to ensure period decimal separator regardless of server locale
+                sb.append(" (R").append(String.format(Locale.US, "%.2f", price)).append(")\n");
             }
         } else {
             sb.append("  No items listed\n");
