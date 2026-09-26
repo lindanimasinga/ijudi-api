@@ -3,6 +3,7 @@ package io.curiousoft.izinga.messaging.aiAgent;
 import io.curiousoft.izinga.messaging.aiAgent.config.AiAgentConfigService;
 import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistory;
 import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistoryService;
+import io.curiousoft.izinga.messaging.security.StoreScopeJwtService;
 import io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsappWebhookPayload;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -35,6 +36,9 @@ class AiCustomerServiceAgentTest {
     @Mock
     private AiAgentConfigService agentConfigService;
 
+    @Mock
+    private StoreScopeJwtService storeScopeJwtService;
+
     private static final String FAKE_API_KEY = "sk-test-key";
     private static final String FAKE_MODEL = "gpt-4.1-mini";
     private static final String FROM = "+27812345678";
@@ -46,8 +50,8 @@ class AiCustomerServiceAgentTest {
 
     @BeforeEach
     void setUp() {
-        enabledAgent = new AiCustomerServiceAgent(true, FAKE_API_KEY, FAKE_MODEL, restTemplate, conversationHistoryService, agentConfigService);
-        disabledAgent = new AiCustomerServiceAgent(false, FAKE_API_KEY, FAKE_MODEL, restTemplate, conversationHistoryService, agentConfigService);
+        enabledAgent = new AiCustomerServiceAgent(true, FAKE_API_KEY, FAKE_MODEL, restTemplate, conversationHistoryService, agentConfigService, storeScopeJwtService);
+        disabledAgent = new AiCustomerServiceAgent(false, FAKE_API_KEY, FAKE_MODEL, restTemplate, conversationHistoryService, agentConfigService, storeScopeJwtService);
     }
 
     // ─── isEnabled ────────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import io.curiousoft.izinga.commons.model.WhatsappSession;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.aiAgent.AiCustomerServiceAgent;
+import io.curiousoft.izinga.messaging.aiAgent.StoreAiAgent;
 import io.curiousoft.izinga.messaging.firebase.FireStoreTextMessage;
 import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.messaging.firebase.FirestoreService;
@@ -60,6 +61,8 @@ class WhatsappInboundEventHandlerTest {
     @Mock
     private AiCustomerServiceAgent aiCustomerService;
     @Mock
+    private StoreAiAgent storeAiAgent;
+    @Mock
     private WhatsappImageDocumentService whatsappImageDocumentService;
     @Mock
     private WhatsappLineService whatsappLineService;
@@ -78,6 +81,7 @@ class WhatsappInboundEventHandlerTest {
                 whatsappSessionRepo,
                 verificationConsentService,
                 aiCustomerService,
+                storeAiAgent,
                 whatsappImageDocumentService,
                 whatsappLineService
         );

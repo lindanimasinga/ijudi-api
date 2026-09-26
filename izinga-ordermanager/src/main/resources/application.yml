@@ -154,3 +154,14 @@ client:
                 x-auth-token: ${yoco.dashboard-api.token}
                 useruuid: ${yoco.dashboard-api.user}
                 businessuuid: ${yoco.dashboard-api.businessuuid}
+
+# SEC-WA02-01-B: dedicated store-scope JWT secret — NOT derived from Firebase auth
+# Must be at least 32 chars. Configure a real secret in Secrets Manager for prod.
+store-scope:
+  jwt:
+    secret: ${STORE_SCOPE_JWT_SECRET:change-this-secret-to-minimum-32-chars!}
+
+# T-09: cap on menu items injected per store prompt
+store:
+  context:
+    max-items: 50

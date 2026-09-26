@@ -1,8 +1,10 @@
 package io.curiousoft.izinga.messaging.aiAgent;
 
 import io.curiousoft.izinga.messaging.aiAgent.config.AiAgentConfigService;
+import io.curiousoft.izinga.messaging.aiAgent.config.McpServerConfig;
 import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistory;
 import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistoryService;
+import io.curiousoft.izinga.messaging.security.StoreScopeJwtService;
 import io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsappWebhookPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +30,8 @@ public class AiCustomerServiceAgent {
     private final RestTemplate restTemplate;
     private final ConversationHistoryService conversationHistoryService;
     private final AiAgentConfigService agentConfigService;
+    /** SA-021-17: attaches per-request scope JWT to MCP server URLs. */
+    private final StoreScopeJwtService storeScopeJwtService;
 
     public AiCustomerServiceAgent(
             @Value("${ai.agent.enabled:false}") boolean enabled,
@@ -35,13 +39,41 @@ public class AiCustomerServiceAgent {
             @Value("${ai.agent.model:gpt-4.1-mini}") String model,
             RestTemplate restTemplate,
             ConversationHistoryService conversationHistoryService,
-            AiAgentConfigService agentConfigService) {
+            AiAgentConfigService agentConfigService,
+            StoreScopeJwtService storeScopeJwtService) {
         this.enabled = enabled;
         this.openAiApiKey = openAiApiKey;
         this.model = model;
         this.restTemplate = restTemplate;
         this.conversationHistoryService = conversationHistoryService;
         this.agentConfigService = agentConfigService;
+        this.storeScopeJwtService = storeScopeJwtService;
+    }
+
+    /**
+     * SA-021-17: Build the MCP tools list with scope JWTs appended to each server URL.
+     * SEC-WA02-01-D: audience is sourced from AiAgentConfig (MongoDB), never from request payload.
+     *
+     * @param agentName the agent config key
+     * @param storeId   the store ID (null for DRIVER/CUSTOMER agents)
+     */
+    protected List<McpServerConfig> buildScopedMcpTools(String agentName, String storeId) {
+        var configs = agentConfigService.getMcpToolsForAgent(agentName);
+        var agentConfig = agentConfigService.getActiveAgentConfig(agentName);
+        var audience = (agentConfig != null) ? agentConfig.getAudience() : null;
+        List<McpServerConfig> scoped = new ArrayList<>(configs.size());
+        for (McpServerConfig cfg : configs) {
+            try {
+                String scopedUrl = storeScopeJwtService.buildScopedUrl(cfg.getServerUrl(), storeId, audience);
+                scoped.add(new McpServerConfig(cfg.getType(), cfg.getServerLabel(),
+                        cfg.getServerDescription(), scopedUrl, cfg.getRequireApproval(), cfg.getHeaders()));
+            } catch (Exception e) {
+                LOG.warn("SA-021-17: failed to build scope token for agent={} server={} — using base URL",
+                        agentName, cfg.getServerLabel(), e);
+                scoped.add(cfg);
+            }
+        }
+        return scoped;
     }
 
     public boolean isEnabled() {
@@ -114,14 +146,15 @@ public class AiCustomerServiceAgent {
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setBearerAuth(openAiApiKey);
 
-            var mcpServerToolsForAgent = agentConfigService.getMcpToolsForAgent();
+            // SA-021-3 + SA-021-17: per-agent mcpServers with scope JWT in each URL
+            var mcpServerToolsForAgent = buildScopedMcpTools(DEFAULT_AGENT_NAME, null);
             Map<String, Object> requestBody = new HashMap<>(Map.of(
                     "model", model,
                     "input", messagesList
             ));
 
             var agent = agentConfigService.getActiveAgentConfig(DEFAULT_AGENT_NAME);
-            if (agent.isUseTools()) {
+            if (agent != null && agent.isUseTools()) {
                 requestBody.put("tools", mcpServerToolsForAgent);
             }
 
@@ -213,7 +246,8 @@ public class AiCustomerServiceAgent {
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setBearerAuth(openAiApiKey);
 
-            var mcpServerToolsForAgent = agentConfigService.getMcpToolsForAgent();
+            // SA-021-3 + SA-021-17: per-agent mcpServers with scope JWT in each URL (no storeId for DRIVER/CUSTOMER)
+            var mcpServerToolsForAgent = buildScopedMcpTools(resolvedAgent, null);
             Map<String, Object> requestBody = new HashMap<>(Map.of("model", model, "input", messagesList));
 
             var agent = agentConfigService.getActiveAgentConfig(resolvedAgent);

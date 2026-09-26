@@ -12,9 +12,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.Objects;
 
 /** SEC-05: /forward/** requires ADMIN or STORE_ADMIN Bearer JWT. */
 @RestController
@@ -60,6 +64,19 @@ public class FirestoreToWhatsappController {
             if (session == null) {
                 LOG.warn("ChatSession not found: {}", cSId);
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "chatSession not found"));
+            }
+
+            // SEC-WA02-03-A/B: STORE_ADMIN must only access sessions belonging to their store.
+            // storeId read ONLY from JWT claim — never from request body/path/query.
+            // ADMIN role bypasses this check.
+            if (!isAdminUser()) {
+                String jwtStoreId = extractStoreIdFromJwt();
+                if (!Objects.equals(jwtStoreId, session.getStoreId())) {
+                    LOG.warn("SEC-WA02-03: STORE_ADMIN storeId mismatch: jwtStoreId={} sessionStoreId={}",
+                            jwtStoreId, session.getStoreId());
+                    // SEC-WA02-03-B: response body is ONLY {"error":"Forbidden"} — no ChatSession fields
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Forbidden"));
+                }
             }
 
             FireStoreMessage msg = firestoreService.getMessageForSession(cSId, msgId);
@@ -110,8 +127,31 @@ public class FirestoreToWhatsappController {
 
         } catch (Exception e) {
             LOG.error("Error forwarding message to WhatsApp", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+            // SEC-WA02-03-A: never expose internal error details to the caller
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "internal error"));
         }
+    }
+
+    /**
+     * SEC-WA02-03-A: returns true when the current principal has ROLE_ADMIN, bypassing storeId check.
+     */
+    private boolean isAdminUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return false;
+        return auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+    }
+
+    /**
+     * SEC-WA02-03-A: extract storeId ONLY from the authenticated JWT claim.
+     * Returns null if not present or authentication is not a JwtAuthenticationToken.
+     */
+    private String extractStoreIdFromJwt() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth instanceof JwtAuthenticationToken jwtAuth) {
+            return jwtAuth.getToken().getClaimAsString("storeId");
+        }
+        return null;
     }
 
     /** REQ-08: resolve outbound phoneId using the WA session's stored phoneNumberId, falling back to resolver. */

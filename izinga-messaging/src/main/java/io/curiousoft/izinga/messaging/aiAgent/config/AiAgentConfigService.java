@@ -115,11 +115,43 @@ public class AiAgentConfigService {
         }
     }
 
-    public List<McpServerConfig> getMcpToolsForAgent() {
-        // For simplicity, returning hardcoded tools. In a real implementation, this could be loaded from the database as well.
-        return List.of(
-                new McpServerConfig("mcp", "order-and-user-management-api", "API for managing orders and users", "https://api.izinga.co.za/mcp", "never")
-        );
+    /**
+     * Remove a named entry from the cache so the next call re-fetches from MongoDB.
+     * Called by AiAgentConfigInitializer after backfill saves, so subsequent lookups
+     * pick up the updated document.
+     */
+    public void invalidateCache(String agentName) {
+        configCache.remove(agentName);
+    }
+
+    /**
+     * Load agent config regardless of active status.
+     * Used for loading the {@code store_support_default} template, which is always
+     * active=false and therefore invisible to {@link #getAgentConfig(String)}.
+     *
+     * Does NOT cache the result — callers that need caching should use getAgentConfig.
+     */
+    public Optional<AiAgentConfig> getAgentConfigAnyStatus(String agentName) {
+        return repository.findByAgentName(agentName);
+    }
+
+    /** Default MCP server fallback — used when an agent has no mcpServers list in its config. */
+    public static final McpServerConfig DEFAULT_MCP_SERVER =
+            new McpServerConfig("mcp", "order-and-user-management-api",
+                    "API for managing orders and users",
+                    "https://api.izinga.co.za/mcp", "never", null);
+
+    /**
+     * SA-021-3: returns the MCP server list for the named agent.
+     * Reads from AiAgentConfig.mcpServers; falls back to DEFAULT_MCP_SERVER when null/empty.
+     *
+     * @param agentName the agent config key (e.g. "driver_support", "store_support_<storeId>")
+     */
+    public List<McpServerConfig> getMcpToolsForAgent(String agentName) {
+        return getAgentConfig(agentName)
+                .filter(c -> c.getMcpServers() != null && !c.getMcpServers().isEmpty())
+                .map(AiAgentConfig::getMcpServers)
+                .orElseGet(() -> List.of(DEFAULT_MCP_SERVER));
     }
 
     /**

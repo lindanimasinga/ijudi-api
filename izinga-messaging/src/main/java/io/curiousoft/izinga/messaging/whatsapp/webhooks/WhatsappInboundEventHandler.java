@@ -4,6 +4,7 @@ import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.aiAgent.AiCustomerServiceAgent;
+import io.curiousoft.izinga.messaging.aiAgent.StoreAiAgent;
 import io.curiousoft.izinga.messaging.firebase.FireStoreTextMessage;
 import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.messaging.firebase.FirestoreService;
@@ -43,6 +44,8 @@ public class WhatsappInboundEventHandler {
     private final WhatsappSessionRepo whatsappSessionRepo;
     private final VerificationConsentService verificationConsentService;
     private final AiCustomerServiceAgent aiCustomerService;
+    /** T-11: store-scoped AI agent for STORE audience lines. */
+    private final StoreAiAgent storeAiAgent;
     private final WhatsappImageDocumentService whatsappImageDocumentService;
     /** REQ-10: line resolution service */
     private final WhatsappLineService whatsappLineService;
@@ -52,6 +55,7 @@ public class WhatsappInboundEventHandler {
                                        DeviceRepository deviceRepo,
                                        WhatsappNotificationService whatsappNotificationService, WhatsappSessionRepo whatsappSessionRepo,
                                        VerificationConsentService verificationConsentService, AiCustomerServiceAgent aiCustomerService,
+                                       StoreAiAgent storeAiAgent,
                                        WhatsappImageDocumentService whatsappImageDocumentService,
                                        WhatsappLineService whatsappLineService) {
         this.eventPublisher = eventPublisher;
@@ -63,6 +67,7 @@ public class WhatsappInboundEventHandler {
         this.whatsappSessionRepo = whatsappSessionRepo;
         this.verificationConsentService = verificationConsentService;
         this.aiCustomerService = aiCustomerService;
+        this.storeAiAgent = storeAiAgent;
         this.whatsappImageDocumentService = whatsappImageDocumentService;
         this.whatsappLineService = whatsappLineService;
     }
@@ -131,7 +136,7 @@ public class WhatsappInboundEventHandler {
         return new LineContext(null, "customer_support", Audience.CUSTOMER, null);
     }
 
-    /** REQ-22: structured INFO log for account_update webhook objects. */
+    /** REQ-22 / T-15: structured INFO log for account_update webhook objects. Includes storeId for STORE lines. */
     private void handleAccountUpdate(WhatsappWebhookPayload payload) {
         try {
             if (payload.getEntry() == null) return;
@@ -141,8 +146,11 @@ public class WhatsappInboundEventHandler {
                     if (change.getValue() == null) continue;
                     var meta = change.getValue().getMetadata();
                     String phoneNumberId = meta != null ? meta.getPhoneNumberId() : "unknown";
-                    LOG.info("REQ-22 account_update: phoneNumberId={} field={} timestamp={}",
-                            phoneNumberId, change.getField(), Instant.now());
+                    // T-15: resolve LineContext to include storeId for STORE lines
+                    LineContext lineContext = resolveLineContext(phoneNumberId);
+                    String storeId = lineContext.storeId();
+                    LOG.info("REQ-22 account_update: phoneNumberId={} field={} audience={} storeId={} timestamp={}",
+                            phoneNumberId, change.getField(), lineContext.audience(), storeId, Instant.now());
                 }
             }
         } catch (Exception e) {
@@ -195,11 +203,17 @@ public class WhatsappInboundEventHandler {
         }
 
         if (isAiCustomerServiceEnabled && session.isAIAgentActive()) {
-            LOG.info("AI customer service enabled, processing message from {} via agent={}",
-                    from, lineContext.agentName());
-            // REQ-20: use agent-aware handler
-            aiResponseToCustomer = aiCustomerService.handleWhatsappQueryForAgent(
-                    message, from, null, lineContext.agentName());
+            LOG.info("AI customer service enabled, processing message from {} via agent={} audience={}",
+                    from, lineContext.agentName(), lineContext.audience());
+            // T-11: route STORE audience to StoreAiAgent; all others to AiCustomerServiceAgent
+            if (lineContext.audience() == Audience.STORE) {
+                aiResponseToCustomer = storeAiAgent.handleWhatsappQuery(
+                        message, from, lineContext.storeId(), lineContext.agentName());
+            } else {
+                // REQ-20: DRIVER / CUSTOMER audiences use agent-aware handler
+                aiResponseToCustomer = aiCustomerService.handleWhatsappQueryForAgent(
+                        message, from, null, lineContext.agentName());
+            }
             if (aiResponseToCustomer != null) {
                 whatsappNotificationService.sendMessage(from, aiResponseToCustomer);
             }
