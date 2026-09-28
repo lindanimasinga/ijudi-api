@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.util.Map;
 import java.util.Optional;
@@ -13,8 +14,15 @@ import java.util.Optional;
  *
  * SA-021-1: added Optional<Map<String,String>> headers for passing the agent-scope JWT
  * to OpenAI Responses API so it is forwarded on each tool-invocation request to the MCP server.
+ *
+ * HOTFIX: added @NoArgsConstructor so Spring Data MongoDB's MappingMongoConverter can
+ * deserialize existing ai_agent_configs documents that contain mcpServers sub-documents.
+ * Without it, startup crashed with NoSuchMethodException on McpServerConfig.<init>().
+ * Pattern matches AiAgentConfig.HumanCorrection which uses the same @NoArgsConstructor
+ * @AllArgsConstructor combination for identical reasons.
  */
 @Getter
+@NoArgsConstructor
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class McpServerConfig {
