@@ -7,12 +7,13 @@ import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.yocopay.api.YocoPaymentClient
 import io.curiousoft.izinga.yocopay.api.YocoPaymentInitiate
 import io.curiousoft.izinga.yocopay.config.YocoConfiguration
+import io.curiousoft.izinga.yocopay.config.checksum
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.junit.Before
-import org.junit.Test
 import org.junit.jupiter.api.Assertions
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 
 
 class YocoPaymentControllerTest {
@@ -22,7 +23,7 @@ class YocoPaymentControllerTest {
     private val yocoPaymentClient = mockk<YocoPaymentClient>()
     private lateinit var sut: YocoPaymentController
 
-    @Before
+    @BeforeEach
     fun setUp() {
         sut = YocoPaymentController(yocoConfiguration = yocoConfig,
             izingaOrderMananger = orderManager, yocoPaymentClient = yocoPaymentClient, mapper = ObjectMapper()
@@ -53,8 +54,11 @@ class YocoPaymentControllerTest {
         val httpResponse = sut.verifyPaymentSuccess(successEvent = yocoEvent, yocoHash = "8AvKYTPMYVtjgiXM7KmaPMQLM+pVfmUOEVl6SalovSs=")
 
         //verify
+        // Production code embeds an MD5 checksum of "$orderId$totalAmount$customerId",
+        // NOT the raw yocoHash (HMAC-SHA256) that was used before commit c1858e8.
+        val expectedChecksum = yocoConfig.checksum("${newOrder.id}${newOrder.totalAmount}${newOrder.customerId}")
         Assertions.assertEquals(200, httpResponse.statusCodeValue)
-        Assertions.assertEquals("new order description:yoco-8AvKYTPMYVtjgiXM7KmaPMQLM+pVfmUOEVl6SalovSs=:", newOrder.description)
+        Assertions.assertEquals("new order description:yoco-$expectedChecksum:", newOrder.description)
 
         verify {
             orderManager.findOrder("new-order-id")

@@ -6,17 +6,18 @@ import com.google.gson.Gson;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.messaging.firebase.FirebaseConnectionWrapper;
+import io.curiousoft.izinga.messaging.firebase.FirestoreService;
+import io.curiousoft.izinga.messaging.whatsapp.WhatsAppService;
 import io.curiousoft.izinga.ordermanagement.IjudiApplication;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.*;
-import org.springframework.test.context.junit4.SpringRunner;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -25,7 +26,8 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
 
-@RunWith(SpringRunner.class)
+import static org.junit.jupiter.api.Assertions.*;
+
 @SpringBootTest(classes = IjudiApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class OrderControllerTest {
@@ -37,11 +39,20 @@ public class OrderControllerTest {
     @Autowired
     private StoreRepository storeRepository;
 
+    // Firebase and WhatsApp infrastructure beans require credentials not present
+    // in test application.yml — mock them so the Spring context starts cleanly.
+    @MockBean
+    private FirebaseConnectionWrapper firebaseConnectionWrapper;
+    @MockBean
+    private FirestoreService firestoreService;
+    @MockBean
+    private WhatsAppService whatsAppService;
+
     private StoreProfile store;
     private UserProfile user;
     private HttpHeaders headers;
 
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         headers = new HttpHeaders();
         headers.set("Origin", "app://izinga");
@@ -120,17 +131,17 @@ public class OrderControllerTest {
                         .body(order), String.class);
 
         System.out.println(new ObjectMapper().writeValueAsString(result.getBody()));
-        Assert.assertTrue(result.getStatusCode().is2xxSuccessful());
+        assertTrue(result.getStatusCode().is2xxSuccessful());
 
         Order orderResponse = new Gson().fromJson(result.getBody(), Order.class);
         //verify
-        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, orderResponse.getStage());
-        Assert.assertNotNull(orderResponse.getId());
-        Assert.assertEquals(1.75, orderResponse.getServiceFee(), 0);
-        Assert.assertEquals(30.0, orderResponse.getShippingData().getFee(), 0);
-        Assert.assertEquals(40.00, orderResponse.getBasketAmount(), 0);
+        assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, orderResponse.getStage());
+        assertNotNull(orderResponse.getId());
+        assertEquals(1.75, orderResponse.getServiceFee(), 0);
+        assertEquals(30.0, orderResponse.getShippingData().getFee(), 0);
+        assertEquals(40.00, orderResponse.getBasketAmount(), 0);
         //verify total amount paid
-        Assert.assertEquals(orderResponse.getServiceFee() + basket.getItems().stream()
+        assertEquals(orderResponse.getServiceFee() + basket.getItems().stream()
                 .mapToDouble(BasketItem::getTotalPrice).sum() + orderResponse.getShippingData().getFee(), orderResponse.getTotalAmount(), 0);
     }
 
@@ -163,7 +174,7 @@ public class OrderControllerTest {
                         .body(order), String.class);
 
         System.out.println(new ObjectMapper().writeValueAsString(result.getBody()));
-        Assert.assertTrue(result.getStatusCode().is2xxSuccessful());
+        assertTrue(result.getStatusCode().is2xxSuccessful());
 
         Order orderResponse = new Gson().fromJson(result.getBody(), Order.class);
 
@@ -176,7 +187,7 @@ public class OrderControllerTest {
         orderResponse = rest.exchange(new URI("/order/" + orderResponse.getId()), HttpMethod.PATCH, entity, Order.class).getBody();
 
         //verify
-        Assert.assertEquals(OrderStage.STAGE_1_WAITING_STORE_CONFIRM, orderResponse.getStage());
+        assertEquals(OrderStage.STAGE_1_WAITING_STORE_CONFIRM, orderResponse.getStage());
     }
 
     @Test
@@ -207,7 +218,7 @@ public class OrderControllerTest {
                         .headers(headers).body(order), String.class);
 
         System.out.println(new ObjectMapper().writeValueAsString(result.getBody()));
-        Assert.assertTrue(result.getStatusCode().is2xxSuccessful());
+        assertTrue(result.getStatusCode().is2xxSuccessful());
 
         Order orderResponse = new Gson().fromJson(result.getBody(), Order.class);
 
@@ -218,7 +229,7 @@ public class OrderControllerTest {
         orderResponse = rest.exchange(new URI("/order/" + orderResponse.getId()), HttpMethod.PATCH, entity, Order.class).getBody();
 
         //verify
-        Assert.assertEquals(OrderStage.STAGE_1_WAITING_STORE_CONFIRM, orderResponse.getStage());
+        assertEquals(OrderStage.STAGE_1_WAITING_STORE_CONFIRM, orderResponse.getStage());
     }
 
     @Test
@@ -249,7 +260,7 @@ public class OrderControllerTest {
                         .headers(headers).body(order), String.class);
 
         System.out.println(new ObjectMapper().writeValueAsString(result.getBody()));
-        Assert.assertTrue(result.getStatusCode().is2xxSuccessful());
+        assertTrue(result.getStatusCode().is2xxSuccessful());
 
         Order orderResponse = new Gson().fromJson(result.getBody(), Order.class);
 
@@ -261,7 +272,7 @@ public class OrderControllerTest {
         ResponseEntity<Order> response = rest.exchange(new URI("/order/" + orderResponse.getId()), HttpMethod.PATCH, entity, Order.class);
 
         //verify
-        Assert.assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
     }
 
     @Test
@@ -269,7 +280,7 @@ public class OrderControllerTest {
 
     }
 
-    @After
+    @AfterEach
     public void tearDown() throws Exception {
         storeRepository.deleteAll();
         userProfileRepo.deleteAll();

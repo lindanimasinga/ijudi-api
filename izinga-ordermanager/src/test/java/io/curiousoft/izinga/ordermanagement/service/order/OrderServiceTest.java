@@ -15,13 +15,12 @@ import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
 import io.curiousoft.izinga.ordermanagement.orders.quote.OrderQuoteRepository;
 import io.curiousoft.izinga.ordermanagement.leads.LeadService;
 import org.assertj.core.util.Lists;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.DayOfWeek;
@@ -30,10 +29,10 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.*;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-@RunWith(MockitoJUnitRunner.class)
+
+@ExtendWith(MockitoExtension.class)
 public class OrderServiceTest {
     @Mock
     private OrderRepository repo;
@@ -67,7 +66,7 @@ public class OrderServiceTest {
     //system under test
     private OrderServiceImpl sut;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         double standardDeliveryFee = 15;
         double standardDeliveryKm = 3;
@@ -175,14 +174,14 @@ public class OrderServiceTest {
         when(repo.save(order)).thenReturn(order);
         Order newOrder = sut.startOrder(order);
         //verify
-        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
-        Assert.assertNotNull(order.getId());
-        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
-        Assert.assertEquals(30, order.getShippingData().getFee(), 0);
-        Assert.assertEquals(1.75, order.getServiceFee(), 0);
-        Assert.assertEquals(40.00, order.getBasketAmount(), 0);
-        Assert.assertEquals(false, order.getHasVat());
-        Assert.assertEquals(false, order.getFreeDelivery());
+        assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        assertNotNull(order.getId());
+        assertEquals(6, order.getShippingData().getDistance(), 0);
+        assertEquals(30, order.getShippingData().getFee(), 0);
+        assertEquals(1.75, order.getServiceFee(), 0);
+        assertEquals(40.00, order.getBasketAmount(), 0);
+        assertEquals(false, order.getHasVat());
+        assertEquals(false, order.getFreeDelivery());
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
@@ -227,14 +226,14 @@ public class OrderServiceTest {
 
         Order newOrder = sut.startOrder(order);
         //verify
-        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
-        Assert.assertNotNull(order.getId());
-        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
-        Assert.assertEquals(0, order.getShippingData().getFee(), 0);
-        Assert.assertEquals(1, order.getServiceFee(), 0);
-        Assert.assertEquals(40.00, order.getBasketAmount(), 0);
-        Assert.assertEquals(false, order.getHasVat());
-        Assert.assertEquals(false, order.getFreeDelivery());
+        assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        assertNotNull(order.getId());
+        assertEquals(6, order.getShippingData().getDistance(), 0);
+        assertEquals(0, order.getShippingData().getFee(), 0);
+        assertEquals(1, order.getServiceFee(), 0);
+        assertEquals(40.00, order.getBasketAmount(), 0);
+        assertEquals(false, order.getHasVat());
+        assertEquals(false, order.getFreeDelivery());
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
@@ -287,7 +286,7 @@ public class OrderServiceTest {
             Order newOrder = sut.startOrder(order);
             fail();
         }catch (Exception e) {
-            Assert.assertEquals("Shop not available name", e.getMessage());
+            assertEquals("Shop not available name", e.getMessage());
         }
 
         //verify
@@ -341,7 +340,7 @@ public class OrderServiceTest {
             Order newOrder = sut.startOrder(order);
             fail();
         }catch (Exception e) {
-            Assert.assertEquals("Only Scheduled delivery is allowed at this time", e.getMessage());
+            assertEquals("Only Scheduled delivery is allowed at this time", e.getMessage());
         }
 
         //verify
@@ -385,14 +384,14 @@ public class OrderServiceTest {
         Order newOrder = sut.startOrder(order);
 
         //verify
-        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
-        Assert.assertNotNull(order.getId());
-        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
-        Assert.assertEquals(30, order.getShippingData().getFee(), 0);
-        Assert.assertEquals(12.5, order.getServiceFee(), 0);
-        Assert.assertEquals(500.00, order.getBasketAmount(), 0);
-        Assert.assertEquals(false, order.getHasVat());
-        Assert.assertEquals(true, order.getFreeDelivery());
+        assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        assertNotNull(order.getId());
+        assertEquals(6, order.getShippingData().getDistance(), 0);
+        assertEquals(30, order.getShippingData().getFee(), 0);
+        assertEquals(12.5, order.getServiceFee(), 0);
+        assertEquals(500.00, order.getBasketAmount(), 0);
+        assertEquals(false, order.getHasVat());
+        assertEquals(true, order.getFreeDelivery());
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
@@ -439,13 +438,13 @@ public class OrderServiceTest {
         Order newOrder = sut.startOrder(order);
 
         //verify
-        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
-        Assert.assertNotNull(order.getId());
-        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
-        Assert.assertEquals(35, order.getShippingData().getFee(), 0);
-        Assert.assertEquals(0, order.getServiceFee(), 0);
-        Assert.assertEquals(40.00, order.getBasketAmount(), 0);
-        Assert.assertEquals(false, order.getHasVat());
+        assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        assertNotNull(order.getId());
+        assertEquals(6, order.getShippingData().getDistance(), 0);
+        assertEquals(35, order.getShippingData().getFee(), 0);
+        assertEquals(0, order.getServiceFee(), 0);
+        assertEquals(40.00, order.getBasketAmount(), 0);
+        assertEquals(false, order.getHasVat());
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
@@ -490,10 +489,10 @@ public class OrderServiceTest {
 
         Order newOrder = sut.startOrder(order);
 
-        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
-        Assert.assertNotNull(order.getId());
-        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
-        Assert.assertEquals(55, order.getShippingData().getFee(), 0);
+        assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        assertNotNull(order.getId());
+        assertEquals(6, order.getShippingData().getDistance(), 0);
+        assertEquals(55, order.getShippingData().getFee(), 0);
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
@@ -538,10 +537,10 @@ public class OrderServiceTest {
 
         Order newOrder = sut.startOrder(order);
 
-        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
-        Assert.assertNotNull(order.getId());
-        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
-        Assert.assertEquals(85, order.getShippingData().getFee(), 0);
+        assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        assertNotNull(order.getId());
+        assertEquals(6, order.getShippingData().getDistance(), 0);
+        assertEquals(85, order.getShippingData().getFee(), 0);
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
@@ -585,10 +584,10 @@ public class OrderServiceTest {
 
         Order newOrder = sut.startOrder(order);
 
-        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
-        Assert.assertNotNull(order.getId());
-        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
-        Assert.assertEquals(35, order.getShippingData().getFee(), 0);
+        assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        assertNotNull(order.getId());
+        assertEquals(6, order.getShippingData().getDistance(), 0);
+        assertEquals(35, order.getShippingData().getFee(), 0);
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
@@ -620,7 +619,7 @@ public class OrderServiceTest {
             Order newOrder = sut.startOrder(order);
             fail();
         }catch (Exception e) {
-            Assert.assertEquals("Delivery address or building or unit number not correct.", e.getMessage());
+            assertEquals("Delivery address or building or unit number not correct.", e.getMessage());
         }
     }
     @Test
@@ -653,7 +652,7 @@ public class OrderServiceTest {
             Order newOrder = sut.startOrder(order);
             fail();
         }catch (Exception e) {
-            Assert.assertEquals("Delivery address or building or unit number not correct.", e.getMessage());
+            assertEquals("Delivery address or building or unit number not correct.", e.getMessage());
         }
     }
     @Test
@@ -685,7 +684,7 @@ public class OrderServiceTest {
             Order newOrder = sut.startOrder(order);
             fail();
         }catch (Exception e) {
-            Assert.assertEquals("Delivery address or building or unit number not correct.", e.getMessage());
+            assertEquals("Delivery address or building or unit number not correct.", e.getMessage());
         }
     }
     @Test
@@ -714,15 +713,15 @@ public class OrderServiceTest {
         when(repo.save(order)).thenReturn(order);
         Order newOrder = sut.startOrder(order);
         //verify
-        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
-        Assert.assertNotNull(order.getId());
-        Assert.assertEquals(1.00, order.getServiceFee(), 0);
-        Assert.assertNull(order.getShippingData());
-        Assert.assertEquals(40.00, order.getBasketAmount(), 0);
+        assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        assertNotNull(order.getId());
+        assertEquals(1.00, order.getServiceFee(), 0);
+        assertNull(order.getShippingData());
+        assertEquals(40.00, order.getBasketAmount(), 0);
         //verify total amount paid
-        Assert.assertEquals(order.getServiceFee() + basket.getItems().stream()
+        assertEquals(order.getServiceFee() + basket.getItems().stream()
                 .mapToDouble(BasketItem::getTotalPrice).sum(), order.getTotalAmount(), 0);
-        Assert.assertFalse(order.getHasVat());
+        assertFalse(order.getHasVat());
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
@@ -769,15 +768,15 @@ public class OrderServiceTest {
         Order newOrder = sut.startOrder(order);
 
         //verify
-        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
-        Assert.assertNotNull(newOrder.getId());
-        Assert.assertEquals(1.75, newOrder.getServiceFee(), 0);
-        Assert.assertEquals(30, newOrder.getShippingData().getFee(), 0);
-        Assert.assertEquals(40.00, newOrder.getBasketAmount(), 0);
+        assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        assertNotNull(newOrder.getId());
+        assertEquals(1.75, newOrder.getServiceFee(), 0);
+        assertEquals(30, newOrder.getShippingData().getFee(), 0);
+        assertEquals(40.00, newOrder.getBasketAmount(), 0);
         //verify total amount paid
-        Assert.assertEquals(newOrder.getServiceFee() + basket.getItems().stream()
+        assertEquals(newOrder.getServiceFee() + basket.getItems().stream()
                 .mapToDouble(BasketItem::getTotalPrice).sum() + shipping.getFee(), newOrder.getTotalAmount(), 0);
-        Assert.assertFalse(newOrder.getHasVat());
+        assertFalse(newOrder.getHasVat());
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
@@ -827,22 +826,22 @@ public class OrderServiceTest {
         Order newOrder = sut.startOrder(order);
 
         //verify
-        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
-        Assert.assertNotNull(newOrder.getId());
-        Assert.assertEquals(1.75, newOrder.getServiceFee(), 0);
-        Assert.assertEquals(30, newOrder.getShippingData().getFee(), 0);
-        Assert.assertEquals(40.00, newOrder.getBasketAmount(), 0);
+        assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        assertNotNull(newOrder.getId());
+        assertEquals(1.75, newOrder.getServiceFee(), 0);
+        assertEquals(30, newOrder.getShippingData().getFee(), 0);
+        assertEquals(40.00, newOrder.getBasketAmount(), 0);
         //verify total amount paid
-        Assert.assertEquals(newOrder.getServiceFee()
+        assertEquals(newOrder.getServiceFee()
                 + basket.getItems().stream().mapToDouble(BasketItem::getTotalPrice).sum()
                 + shipping.getFee()
                 , newOrder.getTotalAmount(), 0);
         //verify deposit amount to be paid
-        Assert.assertEquals(newOrder.getServiceFee()
+        assertEquals(newOrder.getServiceFee()
                         + basket.getItems().stream().mapToDouble(BasketItem::getTotalPrice).sum() * 0.3
                         + shipping.getFee()
                 , newOrder.getDepositAmount(), 0);
-        Assert.assertFalse(newOrder.getHasVat());
+        assertFalse(newOrder.getHasVat());
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
@@ -893,7 +892,7 @@ public class OrderServiceTest {
             Order newOrder = sut.startOrder(order);
             fail();
         }catch (Exception e) {
-            Assert.assertEquals("Collection or scheduled orders not allowed for name", e.getMessage());
+            assertEquals("Collection or scheduled orders not allowed for name", e.getMessage());
         }
         verify(storeRepo).findById(order.getShopId());
         verify(customerRepo).existsById(order.getCustomerId());
@@ -935,7 +934,7 @@ public class OrderServiceTest {
             sut.startOrder(order);
             fail();
         } catch (Exception e) {
-            Assert.assertEquals("Delivery address or building or unit number not correct.", e.getMessage());
+            assertEquals("Delivery address or building or unit number not correct.", e.getMessage());
         }
     }
 
@@ -979,13 +978,13 @@ public class OrderServiceTest {
         Order newOrder = sut.startOrder(order);
 
         //verify
-        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
-        Assert.assertNotNull(order.getId());
-        Assert.assertTrue(order.getHasVat());
-        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
-        Assert.assertEquals(30, order.getShippingData().getFee(), 0);
-        Assert.assertEquals(1.75, order.getServiceFee(), 0);
-        Assert.assertEquals(40, order.getBasketAmount(), 0);
+        assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
+        assertNotNull(order.getId());
+        assertTrue(order.getHasVat());
+        assertEquals(6, order.getShippingData().getDistance(), 0);
+        assertEquals(30, order.getShippingData().getFee(), 0);
+        assertEquals(1.75, order.getServiceFee(), 0);
+        assertEquals(40, order.getBasketAmount(), 0);
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
@@ -1015,7 +1014,7 @@ public class OrderServiceTest {
             fail();
         } catch (Exception e) {
             e.printStackTrace();
-            Assert.assertTrue("order type is not valid".equals(e.getMessage()) ||
+            assertTrue("order type is not valid".equals(e.getMessage()) ||
                     "Please supply shipping info for delivery or If you are paying in store, shipping should be null".equals(e.getMessage()));
         }
     }
@@ -1099,7 +1098,7 @@ public class OrderServiceTest {
             fail();
         } catch (Exception e) {
             e.printStackTrace();
-            Assert.assertEquals("Please supply shipping info for delivery or If you are paying in store, shipping should be null", e.getMessage());
+            assertEquals("Please supply shipping info for delivery or If you are paying in store, shipping should be null", e.getMessage());
         }
     }
     @Test
@@ -1155,7 +1154,7 @@ public class OrderServiceTest {
             fail();
         } catch (Exception e) {
             e.printStackTrace();
-            Assert.assertEquals("Please supply shipping info for delivery or If you are paying in store, shipping should be null", e.getMessage());
+            assertEquals("Please supply shipping info for delivery or If you are paying in store, shipping should be null", e.getMessage());
         }
     }
     @Test
@@ -1188,7 +1187,7 @@ public class OrderServiceTest {
             e.printStackTrace();
             boolean isvald = e.getMessage().equals("Delivery address or building or unit number not correct.") ||
                     e.getMessage().equals("shipping address not valid");
-            Assert.assertTrue(isvald);
+            assertTrue(isvald);
         }
     }
 
@@ -1219,7 +1218,7 @@ public class OrderServiceTest {
             fail();
         } catch (Exception e) {
             e.printStackTrace();
-            Assert.assertEquals("order customer is not valid", e.getMessage());
+            assertEquals("order customer is not valid", e.getMessage());
         }
     }
 
@@ -1250,7 +1249,7 @@ public class OrderServiceTest {
             fail();
         } catch (Exception e) {
             e.printStackTrace();
-            Assert.assertEquals("order shop is not valid", e.getMessage());
+            assertEquals("order shop is not valid", e.getMessage());
         }
     }
     @Test
@@ -1275,7 +1274,7 @@ public class OrderServiceTest {
             fail();
         } catch (Exception e) {
             e.printStackTrace();
-            Assert.assertEquals("order basket is not valid", e.getMessage());
+            assertEquals("order basket is not valid", e.getMessage());
         }
     }
 
@@ -1327,11 +1326,11 @@ public class OrderServiceTest {
 
         Order finalOrder = sut.finishOder(order);
         //verify
-        Assert.assertEquals(OrderStage.STAGE_1_WAITING_STORE_CONFIRM, finalOrder.getStage());
-        Assert.assertNotNull(finalOrder.getDescription());
-        Assert.assertFalse(finalOrder.getShopPaid());
-        Assert.assertFalse(order.getHasVat());
-        Assert.assertEquals("http://localhost/path/to/item",
+        assertEquals(OrderStage.STAGE_1_WAITING_STORE_CONFIRM, finalOrder.getStage());
+        assertNotNull(finalOrder.getDescription());
+        assertFalse(finalOrder.getShopPaid());
+        assertFalse(order.getHasVat());
+        assertEquals("http://localhost/path/to/item",
                 order.getBasket().getItems().stream().findFirst().get().getExternalUrl());
         verify(repo).save(order);
         verify(paymentService).paymentReceived(order);
@@ -1402,10 +1401,10 @@ public class OrderServiceTest {
         Order finalOrder = sut.finishOder(order);
 
         //verify
-        Assert.assertEquals(OrderStage.STAGE_1_WAITING_STORE_CONFIRM, finalOrder.getStage());
-        Assert.assertNotNull(finalOrder.getDescription());
-        Assert.assertFalse(finalOrder.getShopPaid());
-        Assert.assertFalse(order.getHasVat());
+        assertEquals(OrderStage.STAGE_1_WAITING_STORE_CONFIRM, finalOrder.getStage());
+        assertNotNull(finalOrder.getDescription());
+        assertFalse(finalOrder.getShopPaid());
+        assertFalse(order.getHasVat());
         verify(repo).save(order);
         verify(paymentService).paymentReceived(order);
         verify(repo).findById(order.getId());
@@ -1456,12 +1455,12 @@ public class OrderServiceTest {
 
         Order finalOrder = sut.finishOder(order);
         //verify
-        Assert.assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
-        Assert.assertNull(finalOrder.getShippingData());
-        Assert.assertEquals(0, finalOrder.getServiceFee(), 0);
-        Assert.assertTrue(finalOrder.getShopPaid());
-        Assert.assertNotNull(finalOrder.getDescription());
-        Assert.assertTrue(order.getHasVat() == false);
+        assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
+        assertNull(finalOrder.getShippingData());
+        assertEquals(0, finalOrder.getServiceFee(), 0);
+        assertTrue(finalOrder.getShopPaid());
+        assertNotNull(finalOrder.getDescription());
+        assertTrue(order.getHasVat() == false);
         verify(repo).save(order);
         verify(paymentService).paymentReceived(order);
         verify(repo).findById(order.getId());
@@ -1504,10 +1503,10 @@ public class OrderServiceTest {
         Order finalOrder = sut.finishOder(order);
 
         //verify
-        Assert.assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
-        Assert.assertTrue(finalOrder.getShopPaid());
-        Assert.assertNotNull(finalOrder.getDescription());
-        Assert.assertTrue(order.getHasVat() == false);
+        assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
+        assertTrue(finalOrder.getShopPaid());
+        assertNotNull(finalOrder.getDescription());
+        assertTrue(order.getHasVat() == false);
         verify(repo, never()).save(order);
         verify(paymentService, never()).paymentReceived(order);
         verify(repo).findById(order.getId());
@@ -1538,7 +1537,7 @@ public class OrderServiceTest {
             fail();
         } catch (Exception e) {
             e.printStackTrace();
-            Assert.assertEquals("order basket is not valid", e.getMessage());
+            assertEquals("order basket is not valid", e.getMessage());
         }
     }
     @Test
@@ -1579,9 +1578,9 @@ public class OrderServiceTest {
         when(repo.findByCustomerId(customerId)).thenReturn(Optional.of(orders));
         List<Order> finalOrder = sut.findOrderByUserId(customerId);
         //verify
-        Assert.assertNotNull(finalOrder);
-        Assert.assertEquals(2, finalOrder.size());
-        Assert.assertEquals(customerId, finalOrder.get(0).getCustomerId());
+        assertNotNull(finalOrder);
+        assertEquals(2, finalOrder.size());
+        assertEquals(customerId, finalOrder.get(0).getCustomerId());
         verify(repo).findByCustomerId(customerId);
     }
     @Test
@@ -1591,8 +1590,8 @@ public class OrderServiceTest {
         //when
         List<Order> finalOrder = sut.findOrderByUserId(customerId);
         //verify
-        Assert.assertNotNull(finalOrder);
-        Assert.assertEquals(0, finalOrder.size());
+        assertNotNull(finalOrder);
+        assertEquals(0, finalOrder.size());
         verify(repo).findByCustomerId(customerId);
     }
     @Test
@@ -1643,9 +1642,9 @@ public class OrderServiceTest {
         when(repo.findByCustomerId(initialProfile.getId())).thenReturn(Optional.of(orders));
         List<Order> finalOrder = sut.findOrderByPhone(phoneNumber);
         //verify
-        Assert.assertNotNull(finalOrder);
-        Assert.assertEquals(2, finalOrder.size());
-        Assert.assertEquals(customerId, finalOrder.get(0).getCustomerId());
+        assertNotNull(finalOrder);
+        assertEquals(2, finalOrder.size());
+        assertEquals(customerId, finalOrder.get(0).getCustomerId());
         verify(repo).findByCustomerId(initialProfile.getId());
         verify(customerRepo).findByMobileNumber(phoneNumber);
     }
@@ -1701,8 +1700,8 @@ public class OrderServiceTest {
 
         Order finalOrder = sut.finishOder(order);
         //verify
-        Assert.assertEquals(OrderStage.STAGE_1_WAITING_STORE_CONFIRM, finalOrder.getStage());
-        Assert.assertNotNull(finalOrder.getDescription());
+        assertEquals(OrderStage.STAGE_1_WAITING_STORE_CONFIRM, finalOrder.getStage());
+        assertNotNull(finalOrder.getDescription());
         verify(repo).save(order);
         verify(paymentService).paymentReceived(order);
         verify(repo).findById(order.getId());
@@ -1743,13 +1742,13 @@ public class OrderServiceTest {
         when(deviceRepo.findByUserId(order.getCustomerId())).thenReturn(Collections.singletonList(device));
         Order finalOrder = sut.progressNextStage(order.getId(), 12.3123, 32.345);
         //verify
-        Assert.assertEquals(OrderStage.STAGE_2_STORE_PROCESSING, finalOrder.getStage());
-        Assert.assertNotNull(finalOrder.getStatusHistory());
-        Assert.assertEquals(1, finalOrder.getStatusHistory().size());
-        Assert.assertEquals(OrderStage.STAGE_2_STORE_PROCESSING, finalOrder.getStatusHistory().get(0).getStage());
-        Assert.assertNotNull(finalOrder.getStatusHistory().get(0).getLocation());
-        Assert.assertEquals(12.3123, finalOrder.getStatusHistory().get(0).getLocation().getLati(), 0.0001);
-        Assert.assertEquals(32.345, finalOrder.getStatusHistory().get(0).getLocation().getLongi(), 0.0001);
+        assertEquals(OrderStage.STAGE_2_STORE_PROCESSING, finalOrder.getStage());
+        assertNotNull(finalOrder.getStatusHistory());
+        assertEquals(1, finalOrder.getStatusHistory().size());
+        assertEquals(OrderStage.STAGE_2_STORE_PROCESSING, finalOrder.getStatusHistory().get(0).getStage());
+        assertNotNull(finalOrder.getStatusHistory().get(0).getLocation());
+        assertEquals(12.3123, finalOrder.getStatusHistory().get(0).getLocation().getLati(), 0.0001);
+        assertEquals(32.345, finalOrder.getStatusHistory().get(0).getLocation().getLongi(), 0.0001);
         verify(deviceRepo).findByUserId(order.getCustomerId());
         verify(pushNotificationService).sendNotification(device, message);
         verify(repo).findById(order.getId());
@@ -1792,7 +1791,7 @@ public class OrderServiceTest {
         when(deviceRepo.findByUserId(order.getShippingData().getMessengerId())).thenReturn(Collections.singletonList(device));
         Order finalOrder = sut.progressNextStage(order.getId());
         //verify
-        Assert.assertEquals(OrderStage.STAGE_3_READY_FOR_COLLECTION, finalOrder.getStage());
+        assertEquals(OrderStage.STAGE_3_READY_FOR_COLLECTION, finalOrder.getStage());
         verify(deviceRepo).findByUserId(order.getShippingData().getMessengerId());
         verify(pushNotificationService).sendNotification(device, message);
         verify(storeRepo).findById(order.getShopId());
@@ -1836,7 +1835,7 @@ public class OrderServiceTest {
         when(deviceRepo.findByUserId(order.getCustomerId())).thenReturn(Collections.singletonList(device));
         Order finalOrder = sut.progressNextStage(order.getId());
         //verify
-        Assert.assertEquals(OrderStage.STAGE_4_ON_THE_ROAD, finalOrder.getStage());
+        assertEquals(OrderStage.STAGE_4_ON_THE_ROAD, finalOrder.getStage());
         verify(deviceRepo).findByUserId(order.getCustomerId());
         verify(pushNotificationService).sendNotification(device, message);
         verify(repo).findById(order.getId());
@@ -1879,7 +1878,7 @@ public class OrderServiceTest {
         when(deviceRepo.findByUserId(order.getCustomerId())).thenReturn(Collections.singletonList(device));
         Order finalOrder = sut.progressNextStage(order.getId());
         //verify
-        Assert.assertEquals(OrderStage.STAGE_5_ARRIVED, finalOrder.getStage());
+        assertEquals(OrderStage.STAGE_5_ARRIVED, finalOrder.getStage());
         verify(deviceRepo).findByUserId(order.getCustomerId());
         verify(pushNotificationService).sendNotification(device, message);
         verify(repo).findById(order.getId());
@@ -1910,7 +1909,7 @@ public class OrderServiceTest {
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
         Order finalOrder = sut.progressNextStage(order.getId());
         //verify
-        Assert.assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
+        assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
         verify(repo).findById(order.getId());
     }
     @Test
@@ -1938,7 +1937,7 @@ public class OrderServiceTest {
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
         Order finalOrder = sut.progressNextStage(order.getId());
         //verify
-        Assert.assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
+        assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
         verify(repo).findById(order.getId());
     }
     @Test
@@ -1967,7 +1966,7 @@ public class OrderServiceTest {
         when(repo.save(order)).thenReturn(order);
         Order finalOrder = sut.progressNextStage(order.getId());
         //verify
-        Assert.assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
+        assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
         verify(repo).findById(order.getId());
     }
 
@@ -2006,7 +2005,7 @@ public class OrderServiceTest {
 
         Order finalOrder = sut.progressNextStage(order.getId());
         //verify
-        Assert.assertEquals(OrderStage.STAGE_3_READY_FOR_COLLECTION, finalOrder.getStage());
+        assertEquals(OrderStage.STAGE_3_READY_FOR_COLLECTION, finalOrder.getStage());
         verify(deviceRepo).findByUserId(order.getCustomerId());
         verify(pushNotificationService).sendNotification(device, message);
         verify(repo).findById(order.getId());
@@ -2050,7 +2049,7 @@ public class OrderServiceTest {
 
         Order finalOrder = sut.progressNextStage(order.getId());
         //verify
-        Assert.assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
+        assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
         verify(repo).findById(order.getId());
         verify(repo).save(order);
     }
@@ -2087,7 +2086,7 @@ public class OrderServiceTest {
 
         Order finalOrder = sut.progressNextStage(order.getId());
         //verify
-        Assert.assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
+        assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
         verify(repo).findById(order.getId());
         verify(repo).save(order);
     }
@@ -2137,9 +2136,9 @@ public class OrderServiceTest {
         when(repo.findByShopIdAndStageNot(initialProfile.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID)).thenReturn(orders);
         List<Order> finalOrder = sut.findOrderByStoreId(shopId);
         //verify
-        Assert.assertNotNull(finalOrder);
-        Assert.assertEquals(2, finalOrder.size());
-        Assert.assertEquals(shopId,  finalOrder.get(0).getShopId());
+        assertNotNull(finalOrder);
+        assertEquals(2, finalOrder.size());
+        assertEquals(shopId,  finalOrder.get(0).getShopId());
         verify(storeRepo).findById(shopId);
         verify(repo).findByShopIdAndStageNot(initialProfile.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
     }
@@ -2186,9 +2185,9 @@ public class OrderServiceTest {
         when(repo.findByShippingDataMessengerIdAndStageNot(patchProfileRequest.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID)).thenReturn(orders);
         List<Order> finalOrder = sut.findOrderByMessengerId(patchProfileRequest.getId(), false).stream().toList();
         //verify
-        Assert.assertNotNull(finalOrder);
-        Assert.assertEquals(2, finalOrder.size());
-        Assert.assertEquals(patchProfileRequest.getId(),  finalOrder.get(0).getShippingData().getMessengerId());
+        assertNotNull(finalOrder);
+        assertEquals(2, finalOrder.size());
+        assertEquals(patchProfileRequest.getId(),  finalOrder.get(0).getShippingData().getMessengerId());
         verify(repo).findByShippingDataMessengerIdAndStageNot(patchProfileRequest.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
     }
 
@@ -2230,7 +2229,7 @@ public class OrderServiceTest {
 
         List<Order> orders = sut.findOrdersByMessengerAdminId(adminId, false);
 
-        Assert.assertEquals(1, orders.size());
+        assertEquals(1, orders.size());
         verify(repo).findByShippingDataMessengerIdInAndStageNot(List.of("messenger-1"), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
     }
 
@@ -2252,7 +2251,7 @@ public class OrderServiceTest {
             sut.findOrdersByMessengerAdminId(profileId, true);
             fail();
         } catch (IllegalArgumentException e) {
-            Assert.assertEquals("Profile profile-1 is not a messenger admin", e.getMessage());
+            assertEquals("Profile profile-1 is not a messenger admin", e.getMessage());
         }
     }
 
@@ -2303,10 +2302,10 @@ public class OrderServiceTest {
         when(repo.findByShopIdAndStageNot(storeProfile.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID)).thenReturn(orders);
         List<Order> finalOrder = sut.findOrderByStoreId("shopid");
         //verify
-        Assert.assertNotNull(finalOrder);
-        Assert.assertEquals(1, finalOrder.size());
-        finalOrder.forEach(data -> Assert.assertNotSame(data.getStage(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID));
-        Assert.assertEquals("shopid", finalOrder.get(0).getShopId());
+        assertNotNull(finalOrder);
+        assertEquals(1, finalOrder.size());
+        finalOrder.forEach(data -> assertNotSame(data.getStage(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID));
+        assertEquals("shopid", finalOrder.get(0).getShopId());
         verify(repo).findByShopIdAndStageNot(storeProfile.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         verify(storeRepo).findById("shopid");
     }
