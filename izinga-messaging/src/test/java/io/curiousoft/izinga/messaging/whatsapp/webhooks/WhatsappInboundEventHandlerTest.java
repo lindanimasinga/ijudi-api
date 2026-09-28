@@ -141,7 +141,8 @@ class WhatsappInboundEventHandlerTest {
         );
         verify(whatsappNotificationService).sendMessage(
                 FROM,
-                "Thanks. Your driver's license document is linked."
+                "Thanks. Your driver's license document is linked.",
+                Audience.CUSTOMER, null
         );
         verify(firebaseNotificationService, never()).sendNotifications(any(), any());
     }
@@ -170,7 +171,8 @@ class WhatsappInboundEventHandlerTest {
 
         verify(whatsappNotificationService).sendMessage(
                 FROM,
-                "We could not process your image just now. Please send it again, or reply HELP for assistance."
+                "We could not process your image just now. Please send it again, or reply HELP for assistance.",
+                Audience.CUSTOMER, null
         );
         verify(firestoreService, never()).writeMessageForCustomer(anyString(), anyString(), any());
         verify(aiCustomerService, never()).handleWhatsappQuery(anyString(), anyString(), anyString());

@@ -48,6 +48,18 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
 
     @Override
     public void sendMessage(String mobileNumber, String message) {
+        sendMessage(mobileNumber, message, Audience.CUSTOMER, null);
+    }
+
+    /**
+     * REQ-23: reply on the same line the inbound message arrived on, instead of always
+     * resolving the CUSTOMER/default line. Used by the inbound handler, which already has
+     * the LineContext (audience + storeId) that determined which AI agent handled the message —
+     * without this, a STORE-audience reply (e.g. RxNova24's AI agent) would be correctly
+     * *worded* by the store's agent but sent out from the default WhatsApp number instead of
+     * that store's dedicated number.
+     */
+    public void sendMessage(String mobileNumber, String message, Audience audience, @Nullable String storeId) {
         // For simple text messages, we can use the "text" type instead of a template
         try {
             WhatsappTextRequest request = new WhatsappTextRequest();
@@ -56,7 +68,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
             var waMessage = new WhatsappTextRequest.Text();
             waMessage.setBody(message);
             request.setText(waMessage);
-            whatsAppService.sendTextMessage(senderResolver.resolve(Audience.CUSTOMER, null), request).execute();
+            whatsAppService.sendTextMessage(senderResolver.resolve(audience, storeId), request).execute();
             LOGGER.info("Sent text message to {}: {}", to, message);
         } catch (IOException e) {
             LOGGER.error("Failed to send text message to {}: {}", mobileNumber, message, e);
@@ -526,6 +538,12 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
 
     @Override
     public void sendLandingOptions(String mobileNumber, String name, UserProfile userProfile) {
+        sendLandingOptions(mobileNumber, name, userProfile, Audience.CUSTOMER, null);
+    }
+
+    /** REQ-23: same reasoning as {@link #sendMessage(String, String, Audience, String)}. */
+    public void sendLandingOptions(String mobileNumber, String name, UserProfile userProfile,
+                                   Audience audience, @Nullable String storeId) {
         try {
             WhatsappTemplateRequest request = new WhatsappTemplateRequest();
             String to = mobileNumber != null && mobileNumber.startsWith("0") ? mobileNumber.replaceFirst("0", "+27") : mobileNumber;
@@ -553,7 +571,7 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
 
              var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
              request.setTemplate(template);
-             whatsAppService.sendMessage(senderResolver.resolve(Audience.CUSTOMER, null), request).execute();
+             whatsAppService.sendMessage(senderResolver.resolve(audience, storeId), request).execute();
              LOGGER.info("Sent landing options to {}", to);
          } catch (IOException e) {
              LOGGER.error("Failed to send landing options to {}", mobileNumber, e);
