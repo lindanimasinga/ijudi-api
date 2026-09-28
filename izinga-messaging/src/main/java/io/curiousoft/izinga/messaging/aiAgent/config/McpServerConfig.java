@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.messaging.aiAgent.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
@@ -50,6 +51,14 @@ public class McpServerConfig {
         this(type, serverLabel, serverDescription, serverUrl, requireApproval, null);
     }
 
+    /**
+     * Java-side convenience accessor only. @JsonIgnore is required because this follows
+     * JavaBean getter naming (getOptionalHeaders -> "optionalHeaders"), so without it Jackson
+     * serialises a second, bogus "optionalHeaders" field alongside "headers" in every OpenAI
+     * tools[] request — which OpenAI's Responses API rejects with
+     * "Unknown parameter: 'tools[0].optionalHeaders'".
+     */
+    @JsonIgnore
     public Optional<Map<String, String>> getOptionalHeaders() {
         return Optional.ofNullable(headers);
     }
