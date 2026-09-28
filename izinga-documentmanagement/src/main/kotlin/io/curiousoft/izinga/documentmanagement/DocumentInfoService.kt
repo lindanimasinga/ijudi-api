@@ -70,8 +70,8 @@ class DocumentInfoService(
             setBearerAuth(openAiApiKey)
         }
 
-        val requestBody = mapOf(/*
-            "model" to "gpt-image-1.5",*/
+        val requestBody = mapOf(
+            "model" to "dall-e-2",
             "prompt" to prompt,
             "n" to n,
             "size" to size
