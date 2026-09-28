@@ -88,12 +88,17 @@ class StoreLineWebhookIntegrationTest {
     // ---- helper factories ----
 
     private WhatsappLine storeLine() {
+        return storeLine(null);
+    }
+
+    private WhatsappLine storeLine(String landingTemplateName) {
         WhatsappLine line = new WhatsappLine();
         line.setPhoneNumberId(PHONE_ID_STORE);
         line.setAudience(Audience.STORE);
         line.setAgentName(AGENT_NAME_STORE);
         line.setStoreId(STORE_ID);
         line.setActive(true);
+        line.setLandingTemplateName(landingTemplateName);
         return line;
     }
 
@@ -262,6 +267,39 @@ class StoreLineWebhookIntegrationTest {
                 "session must carry phoneNumberId of the STORE line");
         assertEquals(AGENT_NAME_STORE, saved.getAgentName(),
                 "session must carry agentName of the STORE line");
+
+        // REQ-24: no landingTemplateName configured on this line → falls back to the
+        // generic template (null sixth arg; WhatsappNotificationService defaults it).
+        verify(whatsappNotificationService).sendLandingOptions(
+                eq(FROM_STORE), eq("New Store Customer"), any(),
+                eq(Audience.STORE), eq(STORE_ID), isNull());
+    }
+
+    // ---- REQ-24: STORE line with its own landingTemplateName uses that template, not the generic one ----
+
+    @Test
+    void storeLine_withLandingTemplateName_threadsTemplateNameIntoSendLandingOptions() {
+        when(whatsappLineService.findByPhoneNumberId(PHONE_ID_STORE))
+                .thenReturn(Optional.of(storeLine("rxnova24_landing_options")));
+        when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
+
+        when(whatsappSessionRepo.findByFromAndPhoneNumberId(FROM_STORE, PHONE_ID_STORE))
+                .thenReturn(Optional.empty());
+        when(whatsappSessionRepo.findByFrom(FROM_STORE)).thenReturn(Optional.empty());
+        when(whatsappSessionRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        when(userProfileRepo.findByMobileNumber(FROM_STORE)).thenReturn(null);
+        when(userProfileRepo.findByRole(any())).thenReturn(List.of());
+        when(deviceRepo.findByUserIdIn(any())).thenReturn(List.of());
+
+        WhatsappWebhookPayload payload = buildTextPayload(
+                FROM_STORE, "Hello", PHONE_ID_STORE, "New Store Customer");
+
+        handler.handleInbound(new WhatsappInboundEvent(this, payload));
+
+        verify(whatsappNotificationService).sendLandingOptions(
+                eq(FROM_STORE), eq("New Store Customer"), any(),
+                eq(Audience.STORE), eq(STORE_ID), eq("rxnova24_landing_options"));
     }
 
     // ---- T-17 test 4: Session created for CUSTOMER line carries null storeId ----
@@ -379,8 +417,11 @@ class StoreLineWebhookIntegrationTest {
 
         handler.handleInbound(new WhatsappInboundEvent(this, payload));
 
-        // SA-5: sendLandingOptions must NOT be called for DRIVER lines
-        verify(whatsappNotificationService, never()).sendLandingOptions(any(), any(), any());
+        // SA-5: sendLandingOptions must NOT be called for DRIVER lines.
+        // Verify against the 6-arg overload — the handler always calls that one now,
+        // so verifying the old 3-arg overload here would be vacuously true.
+        verify(whatsappNotificationService, never())
+                .sendLandingOptions(any(), any(), any(), any(), any(), any());
     }
 
     // ---- T-17 test 7: Unknown phoneNumberId falls back to CUSTOMER context, StoreAiAgent not called ----

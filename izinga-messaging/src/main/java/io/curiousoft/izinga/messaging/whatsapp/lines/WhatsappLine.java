@@ -32,6 +32,13 @@ public class WhatsappLine {
     /** Optional store ID if this line is scoped to a specific store. */
     private String storeId;
 
+    /**
+     * Optional Meta-approved WhatsApp template name for this line's new-session landing
+     * message (e.g. "rxnova24_landing_options"). When null/blank, the generic
+     * "izinga_landing_options" template is used.
+     */
+    private String landingTemplateName;
+
     /** Whether this line is active and should receive/send messages. */
     private boolean active;
 
@@ -57,6 +64,9 @@ public class WhatsappLine {
 
     public String getStoreId() { return storeId; }
     public void setStoreId(String storeId) { this.storeId = storeId; }
+
+    public String getLandingTemplateName() { return landingTemplateName; }
+    public void setLandingTemplateName(String landingTemplateName) { this.landingTemplateName = landingTemplateName; }
 
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }

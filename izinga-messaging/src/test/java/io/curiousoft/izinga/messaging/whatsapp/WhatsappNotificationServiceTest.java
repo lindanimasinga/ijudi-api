@@ -243,4 +243,44 @@ class WhatsappNotificationServiceTest {
         verify(senderResolver, never()).resolve(eq(Audience.CUSTOMER), any());
         verify(whatsAppService).sendMessage(eq("testPhoneId"), any());
     }
+
+    // ─── REQ-24: per-store landing template ──────────────────────────────────
+
+    @Test
+    void sendLandingOptions_fiveArgOverload_usesGenericTemplateForLegacyBehavior() throws IOException {
+        when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+
+        service.sendLandingOptions("0821234567", "Jane", customerProfile("Jane", "0821234567"),
+                Audience.STORE, "store-123");
+
+        ArgumentCaptor<WhatsappTemplateRequest> captor = ArgumentCaptor.forClass(WhatsappTemplateRequest.class);
+        verify(whatsAppService).sendMessage(anyString(), captor.capture());
+        assertEquals("izinga_landing_options", captor.getValue().getTemplate().getName());
+    }
+
+    @Test
+    void sendLandingOptions_blankTemplateName_fallsBackToGenericTemplate() throws IOException {
+        when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+
+        service.sendLandingOptions("0821234567", "Jane", customerProfile("Jane", "0821234567"),
+                Audience.STORE, "store-123", "  ");
+
+        ArgumentCaptor<WhatsappTemplateRequest> captor = ArgumentCaptor.forClass(WhatsappTemplateRequest.class);
+        verify(whatsAppService).sendMessage(anyString(), captor.capture());
+        assertEquals("izinga_landing_options", captor.getValue().getTemplate().getName());
+    }
+
+    @Test
+    void sendLandingOptions_storeTemplateName_usesStoreSpecificTemplate_notGenericIzingaOne() throws IOException {
+        when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+
+        service.sendLandingOptions("0821234567", "Jane", customerProfile("Jane", "0821234567"),
+                Audience.STORE, "store-123", "rxnova24_landing_options");
+
+        ArgumentCaptor<WhatsappTemplateRequest> captor = ArgumentCaptor.forClass(WhatsappTemplateRequest.class);
+        verify(whatsAppService).sendMessage(eq("testPhoneId"), captor.capture());
+        assertEquals("rxnova24_landing_options", captor.getValue().getTemplate().getName());
+        var bodyComp = captor.getValue().getTemplate().getComponents().get(0);
+        assertEquals("Jane", bodyComp.getParameters().get(0).getText());
+    }
 }

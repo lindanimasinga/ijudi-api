@@ -536,24 +536,39 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
         }
      }
 
+    private static final String DEFAULT_LANDING_TEMPLATE = "izinga_landing_options";
+
     @Override
     public void sendLandingOptions(String mobileNumber, String name, UserProfile userProfile) {
-        sendLandingOptions(mobileNumber, name, userProfile, Audience.CUSTOMER, null);
+        sendLandingOptions(mobileNumber, name, userProfile, Audience.CUSTOMER, null, null);
     }
 
     /** REQ-23: same reasoning as {@link #sendMessage(String, String, Audience, String)}. */
     public void sendLandingOptions(String mobileNumber, String name, UserProfile userProfile,
                                    Audience audience, @Nullable String storeId) {
+        sendLandingOptions(mobileNumber, name, userProfile, audience, storeId, null);
+    }
+
+    /**
+     * REQ-24: per-store landing template. A STORE line with its own Meta-approved template
+     * (WhatsappLine.landingTemplateName, e.g. "rxnova24_landing_options") sends that instead
+     * of the generic {@value #DEFAULT_LANDING_TEMPLATE}. Falls back to the generic template
+     * when templateName is null/blank.
+     */
+    public void sendLandingOptions(String mobileNumber, String name, UserProfile userProfile,
+                                   Audience audience, @Nullable String storeId, @Nullable String templateName) {
         try {
             WhatsappTemplateRequest request = new WhatsappTemplateRequest();
             String to = mobileNumber != null && mobileNumber.startsWith("0") ? mobileNumber.replaceFirst("0", "+27") : mobileNumber;
             request.setTo(to);
 
             String displayName = name != null && !name.isBlank() ? name : "Customer";
+            String resolvedTemplateName = templateName != null && !templateName.isBlank()
+                    ? templateName : DEFAULT_LANDING_TEMPLATE;
 
             var requestStr = """
                     {
-                      "name": "izinga_landing_options",
+                      "name": "#templateName",
                       "language": { "code": "en" },
                       "components": [
                         {
@@ -567,12 +582,13 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
                     """;
 
             // Safe replacements
+            requestStr = requestStr.replace("#templateName", resolvedTemplateName);
             requestStr = requestStr.replace("#name", displayName);
 
              var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
              request.setTemplate(template);
              whatsAppService.sendMessage(senderResolver.resolve(audience, storeId), request).execute();
-             LOGGER.info("Sent landing options to {}", to);
+             LOGGER.info("Sent landing options to {} using template={}", to, resolvedTemplateName);
          } catch (IOException e) {
              LOGGER.error("Failed to send landing options to {}", mobileNumber, e);
          }

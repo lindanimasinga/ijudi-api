@@ -196,8 +196,10 @@ public class WhatsappInboundEventHandler {
             // SA-5: DRIVER line must not receive the customer landing menu
             if (lineContext.audience() != Audience.DRIVER) {
                 var user = userProfileRepo.findByMobileNumber(from);
+                String landingTemplateName = lineContext.line() != null
+                        ? lineContext.line().getLandingTemplateName() : null;
                 whatsappNotificationService.sendLandingOptions(from, extractContactName(contacts), user,
-                        lineContext.audience(), lineContext.storeId());
+                        lineContext.audience(), lineContext.storeId(), landingTemplateName);
             } else {
                 LOG.info("SA-5: DRIVER line — skipping customer landing options for {}", from);
             }
