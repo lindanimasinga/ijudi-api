@@ -59,14 +59,50 @@ class WhatsAppWebhookControllerTest {
         verifyNoInteractions(eventPublisher);
     }
 
+    /**
+     * SEC-01 bypass: when appSecret is null the request MUST be accepted (not rejected).
+     * The bypass is intentionally self-healing — full verification resumes once appSecret
+     * is configured, with no further code change needed.
+     */
     @Test
-    void appSecretMissing_rejectsRequest() {
+    void appSecretNull_acceptsRequestWithWarning() {
         WhatsappConfig noSecretConfig = new WhatsappConfig("phone-id", null, null, null, null, false, null);
         var ctrl = new WhatsAppWebhookController("token", eventPublisher,
                 new com.fasterxml.jackson.databind.ObjectMapper(), noSecretConfig);
-        byte[] body = "{}".getBytes(StandardCharsets.UTF_8);
+        byte[] body = "{\"object\":\"whatsapp_business_account\",\"entry\":[]}".getBytes(StandardCharsets.UTF_8);
         var response = ctrl.receiveWebhook("sha256=anything", body);
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        verify(eventPublisher).publishEvent(any());
+    }
+
+    /** SEC-01 bypass: blank appSecret (empty string) also triggers the bypass — same as null. */
+    @Test
+    void appSecretBlank_acceptsRequestWithWarning() {
+        WhatsappConfig blankSecretConfig = new WhatsappConfig("phone-id", null, null, null, null, false, "");
+        var ctrl = new WhatsAppWebhookController("token", eventPublisher,
+                new com.fasterxml.jackson.databind.ObjectMapper(), blankSecretConfig);
+        byte[] body = "{\"object\":\"whatsapp_business_account\",\"entry\":[]}".getBytes(StandardCharsets.UTF_8);
+        var response = ctrl.receiveWebhook("sha256=anything", body);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        verify(eventPublisher).publishEvent(any());
+    }
+
+    /** verifyHmacSignature low-level: null appSecret returns true (bypass). */
+    @Test
+    void verifyHmacSignature_returnsTrue_whenAppSecretNull() {
+        WhatsappConfig nullSecretConfig = new WhatsappConfig("phone-id", null, null, null, null, false, null);
+        var ctrl = new WhatsAppWebhookController("token", eventPublisher,
+                new com.fasterxml.jackson.databind.ObjectMapper(), nullSecretConfig);
+        assertThat(ctrl.verifyHmacSignature("{}".getBytes(StandardCharsets.UTF_8), "sha256=anything")).isTrue();
+    }
+
+    /** verifyHmacSignature low-level: blank appSecret returns true (bypass). */
+    @Test
+    void verifyHmacSignature_returnsTrue_whenAppSecretBlank() {
+        WhatsappConfig blankSecretConfig = new WhatsappConfig("phone-id", null, null, null, null, false, "");
+        var ctrl = new WhatsAppWebhookController("token", eventPublisher,
+                new com.fasterxml.jackson.databind.ObjectMapper(), blankSecretConfig);
+        assertThat(ctrl.verifyHmacSignature("{}".getBytes(StandardCharsets.UTF_8), "sha256=anything")).isTrue();
     }
 
     @Test

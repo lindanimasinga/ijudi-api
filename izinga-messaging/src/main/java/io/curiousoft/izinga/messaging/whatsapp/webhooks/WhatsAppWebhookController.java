@@ -104,13 +104,22 @@ public class WhatsAppWebhookController {
 
     /**
      * SEC-01: verifies X-Hub-Signature-256 header.
-     * Returns false (reject) when appSecret is missing.
+     *
+     * When appSecret IS configured: performs full HMAC-SHA256 verification — rejects on any mismatch.
+     * When appSecret is NOT configured (null/blank): logs a loud alarm and ACCEPTS the request
+     * unverified. This is a deliberate self-healing bypass: the moment appSecret is added to
+     * Secrets Manager and the app restarts, full verification resumes automatically with zero
+     * further code change. Authorized by Lindani Masinga on 2026-09-28 as a temporary measure
+     * while Meta dashboard 2FA access is unavailable.
      */
     boolean verifyHmacSignature(byte[] body, String signatureHeader) {
         String appSecret = whatsappConfig.appSecret();
         if (appSecret == null || appSecret.isBlank()) {
-            LOG.error("SEC-01: appSecret not configured — rejecting inbound webhook");
-            return false;
+            LOG.warn("SEC-01 BYPASS ACTIVE: appSecret not configured — webhook signature verification " +
+                     "SKIPPED, inbound request ACCEPTED UNVERIFIED. This is a temporary state authorized " +
+                     "by Lindani Masinga on 2026-09-28 due to Meta dashboard 2FA access issue. " +
+                     "Configure whatsapp.cloud.appSecret in Secrets Manager to restore verification.");
+            return true;
         }
         if (signatureHeader == null || signatureHeader.isBlank()) {
             return false;
