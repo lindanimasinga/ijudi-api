@@ -1,13 +1,19 @@
 package io.curiousoft.izinga.commons.model
 
 import org.springframework.data.annotation.Id
+import org.springframework.data.mongodb.core.index.CompoundIndex
 import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
 import java.time.Instant
 
+/**
+ * REQ-12: (from, phoneNumberId) is the unique key, not `from` alone — the same
+ * sender can hold independent sessions on different WhatsApp lines.
+ */
 @Document(collection = "whatsapp_session")
+@CompoundIndex(def = "{'from': 1, 'phoneNumberId': 1}", unique = true, name = "from_phoneNumberId_unique")
 class WhatsappSession: BaseModel {
-    @Indexed(unique = true)
+    @Indexed
     var from: String? = null
     var lastMessageDate: Instant? = null
     var isAIAgentActive: Boolean = true
