@@ -4,10 +4,15 @@ import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.aiAgent.AiCustomerServiceAgent;
+import io.curiousoft.izinga.messaging.aiAgent.StoreAiAgent;
 import io.curiousoft.izinga.messaging.firebase.FireStoreTextMessage;
 import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.messaging.firebase.FirestoreService;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsappNotificationService;
+import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
+import io.curiousoft.izinga.messaging.whatsapp.lines.LineContext;
+import io.curiousoft.izinga.messaging.whatsapp.lines.WhatsappLine;
+import io.curiousoft.izinga.messaging.whatsapp.lines.WhatsappLineService;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateReplyEvent;
 import io.curiousoft.izinga.messaging.whatsapp.verification.VerificationConsentService;
 import io.curiousoft.izinga.messaging.repo.WhatsappSessionRepo;
@@ -23,6 +28,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class WhatsappInboundEventHandler {
@@ -38,14 +44,20 @@ public class WhatsappInboundEventHandler {
     private final WhatsappSessionRepo whatsappSessionRepo;
     private final VerificationConsentService verificationConsentService;
     private final AiCustomerServiceAgent aiCustomerService;
+    /** T-11: store-scoped AI agent for STORE audience lines. */
+    private final StoreAiAgent storeAiAgent;
     private final WhatsappImageDocumentService whatsappImageDocumentService;
+    /** REQ-10: line resolution service */
+    private final WhatsappLineService whatsappLineService;
 
     public WhatsappInboundEventHandler(ApplicationEventPublisher eventPublisher, FirestoreService firestoreService,
                                        FirebaseNotificationService firebaseNotificationService, UserProfileRepo userProfileRepo,
                                        DeviceRepository deviceRepo,
                                        WhatsappNotificationService whatsappNotificationService, WhatsappSessionRepo whatsappSessionRepo,
                                        VerificationConsentService verificationConsentService, AiCustomerServiceAgent aiCustomerService,
-                                       WhatsappImageDocumentService whatsappImageDocumentService) {
+                                       StoreAiAgent storeAiAgent,
+                                       WhatsappImageDocumentService whatsappImageDocumentService,
+                                       WhatsappLineService whatsappLineService) {
         this.eventPublisher = eventPublisher;
         this.firestoreService = firestoreService;
         this.userProfileRepo = userProfileRepo;
@@ -55,7 +67,9 @@ public class WhatsappInboundEventHandler {
         this.whatsappSessionRepo = whatsappSessionRepo;
         this.verificationConsentService = verificationConsentService;
         this.aiCustomerService = aiCustomerService;
+        this.storeAiAgent = storeAiAgent;
         this.whatsappImageDocumentService = whatsappImageDocumentService;
+        this.whatsappLineService = whatsappLineService;
     }
 
     @Async
@@ -64,6 +78,12 @@ public class WhatsappInboundEventHandler {
         try {
             WhatsappWebhookPayload payload = event.getPayload();
             LOG.info("Handling inbound WhatsApp event: {}", payload.getObject());
+
+            // REQ-22: handle account_update webhook type
+            if ("account_update".equals(payload.getObject())) {
+                handleAccountUpdate(payload);
+                return;
+            }
 
             List<WhatsappWebhookPayload.Entry> entries = payload.getEntry();
             if (entries == null) return;
@@ -75,10 +95,18 @@ public class WhatsappInboundEventHandler {
                     var value = change.getValue();
                     if (value == null) continue;
 
+                    // REQ-10: read metadata.phone_number_id and resolve LineContext
+                    String phoneNumberId = value.getMetadata() != null ? value.getMetadata().getPhoneNumberId() : null;
+                    LineContext lineContext = resolveLineContext(phoneNumberId);
+
+                    // REQ-23: DEBUG log per inbound
+                    LOG.debug("REQ-23 inbound: phoneNumberId={} agentName={} audience={}",
+                            phoneNumberId, lineContext.agentName(), lineContext.audience());
+
                     List<WhatsappWebhookPayload.Value.Message> messages = value.getMessages();
                     if (messages != null) {
                         for (WhatsappWebhookPayload.Value.Message message : messages) {
-                            processInboundMessage(message, value.getContacts());
+                            processInboundMessage(message, value.getContacts(), lineContext);
                         }
                     }
 
@@ -91,21 +119,64 @@ public class WhatsappInboundEventHandler {
         }
     }
 
+    /**
+     * REQ-10: resolve LineContext from phoneNumberId.
+     * Falls back to a synthetic CUSTOMER/customer_support context when unknown.
+     */
+    private LineContext resolveLineContext(String phoneNumberId) {
+        if (phoneNumberId == null || phoneNumberId.isBlank()) {
+            return new LineContext(null, "customer_support", Audience.CUSTOMER, null);
+        }
+        Optional<WhatsappLine> lineOpt = whatsappLineService.findByPhoneNumberId(phoneNumberId);
+        if (lineOpt.isPresent()) {
+            WhatsappLine line = lineOpt.get();
+            return new LineContext(line, line.getAgentName(), line.getAudience(), line.getStoreId());
+        }
+        // unknown phoneNumberId — fallback logged in WhatsappLineService
+        return new LineContext(null, "customer_support", Audience.CUSTOMER, null);
+    }
+
+    /** REQ-22 / T-15: structured INFO log for account_update webhook objects. Includes storeId for STORE lines. */
+    private void handleAccountUpdate(WhatsappWebhookPayload payload) {
+        try {
+            if (payload.getEntry() == null) return;
+            for (var entry : payload.getEntry()) {
+                if (entry.getChanges() == null) continue;
+                for (var change : entry.getChanges()) {
+                    if (change.getValue() == null) continue;
+                    var meta = change.getValue().getMetadata();
+                    String phoneNumberId = meta != null ? meta.getPhoneNumberId() : "unknown";
+                    // T-15: resolve LineContext to include storeId for STORE lines
+                    LineContext lineContext = resolveLineContext(phoneNumberId);
+                    String storeId = lineContext.storeId();
+                    LOG.info("REQ-22 account_update: phoneNumberId={} field={} audience={} storeId={} timestamp={}",
+                            phoneNumberId, change.getField(), lineContext.audience(), storeId, Instant.now());
+                }
+            }
+        } catch (Exception e) {
+            LOG.warn("Failed to process account_update payload", e);
+        }
+    }
+
+    /** REQ-10: lineContext threaded through all downstream calls. SA-3: explicit param, never @RequestScope. */
     private void processInboundMessage(WhatsappWebhookPayload.Value.Message message,
-                                       List<WhatsappWebhookPayload.Value.Contact> contacts) {
+                                       List<WhatsappWebhookPayload.Value.Contact> contacts,
+                                       LineContext lineContext) {
         String from = message.getFrom();
         String id = message.getId();
         String type = message.getType();
         LOG.info("Received message from={} id={} type={}", from, id, type);
 
-        var session = upsertSession(from);
-        String aiResponseToCustomer = handlePreDispatchFlows(message, contacts, session);
-        dispatchMessageByType(message, contacts, aiResponseToCustomer);
+        var session = upsertSession(from, lineContext);
+        String aiResponseToCustomer = handlePreDispatchFlows(message, contacts, session, lineContext);
+        dispatchMessageByType(message, contacts, aiResponseToCustomer, lineContext);
     }
 
+    /** REQ-10 / SA-5: lineContext threaded; landing options audience-aware. */
     private String handlePreDispatchFlows(WhatsappWebhookPayload.Value.Message message,
                                           List<WhatsappWebhookPayload.Value.Contact> contacts,
-                                          WhatsappSession session) {
+                                          WhatsappSession session,
+                                          LineContext lineContext) {
         String from = message.getFrom();
         LOG.info("Checking if message from {} is a verification consent reply", from);
         var isVerificationMessage = verificationConsentService.isVerificationMessage(message);
@@ -121,22 +192,39 @@ public class WhatsappInboundEventHandler {
 
         if (session.isNewSession()) {
             LOG.info("New WhatsApp session started for {}", from);
-            var user = userProfileRepo.findByMobileNumber(from);
-            whatsappNotificationService.sendLandingOptions(from, extractContactName(contacts), user);
+            // SA-5: DRIVER line must not receive the customer landing menu
+            if (lineContext.audience() != Audience.DRIVER) {
+                var user = userProfileRepo.findByMobileNumber(from);
+                whatsappNotificationService.sendLandingOptions(from, extractContactName(contacts), user);
+            } else {
+                LOG.info("SA-5: DRIVER line — skipping customer landing options for {}", from);
+            }
             return null;
         }
 
         if (isAiCustomerServiceEnabled && session.isAIAgentActive()) {
-            LOG.info("AI customer service enabled, processing message from {}", from);
-            aiResponseToCustomer = aiCustomerService.handleWhatsappQuery(message, from);
-            whatsappNotificationService.sendMessage(from, aiResponseToCustomer);
+            LOG.info("AI customer service enabled, processing message from {} via agent={} audience={}",
+                    from, lineContext.agentName(), lineContext.audience());
+            // T-11: route STORE audience to StoreAiAgent; all others to AiCustomerServiceAgent
+            if (lineContext.audience() == Audience.STORE) {
+                aiResponseToCustomer = storeAiAgent.handleWhatsappQuery(
+                        message, from, lineContext.storeId(), lineContext.agentName());
+            } else {
+                // REQ-20: DRIVER / CUSTOMER audiences use agent-aware handler
+                aiResponseToCustomer = aiCustomerService.handleWhatsappQueryForAgent(
+                        message, from, null, lineContext.agentName());
+            }
+            if (aiResponseToCustomer != null) {
+                whatsappNotificationService.sendMessage(from, aiResponseToCustomer);
+            }
         }
         return aiResponseToCustomer;
     }
 
     private void dispatchMessageByType(WhatsappWebhookPayload.Value.Message message,
                                        List<WhatsappWebhookPayload.Value.Contact> contacts,
-                                       String aiResponseToCustomer) {
+                                       String aiResponseToCustomer,
+                                       LineContext lineContext) {
         String type = message.getType();
         String from = message.getFrom();
 
@@ -154,7 +242,7 @@ public class WhatsappInboundEventHandler {
             return;
         }
         if ("image".equals(type) || message.getImage() != null) {
-            handleImageMessage(message, contacts);
+            handleImageMessage(message, contacts, lineContext);
             return;
         }
 
@@ -169,13 +257,39 @@ public class WhatsappInboundEventHandler {
         firebaseNotificationService.sendNotifications(devices, pushMessage);
     }
 
-    private WhatsappSession upsertSession(String from) {
-        var opt = whatsappSessionRepo.findByFrom(from);
+    /** SEC-02 / REQ-14: lookup by (from, phoneNumberId); stamp missing phoneNumberId on legacy docs. */
+    private WhatsappSession upsertSession(String from, LineContext lineContext) {
+        String phoneNumberId = lineContext.line() != null ? lineContext.line().getPhoneNumberId() : null;
         var now = Instant.now();
-        var session = new WhatsappSession(from);
-        if (opt.isPresent()) {
-            session = opt.get();
+        WhatsappSession session;
+
+        if (phoneNumberId != null) {
+            // Try compound key first (SEC-02)
+            var opt = whatsappSessionRepo.findByFromAndPhoneNumberId(from, phoneNumberId);
+            if (opt.isPresent()) {
+                session = opt.get();
+            } else {
+                // REQ-14: legacy adoption — look up by from only, stamp if found without phoneNumberId
+                var legacyOpt = whatsappSessionRepo.findByFrom(from);
+                if (legacyOpt.isPresent() && legacyOpt.get().getPhoneNumberId() == null) {
+                    session = legacyOpt.get();
+                    session.setPhoneNumberId(phoneNumberId);
+                    session.setAgentName(lineContext.agentName());
+                    session.setStoreId(lineContext.storeId());
+                    LOG.debug("REQ-14: stamped legacy session for {} with phoneNumberId={}", from, phoneNumberId);
+                } else {
+                    session = new WhatsappSession(from);
+                    session.setPhoneNumberId(phoneNumberId);
+                    session.setAgentName(lineContext.agentName());
+                    session.setStoreId(lineContext.storeId());
+                }
+            }
+        } else {
+            // No phoneNumberId: legacy path
+            var opt = whatsappSessionRepo.findByFrom(from);
+            session = opt.orElseGet(() -> new WhatsappSession(from));
         }
+
         session.setNewSession(session.getLastMessageDate() == null || now.minusSeconds(90 * 60).isAfter(session.getLastMessageDate()));
         session.setLastMessageDate(now);
         whatsappSessionRepo.save(session);
@@ -342,8 +456,10 @@ public class WhatsappInboundEventHandler {
         return contact.getProfile().getName();
     }
 
+    /** REQ-20: lineContext threaded to select the correct agent when handling image uploads. */
     private void handleImageMessage(WhatsappWebhookPayload.Value.Message message,
-                                    List<WhatsappWebhookPayload.Value.Contact> contacts) {
+                                    List<WhatsappWebhookPayload.Value.Contact> contacts,
+                                    LineContext lineContext) {
         String from = message.getFrom();
         try {
             var img = message.getImage();
@@ -388,7 +504,8 @@ public class WhatsappInboundEventHandler {
                             processResult.mediaId(),
                             processResult.mimeType()
                     );
-                    aiReply = aiCustomerService.handleWhatsappQuery(aiEventMessage, from, customerName);
+                    // REQ-20: use agent-aware handler so image responses use the correct agent
+                    aiReply = aiCustomerService.handleWhatsappQueryForAgent(aiEventMessage, from, customerName, lineContext.agentName());
                 }
 
                 whatsappNotificationService.sendMessage(

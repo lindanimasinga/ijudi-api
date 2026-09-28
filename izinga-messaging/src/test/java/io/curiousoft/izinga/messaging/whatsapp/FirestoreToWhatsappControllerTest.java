@@ -2,10 +2,14 @@ package io.curiousoft.izinga.messaging.whatsapp;
 
 import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistoryService;
 import io.curiousoft.izinga.messaging.firebase.FirestoreService;
+import io.curiousoft.izinga.messaging.repo.WhatsappSessionRepo;
+import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
+import io.curiousoft.izinga.messaging.whatsapp.lines.WhatsappSenderResolver;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTextRequest;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTextResponse;
 import okhttp3.MediaType;
 import okhttp3.ResponseBody;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,10 +18,21 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import retrofit2.Call;
 import retrofit2.Response;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -28,6 +43,8 @@ class FirestoreToWhatsappControllerTest {
     @Mock private WhatsAppService whatsAppService;
     @Mock private WhatsappConfig whatsappConfig;
     @Mock private ConversationHistoryService conversationHistoryService;
+    @Mock private WhatsappSenderResolver senderResolver;
+    @Mock private WhatsappSessionRepo whatsappSessionRepo;
 
     @SuppressWarnings("unchecked")
     private final Call<WhatsappTextResponse> callMock = mock(Call.class);
@@ -44,8 +61,11 @@ class FirestoreToWhatsappControllerTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(senderResolver.resolve(Audience.CUSTOMER, null)).thenReturn(PHONE_ID);
+        lenient().when(whatsappSessionRepo.findByFrom(any())).thenReturn(java.util.Optional.empty());
         controller = new FirestoreToWhatsappController(
-                firestoreService, whatsAppService, whatsappConfig, conversationHistoryService);
+                firestoreService, whatsAppService, whatsappConfig, conversationHistoryService,
+                senderResolver, whatsappSessionRepo);
     }
 
     // ─── guard: session not found ────────────────────────────────────────────
@@ -97,7 +117,6 @@ class FirestoreToWhatsappControllerTest {
         FireStoreMessage msg = message(FireStoreMessage.MessageType.TEXT, MSG_TEXT);
         when(firestoreService.getChatSessionById(SESSION_ID)).thenReturn(session);
         when(firestoreService.getMessageForSession(SESSION_ID, MSG_ID)).thenReturn(msg);
-        when(whatsappConfig.phoneId()).thenReturn(PHONE_ID);
         when(whatsAppService.sendTextMessage(eq(PHONE_ID), any())).thenReturn(callMock);
         when(callMock.execute()).thenReturn(Response.error(500,
                 ResponseBody.create(MediaType.get("application/json"), "")));
@@ -116,14 +135,14 @@ class FirestoreToWhatsappControllerTest {
         FireStoreMessage msg = message(FireStoreMessage.MessageType.TEXT, MSG_TEXT);
         when(firestoreService.getChatSessionById(SESSION_ID)).thenReturn(session);
         when(firestoreService.getMessageForSession(SESSION_ID, MSG_ID)).thenReturn(msg);
-        when(whatsappConfig.phoneId()).thenReturn(PHONE_ID);
         when(whatsAppService.sendTextMessage(eq(PHONE_ID), any())).thenReturn(callMock);
         when(callMock.execute()).thenReturn(Response.success(new WhatsappTextResponse()));
 
         ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(conversationHistoryService).recordHumanCorrection(NORM_PHONE, CUST_NAME, MSG_TEXT);
+        // SA-6: agentName resolved from session; session mock returns empty so agentName = null
+        verify(conversationHistoryService).recordHumanCorrection(eq(NORM_PHONE), eq(CUST_NAME), eq(MSG_TEXT), isNull());
 
         ArgumentCaptor<WhatsappTextRequest> reqCaptor = ArgumentCaptor.forClass(WhatsappTextRequest.class);
         verify(whatsAppService).sendTextMessage(eq(PHONE_ID), reqCaptor.capture());
@@ -139,14 +158,13 @@ class FirestoreToWhatsappControllerTest {
         FireStoreMessage msg = message(null, MSG_TEXT);
         when(firestoreService.getChatSessionById(SESSION_ID)).thenReturn(session);
         when(firestoreService.getMessageForSession(SESSION_ID, MSG_ID)).thenReturn(msg);
-        when(whatsappConfig.phoneId()).thenReturn(PHONE_ID);
         when(whatsAppService.sendTextMessage(eq(PHONE_ID), any())).thenReturn(callMock);
         when(callMock.execute()).thenReturn(Response.success(new WhatsappTextResponse()));
 
         ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(conversationHistoryService).recordHumanCorrection(NORM_PHONE, CUST_NAME, MSG_TEXT);
+        verify(conversationHistoryService).recordHumanCorrection(eq(NORM_PHONE), eq(CUST_NAME), eq(MSG_TEXT), isNull());
     }
 
     // ─── post-send non-blocking: history service throws ──────────────────────
@@ -157,16 +175,91 @@ class FirestoreToWhatsappControllerTest {
         FireStoreMessage msg = message(FireStoreMessage.MessageType.TEXT, MSG_TEXT);
         when(firestoreService.getChatSessionById(SESSION_ID)).thenReturn(session);
         when(firestoreService.getMessageForSession(SESSION_ID, MSG_ID)).thenReturn(msg);
-        when(whatsappConfig.phoneId()).thenReturn(PHONE_ID);
         when(whatsAppService.sendTextMessage(eq(PHONE_ID), any())).thenReturn(callMock);
         when(callMock.execute()).thenReturn(Response.success(new WhatsappTextResponse()));
         doThrow(new RuntimeException("DB error")).when(conversationHistoryService)
-                .recordHumanCorrection(anyString(), anyString(), anyString());
+                .recordHumanCorrection(anyString(), anyString(), anyString(), any());
 
 
         ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
+    }
+
+    @AfterEach
+    void tearDown() {
+        // Always clear SecurityContext so test isolation is guaranteed
+        SecurityContextHolder.clearContext();
+    }
+
+    // ─── T-14 SEC-WA02-03-A/B: storeId mismatch ──────────────────────────────
+
+    @Test
+    void forwardMessageToWhatsapp_storeAdminWithMismatchedStoreId_returns403Forbidden() throws Exception {
+        // Session belongs to store "store-xyz" but caller JWT claims "store-abc"
+        ChatSession session = chatSessionWithStore(RAW_PHONE, CUST_NAME, "store-xyz");
+        when(firestoreService.getChatSessionById(SESSION_ID)).thenReturn(session);
+
+        setupStoreAdminAuth("store-abc");
+
+        ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        // SEC-WA02-03-B: body must be {"error":"Forbidden"} only — no ChatSession fields
+        @SuppressWarnings("unchecked")
+        Map<String, String> body = (Map<String, String>) response.getBody();
+        assertEquals("Forbidden", body.get("error"));
+        assertFalse(body.containsKey("customerId"), "Response must not contain ChatSession fields");
+        verifyNoInteractions(whatsAppService);
+    }
+
+    @Test
+    void forwardMessageToWhatsapp_storeAdminWithMatchingStoreId_proceeds() throws Exception {
+        // Session and JWT storeId both match
+        ChatSession session = chatSessionWithStore(RAW_PHONE, CUST_NAME, "store-xyz");
+        FireStoreMessage msg = message(FireStoreMessage.MessageType.TEXT, MSG_TEXT);
+        when(firestoreService.getChatSessionById(SESSION_ID)).thenReturn(session);
+        when(firestoreService.getMessageForSession(SESSION_ID, MSG_ID)).thenReturn(msg);
+        when(whatsAppService.sendTextMessage(eq(PHONE_ID), any())).thenReturn(callMock);
+        when(callMock.execute()).thenReturn(Response.success(new WhatsappTextResponse()));
+
+        setupStoreAdminAuth("store-xyz");
+
+        ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+    }
+
+    @Test
+    void forwardMessageToWhatsapp_adminRoleBypassesStoreIdCheck() throws Exception {
+        // ADMIN can access any session regardless of storeId
+        ChatSession session = chatSessionWithStore(RAW_PHONE, CUST_NAME, "store-xyz");
+        FireStoreMessage msg = message(FireStoreMessage.MessageType.TEXT, MSG_TEXT);
+        when(firestoreService.getChatSessionById(SESSION_ID)).thenReturn(session);
+        when(firestoreService.getMessageForSession(SESSION_ID, MSG_ID)).thenReturn(msg);
+        when(whatsAppService.sendTextMessage(eq(PHONE_ID), any())).thenReturn(callMock);
+        when(callMock.execute()).thenReturn(Response.success(new WhatsappTextResponse()));
+
+        setupAdminAuth("different-store-or-null");
+
+        ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+    }
+
+    @Test
+    void forwardMessageToWhatsapp_exceptionInMethod_returns500WithInternalError_notExceptionMessage() throws Exception {
+        // SEC-WA02-03-A: e.getMessage() must NOT be exposed
+        when(firestoreService.getChatSessionById(SESSION_ID))
+                .thenThrow(new RuntimeException("sensitive internal message"));
+
+        ResponseEntity<Object> response = controller.forwardMessageToWhatsapp(SESSION_ID, MSG_ID);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        @SuppressWarnings("unchecked")
+        Map<String, String> body = (Map<String, String>) response.getBody();
+        assertEquals("internal error", body.get("error"),
+                "Response body must be 'internal error', not the exception message");
     }
 
     // ─── helpers ─────────────────────────────────────────────────────────────
@@ -175,7 +268,37 @@ class FirestoreToWhatsappControllerTest {
         return ChatSession.builder().customerMobileNumber(phone).customerName(name).build();
     }
 
+    private ChatSession chatSessionWithStore(String phone, String name, String storeId) {
+        return ChatSession.builder()
+                .customerMobileNumber(phone)
+                .customerName(name)
+                .storeId(storeId)
+                .build();
+    }
+
     private FireStoreMessage message(FireStoreMessage.MessageType type, String text) {
         return FireStoreMessage.builder().messageType(type).message(text).build();
+    }
+
+    /** Sets up SecurityContextHolder with a STORE_ADMIN JwtAuthenticationToken bearing the given storeId. */
+    private void setupStoreAdminAuth(String storeId) {
+        Jwt jwt = Jwt.withTokenValue("test.token.value")
+                .header("alg", "RS256")
+                .claim("storeId", storeId)
+                .claim("sub", "uid-store-admin")
+                .build();
+        JwtAuthenticationToken auth = new JwtAuthenticationToken(jwt, List.of(() -> "ROLE_STORE_ADMIN"), "uid-store-admin");
+        SecurityContextHolder.getContext().setAuthentication(auth);
+    }
+
+    /** Sets up SecurityContextHolder with an ADMIN JwtAuthenticationToken. */
+    private void setupAdminAuth(String storeId) {
+        Jwt jwt = Jwt.withTokenValue("test.token.value")
+                .header("alg", "RS256")
+                .claim("storeId", storeId)
+                .claim("sub", "uid-admin")
+                .build();
+        JwtAuthenticationToken auth = new JwtAuthenticationToken(jwt, List.of(() -> "ROLE_ADMIN"), "uid-admin");
+        SecurityContextHolder.getContext().setAuthentication(auth);
     }
 }

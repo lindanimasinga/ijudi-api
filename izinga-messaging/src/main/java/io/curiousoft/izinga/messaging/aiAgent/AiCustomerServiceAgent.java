@@ -1,8 +1,10 @@
 package io.curiousoft.izinga.messaging.aiAgent;
 
 import io.curiousoft.izinga.messaging.aiAgent.config.AiAgentConfigService;
+import io.curiousoft.izinga.messaging.aiAgent.config.McpServerConfig;
 import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistory;
 import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistoryService;
+import io.curiousoft.izinga.messaging.security.StoreScopeJwtService;
 import io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsappWebhookPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,7 +21,8 @@ public class AiCustomerServiceAgent {
     private static final Logger LOG = LoggerFactory.getLogger(AiCustomerServiceAgent.class);
 
     private static final String OPENAI_CHAT_URL = "https://api.openai.com/v1/responses";
-    private static final String AGENT_NAME = "driver_support";
+    /** REQ-11: removed hardcoded AGENT_NAME constant — resolved from LineContext at call time. */
+    private static final String DEFAULT_AGENT_NAME = "driver_support";
 
     private final boolean enabled;
     private final String openAiApiKey;
@@ -27,6 +30,8 @@ public class AiCustomerServiceAgent {
     private final RestTemplate restTemplate;
     private final ConversationHistoryService conversationHistoryService;
     private final AiAgentConfigService agentConfigService;
+    /** SA-021-17: attaches per-request scope JWT to MCP server URLs. */
+    private final StoreScopeJwtService storeScopeJwtService;
 
     public AiCustomerServiceAgent(
             @Value("${ai.agent.enabled:false}") boolean enabled,
@@ -34,13 +39,41 @@ public class AiCustomerServiceAgent {
             @Value("${ai.agent.model:gpt-4.1-mini}") String model,
             RestTemplate restTemplate,
             ConversationHistoryService conversationHistoryService,
-            AiAgentConfigService agentConfigService) {
+            AiAgentConfigService agentConfigService,
+            StoreScopeJwtService storeScopeJwtService) {
         this.enabled = enabled;
         this.openAiApiKey = openAiApiKey;
         this.model = model;
         this.restTemplate = restTemplate;
         this.conversationHistoryService = conversationHistoryService;
         this.agentConfigService = agentConfigService;
+        this.storeScopeJwtService = storeScopeJwtService;
+    }
+
+    /**
+     * SA-021-17: Build the MCP tools list with scope JWTs appended to each server URL.
+     * SEC-WA02-01-D: audience is sourced from AiAgentConfig (MongoDB), never from request payload.
+     *
+     * @param agentName the agent config key
+     * @param storeId   the store ID (null for DRIVER/CUSTOMER agents)
+     */
+    protected List<McpServerConfig> buildScopedMcpTools(String agentName, String storeId) {
+        var configs = agentConfigService.getMcpToolsForAgent(agentName);
+        var agentConfig = agentConfigService.getActiveAgentConfig(agentName);
+        var audience = (agentConfig != null) ? agentConfig.getAudience() : null;
+        List<McpServerConfig> scoped = new ArrayList<>(configs.size());
+        for (McpServerConfig cfg : configs) {
+            try {
+                String scopedUrl = storeScopeJwtService.buildScopedUrl(cfg.getServerUrl(), storeId, audience);
+                scoped.add(new McpServerConfig(cfg.getType(), cfg.getServerLabel(),
+                        cfg.getServerDescription(), scopedUrl, cfg.getRequireApproval(), cfg.getHeaders()));
+            } catch (Exception e) {
+                LOG.warn("SA-021-17: failed to build scope token for agent={} server={} — using base URL",
+                        agentName, cfg.getServerLabel(), e);
+                scoped.add(cfg);
+            }
+        }
+        return scoped;
     }
 
     public boolean isEnabled() {
@@ -78,15 +111,16 @@ public class AiCustomerServiceAgent {
         }
 
         LOG.info("AI agent handling query from {}: {}", from, userText);
-        var systemPrompt = agentConfigService.getSystemPrompt(AGENT_NAME);
+        // REQ-20: agentName is passed in, never hardcoded
+        var systemPrompt = agentConfigService.getSystemPrompt(DEFAULT_AGENT_NAME);
         try {
             // Load system prompt from database
             if (systemPrompt == null) {
-                LOG.error("No system prompt found for agent: {}", AGENT_NAME);
+                LOG.error("No system prompt found for agent: {}", DEFAULT_AGENT_NAME);
                 return null;
             }
 
-            // Get or create conversation
+            // Get or create conversation (no agentName scoping for legacy callers)
             ConversationHistory conversation = conversationHistoryService
                 .getOrCreateConversation(from, driverName != null ? driverName : "Driver");
 
@@ -112,14 +146,15 @@ public class AiCustomerServiceAgent {
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setBearerAuth(openAiApiKey);
 
-            var mcpServerToolsForAgent = agentConfigService.getMcpToolsForAgent();
+            // SA-021-3 + SA-021-17: per-agent mcpServers with scope JWT in each URL
+            var mcpServerToolsForAgent = buildScopedMcpTools(DEFAULT_AGENT_NAME, null);
             Map<String, Object> requestBody = new HashMap<>(Map.of(
                     "model", model,
                     "input", messagesList
             ));
 
-            var agent = agentConfigService.getActiveAgentConfig(AGENT_NAME);
-            if (agent.isUseTools()) {
+            var agent = agentConfigService.getActiveAgentConfig(DEFAULT_AGENT_NAME);
+            if (agent != null && agent.isUseTools()) {
                 requestBody.put("tools", mcpServerToolsForAgent);
             }
 
@@ -152,6 +187,92 @@ public class AiCustomerServiceAgent {
      */
     public String handleWhatsappQuery(WhatsappWebhookPayload.Value.Message message, String from) {
         return handleWhatsappQuery(message, from, null);
+    }
+
+    /**
+     * REQ-20: agent-aware entry point. Routes to the correct agent config and conversation history.
+     * SA-6: agentName comes from LineContext, never a constant.
+     */
+    public String handleWhatsappQueryForAgent(WhatsappWebhookPayload.Value.Message message, String from,
+                                               String driverName, String agentName) {
+        if ((message == null || message.getText() == null || message.getText().getBody() == null) && message.getButton() == null) {
+            LOG.warn("Received null or empty message from {}", from);
+            return null;
+        }
+        String userText = Optional.ofNullable(message.getText())
+                .map(it -> it.getBody().trim())
+                .orElse("");
+        if (userText.isBlank() && message.getButton() != null) {
+            userText = message.getButton().getText().trim();
+        }
+        return handleWhatsappQueryForAgent(userText, from, driverName, agentName);
+    }
+
+    /**
+     * REQ-20: agent-aware text overload.
+     */
+    public String handleWhatsappQueryForAgent(String userText, String from, String driverName, String agentName) {
+        if (!enabled) {
+            LOG.debug("AI agent is disabled, skipping query from {}", from);
+            return null;
+        }
+        String resolvedAgent = (agentName != null && !agentName.isBlank()) ? agentName : DEFAULT_AGENT_NAME;
+        LOG.info("AI agent '{}' handling query from {}: {}", resolvedAgent, from, userText);
+
+        var systemPrompt = agentConfigService.getSystemPrompt(resolvedAgent);
+        try {
+            if (systemPrompt == null) {
+                LOG.error("No system prompt found for agent: {}", resolvedAgent);
+                return null;
+            }
+
+            // REQ-15: per-agent conversation history
+            ConversationHistory conversation = conversationHistoryService
+                    .getOrCreateConversation(from, driverName != null ? driverName : "User", resolvedAgent);
+            conversationHistoryService.addUserMessage(conversation, userText);
+
+            var systemPromptWithContext = systemPrompt + " You are helping " + conversation.getDriverName() +
+                    " with their phone number " + conversation.getDriverPhoneNumber() +
+                    " as the only number you will use and assist with their queries.";
+
+            List<Map<String, Object>> messagesList = new ArrayList<>();
+            messagesList.add(Map.of("role", "system", "content", systemPromptWithContext));
+            var contextMessages = conversationHistoryService.getContextMessages(conversation);
+            for (var msg : contextMessages) {
+                messagesList.add(Map.of("role", msg.getRole(), "content", msg.getContent()));
+            }
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(openAiApiKey);
+
+            // SA-021-3 + SA-021-17: per-agent mcpServers with scope JWT in each URL (no storeId for DRIVER/CUSTOMER)
+            var mcpServerToolsForAgent = buildScopedMcpTools(resolvedAgent, null);
+            Map<String, Object> requestBody = new HashMap<>(Map.of("model", model, "input", messagesList));
+
+            var agent = agentConfigService.getActiveAgentConfig(resolvedAgent);
+            if (agent != null && agent.isUseTools()) {
+                requestBody.put("tools", mcpServerToolsForAgent);
+            }
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+            ResponseEntity<Map> response = restTemplate.postForEntity(OPENAI_CHAT_URL, entity, Map.class);
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                String reply = extractReply(response.getBody());
+                if (reply != null) {
+                    conversationHistoryService.addAssistantMessage(conversation, reply);
+                    LOG.info("AI agent '{}' replied to {} with {} chars of context",
+                            resolvedAgent, from, contextMessages.size());
+                    return reply;
+                }
+            } else {
+                LOG.warn("OpenAI returned non-2xx status {} for query from {}", response.getStatusCode(), from);
+            }
+        } catch (Exception e) {
+            LOG.error("AI agent '{}' failed to handle query from {}: {}", resolvedAgent, from, e.getMessage(), e);
+        }
+        return null;
     }
 
     @SuppressWarnings("unchecked")

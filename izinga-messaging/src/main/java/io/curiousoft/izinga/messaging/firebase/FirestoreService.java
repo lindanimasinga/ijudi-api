@@ -194,7 +194,21 @@ public class FirestoreService {
      * If a chat session does not exist for the customer, create one.
      * Returns the created message document id.
      */
+    /**
+     * Backward-compatible 3-arg overload. Delegates to the storeId-aware 4-arg version with null storeId.
+     */
     public String writeMessageForCustomer(String customerId, String customerName, FireStoreTextMessage messageData) throws Exception {
+        return writeMessageForCustomer(customerId, customerName, messageData, null);
+    }
+
+    /**
+     * T-13: create a new ChatSession with storeId when provided.
+     * Called for STORE audience lines so the ChatSession is associated with the store.
+     *
+     * @param storeId the store this conversation belongs to; may be null for non-STORE lines
+     */
+    public String writeMessageForCustomer(String customerId, String customerName,
+                                          FireStoreTextMessage messageData, String storeId) throws Exception {
         Objects.requireNonNull(customerId, "customerId must not be null");
         Objects.requireNonNull(messageData, "messageData must not be null");
 
@@ -206,7 +220,7 @@ public class FirestoreService {
             Instant lastMsgTs = messageData.getTimestamp() != null ? messageData.getTimestamp() : Instant.now();
             String generatedSessionId = "session_" + System.currentTimeMillis();
 
-            ChatSession newSession = ChatSession.builder()
+            ChatSession.ChatSessionBuilder builder = ChatSession.builder()
                     .customerId(customerId)
                     .customerMobileNumber(customerId)
                     .customerName(customerName)
@@ -215,8 +229,12 @@ public class FirestoreService {
                     .sessionId(generatedSessionId)
                     .createdAt(Instant.now())
                     .updatedAt(Instant.now())
-                    .status(ChatSession.ChatStatus.ACTIVE)
-                    .build();
+                    .status(ChatSession.ChatStatus.ACTIVE);
+            // T-13: set storeId if provided
+            if (storeId != null) {
+                builder = builder.storeId(storeId);
+            }
+            ChatSession newSession = builder.build();
 
             sessionId = createDocument(newSession);
             LOG.info("Created new chatSession {} (sessionId={}) for customer {}", sessionId, generatedSessionId, customerId);

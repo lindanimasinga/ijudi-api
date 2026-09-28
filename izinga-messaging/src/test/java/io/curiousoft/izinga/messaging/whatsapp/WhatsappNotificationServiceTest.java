@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.model.ProfileRoles;
 import io.curiousoft.izinga.commons.model.UserProfile;
+import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
+import io.curiousoft.izinga.messaging.whatsapp.lines.WhatsappSenderResolver;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateRequest;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +31,9 @@ class WhatsappNotificationServiceTest {
     @Mock
     private WhatsappConfig whatsappConfig;
 
+    @Mock
+    private WhatsappSenderResolver senderResolver;
+
     @SuppressWarnings("unchecked")
     private final Call<WhatsappTemplateResponse> callMock = mock(Call.class);
 
@@ -36,8 +41,9 @@ class WhatsappNotificationServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(whatsappConfig.phoneId()).thenReturn("testPhoneId");
-        service = new WhatsappNotificationService(whatsAppService, whatsappConfig, new ObjectMapper(), "https://video.url");
+        // REQ-08: service uses senderResolver, not whatsappConfig.phoneId() directly
+        when(senderResolver.resolve(any(Audience.class), any())).thenReturn("testPhoneId");
+        service = new WhatsappNotificationService(whatsAppService, whatsappConfig, new ObjectMapper(), "https://video.url", senderResolver);
     }
 
     private UserProfile customerProfile(String name, String mobile) {

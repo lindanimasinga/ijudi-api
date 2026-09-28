@@ -75,3 +75,8 @@ cancellation:
     fee:
         hmac-secret: test-hmac-secret-for-unit-tests-only
         policy-cache-ttl-minutes: 5
+
+# SEC-WA02-01-B: dedicated store-scope JWT secret for unit tests (not the Firebase secret)
+store-scope:
+    jwt:
+        secret: test-store-scope-jwt-secret-for-unit-tests-only-32chars!

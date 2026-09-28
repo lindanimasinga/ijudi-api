@@ -7,6 +7,8 @@ import io.curiousoft.izinga.commons.model.UserProfile;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsAppService;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsappConfig;
+import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
+import io.curiousoft.izinga.messaging.whatsapp.lines.WhatsappSenderResolver;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateRequest;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateResponse;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
@@ -35,14 +37,16 @@ public class WhatsAppOtpServiceTest {
     @Mock private FirebaseAuth firebaseAuth;
     @Mock private UserProfileService userProfileService;
     @Mock private UserProfileRepo userProfileRepo;
+    @Mock private WhatsappSenderResolver senderResolver;
 
     private WhatsAppOtpService service;
 
     @Before
     public void setUp() {
+        when(senderResolver.resolve(any(Audience.class), any())).thenReturn("testPhoneId");
         service = new WhatsAppOtpService(
                 otpRepository, whatsAppService, whatsappConfig,
-                firebaseAuth, userProfileService, userProfileRepo);
+                firebaseAuth, userProfileService, userProfileRepo, senderResolver);
     }
 
     // ===================== normalizeMobileNumber =====================
@@ -168,7 +172,7 @@ public class WhatsAppOtpServiceTest {
         // Use a fresh service instance to avoid cross-test rate limit state
         WhatsAppOtpService freshService = new WhatsAppOtpService(
                 otpRepository, whatsAppService, whatsappConfig,
-                firebaseAuth, userProfileService, userProfileRepo);
+                firebaseAuth, userProfileService, userProfileRepo, senderResolver);
 
         // Exhaust IP limit with different phone numbers (simulating attacker cycling numbers)
         // We need to send 10 requests from the same IP to different phone numbers
@@ -191,7 +195,7 @@ public class WhatsAppOtpServiceTest {
     public void sendOtp_phoneHourlyLimitExceeded_throwsRateLimitException() throws Exception {
         WhatsAppOtpService freshService = new WhatsAppOtpService(
                 otpRepository, whatsAppService, whatsappConfig,
-                firebaseAuth, userProfileService, userProfileRepo);
+                firebaseAuth, userProfileService, userProfileRepo, senderResolver);
 
         var sendTimesField = WhatsAppOtpService.class.getDeclaredField("phoneSendTimes");
         sendTimesField.setAccessible(true);
