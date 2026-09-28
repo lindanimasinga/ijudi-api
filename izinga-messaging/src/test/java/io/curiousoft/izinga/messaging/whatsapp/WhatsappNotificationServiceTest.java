@@ -8,6 +8,8 @@ import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import io.curiousoft.izinga.messaging.whatsapp.lines.WhatsappSenderResolver;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateRequest;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateResponse;
+import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTextRequest;
+import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTextResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -191,5 +193,94 @@ class WhatsappNotificationServiceTest {
         verify(whatsAppService).sendMessage(anyString(), captor.capture());
         var bodyComp = captor.getValue().getTemplate().getComponents().get(0);
         assertEquals("Jane \"The\" Smith\\Doe", bodyComp.getParameters().get(0).getText());
+    }
+
+    // ─── REQ-23: outbound reply uses the inbound line's audience/storeId ────────
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void sendMessage_twoArgOverload_resolvesCustomerAudienceForLegacyBehavior() throws IOException {
+        Call<WhatsappTextResponse> textCallMock = mock(Call.class);
+        when(whatsAppService.sendTextMessage(anyString(), any())).thenReturn(textCallMock);
+
+        service.sendMessage("0821234567", "hello");
+
+        verify(senderResolver).resolve(Audience.CUSTOMER, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void sendMessage_audienceOverload_resolvesStoreAudienceWithStoreId_notCustomerDefault() throws IOException {
+        Call<WhatsappTextResponse> textCallMock = mock(Call.class);
+        when(whatsAppService.sendTextMessage(anyString(), any())).thenReturn(textCallMock);
+
+        service.sendMessage("0821234567", "Hi from RxNova24", Audience.STORE, "store-123");
+
+        ArgumentCaptor<WhatsappTextRequest> captor = ArgumentCaptor.forClass(WhatsappTextRequest.class);
+        verify(senderResolver).resolve(Audience.STORE, "store-123");
+        verify(senderResolver, never()).resolve(eq(Audience.CUSTOMER), any());
+        verify(whatsAppService).sendTextMessage(eq("testPhoneId"), captor.capture());
+        assertEquals("Hi from RxNova24", captor.getValue().getText().getBody());
+    }
+
+    @Test
+    void sendLandingOptions_threeArgOverload_resolvesCustomerAudienceForLegacyBehavior() throws IOException {
+        when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+
+        service.sendLandingOptions("0821234567", "Jane", customerProfile("Jane", "0821234567"));
+
+        verify(senderResolver).resolve(Audience.CUSTOMER, null);
+    }
+
+    @Test
+    void sendLandingOptions_audienceOverload_resolvesStoreAudienceWithStoreId_notCustomerDefault() throws IOException {
+        when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+
+        service.sendLandingOptions("0821234567", "Jane", customerProfile("Jane", "0821234567"),
+                Audience.STORE, "store-123");
+
+        verify(senderResolver).resolve(Audience.STORE, "store-123");
+        verify(senderResolver, never()).resolve(eq(Audience.CUSTOMER), any());
+        verify(whatsAppService).sendMessage(eq("testPhoneId"), any());
+    }
+
+    // ─── REQ-24: per-store landing template ──────────────────────────────────
+
+    @Test
+    void sendLandingOptions_fiveArgOverload_usesGenericTemplateForLegacyBehavior() throws IOException {
+        when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+
+        service.sendLandingOptions("0821234567", "Jane", customerProfile("Jane", "0821234567"),
+                Audience.STORE, "store-123");
+
+        ArgumentCaptor<WhatsappTemplateRequest> captor = ArgumentCaptor.forClass(WhatsappTemplateRequest.class);
+        verify(whatsAppService).sendMessage(anyString(), captor.capture());
+        assertEquals("izinga_landing_options", captor.getValue().getTemplate().getName());
+    }
+
+    @Test
+    void sendLandingOptions_blankTemplateName_fallsBackToGenericTemplate() throws IOException {
+        when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+
+        service.sendLandingOptions("0821234567", "Jane", customerProfile("Jane", "0821234567"),
+                Audience.STORE, "store-123", "  ");
+
+        ArgumentCaptor<WhatsappTemplateRequest> captor = ArgumentCaptor.forClass(WhatsappTemplateRequest.class);
+        verify(whatsAppService).sendMessage(anyString(), captor.capture());
+        assertEquals("izinga_landing_options", captor.getValue().getTemplate().getName());
+    }
+
+    @Test
+    void sendLandingOptions_storeTemplateName_usesStoreSpecificTemplate_notGenericIzingaOne() throws IOException {
+        when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+
+        service.sendLandingOptions("0821234567", "Jane", customerProfile("Jane", "0821234567"),
+                Audience.STORE, "store-123", "rxnova24_landing_options");
+
+        ArgumentCaptor<WhatsappTemplateRequest> captor = ArgumentCaptor.forClass(WhatsappTemplateRequest.class);
+        verify(whatsAppService).sendMessage(eq("testPhoneId"), captor.capture());
+        assertEquals("rxnova24_landing_options", captor.getValue().getTemplate().getName());
+        var bodyComp = captor.getValue().getTemplate().getComponents().get(0);
+        assertEquals("Jane", bodyComp.getParameters().get(0).getText());
     }
 }

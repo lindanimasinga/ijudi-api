@@ -186,7 +186,8 @@ public class WhatsappInboundEventHandler {
         if (isVerificationMessage) {
             LOG.info("Received verification consent reply from {}", from);
             verificationConsentService.handleVerificationConsentReply(message, from);
-            whatsappNotificationService.sendMessage(from, "Thank you. Your application is being processed.");
+            whatsappNotificationService.sendMessage(from, "Thank you. Your application is being processed.",
+                    lineContext.audience(), lineContext.storeId());
             return null;
         }
 
@@ -195,7 +196,10 @@ public class WhatsappInboundEventHandler {
             // SA-5: DRIVER line must not receive the customer landing menu
             if (lineContext.audience() != Audience.DRIVER) {
                 var user = userProfileRepo.findByMobileNumber(from);
-                whatsappNotificationService.sendLandingOptions(from, extractContactName(contacts), user);
+                String landingTemplateName = lineContext.line() != null
+                        ? lineContext.line().getLandingTemplateName() : null;
+                whatsappNotificationService.sendLandingOptions(from, extractContactName(contacts), user,
+                        lineContext.audience(), lineContext.storeId(), landingTemplateName);
             } else {
                 LOG.info("SA-5: DRIVER line — skipping customer landing options for {}", from);
             }
@@ -215,7 +219,8 @@ public class WhatsappInboundEventHandler {
                         message, from, null, lineContext.agentName());
             }
             if (aiResponseToCustomer != null) {
-                whatsappNotificationService.sendMessage(from, aiResponseToCustomer);
+                whatsappNotificationService.sendMessage(from, aiResponseToCustomer,
+                        lineContext.audience(), lineContext.storeId());
             }
         }
         return aiResponseToCustomer;
@@ -512,20 +517,22 @@ public class WhatsappInboundEventHandler {
                         from,
                         aiReply != null && !aiReply.isBlank()
                                 ? aiReply
-                                : "Thanks. Your document image was received and linked to your profile."
+                                : "Thanks. Your document image was received and linked to your profile.",
+                        lineContext.audience(), lineContext.storeId()
                 );
             }
         } catch (Exception e) {
             LOG.error("Error handling image message", e);
-            sendImageProcessingFallback(from);
+            sendImageProcessingFallback(from, lineContext);
         }
     }
 
-    private void sendImageProcessingFallback(String from) {
+    private void sendImageProcessingFallback(String from, LineContext lineContext) {
         try {
             whatsappNotificationService.sendMessage(
                     from,
-                    "We could not process your image just now. Please send it again, or reply HELP for assistance."
+                    "We could not process your image just now. Please send it again, or reply HELP for assistance.",
+                    lineContext.audience(), lineContext.storeId()
             );
         } catch (Exception ex) {
             LOG.warn("Failed to send image-processing fallback message to {}", from, ex);
