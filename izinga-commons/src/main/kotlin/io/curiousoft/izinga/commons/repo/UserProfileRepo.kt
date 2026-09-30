@@ -12,6 +12,8 @@ interface UserProfileRepo : ProfileRepo<UserProfile> {
     fun findByMobileNumber(phone: String): UserProfile?
     @Query("{ 'role': ?0, 'tag.messengerAdminId': ?1 }")
     fun findByRoleAndMessengerAdminId(role: ProfileRoles, messengerAdminId: String): List<UserProfile>
+    @Query("{ 'role': ?0, 'tag.storeId': ?1 }")
+    fun findByRoleAndStoreId(role: ProfileRoles, storeId: String): List<UserProfile>
     fun findByRoleAndLatitudeBetweenAndLongitudeBetween(
         messenger: ProfileRoles,
         latMin: Double,
