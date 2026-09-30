@@ -76,13 +76,15 @@ class UserController(
         @RequestParam(required = false, defaultValue = "false") includePendingUsers: Boolean,
         @RequestParam(required = false) role: ProfileRoles?,
         @RequestParam(required = false) messengerAdminId: String?,
+        @RequestParam(required = false) storeId: String?,
         @RequestParam(required = false) latitude: Double?,
         @RequestParam(required = false) longitude: Double?,
         @RequestParam(required = false) range: Double?,
         @RequestParam(required = false, defaultValue = "FOOD") storeType: StoreType = StoreType.FOOD) : ResponseEntity<List<UserProfile?>?> {
-        logger.info("Find users request role={} messengerAdminId={} latitude={} longitude={} range={}", role, messengerAdminId, latitude, longitude, range)
+        logger.info("Find users request role={} messengerAdminId={} storeId={} latitude={} longitude={} range={}", role, messengerAdminId, storeId, latitude, longitude, range)
         val users = when {
             role == ProfileRoles.MESSENGER && !messengerAdminId.isNullOrBlank() -> profileService.findMessengersByAdminId(messengerAdminId)
+            role == ProfileRoles.MESSENGER && !storeId.isNullOrBlank() -> profileService.findMessengersByStoreId(storeId)
             role == ProfileRoles.MESSENGER && latitude != null && longitude != null && range != null -> profileService.findMessengersByLocation(latitude, longitude, range)
             role != null -> profileService.findByLocation(
                 role,
