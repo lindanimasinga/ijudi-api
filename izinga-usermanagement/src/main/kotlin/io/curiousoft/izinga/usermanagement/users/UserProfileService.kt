@@ -155,6 +155,10 @@ class UserProfileService(
         return profileRepo.findByRoleAndMessengerAdminId(ProfileRoles.MESSENGER, messengerAdminId)
     }
 
+    fun findMessengersByStoreId(storeId: String): List<UserProfile> {
+        return profileRepo.findByRoleAndStoreId(ProfileRoles.MESSENGER, storeId)
+    }
+
     fun findMessengersByLocation(latitude: Double, longitude: Double, range: Double): List<UserProfile>? {
         val maxLat = latitude + range
         val minLat = latitude - range
