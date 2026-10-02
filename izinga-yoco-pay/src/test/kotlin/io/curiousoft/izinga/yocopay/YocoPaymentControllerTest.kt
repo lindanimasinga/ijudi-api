@@ -53,8 +53,11 @@ class YocoPaymentControllerTest {
         val httpResponse = sut.verifyPaymentSuccess(successEvent = yocoEvent, yocoHash = "8AvKYTPMYVtjgiXM7KmaPMQLM+pVfmUOEVl6SalovSs=")
 
         //verify
+        // The controller ignores the incoming yocoHash for description; it computes a server-side
+        // checksum from MD5(orderId+totalAmount+customerId+key).
+        // Expected: MD5("new-order-id100.0null" + "apikey") base64 = y231HAmY64tMJkNbiPm2GA==
         Assertions.assertEquals(200, httpResponse.statusCodeValue)
-        Assertions.assertEquals("new order description:yoco-8AvKYTPMYVtjgiXM7KmaPMQLM+pVfmUOEVl6SalovSs=:", newOrder.description)
+        Assertions.assertEquals("new order description:yoco-y231HAmY64tMJkNbiPm2GA==:", newOrder.description)
 
         verify {
             orderManager.findOrder("new-order-id")
