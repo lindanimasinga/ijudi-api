@@ -3,6 +3,8 @@ package io.curiousoft.izinga.ordermanagement.service;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.ordermanagement.stores.StoreAgreementAuditRepository;
+import io.curiousoft.izinga.ordermanagement.stores.StoreTierChangeAuditRepository;
 import io.curiousoft.izinga.ordermanagement.stores.StoreService;
 import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,12 +51,17 @@ class StoreServiceSecurityTest {
     private ApplicationEventPublisher applicationEventPublisher;
     @Mock
     private ReferralCodeService referralCodeService;
+    @Mock
+    private StoreAgreementAuditRepository storeAgreementAuditRepository;
+    @Mock
+    private StoreTierChangeAuditRepository storeTierChangeAuditRepository;
 
     @BeforeEach
     void setUp() {
         storeService = new StoreService(
                 storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, 0.0,
-                applicationEventPublisher, referralCodeService);
+                applicationEventPublisher, referralCodeService,
+                storeAgreementAuditRepository, storeTierChangeAuditRepository);
     }
 
     // ──────────────────────────────────────────────────────────────────────────

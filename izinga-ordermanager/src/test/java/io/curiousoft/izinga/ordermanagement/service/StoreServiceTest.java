@@ -3,6 +3,8 @@ package io.curiousoft.izinga.ordermanagement.service;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.ordermanagement.stores.StoreAgreementAuditRepository;
+import io.curiousoft.izinga.ordermanagement.stores.StoreTierChangeAuditRepository;
 import io.curiousoft.izinga.ordermanagement.stores.StoreService;
 import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService;
 import org.junit.Assert;
@@ -36,10 +38,16 @@ public class StoreServiceTest {
     private ApplicationEventPublisher applicationEventPublisher;
     @Mock
     private ReferralCodeService referralCodeService;
+    @Mock
+    private StoreAgreementAuditRepository storeAgreementAuditRepository;
+    @Mock
+    private StoreTierChangeAuditRepository storeTierChangeAuditRepository;
 
     @Before
     public void setUp() {
-        storeService = new StoreService(storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, 0.1, applicationEventPublisher, referralCodeService);
+        storeService = new StoreService(storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, 0.1,
+                applicationEventPublisher, referralCodeService,
+                storeAgreementAuditRepository, storeTierChangeAuditRepository);
     }
 
     @Test
@@ -58,6 +66,7 @@ public class StoreServiceTest {
         bank.setName("ukheshe");
         bank.setPhone("phoneNumber");
         bank.setType(BankAccType.CHEQUE);
+        bank.setBranchCode("051001"); // T-08: required for bank validation
         user.setBank(bank);
 
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
@@ -111,6 +120,7 @@ public class StoreServiceTest {
         bank.setName("ukheshe");
         bank.setPhone("phoneNumber");
         bank.setType(BankAccType.CHEQUE);
+        bank.setBranchCode("051001"); // T-08: required for bank validation
         user.setBank(bank);
 
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
@@ -187,6 +197,7 @@ public class StoreServiceTest {
         bank.setName("ukheshe");
         bank.setPhone("phoneNumber");
         bank.setType(BankAccType.CHEQUE);
+        bank.setBranchCode("051001"); // T-08: required for bank validation
         user.setBank(bank);
 
         ArrayList<BusinessHours> businessHours = new ArrayList<>();

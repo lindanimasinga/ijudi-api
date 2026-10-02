@@ -55,6 +55,11 @@ public class SecurityConfig {
                         // SEC-01: store write endpoints require authentication; DELETE restricted to ADMIN
                         .requestMatchers(POST, "/store").authenticated()
                         .requestMatchers(PATCH, "/store/*", "/store/*/stock").authenticated()
+                        // SEC-ONB02-03-C: sub-resource PATCH paths have THREE path segments
+                        // (/store/{id}/ica-acceptance, /store/{id}/subscription-tier) and are NOT
+                        // covered by the single-segment wildcard above — explicit matchers required.
+                        .requestMatchers(PATCH, "/store/*/ica-acceptance").authenticated()
+                        .requestMatchers(PATCH, "/store/*/subscription-tier").authenticated()
                         .requestMatchers(DELETE, "/store/*").hasRole("ADMIN")
                         .anyRequest().permitAll()
                 )
