@@ -84,12 +84,13 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
             throw new Exception("Shop shortname or id already exists. Please try a different shortname");
         }
 
-        // C-04: ICA gate — existing STORE_ADMINs must have accepted the ICA before creating
-        // additional stores. First-time creators have role CUSTOMER (role is upgraded to STORE_ADMIN
-        // after creation), so this gate does NOT apply to them.
-        // TODO: Gap — a first-time CUSTOMER creator can bypass this check. Review whether
-        //       the frontend should gate the create-store flow on ICA acceptance before the API call.
-        if (user.getRole() == ProfileRoles.STORE_ADMIN && !Boolean.TRUE.equals(profile.getIcaAccepted())) {
+        // C-04 (DEFECT-ONB02-01 fix): ICA gate applies to ALL store-creation calls —
+        // both first-time creators (role=CUSTOMER, upgraded to STORE_ADMIN after this method
+        // returns) and existing STORE_ADMINs creating additional stores. The prior condition
+        // only gated STORE_ADMINs; a first-time CUSTOMER caller always bypassed it because
+        // the role upgrade happens at line 102, after this gate. Since POST /store is
+        // exclusively a merchant-onboarding path, the gate must be unconditional.
+        if (!Boolean.TRUE.equals(profile.getIcaAccepted())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "MERCHANT_ICA_NOT_ACCEPTED");
         }
 

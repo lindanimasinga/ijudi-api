@@ -124,11 +124,14 @@ public class StoreServiceReferralAttributionTest {
         hours.add(new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date()));
         ArrayList<String> tags = new ArrayList<>();
         tags.add("food");
-        return new StoreProfile(
+        StoreProfile profile = new StoreProfile(
                 StoreType.FOOD, "Test Store", "test-store-unique",
                 "1 Store St", "https://img.test/s.png", "0811111111",
                 tags, hours, "owner-001", bank
         );
+        // DEFECT-ONB02-01 fix: ICA must be accepted for all callers including first-time CUSTOMER creators
+        profile.setIcaAccepted(true);
+        return profile;
     }
 
     private UserProfile ownerProfile() {

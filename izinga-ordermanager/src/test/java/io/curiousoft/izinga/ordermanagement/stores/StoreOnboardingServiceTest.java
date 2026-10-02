@@ -100,12 +100,52 @@ public class StoreOnboardingServiceTest {
         verify(storeRepository).save(any());
     }
 
+    /**
+     * DEFECT-ONB02-01: verify the bug is gone — a CUSTOMER-role first-time creator
+     * must NOT be able to bypass the ICA gate.
+     * Before the fix this test would have PASSED (store was created), confirming the defect.
+     */
     @Test
-    public void create_customerRole_noIcaGate_succeeds() throws Exception {
-        // First-time creators are CUSTOMER — gate must NOT trigger.
+    public void create_customerRoleFirstTimeCreator_withoutIcaAccepted_throws403() {
         UserProfile user = userWithRole(ProfileRoles.CUSTOMER);
         StoreProfile profile = storeProfile("owner-001");
-        // icaAccepted not set — gate skipped for CUSTOMER
+        // icaAccepted not set (null) — must be rejected
+
+        when(userProfileRepo.findById("owner-001")).thenReturn(Optional.of(user));
+        when(storeRepository.findOneByIdOrShortName(any(), any())).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> storeService.create(profile));
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("MERCHANT_ICA_NOT_ACCEPTED", ex.getReason());
+        verify(storeRepository, never()).save(any());
+        verify(userProfileRepo, never()).save(any());
+    }
+
+    /** DEFECT-ONB02-01: explicit false also blocked for first-time CUSTOMER creator. */
+    @Test
+    public void create_customerRoleFirstTimeCreator_withIcaAcceptedFalse_throws403() {
+        UserProfile user = userWithRole(ProfileRoles.CUSTOMER);
+        StoreProfile profile = storeProfile("owner-001");
+        profile.setIcaAccepted(false);
+
+        when(userProfileRepo.findById("owner-001")).thenReturn(Optional.of(user));
+        when(storeRepository.findOneByIdOrShortName(any(), any())).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> storeService.create(profile));
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals("MERCHANT_ICA_NOT_ACCEPTED", ex.getReason());
+        verify(storeRepository, never()).save(any());
+    }
+
+    /** DEFECT-ONB02-01: happy path — CUSTOMER with ICA accepted creates store and is upgraded to STORE_ADMIN. */
+    @Test
+    public void create_customerRoleFirstTimeCreator_withIcaAcceptedTrue_succeeds() throws Exception {
+        UserProfile user = userWithRole(ProfileRoles.CUSTOMER);
+        StoreProfile profile = storeProfile("owner-001");
+        profile.setIcaAccepted(true);
+        profile.setIcaVersion(ICA_VERSION);
 
         when(userProfileRepo.findById("owner-001")).thenReturn(Optional.of(user));
         when(storeRepository.findOneByIdOrShortName(any(), any())).thenReturn(Optional.empty());
@@ -114,6 +154,9 @@ public class StoreOnboardingServiceTest {
         StoreProfile result = storeService.create(profile);
         assertNotNull(result);
         verify(storeRepository).save(any());
+        // Role must be upgraded after store creation
+        assertEquals(ProfileRoles.STORE_ADMIN, user.getRole());
+        verify(userProfileRepo).save(user);
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -125,6 +168,7 @@ public class StoreOnboardingServiceTest {
         UserProfile user = userWithRole(ProfileRoles.CUSTOMER);
         user.setBank(null);
         StoreProfile profile = storeProfile("owner-001");
+        profile.setIcaAccepted(true); // ICA accepted so gate passes; bank validation fires
 
         when(userProfileRepo.findById("owner-001")).thenReturn(Optional.of(user));
         when(storeRepository.findOneByIdOrShortName(any(), any())).thenReturn(Optional.empty());
@@ -141,6 +185,7 @@ public class StoreOnboardingServiceTest {
         bank.setAccountId(null);
         user.setBank(bank);
         StoreProfile profile = storeProfile("owner-001");
+        profile.setIcaAccepted(true); // ICA accepted so gate passes; bank validation fires
 
         when(userProfileRepo.findById("owner-001")).thenReturn(Optional.of(user));
         when(storeRepository.findOneByIdOrShortName(any(), any())).thenReturn(Optional.empty());
@@ -157,6 +202,7 @@ public class StoreOnboardingServiceTest {
         bank.setBranchCode(null);
         user.setBank(bank);
         StoreProfile profile = storeProfile("owner-001");
+        profile.setIcaAccepted(true); // ICA accepted so gate passes; bank validation fires
 
         when(userProfileRepo.findById("owner-001")).thenReturn(Optional.of(user));
         when(storeRepository.findOneByIdOrShortName(any(), any())).thenReturn(Optional.empty());
@@ -173,6 +219,7 @@ public class StoreOnboardingServiceTest {
         bank.setType(BankAccType.wallet);
         user.setBank(bank);
         StoreProfile profile = storeProfile("owner-001");
+        profile.setIcaAccepted(true); // ICA accepted so gate passes; bank validation fires
 
         when(userProfileRepo.findById("owner-001")).thenReturn(Optional.of(user));
         when(storeRepository.findOneByIdOrShortName(any(), any())).thenReturn(Optional.empty());
@@ -189,6 +236,7 @@ public class StoreOnboardingServiceTest {
         bank.setType(BankAccType.string);
         user.setBank(bank);
         StoreProfile profile = storeProfile("owner-001");
+        profile.setIcaAccepted(true); // ICA accepted so gate passes; bank validation fires
 
         when(userProfileRepo.findById("owner-001")).thenReturn(Optional.of(user));
         when(storeRepository.findOneByIdOrShortName(any(), any())).thenReturn(Optional.empty());
@@ -203,6 +251,7 @@ public class StoreOnboardingServiceTest {
         UserProfile user = userWithRole(ProfileRoles.CUSTOMER);
         user.setBank(validBank());
         StoreProfile profile = storeProfile("owner-001");
+        profile.setIcaAccepted(true); // ICA accepted so gate passes
 
         when(userProfileRepo.findById("owner-001")).thenReturn(Optional.of(user));
         when(storeRepository.findOneByIdOrShortName(any(), any())).thenReturn(Optional.empty());
@@ -309,6 +358,24 @@ public class StoreOnboardingServiceTest {
 
         assertNotNull(result);
         verify(storeAgreementAuditRepository).save(any());
+    }
+
+    /**
+     * AC-06 — ADR-022 Decision 1: ICA fields must be written to StoreProfile ONLY.
+     * UserProfile must not be mutated during acceptIca().
+     */
+    @Test
+    public void acceptIca_doesNotTouchUserProfile() throws Exception {
+        StoreProfile store = persistedStore();
+        when(storeRepository.findById(STORE_ID)).thenReturn(Optional.of(store));
+        when(storeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(storeAgreementAuditRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        storeService.acceptIca(STORE_ID, USER_ID, true, ICA_VERSION,
+                "127.0.0.1", "Mozilla/5.0", STORE_ID, false);
+
+        // UserProfile repository must not be read or written during ICA acceptance
+        verifyNoInteractions(userProfileRepo);
     }
 
     @Test

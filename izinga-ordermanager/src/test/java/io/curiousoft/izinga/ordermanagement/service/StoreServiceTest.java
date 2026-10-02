@@ -84,6 +84,9 @@ public class StoreServiceTest {
                 "ownerId",
                 new Bank());
 
+        // DEFECT-ONB02-01 fix: ICA must be accepted for all callers including first-time CUSTOMER creators
+        initialProfile.setIcaAccepted(true);
+
         //when
         when(userProfileRepo.findById(initialProfile.getOwnerId())).thenReturn(Optional.of(user));
         when(storeRepository.findOneByIdOrShortName(initialProfile.getId(), initialProfile.getShortName())).thenReturn(Optional.empty());
@@ -149,6 +152,8 @@ public class StoreServiceTest {
         set.add(stock5);
         set.add(stock6);
         initialProfile.setStockList(set);
+        // DEFECT-ONB02-01 fix: ICA must be accepted for all callers including first-time CUSTOMER creators
+        initialProfile.setIcaAccepted(true);
 
         when(userProfileRepo.findById(initialProfile.getOwnerId())).thenReturn(Optional.of(user));
         when(storeRepository.findOneByIdOrShortName(initialProfile.getId(), initialProfile.getShortName())).thenReturn(Optional.empty());
@@ -227,6 +232,8 @@ public class StoreServiceTest {
         set.add(stock5);
         set.add(stock6);
         initialProfile.setStockList(set);
+        // DEFECT-ONB02-01 fix: ICA must be accepted for all callers including first-time CUSTOMER creators
+        initialProfile.setIcaAccepted(true);
 
         when(userProfileRepo.findById(initialProfile.getOwnerId())).thenReturn(Optional.of(user));
         when(storeRepository.findOneByIdOrShortName(initialProfile.getId(), initialProfile.getShortName())).thenReturn(Optional.empty());
