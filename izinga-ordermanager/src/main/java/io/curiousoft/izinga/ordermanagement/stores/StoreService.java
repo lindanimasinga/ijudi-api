@@ -4,6 +4,7 @@ import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.ordermanagement.service.ProfileServiceImpl;
+import io.curiousoft.izinga.payfast.model.MerchantSubscriptionActivatedEvent;
 import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +12,7 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -286,6 +288,36 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         storeTierChangeAuditRepository.save(audit);
 
         return store;
+    }
+
+    /**
+     * TIER-BILLING-01 / REQ-05: Listens for [MerchantSubscriptionActivatedEvent] published by
+     * PayFastItnHandler when a valid PayFast ITN with payment_status=COMPLETE is received.
+     * Calls the existing [updateSubscriptionTier] method to elevate StoreProfile.subscriptionTier
+     * to the tier activated by payment.
+     *
+     * <p>isAdmin=true bypasses the JWT IDOR check (this is a server-side system event, not a
+     * user HTTP request). jwtStoreId is null for the same reason.
+     *
+     * <p>TODO TIER-BILLING-01 follow-up (SEC-ONB02-03-F): Replace the isAdmin=true bypass with
+     * a dedicated BILLING_ADMIN role check once the role is introduced.
+     */
+    @EventListener
+    public void onMerchantSubscriptionActivated(MerchantSubscriptionActivatedEvent event) {
+        try {
+            LOG.info("MerchantSubscriptionActivatedEvent received: storeId={} tier={} ownerId={}",
+                    event.getStoreId(), event.getTier(), event.getOwnerId());
+            updateSubscriptionTier(
+                    event.getStoreId(),
+                    event.getOwnerId(),
+                    event.getTier(),
+                    null,    // jwtStoreId — null because this is a system event
+                    true     // isAdmin — bypasses IDOR check for server-side event
+            );
+        } catch (Exception e) {
+            LOG.error("Failed to update subscription tier for storeId={} tier={}: {}",
+                    event.getStoreId(), event.getTier(), e.getMessage(), e);
+        }
     }
 
     @Override

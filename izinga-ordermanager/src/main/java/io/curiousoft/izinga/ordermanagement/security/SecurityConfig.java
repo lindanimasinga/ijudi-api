@@ -45,6 +45,9 @@ public class SecurityConfig {
                         // Rate-limited inside WhatsAppOtpService (per-phone + per-IP). SEC-01.
                         .requestMatchers(POST, "/auth/whatsapp/otp/send").permitAll()
                         .requestMatchers(POST, "/auth/whatsapp/otp/verify").permitAll()
+                        // TIER-BILLING-01 / REQ-04: PayFast ITN is a server-to-server callback —
+                        // no JWT auth; security enforced by PayFast MD5 signature validation.
+                        .requestMatchers(POST, "/merchant/subscription/itn").permitAll()
                         .requestMatchers(GET, "/v2/promotion/**", "/v2/store/**").permitAll()
                         .requestMatchers(POST, "/v2/leads").permitAll()
                         .requestMatchers("/v2/**").authenticated()
@@ -60,6 +63,8 @@ public class SecurityConfig {
                         // covered by the single-segment wildcard above — explicit matchers required.
                         .requestMatchers(PATCH, "/store/*/ica-acceptance").authenticated()
                         .requestMatchers(PATCH, "/store/*/subscription-tier").authenticated()
+                        // TIER-BILLING-01: subscription initiate requires STORE_ADMIN (enforced via @PreAuthorize)
+                        .requestMatchers(POST, "/merchant/subscription/initiate").authenticated()
                         .requestMatchers(DELETE, "/store/*").hasRole("ADMIN")
                         .anyRequest().permitAll()
                 )
