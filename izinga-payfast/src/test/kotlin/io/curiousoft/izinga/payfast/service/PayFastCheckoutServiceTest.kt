@@ -43,7 +43,8 @@ class PayFastCheckoutServiceTest {
         baseUrl = "https://sandbox.payfast.co.za/eng/process",
         returnUrl = "https://biz.izinga.co.za/business/subscription-success",
         cancelUrl = "https://biz.izinga.co.za/business/subscription-cancel",
-        notifyUrl = "https://api.izinga.co.za/merchant/subscription/itn"
+        notifyUrl = "https://api.izinga.co.za/merchant/subscription/itn",
+        validateUrl = "https://sandbox.payfast.co.za/eng/query/validate"
     )
     private val signatureUtil = PayFastSignatureUtil(properties.passphrase)
 

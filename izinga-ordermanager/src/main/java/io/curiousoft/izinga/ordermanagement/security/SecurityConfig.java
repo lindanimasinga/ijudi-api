@@ -45,8 +45,9 @@ public class SecurityConfig {
                         // Rate-limited inside WhatsAppOtpService (per-phone + per-IP). SEC-01.
                         .requestMatchers(POST, "/auth/whatsapp/otp/send").permitAll()
                         .requestMatchers(POST, "/auth/whatsapp/otp/verify").permitAll()
-                        // TIER-BILLING-01 / REQ-04: PayFast ITN is a server-to-server callback —
-                        // no JWT auth; security enforced by PayFast MD5 signature validation.
+                        // SEC-TB01-01-E: PayFast ITN webhook — explicitly public (no JWT, PayFast server-to-server).
+                        // Security enforced by PayFast signature validation + server-to-server validate in PayFastItnHandler.
+                        // Never remove or move to authenticated() — PayFast cannot supply a Bearer token.
                         .requestMatchers(POST, "/merchant/subscription/itn").permitAll()
                         .requestMatchers(GET, "/v2/promotion/**", "/v2/store/**").permitAll()
                         .requestMatchers(POST, "/v2/leads").permitAll()

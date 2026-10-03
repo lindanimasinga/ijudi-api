@@ -3,6 +3,7 @@ package io.curiousoft.izinga.ordermanagement.subscription;
 import io.curiousoft.izinga.commons.model.SubscriptionTier;
 import io.curiousoft.izinga.payfast.service.PayFastCheckoutService;
 import io.curiousoft.izinga.payfast.service.PayFastItnHandler;
+import io.curiousoft.izinga.payfast.service.PayFastValidateTransientException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,18 +80,29 @@ public class MerchantSubscriptionController {
      * POST /merchant/subscription/itn
      *
      * REQ-04: PUBLIC endpoint — called by PayFast's servers, not by an authenticated user.
-     * Security is enforced entirely by PayFast signature validation inside [PayFastItnHandler].
-     * Always returns HTTP 200 to prevent PayFast retries on permanent errors.
+     * Security is enforced by PayFast MD5 signature validation AND server-to-server validate
+     * inside [PayFastItnHandler]. See SEC-TB01-01-C/D.
      *
-     * NOTE: This endpoint is explicitly listed as permitAll in SecurityConfig.
+     * HTTP response contract (SEC-TB01-01-C):
+     * - [PayFastValidateTransientException] → HTTP 500 (transient validate failure — PayFast retries).
+     * - All other exceptions / false returns    → HTTP 200 (permanent rejection — no retry needed).
+     * - Successful processing                   → HTTP 200.
+     *
+     * NOTE: This endpoint is explicitly listed as permitAll in SecurityConfig (SEC-TB01-01-E).
      */
     @PostMapping("/itn")
     public ResponseEntity<Void> handleItn(HttpServletRequest request) {
         Map<String, String> params = parseItnParams(request);
         try {
             itnHandler.handleItn(params);
+        } catch (PayFastValidateTransientException e) {
+            // SEC-TB01-01-C: transient validate failure → HTTP 500 so PayFast retries delivery.
+            // Do NOT return 200 here — that would silently drop a payment that may succeed on retry.
+            log.error("PAYFAST_VALIDATE_CALL_FAILED for mPaymentId={} — returning 500 for PayFast retry: {}",
+                    params.get("m_payment_id"), e.getMessage());
+            return ResponseEntity.status(500).build();
         } catch (Exception e) {
-            // Always return 200 to PayFast — log the error but do not propagate.
+            // All other unexpected errors: return 200 to prevent PayFast retrying a permanent failure.
             log.error("Unexpected error in ITN handler for mPaymentId={}: {}",
                     params.get("m_payment_id"), e.getMessage(), e);
         }

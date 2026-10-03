@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.payfast.model
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import io.curiousoft.izinga.commons.model.SubscriptionTier
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.Indexed
@@ -55,8 +56,12 @@ data class MerchantSubscription(
 
     /**
      * PayFast subscription token — enables future recurring charges.
-     * SEC-TB01-03 / RISK-06: MUST NOT appear in logs. Null until ACTIVE.
+     * SEC-TB01-03-B / RISK-06: MUST NOT appear in logs or API responses.
+     * SEC-TB01-03-C: @JsonIgnore prevents serialization in any future GET endpoint response.
+     *   Jackson annotations do not affect MongoDB persistence — the field is still
+     *   stored and retrieved from the database for internal billing use.
      */
+    @JsonIgnore
     var payFastToken: String? = null,
 
     /** PayFast pf_payment_id from ITN. Indexed for replay-prevention lookups. */

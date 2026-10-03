@@ -55,5 +55,24 @@ data class PayFastProperties(
      * ITN webhook URL (iZinga's own endpoint that PayFast posts to).
      * e.g. https://api.izinga.co.za/merchant/subscription/itn
      */
-    val notifyUrl: String
+    val notifyUrl: String,
+
+    /**
+     * PayFast server-to-server ITN validate endpoint.
+     * Sandbox:    https://sandbox.payfast.co.za/eng/query/validate
+     * Production: https://www.payfast.co.za/eng/query/validate
+     *
+     * SEC-TB01-01-C/D: This property must be set in all profiles. The production implementation
+     * has no bypass path — [PayFastValidateClientImpl] always calls this URL.
+     */
+    val validateUrl: String,
+
+    /**
+     * HTTP connect+read timeout (seconds) for the PayFast server-to-server validate call.
+     * SEC-TB01-01-C: On timeout, [PayFastValidateTransientException] is thrown → HTTP 500
+     * is returned → PayFast retries the ITN.
+     *
+     * Tunable without a code change. Default: 5 seconds.
+     */
+    val validateTimeoutSeconds: Int = 5
 )
