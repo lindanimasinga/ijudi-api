@@ -60,10 +60,18 @@ ukheshe:
         account: 2885091160
     password: 111111
     username: 812815707
+promocodes:
+    verifier:
+        url: http://localhost/
+
 yoco:
     api:
         key: sk_test_b03f2c6bMP0k5GY10ad45ddbb5dc
         url: https://online.yoco.com/v1/
+    dashboard-api:
+        url: https://portal.yoco.co.za/api/client/v2/
+        user: test-user
+        token: test-token
 zoomconnectsms:
     api:
         email: lindanimasinga@gmail.com
