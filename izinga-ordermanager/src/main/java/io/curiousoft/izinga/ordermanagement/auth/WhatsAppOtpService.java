@@ -327,7 +327,11 @@ public class WhatsAppOtpService {
     /**
      * Finds or creates the Firebase Auth user record for the given normalized phone number.
      * If a matching UserProfile exists, reuses the stored Firebase UID.
-     * If not, creates a new Firebase user and a new UserProfile.
+     * If no UserProfile exists, checks Firebase Auth FIRST before minting a new identity —
+     * this is the critical invariant: a UserProfile can be deleted independently (support
+     * cleanup, QA reset, data migration) while the person's real verified Firebase phone
+     * account persists untouched. Keying only on Mongo would permanently split the person
+     * across two Firebase identities on the next login.
      *
      * The normalized mobile number is stored byte-identically in:
      * - UserProfile.mobileNumber
@@ -335,7 +339,7 @@ public class WhatsAppOtpService {
      * - findUserByPhone() lookups (which try 0|+27|27 + last9 — all resolve to +27XXXXXXXXX)
      */
     private String resolveOrCreateFirebaseUser(String normalized) throws FirebaseAuthException {
-        // Check for existing profile
+        // Check for existing Mongo profile
         UserProfile existingProfile = userProfileService.findUserByPhone(normalized);
         if (existingProfile != null) {
             // Try to find Firebase user by phone
@@ -343,8 +347,7 @@ public class WhatsAppOtpService {
                 UserRecord firebaseUser = firebaseAuth.getUserByPhoneNumber(normalized);
                 return firebaseUser.getUid();
             } catch (FirebaseAuthException e) {
-                if ("USER_NOT_FOUND".equals(e.getErrorCode().name()) ||
-                        e.getMessage() != null && e.getMessage().contains("USER_NOT_FOUND")) {
+                if (isUserNotFound(e)) {
                     // Firebase user doesn't exist — create one with matching UID
                     return createFirebaseUser(normalized, existingProfile.getId());
                 }
@@ -352,13 +355,46 @@ public class WhatsAppOtpService {
             }
         }
 
-        // No existing profile — create Firebase user and UserProfile
-        String uid = UUID.randomUUID().toString();
-        createFirebaseUser(normalized, uid);
-        createUserProfile(normalized, uid);
-        return uid;
+        // No Mongo profile exists — but a Firebase Auth account may still exist for this phone
+        // (e.g. the UserProfile was deleted independently during support cleanup or QA reset).
+        // Firebase Auth is the source of truth for phone identity, not Mongo.
+        // Check before minting a new identity, or every profile-only cleanup permanently
+        // orphans the real account and splits the person across two Firebase identities.
+        try {
+            UserRecord firebaseUser = firebaseAuth.getUserByPhoneNumber(normalized);
+            // Firebase account exists; re-link by creating the missing UserProfile against it.
+            createUserProfile(normalized, firebaseUser.getUid());
+            LOG.info("Re-linked existing Firebase uid={} after missing UserProfile for normalized={}",
+                    firebaseUser.getUid(), normalized);
+            return firebaseUser.getUid();
+        } catch (FirebaseAuthException e) {
+            if (!isUserNotFound(e)) {
+                throw e;
+            }
+            // Truly no Firebase account either — mint a fresh identity.
+            String uid = UUID.randomUUID().toString();
+            createFirebaseUser(normalized, uid);
+            createUserProfile(normalized, uid);
+            return uid;
+        }
     }
 
+    /**
+     * Returns true if the FirebaseAuthException indicates the user record was not found.
+     * Null-safe: handles getErrorCode() returning null (e.g. in Mockito test stubs).
+     */
+    private boolean isUserNotFound(FirebaseAuthException e) {
+        return (e.getErrorCode() != null && "USER_NOT_FOUND".equals(e.getErrorCode().name()))
+                || (e.getMessage() != null && e.getMessage().contains("USER_NOT_FOUND"));
+    }
+
+    /**
+     * Creates a Firebase Auth user with the given preferred UID.
+     * If a user already exists for {@code normalized} (detected by getUserByPhoneNumber),
+     * the EXISTING uid is returned and {@code preferredUid} is ignored — this is intentional:
+     * Firebase Auth is the source of truth for phone identity and we never override an existing
+     * account. The caller should always prefer the uid returned here over its own preferredUid.
+     */
     private String createFirebaseUser(String normalized, String preferredUid) throws FirebaseAuthException {
         try {
             // Try to find first; create only if absent

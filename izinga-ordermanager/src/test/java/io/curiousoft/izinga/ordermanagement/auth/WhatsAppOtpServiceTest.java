@@ -340,6 +340,43 @@ public class WhatsAppOtpServiceTest {
         verify(userProfileRepo).save(any(UserProfile.class));
     }
 
+    @Test
+    public void verifyOtp_noMongoProfileButFirebaseExists_reusesExistingFirebaseUid() throws Exception {
+        // Regression for identity-split bug: when a UserProfile was deleted (e.g. support/QA reset)
+        // but the Firebase Auth account still exists for the same phone, the SAME Firebase uid
+        // MUST be reused — not a new random one. Minting a new uid would permanently split the
+        // person across two Firebase identities, causing every subsequent auth token check to
+        // operate against the wrong identity (the real signed-in client carries the original uid).
+        String normalized = "+27812815707";
+        String code = "345678";
+        String hash = service.hashCode(normalized, code);
+
+        var doc = makeDoc("docReg1", normalized, hash, 0, false);
+        when(otpRepository.findTopByMobileNumberAndUsedFalseOrderByCreatedAtDesc(normalized))
+                .thenReturn(Optional.of(doc));
+        when(otpRepository.atomicMarkUsed("docReg1")).thenReturn(doc);
+
+        // No Mongo UserProfile exists (was deleted independently)
+        when(userProfileService.findUserByPhone(normalized)).thenReturn(null);
+        // Firebase Auth DOES have a verified user for this phone number
+        UserRecord existingFirebaseUser = mock(UserRecord.class);
+        when(existingFirebaseUser.getUid()).thenReturn("5jIWdGqg5IZ3wAyTtFNDPnRqLrn1");
+        when(firebaseAuth.getUserByPhoneNumber(normalized)).thenReturn(existingFirebaseUser);
+        when(firebaseAuth.createCustomToken(eq("5jIWdGqg5IZ3wAyTtFNDPnRqLrn1"), anyMap()))
+                .thenReturn("token-for-existing-user");
+
+        String token = service.verifyOtp("0812815707", code);
+
+        // Token must be minted for the EXISTING Firebase uid, not a new random one
+        assertEquals("token-for-existing-user", token);
+        // The missing UserProfile must be re-created against the EXISTING uid
+        verify(userProfileRepo).save(argThat(profile ->
+                "5jIWdGqg5IZ3wAyTtFNDPnRqLrn1".equals(profile.getId())
+                        && normalized.equals(profile.getMobileNumber())));
+        // A brand-new Firebase user must NOT be created
+        verify(firebaseAuth, never()).createUser(any(UserRecord.CreateRequest.class));
+    }
+
     // ===================== helpers =====================
 
     private WhatsAppOtpDocument makeDoc(String id, String mobile, String hash, int attempts, boolean used) {
