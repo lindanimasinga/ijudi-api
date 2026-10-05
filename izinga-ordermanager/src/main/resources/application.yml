@@ -52,6 +52,7 @@ payfast:
         merchant-key: ${PAYFAST_SUBSCRIPTION_MERCHANT_KEY:REPLACE_WITH_SECRET_BEFORE_LAUNCH}
         passphrase: ${PAYFAST_SUBSCRIPTION_PASSPHRASE:REPLACE_WITH_SECRET_BEFORE_LAUNCH}
         base-url: https://www.payfast.co.za/eng/process
+        validate-url: https://www.payfast.co.za/eng/query/validate
         return-url: https://biz.izinga.co.za/business/subscription-success
         cancel-url: https://biz.izinga.co.za/business/subscription-cancel
         notify-url: https://api.izinga.co.za/merchant/subscription/itn
