@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.ordermanagement.service;
 
+import com.google.firebase.auth.FirebaseAuth;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
@@ -55,13 +56,15 @@ class StoreServiceSecurityTest {
     private StoreAgreementAuditRepository storeAgreementAuditRepository;
     @Mock
     private StoreTierChangeAuditRepository storeTierChangeAuditRepository;
+    @Mock
+    private FirebaseAuth firebaseAuth;
 
     @BeforeEach
     void setUp() {
         storeService = new StoreService(
                 storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, 0.0,
                 applicationEventPublisher, referralCodeService,
-                storeAgreementAuditRepository, storeTierChangeAuditRepository);
+                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth);
     }
 
     // ──────────────────────────────────────────────────────────────────────────

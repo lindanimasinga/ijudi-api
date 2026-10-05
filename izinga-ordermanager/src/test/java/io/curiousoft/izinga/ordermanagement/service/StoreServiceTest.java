@@ -1,5 +1,7 @@
 package io.curiousoft.izinga.ordermanagement.service;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
@@ -42,12 +44,14 @@ public class StoreServiceTest {
     private StoreAgreementAuditRepository storeAgreementAuditRepository;
     @Mock
     private StoreTierChangeAuditRepository storeTierChangeAuditRepository;
+    @Mock
+    private FirebaseAuth firebaseAuth;
 
     @Before
     public void setUp() {
         storeService = new StoreService(storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, 0.1,
                 applicationEventPublisher, referralCodeService,
-                storeAgreementAuditRepository, storeTierChangeAuditRepository);
+                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth);
     }
 
     @Test
@@ -97,6 +101,8 @@ public class StoreServiceTest {
         verify(userProfileRepo).findById(initialProfile.getOwnerId());
         verify(storeRepository).save(initialProfile);
         verify(userProfileRepo).save(user);
+        // TIER-BILLING-01: Firebase storeId claim must be set with the owner's uid and the new store's id
+        verify(firebaseAuth).setCustomUserClaims(eq(user.getId()), eq(Map.of("storeId", profile.getId())));
 
         Assert.assertNotNull(profile.getId());
         Assert.assertNotNull(profile.getOwnerId());
@@ -104,6 +110,79 @@ public class StoreServiceTest {
         Assert.assertEquals(user.getBank().getAccountId(), profile.getBank().getAccountId());
         Assert.assertEquals(user.getBank().getPhone(), profile.getBank().getPhone());
         Assert.assertEquals(ProfileRoles.STORE_ADMIN, user.getRole());
+    }
+
+    /**
+     * TIER-BILLING-01: Firebase claim setting — happy path.
+     * Verifies setCustomUserClaims is called with the correct uid and storeId.
+     */
+    @Test
+    public void create_setsFirebaseStoreIdClaim_onSuccess() throws Exception {
+        UserProfile user = new UserProfile("claim-user", UserProfile.SignUpReason.BUY,
+                "address", "https://img.url", "081000001", ProfileRoles.CUSTOMER);
+        Bank bank = new Bank();
+        bank.setAccountId("acc-1");
+        bank.setName("FNB");
+        bank.setPhone("081000001");
+        bank.setType(BankAccType.CHEQUE);
+        bank.setBranchCode("250655");
+        user.setBank(bank);
+        user.setId("firebase-uid-001");
+
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        businessHours.add(new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date()));
+        StoreProfile store = new StoreProfile(StoreType.FOOD, "Claim Store", "claim-store",
+                "1 Test St", "https://img.url", "081000001",
+                Collections.singletonList("food"), businessHours, "firebase-uid-001", new Bank());
+        store.setIcaAccepted(true);
+
+        when(userProfileRepo.findById("firebase-uid-001")).thenReturn(Optional.of(user));
+        when(storeRepository.findOneByIdOrShortName(store.getId(), store.getShortName())).thenReturn(Optional.empty());
+        when(storeRepository.save(store)).thenReturn(store);
+
+        StoreProfile result = storeService.create(store);
+
+        verify(firebaseAuth).setCustomUserClaims(eq("firebase-uid-001"), eq(Map.of("storeId", result.getId())));
+    }
+
+    /**
+     * TIER-BILLING-01: Firebase claim setting — error path.
+     * When setCustomUserClaims throws FirebaseAuthException, the store creation must still succeed
+     * (log-and-continue pattern — the store is the source of truth).
+     */
+    @Test
+    public void create_logsAndContinues_whenFirebaseClaimSetFails() throws Exception {
+        UserProfile user = new UserProfile("fb-fail-user", UserProfile.SignUpReason.BUY,
+                "address", "https://img.url", "081000002", ProfileRoles.CUSTOMER);
+        Bank bank = new Bank();
+        bank.setAccountId("acc-2");
+        bank.setName("Capitec");
+        bank.setPhone("081000002");
+        bank.setType(BankAccType.CHEQUE);
+        bank.setBranchCode("470010");
+        user.setBank(bank);
+        user.setId("firebase-uid-002");
+
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        businessHours.add(new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date()));
+        StoreProfile store = new StoreProfile(StoreType.FOOD, "Fail Claim Store", "fail-claim-store",
+                "2 Test St", "https://img.url", "081000002",
+                Collections.singletonList("food"), businessHours, "firebase-uid-002", new Bank());
+        store.setIcaAccepted(true);
+
+        when(userProfileRepo.findById("firebase-uid-002")).thenReturn(Optional.of(user));
+        when(storeRepository.findOneByIdOrShortName(store.getId(), store.getShortName())).thenReturn(Optional.empty());
+        when(storeRepository.save(store)).thenReturn(store);
+        doThrow(mock(FirebaseAuthException.class))
+                .when(firebaseAuth).setCustomUserClaims(anyString(), anyMap());
+
+        // Must not throw — log-and-continue
+        StoreProfile result = storeService.create(store);
+
+        Assert.assertNotNull(result);
+        Assert.assertEquals(ProfileRoles.STORE_ADMIN, user.getRole());
+        verify(storeRepository).save(store);
+        verify(userProfileRepo).save(user);
     }
 
     @Test

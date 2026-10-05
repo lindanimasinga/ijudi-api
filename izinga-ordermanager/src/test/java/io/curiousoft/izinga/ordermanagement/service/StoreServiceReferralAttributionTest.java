@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.ordermanagement.service;
 
+import com.google.firebase.auth.FirebaseAuth;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
@@ -35,6 +36,7 @@ public class StoreServiceReferralAttributionTest {
     @Mock ReferralCodeService referralCodeService;
     @Mock StoreAgreementAuditRepository storeAgreementAuditRepository;
     @Mock StoreTierChangeAuditRepository storeTierChangeAuditRepository;
+    @Mock FirebaseAuth firebaseAuth;
 
     private StoreService storeService;
 
@@ -42,7 +44,7 @@ public class StoreServiceReferralAttributionTest {
     public void setUp() {
         storeService = new StoreService(storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, MARKUP,
                 eventPublisher, referralCodeService,
-                storeAgreementAuditRepository, storeTierChangeAuditRepository);
+                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth);
     }
 
     @Test

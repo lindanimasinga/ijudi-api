@@ -1,5 +1,7 @@
 package io.curiousoft.izinga.ordermanagement.stores;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
@@ -37,6 +39,7 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
     private final ReferralCodeService referralCodeService;
     private final StoreAgreementAuditRepository storeAgreementAuditRepository;
     private final StoreTierChangeAuditRepository storeTierChangeAuditRepository;
+    private final FirebaseAuth firebaseAuth;
 
     public StoreService(StoreRepository storeRepository,
                         UserProfileRepo userProfileRepo,
@@ -45,7 +48,8 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
                         ApplicationEventPublisher applicationEventPublisher,
                         ReferralCodeService referralCodeService,
                         StoreAgreementAuditRepository storeAgreementAuditRepository,
-                        StoreTierChangeAuditRepository storeTierChangeAuditRepository) {
+                        StoreTierChangeAuditRepository storeTierChangeAuditRepository,
+                        FirebaseAuth firebaseAuth) {
         super(storeRepository, applicationEventPublisher);
         this.userProfileRepo = userProfileRepo;
         this.mainPayAccount = mainPayAccount;
@@ -53,6 +57,7 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         this.referralCodeService = referralCodeService;
         this.storeAgreementAuditRepository = storeAgreementAuditRepository;
         this.storeTierChangeAuditRepository = storeTierChangeAuditRepository;
+        this.firebaseAuth = firebaseAuth;
     }
 
     /**
@@ -105,6 +110,33 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         user.setRole(ProfileRoles.STORE_ADMIN);
         newStore.setMarkUp(markupPercentage);
         userProfileRepo.save(user);
+
+        // TIER-BILLING-01: Set the storeId Firebase custom claim so that
+        // MerchantSubscriptionController.initiateSubscription() can read it from the JWT (IDOR-safe).
+        // user.getId() is the Firebase UID — WhatsAppOtpService.createUserProfile() sets profile.id = uid
+        // at account creation, so the Mongo document id and Firebase UID are always identical.
+        //
+        // Error handling: log and continue if Firebase rejects the claim write. The store record is
+        // the source of truth; the JWT claim is a secondary auth decoration that can be healed
+        // separately (e.g. via a future admin "sync-claims" endpoint). Throwing here would mean the
+        // merchant sees a failed store-creation response while the store was actually persisted —
+        // worse UX than a successful creation with a deferred claim-sync.
+        //
+        // Multi-store note: the Firebase JWT holds a single storeId string. If a merchant creates
+        // a second store this claim is overwritten to the newest store, which means only the latest
+        // store can reach the subscription checkout via JWT. This matches the single-store assumption
+        // baked into MerchantSubscriptionController's IDOR design (TIER-BILLING-01).
+        // TODO: TIER-BILLING-02 — multi-store support will require a different JWT claim shape
+        //  (e.g. storeIds array or a dedicated subscription-initiate token).
+        try {
+            firebaseAuth.setCustomUserClaims(user.getId(), Map.of("storeId", newStore.getId()));
+            LOG.info("Firebase storeId claim set for uid={} storeId={}", user.getId(), newStore.getId());
+        } catch (FirebaseAuthException e) {
+            LOG.error("Failed to set storeId Firebase custom claim for uid={} storeId={}: {} " +
+                    "— store created successfully; claim must be healed via support before subscription checkout can proceed",
+                    user.getId(), newStore.getId(), e.getMessage(), e);
+        }
+
         return newStore;
     }
 

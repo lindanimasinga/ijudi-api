@@ -1,5 +1,7 @@
 package io.curiousoft.izinga.ordermanagement.stores;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
@@ -18,7 +20,7 @@ import java.time.DayOfWeek;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
@@ -41,13 +43,14 @@ public class StoreOnboardingServiceTest {
     @Mock private ReferralCodeService referralCodeService;
     @Mock private StoreAgreementAuditRepository storeAgreementAuditRepository;
     @Mock private StoreTierChangeAuditRepository storeTierChangeAuditRepository;
+    @Mock private FirebaseAuth firebaseAuth;
 
     @BeforeEach
     public void setUp() {
         storeService = new StoreService(
                 storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, 0.1,
                 eventPublisher, referralCodeService,
-                storeAgreementAuditRepository, storeTierChangeAuditRepository);
+                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth);
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -526,5 +529,63 @@ public class StoreOnboardingServiceTest {
                 "owner-001", validBank());
         store.setId(STORE_ID);
         return store;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+    // TIER-BILLING-01: setCustomUserClaims — Firebase storeId claim at store creation
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * TIER-BILLING-01 AC: On successful store creation, setCustomUserClaims must be called
+     * with the owner's Firebase UID (= user.getId()) and storeId claim set to the new store's id.
+     */
+    @Test
+    public void create_setsFirebaseStoreIdClaim_onSuccess() throws Exception {
+        UserProfile user = userWithRole(ProfileRoles.CUSTOMER);
+        user.setId("firebase-uid-claim-test");
+        user.setBank(validBank());
+
+        StoreProfile profile = storeProfile("firebase-uid-claim-test");
+        profile.setIcaAccepted(true);
+
+        when(userProfileRepo.findById("firebase-uid-claim-test")).thenReturn(Optional.of(user));
+        when(storeRepository.findOneByIdOrShortName(any(), any())).thenReturn(Optional.empty());
+        when(storeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        StoreProfile result = storeService.create(profile);
+
+        // Firebase claim must be set with the exact uid and storeId
+        verify(firebaseAuth).setCustomUserClaims(
+                eq("firebase-uid-claim-test"),
+                eq(Map.of("storeId", result.getId())));
+    }
+
+    /**
+     * TIER-BILLING-01 AC: If setCustomUserClaims throws FirebaseAuthException, the store creation
+     * must still complete successfully (log-and-continue pattern).
+     * The store record is the source of truth; the JWT claim is a secondary auth decoration.
+     */
+    @Test
+    public void create_logsAndContinues_whenFirebaseClaimSetFails() throws Exception {
+        UserProfile user = userWithRole(ProfileRoles.CUSTOMER);
+        user.setId("firebase-uid-fail-test");
+        user.setBank(validBank());
+
+        StoreProfile profile = storeProfile("firebase-uid-fail-test");
+        profile.setIcaAccepted(true);
+
+        when(userProfileRepo.findById("firebase-uid-fail-test")).thenReturn(Optional.of(user));
+        when(storeRepository.findOneByIdOrShortName(any(), any())).thenReturn(Optional.empty());
+        when(storeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        doThrow(mock(FirebaseAuthException.class))
+                .when(firebaseAuth).setCustomUserClaims(anyString(), anyMap());
+
+        // Must not throw — store creation must succeed even if claim-setting fails
+        StoreProfile result = storeService.create(profile);
+
+        assertNotNull(result);
+        assertEquals(ProfileRoles.STORE_ADMIN, user.getRole());
+        verify(storeRepository).save(any());
+        verify(userProfileRepo).save(user);
     }
 }

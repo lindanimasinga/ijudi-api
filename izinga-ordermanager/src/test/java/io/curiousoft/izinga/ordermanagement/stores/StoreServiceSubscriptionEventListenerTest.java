@@ -1,10 +1,13 @@
 package io.curiousoft.izinga.ordermanagement.stores;
 
+import com.google.firebase.auth.FirebaseAuth;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.payfast.model.MerchantSubscriptionActivatedEvent;
 import java.time.DayOfWeek;
+import io.curiousoft.izinga.ordermanagement.stores.StoreAgreementAuditRepository;
+import io.curiousoft.izinga.ordermanagement.stores.StoreTierChangeAuditRepository;
 import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,13 +46,14 @@ public class StoreServiceSubscriptionEventListenerTest {
     @Mock private ReferralCodeService referralCodeService;
     @Mock private StoreAgreementAuditRepository storeAgreementAuditRepository;
     @Mock private StoreTierChangeAuditRepository storeTierChangeAuditRepository;
+    @Mock private FirebaseAuth firebaseAuth;
 
     @BeforeEach
     public void setUp() {
         storeService = new StoreService(
                 storeRepository, userProfileRepo, "main-pay", 0.1,
                 eventPublisher, referralCodeService,
-                storeAgreementAuditRepository, storeTierChangeAuditRepository);
+                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth);
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────
