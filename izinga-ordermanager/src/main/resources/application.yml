@@ -79,8 +79,6 @@ service:
 feign:
     okhttp:
         enabled: true
-    jackson:
-        date-format: yyyy-MM-dd HH:mm:ss
     ai:
         mcp:
             server:
@@ -169,6 +167,8 @@ store:
 #   - aws-secretsmanager:izinga-prod (prod profile, via spring.config.import in application-prod.yml)
 # Default is intentionally invalid to fail loudly rather than silently connecting to production.
 spring:
+    jackson:
+        date-format: yyyy-MM-dd HH:mm:ss
     security:
         oauth2:
             resourceserver:
