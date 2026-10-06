@@ -1,5 +1,7 @@
 package io.curiousoft.izinga.usermanagement.users
 
+import io.curiousoft.izinga.commons.model.Bank
+import io.curiousoft.izinga.commons.model.BankAccType
 import io.curiousoft.izinga.commons.model.IcaAcceptanceLog
 import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.StoreType
@@ -15,7 +17,9 @@ import org.slf4j.LoggerFactory
 import org.springframework.ai.tool.annotation.Tool
 import org.springframework.ai.tool.annotation.ToolParam
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.web.server.ResponseStatusException
 import java.util.Date
 import java.util.stream.Collectors
 import java.util.stream.Stream
@@ -87,6 +91,7 @@ class UserProfileService(
     @Tool(name = "create_user", description = "Creates a new user profile. It can be a normal customer or a driver or a store owner depending on the role specified in the profile object.")
     @Throws(Exception::class)
     override fun create(profile: UserProfile): UserProfile {
+        validateUserProfileForCreate(profile)
         //remove empty spaces and dashes from the mobile number
         profile.mobileNumber = fomatMobileNumber(profile.mobileNumber!!)
         if (profileRepo.existsByMobileNumber(profile.mobileNumber!!)) throw Exception("User with phone number " + profile.mobileNumber + " already exist.")
@@ -109,6 +114,7 @@ class UserProfileService(
 
     @Throws(Exception::class)
     override fun update(profileId: String, profile: UserProfile): UserProfile {
+        validateUserProfileForUpdate(profile)
         val persisted = userProfileRepo.findById(profileId).orElse(null)
         val wasIcaAccepted = persisted?.icaAccepted == true
 
@@ -167,6 +173,91 @@ class UserProfileService(
         return profileRepo.findByRoleAndLatitudeBetweenAndLongitudeBetween(
             ProfileRoles.MESSENGER, minLat, maxLat, minLng, maxLng
         )
+    }
+
+    /**
+     * Validates required fields for a new UserProfile submitted via POST /user.
+     *
+     * Root cause context: Profile.kt declares @NotBlank on constructor parameters without an
+     * explicit @field: use-site target. Kotlin routes bare constructor-parameter annotations to
+     * the @param: target, which Hibernate Validator ignores — it only inspects @field:-targeted
+     * annotations. This makes all @NotBlank/@NotNull constraints on Profile/UserProfile constructor
+     * parameters inert when @Valid is processed by either Spring MVC or the programmatic validator
+     * in ProfileServiceImpl.validate(). Manual explicit checks here are the proven-safe pattern,
+     * mirroring StoreService.validateBankForCreate().
+     *
+     * @throws ResponseStatusException HTTP 400 if any required field is missing or blank.
+     */
+    private fun validateUserProfileForCreate(profile: UserProfile) {
+        if (profile.name.isNullOrBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "name is required")
+        }
+        if (profile.mobileNumber.isNullOrBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "mobileNumber is required")
+        }
+        if (profile.role == null) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "role is required")
+        }
+        if (profile.signUpReason == null) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "signUpReason is required")
+        }
+        profile.bank?.let { validateBankForProfile(it) }
+    }
+
+    /**
+     * Validates a UserProfile update request submitted via PATCH /user/{id}.
+     *
+     * Rejects any field that is explicitly sent as a non-null blank string — e.g. name: "" — which
+     * the broken constructor-parameter @NotBlank annotations would silently allow through.
+     * Null values are permitted: they indicate "field not being changed in this request" semantics.
+     *
+     * @throws ResponseStatusException HTTP 400 if any explicitly-provided field is blank.
+     */
+    private fun validateUserProfileForUpdate(profile: UserProfile) {
+        if (profile.name != null && profile.name!!.isBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "name is required")
+        }
+        if (profile.surname != null && profile.surname!!.isBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "surname is required")
+        }
+        if (profile.emailAddress != null && profile.emailAddress!!.isBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "emailAddress is required")
+        }
+        if (profile.address != null && profile.address!!.isBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "address is required")
+        }
+        if (profile.mobileNumber != null && profile.mobileNumber!!.isBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "mobileNumber is required")
+        }
+        profile.bank?.let { validateBankForProfile(it) }
+    }
+
+    /**
+     * Validates bank details provided on a UserProfile, mirroring the logic in
+     * StoreService.validateBankForCreate(). Legacy BankAccType values wallet and string
+     * are rejected as they are not valid for real bank account registrations.
+     *
+     * @throws ResponseStatusException HTTP 400 if any required bank field is missing or invalid.
+     */
+    private fun validateBankForProfile(bank: Bank) {
+        if (bank.accountId.isNullOrBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank account ID is required")
+        }
+        if (bank.name.isNullOrBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank name is required")
+        }
+        if (bank.branchCode.isNullOrBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank branch code is required")
+        }
+        if (bank.phone.isNullOrBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank phone is required")
+        }
+        if (bank.type == null) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank account type is required")
+        }
+        if (bank.type == BankAccType.wallet || bank.type == BankAccType.string) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank account type '${bank.type!!.name}' is not valid")
+        }
     }
 
     private fun fomatMobileNumber(mobileNumber: String): String {
