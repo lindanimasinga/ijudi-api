@@ -10,7 +10,13 @@ import java.security.MessageDigest
  * Algorithm (PayFast spec):
  * 1. Collect all parameters except "signature".
  * 2. Sort alphabetically by key.
- * 3. URL-encode each value with UTF-8, then join as key=value pairs with "&".
+ * 3. URL-encode each value with UTF-8 using [urlEncode] — spaces MUST encode as '+' (matching
+ *    PHP's urlencode() behaviour, which is what PayFast's reference implementation produces and
+ *    what the PayFast server uses when computing its own signature for comparison). Do NOT replace
+ *    '+' with '%20' — that diverges from PayFast's algorithm and causes signature mismatches.
+ *    java.net.URLEncoder.encode() already produces '+' for spaces by default, and uppercase hex
+ *    for all other percent-encoded bytes (e.g. '%3A', not '%3a'), which matches PayFast's expected
+ *    encoding exactly. No post-processing of the encoder output is needed or correct.
  * 4. Append "&passphrase=<url-encoded-passphrase>" if passphrase is non-blank.
  * 5. Compute MD5 of the resulting string, return lowercase hex.
  *
@@ -63,7 +69,7 @@ class PayFastSignatureUtil(private val passphrase: String) {
     }
 
     private fun urlEncode(value: String): String =
-        URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20")
+        URLEncoder.encode(value, StandardCharsets.UTF_8)
 
     private fun md5(input: String): String {
         val digest = MessageDigest.getInstance("MD5")

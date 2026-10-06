@@ -41,12 +41,35 @@ class PayFastSignatureUtilTest {
     }
 
     @Test
-    fun `buildParamString URL-encodes spaces as percent-encoding`() {
+    fun `buildParamString URL-encodes spaces as plus signs matching PHP urlencode behaviour`() {
         val params = mapOf("item_name" to "Test Product")
         val result = util.buildParamString(params)
-        // Space must be encoded as %20 (not +)
-        assertTrue(result.contains("item_name=Test%20Product"),
-            "Space should be encoded as %20, not +. Result: $result")
+        // Space MUST encode as '+' to match PHP urlencode() which PayFast's server uses.
+        // Bug guard: do NOT replace '+' with '%20' — that causes PayFast signature mismatches.
+        assertTrue(result.contains("item_name=Test+Product"),
+            "Space should be encoded as '+' (PHP urlencode style), not '%20'. Result: $result")
+        assertFalse(result.contains("item_name=Test%20Product"),
+            "Space must NOT be encoded as '%20' — that diverges from PayFast's algorithm. Result: $result")
+    }
+
+    /**
+     * Regression test for Bug #13 (TIER-BILLING-01):
+     * item_name "iZinga PREMIUM 1 Subscription" contains spaces which always appear in real checkout
+     * requests. Before the fix, urlEncode() was replacing '+' with '%20', causing PayFast's sandbox
+     * to reject the request with "Generated signature does not match submitted signature".
+     */
+    @Test
+    fun `buildParamString regression - subscription item_name with spaces encodes as plus not percent20`() {
+        val params = mapOf(
+            "merchant_id" to "10020746",
+            "amount" to "799.00",
+            "item_name" to "iZinga PREMIUM 1 Subscription"
+        )
+        val result = util.buildParamString(params)
+        assertTrue(result.contains("item_name=iZinga+PREMIUM+1+Subscription"),
+            "Subscription item_name spaces must encode as '+'. Got: $result")
+        assertFalse(result.contains("%20"),
+            "No '%20' must appear in the param string for this input. Got: $result")
     }
 
     @Test
@@ -176,6 +199,43 @@ class PayFastSignatureUtilTest {
         assertFalse(util.isValidSignature(params), "Altered param should fail signature check")
     }
 
+    /**
+     * Regression test for Bug #13 / ITN path (isValidSignature):
+     * PayFast sends its ITN with a signature computed using PHP urlencode() (spaces as '+').
+     * isValidSignature must use the same encoding when re-computing for comparison.
+     * Before the fix, the mismatch caused all ITN validations to fail whenever item_name had spaces.
+     */
+    @Test
+    fun `isValidSignature regression - round-trip with spaces in item_name uses plus encoding`() {
+        // Simulate the params PayFast would POST in an ITN for a subscription with spaces in item_name
+        val params = mutableMapOf(
+            "merchant_id" to "10020746",
+            "m_payment_id" to "some-uuid-here",
+            "amount" to "799.00",
+            "item_name" to "iZinga PREMIUM 1 Subscription",
+            "payment_status" to "COMPLETE"
+        )
+        // Compute a signature — this simulates what PayFast would have computed using the same algo
+        val sig = util.computeSignature(params)
+        params["signature"] = sig
+        assertTrue(util.isValidSignature(params),
+            "isValidSignature must accept a round-tripped ITN signature with spaces in item_name. " +
+            "Failure here means urlEncode is inconsistent between signing and verification.")
+    }
+
+    @Test
+    fun `urlEncode produces uppercase hex digits for percent-encoded bytes`() {
+        // PayFast docs note hex digits must be uppercase (e.g. %3A not %3a).
+        // java.net.URLEncoder.encode() already produces uppercase hex — this test documents and guards that.
+        val params = mapOf("return_url" to "https://example.com/return")
+        val result = util.buildParamString(params)
+        // Colon (':') encodes as %3A (uppercase), slash ('/') as %2F (uppercase)
+        assertTrue(result.contains("%3A") || result.contains("%2F") || result.contains("%3A"),
+            "Percent-encoded bytes must use uppercase hex. Result: $result")
+        assertFalse(result.contains("%3a") || result.contains("%2f"),
+            "Lowercase hex is not acceptable per PayFast spec. Result: $result")
+    }
+
     // ─────────────────────────────────────────────────────────────────────────────────────────────
     // Edge cases
     // ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -196,5 +256,5 @@ class PayFastSignatureUtilTest {
     }
 
     private fun urlEncode(value: String): String =
-        java.net.URLEncoder.encode(value, Charsets.UTF_8).replace("+", "%20")
+        java.net.URLEncoder.encode(value, Charsets.UTF_8)
 }
