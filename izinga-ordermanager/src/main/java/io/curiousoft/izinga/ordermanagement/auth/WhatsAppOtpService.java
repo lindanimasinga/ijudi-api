@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.ordermanagement.auth;
 
+import com.google.firebase.auth.AuthErrorCode;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.UserRecord;
@@ -381,11 +382,26 @@ public class WhatsAppOtpService {
 
     /**
      * Returns true if the FirebaseAuthException indicates the user record was not found.
-     * Null-safe: handles getErrorCode() returning null (e.g. in Mockito test stubs).
+     *
+     * Uses {@link FirebaseAuthException#getAuthErrorCode()} as the primary check.
+     * {@code getErrorCode()} is inherited from {@link com.google.firebase.FirebaseException} and
+     * returns the generic {@link com.google.firebase.ErrorCode} enum, which has no USER_NOT_FOUND
+     * constant (only NOT_FOUND) — checking its name against "USER_NOT_FOUND" can never match.
+     * The auth-specific detail lives on {@code getAuthErrorCode()} which returns
+     * {@link AuthErrorCode}, and that enum does have USER_NOT_FOUND.
+     *
+     * The message-contains branch is kept as a defensive fallback only, because the Firebase SDK's
+     * actual exception message is human-readable prose ("No user record found for the provided
+     * phone number: ...") and does not contain the literal substring "USER_NOT_FOUND".
      */
     private boolean isUserNotFound(FirebaseAuthException e) {
-        return (e.getErrorCode() != null && "USER_NOT_FOUND".equals(e.getErrorCode().name()))
-                || (e.getMessage() != null && e.getMessage().contains("USER_NOT_FOUND"));
+        // Primary: compare auth-specific error code directly (enum identity comparison is safe).
+        if (e.getAuthErrorCode() == AuthErrorCode.USER_NOT_FOUND) {
+            return true;
+        }
+        // Defensive fallback: message-contains check in case getAuthErrorCode() is null
+        // (e.g. older SDK call paths or test mocks that do not stub getAuthErrorCode()).
+        return e.getMessage() != null && e.getMessage().contains("USER_NOT_FOUND");
     }
 
     /**
@@ -413,7 +429,7 @@ public class WhatsAppOtpService {
     private void createUserProfile(String normalized, String uid) {
         try {
             var profile = new UserProfile(
-                    "WhatsApp User",
+                    "Customer",
                     UserProfile.SignUpReason.BUY,
                     "",
                     "",
