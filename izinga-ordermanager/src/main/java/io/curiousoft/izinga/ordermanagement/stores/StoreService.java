@@ -101,9 +101,19 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "MERCHANT_ICA_NOT_ACCEPTED");
         }
 
-        profile.setBank(user.getBank());
+        // STORE-BANK-01: Prefer the per-store bank submitted by the frontend (detected by a non-blank
+        // accountId); fall back to the owner's user-level bank only when the store did not provide
+        // a meaningful bank object. An empty or null bank means the merchant didn't fill in the
+        // bank section, so we inherit from their user profile as before.
+        //
+        // No IDOR risk: the controller pins profile.ownerId to authentication.getName() (StoreControler
+        // line 37) before calling this method, so the authenticated user IS the store owner —
+        // trusting their submitted bank details is correct.
+        if (profile.getBank() == null || !StringUtils.hasText(profile.getBank().getAccountId())) {
+            profile.setBank(user.getBank());
+        }
 
-        // T-08: Bank validation — validate the effective bank (user's bank) after overwrite.
+        // T-08: Bank validation — validate the effective bank (store-level if provided, else user-level).
         validateBankForCreate(profile.getBank());
 
         StoreProfile newStore = super.create(profile);

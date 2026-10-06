@@ -185,6 +185,98 @@ public class StoreServiceTest {
         verify(userProfileRepo).save(user);
     }
 
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+    // STORE-BANK-01 — per-store payout bank
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * STORE-BANK-01 happy path: when the frontend submits a bank with a populated accountId
+     * the store is persisted with THAT bank — the owner's user-level bank must NOT overwrite it.
+     */
+    @Test
+    public void create_withPopulatedStoreLevelBank_usesStoreBankIgnoringUserBank() throws Exception {
+        // given — owner's personal profile bank
+        UserProfile user = new UserProfile("owner-bank-01", UserProfile.SignUpReason.BUY,
+                "address", "https://img.url", "081000010", ProfileRoles.CUSTOMER);
+        Bank userBank = new Bank();
+        userBank.setAccountId("USER-ACCOUNT-ID");
+        userBank.setName("FNB");
+        userBank.setPhone("081000010");
+        userBank.setType(BankAccType.CHEQUE);
+        userBank.setBranchCode("250655");
+        user.setBank(userBank);
+        user.setId("owner-bank-01-firebase-uid");
+
+        // given — store-specific bank with a different accountId
+        Bank storeBank = new Bank();
+        storeBank.setAccountId("STORE-ACCOUNT-ID");
+        storeBank.setName("Standard Bank");
+        storeBank.setPhone("081000010");
+        storeBank.setType(BankAccType.CHEQUE);
+        storeBank.setBranchCode("051001");
+
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        businessHours.add(new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date()));
+        StoreProfile store = new StoreProfile(StoreType.FOOD, "Store Bank Test", "store-bank-test",
+                "1 Test St", "https://img.url", "081000010",
+                Collections.singletonList("food"), businessHours, "owner-bank-01", null);
+        store.setBank(storeBank);
+        store.setIcaAccepted(true);
+
+        when(userProfileRepo.findById("owner-bank-01")).thenReturn(Optional.of(user));
+        when(storeRepository.findOneByIdOrShortName(store.getId(), store.getShortName())).thenReturn(Optional.empty());
+        when(storeRepository.save(store)).thenReturn(store);
+
+        // when
+        StoreProfile result = storeService.create(store);
+
+        // then — store's own bank is used, not the user's bank
+        Assert.assertNotNull("bank must not be null after create", result.getBank());
+        Assert.assertEquals("store-level accountId must be used, not user's",
+                "STORE-ACCOUNT-ID", result.getBank().getAccountId());
+        Assert.assertEquals("Standard Bank", result.getBank().getName());
+    }
+
+    /**
+     * STORE-BANK-01 fallback path: when the store has a null bank, the owner's user-level
+     * bank is used as the fallback — existing pre-fix behaviour preserved.
+     */
+    @Test
+    public void create_withNullBank_fallsBackToUserBank() throws Exception {
+        // given — owner's personal profile bank
+        UserProfile user = new UserProfile("owner-bank-02", UserProfile.SignUpReason.BUY,
+                "address", "https://img.url", "081000020", ProfileRoles.CUSTOMER);
+        Bank userBank = new Bank();
+        userBank.setAccountId("USER-FALLBACK-ACCOUNT");
+        userBank.setName("FNB");
+        userBank.setPhone("081000020");
+        userBank.setType(BankAccType.CHEQUE);
+        userBank.setBranchCode("250655");
+        user.setBank(userBank);
+        user.setId("owner-bank-02-firebase-uid");
+
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        businessHours.add(new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date()));
+        // bank explicitly null — merchant did not fill in the bank section
+        StoreProfile store = new StoreProfile(StoreType.FOOD, "Null Bank Store", "null-bank-store",
+                "2 Test St", "https://img.url", "081000020",
+                Collections.singletonList("food"), businessHours, "owner-bank-02", null);
+        store.setBank(null);
+        store.setIcaAccepted(true);
+
+        when(userProfileRepo.findById("owner-bank-02")).thenReturn(Optional.of(user));
+        when(storeRepository.findOneByIdOrShortName(store.getId(), store.getShortName())).thenReturn(Optional.empty());
+        when(storeRepository.save(store)).thenReturn(store);
+
+        // when
+        StoreProfile result = storeService.create(store);
+
+        // then — falls back to user's bank
+        Assert.assertNotNull("bank must not be null after create with fallback", result.getBank());
+        Assert.assertEquals("user-level accountId must be used as fallback",
+                "USER-FALLBACK-ACCOUNT", result.getBank().getAccountId());
+    }
+
     @Test
     public void createStore_with_stock() throws Exception {
 
