@@ -7,27 +7,43 @@ import java.security.MessageDigest
 /**
  * TIER-BILLING-01 / REQ-02, REQ-04: Generates and validates PayFast MD5 signatures.
  *
- * Algorithm (PayFast spec):
- * 1. Collect all parameters except "signature".
- * 2. Sort alphabetically by key.
- * 3. URL-encode each value with UTF-8 using [urlEncode] — spaces MUST encode as '+' (matching
- *    PHP's urlencode() behaviour, which is what PayFast's reference implementation produces and
- *    what the PayFast server uses when computing its own signature for comparison). Do NOT replace
- *    '+' with '%20' — that diverges from PayFast's algorithm and causes signature mismatches.
- *    java.net.URLEncoder.encode() already produces '+' for spaces by default, and uppercase hex
- *    for all other percent-encoded bytes (e.g. '%3A', not '%3a'), which matches PayFast's expected
- *    encoding exactly. No post-processing of the encoder output is needed or correct.
- * 4. Append "&passphrase=<url-encoded-passphrase>" if passphrase is non-blank.
- * 5. Compute MD5 of the resulting string, return lowercase hex.
+ * IMPORTANT — PayFast operates two distinct signature schemes that MUST NOT be mixed:
+ *
+ * Scheme 1 — Custom Payment Integration (hosted-checkout redirect, what PayFastCheckoutService uses):
+ *   Fields are processed in PAYFAST'S DOCUMENTED FIELD ORDER:
+ *     Merchant Details → Buyer Details → Transaction Details → Transaction Options → Recurring Billing
+ *   This is explicitly NOT alphabetical order.
+ *   The caller (PayFastCheckoutService.buildPayFastParams) is responsible for passing a LinkedHashMap
+ *   built in documented order; buildParamString() then preserves that insertion order.
+ *   PayFast's own documentation warns: "Do not use the custom payment signature format when
+ *   implementing the API, and vice versa."
+ *   Used by: buildParamString() / computeSignature()
+ *
+ * Scheme 2 — Instant Transaction Notifications (ITN, inbound PayFast-to-us webhooks):
+ *   PayFast computes the ITN signature by sorting all fields ALPHABETICALLY before hashing.
+ *   When validating an incoming ITN we must recompute using the same alphabetical ordering so our
+ *   hash matches what PayFast sent in the "signature" field.
+ *   This also handles the fact that Java's HttpServletRequest.getParameterMap() does not guarantee
+ *   iteration order, making insertion-order preservation impossible for incoming ITN params.
+ *   Used by: buildParamStringSorted() / computeSignatureSorted() / isValidSignature()
  *
  * SEC-TB01-03: passphrase is injected at construction time and never logged.
  */
 class PayFastSignatureUtil(private val passphrase: String) {
 
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+    // Custom Payment Integration (checkout initiation — Scheme 1)
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+
     /**
-     * Computes the PayFast MD5 signature over [params].
+     * Computes the PayFast MD5 signature over [params] preserving the caller's map iteration order
+     * (insertion order for LinkedHashMap).
      *
-     * @param params all form parameters including "signature" key (it will be excluded automatically).
+     * FOR CHECKOUT INITIATION ONLY. The caller must pass a LinkedHashMap built in PayFast's
+     * documented field order. Do NOT use this method to validate incoming ITN webhooks — use
+     * [isValidSignature] instead.
+     *
+     * @param params all form parameters excluding "signature" (it will be excluded automatically).
      * @return lowercase hex MD5 signature string.
      */
     fun computeSignature(params: Map<String, String>): String {
@@ -36,24 +52,71 @@ class PayFastSignatureUtil(private val passphrase: String) {
     }
 
     /**
-     * Validates whether the [signature] in the incoming map matches a freshly computed signature
-     * over the same map (excluding the "signature" entry itself).
+     * Builds the parameter string for Custom Payment Integration signature computation.
+     *
+     * Preserves the iteration order of [params] (insertion order for LinkedHashMap) — this matches
+     * PayFast's documented field order requirement for hosted-checkout redirect. Excludes the
+     * "signature" key. Appends "&passphrase=<url-encoded-passphrase>" if passphrase is non-blank.
+     *
+     * URL-encoding: spaces encode as '+' (matching PHP urlencode() / java.net.URLEncoder default).
+     * Do NOT replace '+' with '%20' — that diverges from PayFast's algorithm and causes mismatches.
+     */
+    fun buildParamString(params: Map<String, String>): String {
+        val sb = StringBuilder()
+        params.entries
+            .filter { it.key != "signature" }
+            .forEach { (key, value) ->
+                if (sb.isNotEmpty()) sb.append("&")
+                sb.append(key).append("=").append(urlEncode(value))
+            }
+        if (passphrase.isNotBlank()) {
+            sb.append("&passphrase=").append(urlEncode(passphrase))
+        }
+        return sb.toString()
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+    // ITN validation (inbound webhook — Scheme 2)
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Validates whether the "signature" value in [params] matches a freshly computed signature
+     * over the same map (excluding the "signature" entry itself), using ALPHABETICAL key ordering.
+     *
+     * FOR ITN VALIDATION ONLY. PayFast computes ITN signatures by sorting fields alphabetically;
+     * this method replicates that ordering so the two hashes can be compared.
      *
      * @param params full ITN parameter map, including the "signature" field.
      * @return true if the computed signature matches the provided "signature" value.
      */
     fun isValidSignature(params: Map<String, String>): Boolean {
         val provided = params["signature"] ?: return false
-        val computed = computeSignature(params)
+        val computed = computeSignatureSorted(params)
         return computed.equals(provided, ignoreCase = true)
     }
 
     /**
-     * Builds the parameter string used for signature computation:
-     * sorted keys, URL-encoded values, passphrase appended if non-blank.
-     * Excludes the "signature" key.
+     * Computes the PayFast MD5 signature over [params] sorted ALPHABETICALLY by key.
+     *
+     * FOR ITN VALIDATION AND ITN TEST SETUP ONLY. Use this when simulating what PayFast would
+     * compute for an ITN signature (e.g. in test helpers that build signed ITN param maps).
+     * Do NOT use this for checkout initiation — use [computeSignature] instead.
+     *
+     * @param params all form parameters excluding "signature" (it will be excluded automatically).
+     * @return lowercase hex MD5 signature string.
      */
-    fun buildParamString(params: Map<String, String>): String {
+    fun computeSignatureSorted(params: Map<String, String>): String {
+        val paramString = buildParamStringSorted(params)
+        return md5(paramString)
+    }
+
+    /**
+     * Builds the parameter string for ITN signature computation.
+     *
+     * Sorts keys ALPHABETICALLY — matching how PayFast computes its ITN "signature" field.
+     * Excludes the "signature" key. Appends "&passphrase=<url-encoded-passphrase>" if non-blank.
+     */
+    fun buildParamStringSorted(params: Map<String, String>): String {
         val sb = StringBuilder()
         params.entries
             .filter { it.key != "signature" }
@@ -67,6 +130,10 @@ class PayFastSignatureUtil(private val passphrase: String) {
         }
         return sb.toString()
     }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+    // Shared internals
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
 
     private fun urlEncode(value: String): String =
         URLEncoder.encode(value, StandardCharsets.UTF_8)

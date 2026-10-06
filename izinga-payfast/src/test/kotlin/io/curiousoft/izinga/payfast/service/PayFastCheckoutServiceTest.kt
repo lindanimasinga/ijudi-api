@@ -223,8 +223,16 @@ class PayFastCheckoutServiceTest {
 
         assertNotNull(result["signature"], "signature must be present in PayFast params")
         assertEquals(32, result["signature"]!!.length, "signature must be 32-char MD5 hex")
-        // The signature must validate against the returned params using the same passphrase
-        assertTrue(signatureUtil.isValidSignature(result), "signature in result must be valid")
+
+        // Checkout signatures use Scheme 1 (insertion/documented field order, NOT alphabetical).
+        // Do NOT use isValidSignature here — that is Scheme 2 (ITN alphabetical order) and would
+        // fail for checkout params because the map is in documented field order, not alphabetical.
+        // Instead recompute using computeSignature (insertion order) and compare directly.
+        val paramsWithoutSignature = result.filterKeys { it != "signature" }
+        val expectedSig = signatureUtil.computeSignature(paramsWithoutSignature)
+        assertEquals(expectedSig, result["signature"],
+            "Checkout signature must match insertion-order MD5 (Scheme 1). " +
+            "If this fails, buildPayFastParams is not passing a LinkedHashMap in documented order.")
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────

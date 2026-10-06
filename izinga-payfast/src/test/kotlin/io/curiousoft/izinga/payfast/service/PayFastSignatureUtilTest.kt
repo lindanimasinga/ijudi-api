@@ -6,10 +6,19 @@ import org.junit.jupiter.api.Test
 /**
  * TIER-BILLING-01 / T-08: Unit tests for [PayFastSignatureUtil].
  *
- * Test vectors derived from PayFast public documentation and known-good examples:
- * https://developers.payfast.co.za/docs#step_2_signature
+ * PayFast uses TWO distinct signature schemes (see PayFastSignatureUtil KDoc):
  *
- * These tests do NOT require real PayFast sandbox access (Gate (c) not needed here).
+ * - Scheme 1 (Checkout / Custom Payment Integration): insertion/documented field order, NOT alphabetical.
+ *   → buildParamString() / computeSignature()
+ *
+ * - Scheme 2 (ITN validation): alphabetical sort.
+ *   → buildParamStringSorted() / computeSignatureSorted() / isValidSignature()
+ *
+ * Bug #14 regression: removing .sortedBy from buildParamString fixes outbound checkout signing
+ * (PayFast sandbox was rejecting with "signature does not match" because the alphabetical sort
+ * was destroying the insertion order that PayFastCheckoutService carefully constructed).
+ *
+ * Tests do NOT require real PayFast sandbox access.
  */
 class PayFastSignatureUtilTest {
 
@@ -18,12 +27,14 @@ class PayFastSignatureUtilTest {
     private val util = PayFastSignatureUtil(passphrase)
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────
-    // buildParamString
+    // buildParamString — Scheme 1: insertion order, no alphabetical sort
     // ─────────────────────────────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `buildParamString excludes signature key and sorts alphabetically`() {
-        val params = mapOf(
+    fun `buildParamString excludes signature key and preserves insertion order`() {
+        // Params in INSERTION order: merchant_id, merchant_key, amount, item_name
+        // Alphabetical order would be: amount, item_name, merchant_id, merchant_key
+        val params = linkedMapOf(
             "merchant_id" to "10000100",
             "merchant_key" to "46f0cd694581a",
             "amount" to "100.00",
@@ -31,13 +42,55 @@ class PayFastSignatureUtilTest {
             "signature" to "should-be-excluded"
         )
         val result = util.buildParamString(params)
-        // "signature" must not appear; keys must be alphabetically sorted
+
+        // signature must be excluded
         assertFalse(result.contains("signature="), "signature key must be excluded from param string")
+
+        // INSERTION ORDER: merchant_id comes first (not amount, which would be first alphabetically)
         val firstKey = result.substringBefore("=")
-        assertEquals("amount", firstKey, "First key should be 'amount' (alphabetically first)")
-        // passphrase must be appended at the end
+        assertEquals("merchant_id", firstKey,
+            "First key must be 'merchant_id' (insertion order) — NOT 'amount' (alphabetical). " +
+            "Bug #14: buildParamString must NOT sort alphabetically for checkout. Got: $result")
+
+        // passphrase appended at the end
         assertTrue(result.endsWith("&passphrase=${urlEncode(passphrase)}"),
-            "passphrase must be appended at end")
+            "passphrase must be appended at end. Got: $result")
+    }
+
+    /**
+     * Bug #14 regression: buildParamString must NOT sort alphabetically.
+     *
+     * Before this fix, buildParamString had .sortedBy { it.key } which destroyed the insertion
+     * order that PayFastCheckoutService carefully built. PayFast's checkout signature requires
+     * documented field order (insertion), NOT alphabetical. Alphabetical ordering caused
+     * "Generated signature does not match submitted signature" on PayFast sandbox.
+     *
+     * Expected MD5 pre-computed for insertion-order param string:
+     *   merchant_id=10000100&amount=100.00&item_name=iZinga+PREMIUM+1+Subscription&passphrase=jt7NOE43FZPn
+     *   → MD5: 3e25a08d04e00b9a57861453bf013e3f
+     *
+     * Alphabetical-order MD5 (WRONG for checkout) would be:
+     *   amount=100.00&item_name=iZinga+PREMIUM+1+Subscription&merchant_id=10000100&passphrase=jt7NOE43FZPn
+     *   → MD5: ae21f997e6d55dfffb0ce18d6de63aa5
+     */
+    @Test
+    fun `computeSignature preserves insertion order for checkout params - Bug14 regression`() {
+        val params = linkedMapOf(
+            "merchant_id" to "10000100",
+            "amount" to "100.00",
+            "item_name" to "iZinga PREMIUM 1 Subscription"
+        )
+
+        val sig = util.computeSignature(params)
+
+        // Must match insertion-order MD5 (merchant_id first, then amount, then item_name)
+        assertEquals("3e25a08d04e00b9a57861453bf013e3f", sig,
+            "computeSignature must use insertion order for checkout (Scheme 1). " +
+            "Got $sig — if this is ae21f997e6d55dfffb0ce18d6de63aa5, the alphabetical sort was NOT removed.")
+
+        // Must NOT match alphabetical-order MD5 (which would be produced if .sortedBy is still present)
+        assertNotEquals("ae21f997e6d55dfffb0ce18d6de63aa5", sig,
+            "computeSignature must NOT use alphabetical order — that is Scheme 2 (ITN only).")
     }
 
     @Test
@@ -80,8 +133,91 @@ class PayFastSignatureUtilTest {
         assertFalse(result.contains("passphrase="), "No passphrase should be appended when blank")
     }
 
+    @Test
+    fun `buildParamString insertion order differs from alphabetical order for multi-key map`() {
+        // Prove that insertion order and alphabetical order produce different results
+        // when keys are not already in alphabetical order.
+        val params = linkedMapOf(
+            "merchant_id" to "10000100",
+            "amount" to "100.00",
+            "item_name" to "iZinga PREMIUM 1 Subscription"
+        )
+        val insertionResult = util.buildParamString(params)
+        val sortedResult = util.buildParamStringSorted(params)
+
+        assertNotEquals(insertionResult, sortedResult,
+            "Insertion-order and alphabetical param strings must differ for non-alphabetically-ordered keys")
+
+        // insertion: merchant_id comes first
+        assertTrue(insertionResult.startsWith("merchant_id="),
+            "Insertion-order result must start with 'merchant_id=' (first inserted key). Got: $insertionResult")
+
+        // sorted: amount comes first alphabetically
+        assertTrue(sortedResult.startsWith("amount="),
+            "Alphabetical-order result must start with 'amount=' (alphabetically first). Got: $sortedResult")
+    }
+
     // ─────────────────────────────────────────────────────────────────────────────────────────────
-    // computeSignature — known-good PayFast test vector
+    // buildParamStringSorted — Scheme 2: alphabetical sort (for ITN validation)
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `buildParamStringSorted sorts alphabetically and excludes signature key`() {
+        val params = mapOf(
+            "merchant_id" to "10000100",
+            "merchant_key" to "46f0cd694581a",
+            "amount" to "100.00",
+            "item_name" to "Test Product",
+            "signature" to "should-be-excluded"
+        )
+        val result = util.buildParamStringSorted(params)
+
+        // signature must be excluded
+        assertFalse(result.contains("signature="), "signature key must be excluded")
+
+        // ALPHABETICAL ORDER: 'amount' must come first
+        val firstKey = result.substringBefore("=")
+        assertEquals("amount", firstKey,
+            "First key must be 'amount' (alphabetically first). Got: $result")
+
+        // passphrase appended at the end
+        assertTrue(result.endsWith("&passphrase=${urlEncode(passphrase)}"),
+            "passphrase must be appended at end. Got: $result")
+    }
+
+    @Test
+    fun `buildParamStringSorted with blank passphrase does not append passphrase`() {
+        val utilNoPassphrase = PayFastSignatureUtil("")
+        val params = mapOf("merchant_id" to "10000100")
+        val result = utilNoPassphrase.buildParamStringSorted(params)
+        assertFalse(result.contains("passphrase="), "No passphrase should be appended when blank")
+    }
+
+    /**
+     * Pre-computed expected MD5 for alphabetical-order param string:
+     *   amount=100.00&item_name=iZinga+PREMIUM+1+Subscription&merchant_id=10000100&passphrase=jt7NOE43FZPn
+     *   → MD5: ae21f997e6d55dfffb0ce18d6de63aa5
+     */
+    @Test
+    fun `computeSignatureSorted sorts alphabetically matching ITN scheme`() {
+        val params = linkedMapOf(
+            "merchant_id" to "10000100",
+            "amount" to "100.00",
+            "item_name" to "iZinga PREMIUM 1 Subscription"
+        )
+
+        val sig = util.computeSignatureSorted(params)
+
+        assertEquals("ae21f997e6d55dfffb0ce18d6de63aa5", sig,
+            "computeSignatureSorted must use alphabetical order (Scheme 2 / ITN). Got: $sig")
+
+        // Must NOT match the checkout (insertion-order) MD5
+        assertNotEquals("3e25a08d04e00b9a57861453bf013e3f", sig,
+            "computeSignatureSorted must NOT match insertion-order (Scheme 1 / checkout) hash.")
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+    // computeSignature — general properties
     // ─────────────────────────────────────────────────────────────────────────────────────────────
 
     /**
@@ -89,22 +225,9 @@ class PayFastSignatureUtilTest {
      * Parameters, passphrase, and expected MD5 taken from:
      * https://developers.payfast.co.za/docs#step_2_signature
      *
-     * Passphrase: "jt7NOE43FZPn"
-     * merchant_id: 10000100
-     * merchant_key: 46f0cd694581a
-     * return_url: https://www.example.com/return
-     * cancel_url: https://www.example.com/cancel
-     * notify_url: https://www.example.com/notify
-     * name_first: First
-     * name_last: Last
-     * email_address: test@test.com
-     * m_payment_id: 1234
-     * amount: 10.00
-     * item_name: Test+Item
-     *
-     * Expected MD5 (computed from PayFast's documented algorithm): ad8a9d90d01a6e9609542c9b3d75da19
-     * NOTE: The exact expected hash below is computed using the same algorithm as implemented.
-     * If PayFast updates their algo, re-verify against their sandbox test vectors.
+     * NOTE: The PayFast docs example uses custom integration / documented field order, which
+     * matches computeSignature (insertion-order). The params below are in the documented
+     * PayFast field order so both schemes produce the same result for this specific vector.
      */
     @Test
     fun `computeSignature produces valid MD5 for known PayFast-compatible parameters`() {
@@ -131,7 +254,7 @@ class PayFastSignatureUtilTest {
     }
 
     @Test
-    fun `computeSignature is case-insensitively deterministic`() {
+    fun `computeSignature is deterministic for the same input`() {
         val params = mapOf("amount" to "100.00", "item_name" to "Widget")
         val sig1 = util.computeSignature(params)
         val sig2 = util.computeSignature(params)
@@ -154,19 +277,48 @@ class PayFastSignatureUtilTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────
-    // isValidSignature
+    // isValidSignature — Scheme 2 (ITN validation, alphabetical recompute)
     // ─────────────────────────────────────────────────────────────────────────────────────────────
 
+    /**
+     * Simulates an incoming ITN: PayFast computes signature alphabetically, embeds it in the POST
+     * body. Our server receives the decoded params and calls isValidSignature, which also
+     * recomputes alphabetically — so the signatures match.
+     */
     @Test
-    fun `isValidSignature returns true for a round-tripped signature`() {
+    fun `isValidSignature returns true when signature was computed alphabetically (ITN simulation)`() {
         val params = mutableMapOf(
             "merchant_id" to "10000100",
             "amount" to "800.00",
             "item_name" to "iZinga PREMIUM 1 Subscription"
         )
+        // Simulate PayFast ITN signing (alphabetical)
+        val sig = util.computeSignatureSorted(params)
+        params["signature"] = sig
+        assertTrue(util.isValidSignature(params),
+            "isValidSignature must accept a correctly alphabetically-signed ITN. " +
+            "Note: isValidSignature uses alphabetical order (Scheme 2) to match PayFast's ITN scheme.")
+    }
+
+    /**
+     * Demonstrates that isValidSignature correctly REJECTS a signature produced with insertion
+     * order (Scheme 1) when the params are not already in alphabetical order.
+     * This confirms the two schemes are correctly separated.
+     */
+    @Test
+    fun `isValidSignature returns false when signature was computed with insertion order (Scheme 1) and params not alphabetical`() {
+        val params = mutableMapOf(
+            "merchant_id" to "10000100",   // insertion: merchant_id first
+            "amount" to "800.00",
+            "item_name" to "iZinga PREMIUM 1 Subscription"
+        )
+        // Sign with insertion order (Scheme 1 / checkout)
         val sig = util.computeSignature(params)
         params["signature"] = sig
-        assertTrue(util.isValidSignature(params), "Round-tripped signature should be valid")
+        // isValidSignature uses alphabetical order — this signature won't match
+        assertFalse(util.isValidSignature(params),
+            "isValidSignature must reject a Scheme 1 (insertion-order) signature for non-alphabetical params, " +
+            "because PayFast's ITN scheme is alphabetical and these params are NOT in alphabetical order.")
     }
 
     @Test
@@ -188,15 +340,16 @@ class PayFastSignatureUtilTest {
     @Test
     fun `isValidSignature returns false when amount is altered after signing`() {
         val params = mutableMapOf(
-            "merchant_id" to "10000100",
-            "amount" to "800.00",
-            "item_name" to "iZinga Subscription"
+            "amount" to "800.00",        // alphabetically first
+            "item_name" to "iZinga Subscription",
+            "merchant_id" to "10000100"  // alphabetically last
         )
-        val sig = util.computeSignature(params)
+        // Sign with alphabetical order (simulating PayFast ITN signing)
+        val sig = util.computeSignatureSorted(params)
         params["signature"] = sig
         // Tamper with amount after signing
         params["amount"] = "1.00"
-        assertFalse(util.isValidSignature(params), "Altered param should fail signature check")
+        assertFalse(util.isValidSignature(params), "Altered param should fail ITN signature check")
     }
 
     /**
@@ -204,10 +357,14 @@ class PayFastSignatureUtilTest {
      * PayFast sends its ITN with a signature computed using PHP urlencode() (spaces as '+').
      * isValidSignature must use the same encoding when re-computing for comparison.
      * Before the fix, the mismatch caused all ITN validations to fail whenever item_name had spaces.
+     *
+     * Updated for Bug #14: signature is now computed with computeSignatureSorted (alphabetical)
+     * to correctly simulate PayFast's ITN signing scheme.
      */
     @Test
-    fun `isValidSignature regression - round-trip with spaces in item_name uses plus encoding`() {
-        // Simulate the params PayFast would POST in an ITN for a subscription with spaces in item_name
+    fun `isValidSignature regression - ITN with spaces in item_name uses plus encoding and alphabetical order`() {
+        // Simulate the params PayFast would POST in an ITN for a subscription with spaces in item_name.
+        // PayFast signs ITNs alphabetically, so we use computeSignatureSorted to build the test signature.
         val params = mutableMapOf(
             "merchant_id" to "10020746",
             "m_payment_id" to "some-uuid-here",
@@ -215,11 +372,11 @@ class PayFastSignatureUtilTest {
             "item_name" to "iZinga PREMIUM 1 Subscription",
             "payment_status" to "COMPLETE"
         )
-        // Compute a signature — this simulates what PayFast would have computed using the same algo
-        val sig = util.computeSignature(params)
+        // Compute signature the way PayFast would (alphabetical, spaces as '+')
+        val sig = util.computeSignatureSorted(params)
         params["signature"] = sig
         assertTrue(util.isValidSignature(params),
-            "isValidSignature must accept a round-tripped ITN signature with spaces in item_name. " +
+            "isValidSignature must accept a correctly signed ITN with spaces in item_name. " +
             "Failure here means urlEncode is inconsistent between signing and verification.")
     }
 
@@ -247,11 +404,19 @@ class PayFastSignatureUtilTest {
     }
 
     @Test
+    fun `computeSignatureSorted handles empty param map (only passphrase)`() {
+        val sig = util.computeSignatureSorted(emptyMap())
+        assertEquals(32, sig.length, "Even empty params should produce a 32-char MD5")
+        // Both schemes produce the same result for empty params (only passphrase differs by sort, not here)
+        assertEquals(sig, util.computeSignature(emptyMap()),
+            "For empty params, insertion and alphabetical order produce the same result")
+    }
+
+    @Test
     fun `buildParamString handles special characters in values`() {
         val params = mapOf("item_name" to "Café & Résumé")
         val result = util.buildParamString(params)
         // The & separator between params should only appear as a delimiter, not inside encoded values
-        // item_name should be the only param, no unencoded & should appear as a value separator issue
         assertTrue(result.startsWith("item_name="), "Result should start with item_name= but was: $result")
     }
 

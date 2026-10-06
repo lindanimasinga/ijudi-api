@@ -501,11 +501,19 @@ class PayFastItnHandlerTest {
 
     /**
      * Adds a valid signature to [params] using the test passphrase.
+     *
+     * Uses computeSignatureSorted (alphabetical, Scheme 2) to simulate PayFast's ITN signing
+     * behaviour — PayFast computes ITN signatures alphabetically. isValidSignature also uses
+     * alphabetical order, so this correctly simulates a real signed ITN payload.
+     *
+     * Do NOT change this back to computeSignature (insertion order / Scheme 1) — that would
+     * cause all ITN handler tests to silently sign and verify with the same wrong ordering,
+     * masking a real production signature mismatch when params are not in alphabetical order.
      */
     private fun buildSignedParams(params: Map<String, String>): Map<String, String> {
         val mutable = params.toMutableMap()
         mutable.remove("signature")
-        val sig = signatureUtil.computeSignature(mutable)
+        val sig = signatureUtil.computeSignatureSorted(mutable)
         mutable["signature"] = sig
         return mutable
     }
