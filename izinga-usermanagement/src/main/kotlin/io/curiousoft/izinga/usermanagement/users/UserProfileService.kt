@@ -94,7 +94,27 @@ class UserProfileService(
         validateUserProfileForCreate(profile)
         //remove empty spaces and dashes from the mobile number
         profile.mobileNumber = fomatMobileNumber(profile.mobileNumber!!)
-        if (profileRepo.existsByMobileNumber(profile.mobileNumber!!)) throw Exception("User with phone number " + profile.mobileNumber + " already exist.")
+
+        // ONB-FIX: a role=null placeholder is created for every phone number that completes
+        // WhatsApp OTP verification (see WhatsAppOtpService.createUserProfile()).  A raw
+        // existsByMobileNumber() check would therefore reject 100% of new signups, because a
+        // placeholder always exists by the time the user submits their profile form.
+        //
+        // Instead, look up the existing record and branch on its role:
+        //  • role != null  → a completed profile already exists → genuine duplicate, reject.
+        //  • role == null  → this is the OTP placeholder → completing it is the intended path.
+        //    Copy the placeholder's id onto the incoming profile so that UserProfile.id continues
+        //    to equal the Firebase UID set in resolveOrCreateFirebaseUser().  ProfileServiceImpl
+        //    .create() will preserve this id (it now skips UUID assignment when id is already set),
+        //    and the subsequent profileRepo.save() upserts over the placeholder document.
+        val existingProfile = profileRepo.findByMobileNumber(profile.mobileNumber!!)
+        if (existingProfile != null) {
+            if (existingProfile.role != null) {
+                throw Exception("User with phone number " + profile.mobileNumber + " already exist.")
+            }
+            // Placeholder found — carry its id forward (Firebase UID invariant)
+            profile.id = existingProfile.id
+        }
 
         // T-09: validate ambassadorId if provided; clear it if not a valid active ambassador
         val requestedAmbassadorId = profile.ambassadorId

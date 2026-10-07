@@ -59,7 +59,7 @@ class UserProfileServiceReferralAttributionTest {
         val saved = makeCustomer().also { it.id = "new-user-1"; it.referredByPartnerId = "partner-123" }
 
         `when`(referralCodeService.resolveCode("ABC12345")).thenReturn(partner)
-        `when`(userProfileRepo.existsByMobileNumber(anyString())).thenReturn(false)
+        `when`(userProfileRepo.findByMobileNumber(anyString())).thenReturn(null)
         `when`(userProfileRepo.save(any())).thenReturn(saved)
 
         val result = service.create(profile, "ABC12345")
@@ -73,7 +73,7 @@ class UserProfileServiceReferralAttributionTest {
         val profile = makeCustomer()
         val saved = makeCustomer().also { it.id = "new-user-2" }
 
-        `when`(userProfileRepo.existsByMobileNumber(anyString())).thenReturn(false)
+        `when`(userProfileRepo.findByMobileNumber(anyString())).thenReturn(null)
         `when`(userProfileRepo.save(any())).thenReturn(saved)
 
         service.create(profile, null)
@@ -87,7 +87,7 @@ class UserProfileServiceReferralAttributionTest {
         val profile = makeCustomer()
         val saved = makeCustomer().also { it.id = "new-user-3" }
 
-        `when`(userProfileRepo.existsByMobileNumber(anyString())).thenReturn(false)
+        `when`(userProfileRepo.findByMobileNumber(anyString())).thenReturn(null)
         `when`(userProfileRepo.save(any())).thenReturn(saved)
 
         service.create(profile, "   ")
@@ -102,7 +102,7 @@ class UserProfileServiceReferralAttributionTest {
         val saved = makeCustomer().also { it.id = "new-user-4" }
 
         `when`(referralCodeService.resolveCode("NOTFOUND")).thenReturn(null)
-        `when`(userProfileRepo.existsByMobileNumber(anyString())).thenReturn(false)
+        `when`(userProfileRepo.findByMobileNumber(anyString())).thenReturn(null)
         `when`(userProfileRepo.save(any())).thenReturn(saved)
 
         service.create(profile, "NOTFOUND")
@@ -195,7 +195,7 @@ class UserProfileServiceReferralAttributionTest {
         val saved = makeCustomer().also { it.id = "new-user-5"; it.referredByPartnerId = "partner-payload-1" }
 
         `when`(referralCodeService.resolveCode("PAYLOAD01")).thenReturn(partner)
-        `when`(userProfileRepo.existsByMobileNumber(anyString())).thenReturn(false)
+        `when`(userProfileRepo.findByMobileNumber(anyString())).thenReturn(null)
         `when`(userProfileRepo.save(any())).thenReturn(saved)
 
         service.create(profile, "PAYLOAD01")

@@ -134,7 +134,8 @@ class UserProfileValidationTest {
     @Test
     fun `create passes with valid minimal profile`() {
         val profile = UserProfile("John", UserProfile.SignUpReason.BUY, "Cape Town", "https://img", "0812815707", ProfileRoles.CUSTOMER)
-        `when`(userProfileRepo.existsByMobileNumber("+27812815707")).thenReturn(false)
+        // No existing record for this phone — findByMobileNumber returns null (clean new signup)
+        `when`(userProfileRepo.findByMobileNumber("+27812815707")).thenReturn(null)
         `when`(userProfileRepo.save(profile)).thenReturn(profile)
         profileService.create(profile)
         verify(userProfileRepo).save(profile)
@@ -160,7 +161,7 @@ class UserProfileValidationTest {
             "0831234567",
             ProfileRoles.AMBASSADOR
         ).apply { profileApproved = true }
-        `when`(userProfileRepo.existsByMobileNumber("+27831234567")).thenReturn(false)
+        `when`(userProfileRepo.findByMobileNumber("+27831234567")).thenReturn(null)
         `when`(userProfileRepo.save(profile)).thenReturn(profile)
         profileService.create(profile)
         verify(userProfileRepo).save(profile)
@@ -177,6 +178,64 @@ class UserProfileValidationTest {
         assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
         assertEquals("imageUrl is required", ex.reason)
         verify(userProfileRepo, never()).save(profile)
+    }
+
+    // -----------------------------------------------------------------------
+    // create() — OTP placeholder completion logic (ONB-FIX)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Core regression guard for the fix described in the ONB-FIX commit.
+     *
+     * When a role=null placeholder exists for a phone number (created during WhatsApp OTP
+     * verification), create() must succeed and must reuse the placeholder's id so the
+     * UserProfile.id == Firebase UID invariant is preserved.
+     */
+    @Test
+    fun `create succeeds when existing record is a role-null OTP placeholder — reuses placeholder id`() {
+        val placeholderId = "firebase-uid-abc123"
+        val placeholder = UserProfile(
+            "Customer", UserProfile.SignUpReason.BUY, "", "", "+27892341670", null
+        ).also { it.id = placeholderId }
+
+        val incoming = UserProfile(
+            "Sipho", UserProfile.SignUpReason.BUY, "Durban", "https://img/avatar.jpg",
+            "+27892341670", ProfileRoles.CUSTOMER
+        )
+
+        `when`(userProfileRepo.findByMobileNumber("+27892341670")).thenReturn(placeholder)
+        `when`(userProfileRepo.save(incoming)).thenReturn(incoming)
+
+        profileService.create(incoming)
+
+        // id must be the placeholder's id (= Firebase UID), NOT a freshly generated UUID
+        assertEquals(placeholderId, incoming.id)
+        verify(userProfileRepo).save(incoming)
+    }
+
+    /**
+     * Genuine duplicate: phone already has a fully-registered profile (role != null).
+     * create() must still reject with the existing error message and must not call save().
+     */
+    @Test
+    fun `create rejects phone that already has a completed profile with non-null role`() {
+        val completedProfile = UserProfile(
+            "Existing User", UserProfile.SignUpReason.BUY, "Cape Town", "https://img",
+            "+27892341670", ProfileRoles.CUSTOMER
+        ).also { it.id = "existing-id" }
+
+        val incoming = UserProfile(
+            "New Attempt", UserProfile.SignUpReason.BUY, "Durban", "https://img/avatar.jpg",
+            "+27892341670", ProfileRoles.CUSTOMER
+        )
+
+        `when`(userProfileRepo.findByMobileNumber("+27892341670")).thenReturn(completedProfile)
+
+        val ex = assertThrows(Exception::class.java) { profileService.create(incoming) }
+        assert(ex.message!!.contains("already exist")) {
+            "Expected 'already exist' in: ${ex.message}"
+        }
+        verify(userProfileRepo, never()).save(incoming)
     }
 
     @Test

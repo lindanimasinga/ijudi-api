@@ -26,7 +26,14 @@ abstract class ProfileServiceImpl<E : ProfileRepo<U>, U : Profile>(protected val
     @Throws(Exception::class)
     override fun create(profile: U): U {
         validate(profile)
-        profile.id = UUID.randomUUID().toString()
+        // Only generate a new UUID if the profile does not already carry an id.
+        // UserProfileService.create() sets profile.id to the existing placeholder's id
+        // (which equals the Firebase UID established during OTP verification) before calling
+        // super.create() — overwriting it here would permanently break the Firebase UID
+        // invariant documented in WhatsAppOtpService.resolveOrCreateFirebaseUser().
+        if (profile.id.isNullOrBlank()) {
+            profile.id = UUID.randomUUID().toString()
+        }
         val saved = profileRepo.save<U>(profile)
         eventPublisher.publishEvent(ProfileCreatedEvent(this, saved))
         return saved
