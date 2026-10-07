@@ -2,7 +2,6 @@ package io.curiousoft.izinga.commons.model
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import io.curiousoft.izinga.commons.validator.ValidMobileNumber
-import org.springframework.data.mongodb.core.index.Indexed
 import jakarta.validation.constraints.NotBlank
 
 open class Profile(
@@ -10,7 +9,6 @@ open class Profile(
     var address: @NotBlank(message = "profile address not valid") String?,
     var imageUrl: @NotBlank(message = "profile image url not valid") String?,
     @field:ValidMobileNumber(message = "profile mobile not format is not valid. Please put like +27812815577 or 27812815577")
-    @field:Indexed(unique = true)
     @param:ValidMobileNumber(message = "profile mobile number not valid") var mobileNumber: @NotBlank(message = "profile mobile not format is not valid. Please put like +27812815577 or 27812815577") String?,
     // role is deliberately nullable. A null role is the first-class signal for an OTP-verified
     // placeholder profile that has not yet completed signup (see WhatsAppOtpService.createUserProfile()).

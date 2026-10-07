@@ -4,8 +4,17 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import java.util.Date
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
+import org.springframework.data.mongodb.core.index.CompoundIndex
 import org.springframework.data.mongodb.core.index.Indexed
 
+// Unique index scoped to the userProfile collection only.
+// Intentionally NOT on the shared Profile base class — StoreProfile legitimately allows multiple
+// stores with the same owner phone (one merchant, many stores), so a shared unique constraint
+// on Profile.mobileNumber would break at startup against existing duplicate storeProfile data.
+// @CompoundIndex at class level (Option 1) is used because mobileNumber is a constructor param
+// of the parent class and is not declared `open`, so field-level override in this subclass
+// is not cleanly possible in Kotlin without widening the parent class.
+@CompoundIndex(def = "{'mobileNumber': 1}", unique = true, name = "userProfile_mobileNumber_unique")
 class UserProfile(
     name: @NotBlank(message = "profile name not valid") String?,
     var signUpReason: @NotNull(message = "signupReason not valid") SignUpReason?,
