@@ -140,6 +140,45 @@ class UserProfileValidationTest {
         verify(userProfileRepo).save(profile)
     }
 
+    /**
+     * Regression guard for the createAmbassador() break introduced when commit 3340ec4
+     * added an unconditional imageUrl check to validateUserProfileForCreate().
+     *
+     * Admin-initiated AMBASSADOR records are created with blank address (no home address
+     * yet) and PENDING_PHOTO_URL as imageUrl (no selfie yet).  Both must be accepted by
+     * profileService.create() — address is not validated at create time, and imageUrl is
+     * non-blank (the placeholder satisfies the check).
+     */
+    @Test
+    fun `create succeeds for ambassador shape — blank address and pending-photo placeholder imageUrl`() {
+        val pendingPhotoUrl = AmbassadorAdminController.PENDING_PHOTO_URL
+        val profile = UserProfile(
+            "Sipho Dlamini",
+            UserProfile.SignUpReason.DELIVERY_DRIVER,
+            "",                   // blank address — intentional for admin-initiated records
+            pendingPhotoUrl,      // placeholder, not blank — satisfies imageUrl check
+            "0831234567",
+            ProfileRoles.AMBASSADOR
+        ).apply { profileApproved = true }
+        `when`(userProfileRepo.existsByMobileNumber("+27831234567")).thenReturn(false)
+        `when`(userProfileRepo.save(profile)).thenReturn(profile)
+        profileService.create(profile)
+        verify(userProfileRepo).save(profile)
+    }
+
+    /**
+     * Confirm the self-signup path (POST /user) still correctly rejects a blank imageUrl.
+     * This must NOT regress — the ambassador fix must NOT weaken this guard.
+     */
+    @Test
+    fun `create still rejects blank imageUrl for self-signup CUSTOMER profile`() {
+        val profile = UserProfile("Jane", UserProfile.SignUpReason.BUY, "Johannesburg", "", "0821234567", ProfileRoles.CUSTOMER)
+        val ex = assertThrows(ResponseStatusException::class.java) { profileService.create(profile) }
+        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
+        assertEquals("imageUrl is required", ex.reason)
+        verify(userProfileRepo, never()).save(profile)
+    }
+
     @Test
     fun `create rejects bank with missing accountId`() {
         val bank = Bank().apply { accountId = ""; name = "FNB"; branchCode = "250655"; phone = "0800"; type = BankAccType.CHEQUE }
