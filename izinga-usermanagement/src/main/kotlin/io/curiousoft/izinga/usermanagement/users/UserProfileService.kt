@@ -201,6 +201,9 @@ class UserProfileService(
         if (profile.signUpReason == null) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "signUpReason is required")
         }
+        if (profile.imageUrl.isNullOrBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "imageUrl is required")
+        }
         profile.bank?.let { validateBankForProfile(it) }
     }
 
@@ -228,6 +231,9 @@ class UserProfileService(
         }
         if (profile.mobileNumber != null && profile.mobileNumber!!.isBlank()) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "mobileNumber is required")
+        }
+        if (profile.imageUrl != null && profile.imageUrl!!.isBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "imageUrl is required")
         }
         profile.bank?.let { validateBankForProfile(it) }
     }

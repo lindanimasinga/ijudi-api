@@ -114,6 +114,24 @@ class UserProfileValidationTest {
     }
 
     @Test
+    fun `create rejects null imageUrl`() {
+        val profile = UserProfile("John", UserProfile.SignUpReason.BUY, "address", null, "+27812815707", ProfileRoles.CUSTOMER)
+        val ex = assertThrows(ResponseStatusException::class.java) { profileService.create(profile) }
+        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
+        assertEquals("imageUrl is required", ex.reason)
+        verify(userProfileRepo, never()).save(profile)
+    }
+
+    @Test
+    fun `create rejects blank imageUrl`() {
+        val profile = UserProfile("John", UserProfile.SignUpReason.BUY, "address", "", "+27812815707", ProfileRoles.CUSTOMER)
+        val ex = assertThrows(ResponseStatusException::class.java) { profileService.create(profile) }
+        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
+        assertEquals("imageUrl is required", ex.reason)
+        verify(userProfileRepo, never()).save(profile)
+    }
+
+    @Test
     fun `create passes with valid minimal profile`() {
         val profile = UserProfile("John", UserProfile.SignUpReason.BUY, "Cape Town", "https://img", "0812815707", ProfileRoles.CUSTOMER)
         `when`(userProfileRepo.existsByMobileNumber("+27812815707")).thenReturn(false)
@@ -300,6 +318,25 @@ class UserProfileValidationTest {
         assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
         assertEquals("mobileNumber is required", ex.reason)
         verify(userProfileRepo, never()).findById("testId")
+    }
+
+    @Test
+    fun `update rejects blank imageUrl`() {
+        val incoming = UserProfile("John", UserProfile.SignUpReason.BUY, "address", "", "+27812815707", ProfileRoles.CUSTOMER)
+        val ex = assertThrows(ResponseStatusException::class.java) { profileService.update("testId", incoming) }
+        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
+        assertEquals("imageUrl is required", ex.reason)
+        verify(userProfileRepo, never()).findById("testId")
+    }
+
+    @Test
+    fun `update allows null imageUrl — field not being changed`() {
+        val incoming = UserProfile("John", UserProfile.SignUpReason.BUY, "address", null, "+27812815707", ProfileRoles.CUSTOMER)
+        val persisted = persistedProfile()
+        `when`(userProfileRepo.findById("testId")).thenReturn(Optional.of(persisted))
+        `when`(userProfileRepo.save(persisted)).thenReturn(persisted)
+        profileService.update("testId", incoming)
+        verify(userProfileRepo).save(persisted)
     }
 
     @Test
