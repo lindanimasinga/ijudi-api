@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import io.curiousoft.izinga.commons.validator.ValidMobileNumber
 import org.springframework.data.mongodb.core.index.Indexed
 import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.NotNull
 
 open class Profile(
     var name: @NotBlank(message = "profile name not valid") String?,
@@ -13,7 +12,14 @@ open class Profile(
     @field:ValidMobileNumber(message = "profile mobile not format is not valid. Please put like +27812815577 or 27812815577")
     @field:Indexed(unique = true)
     @param:ValidMobileNumber(message = "profile mobile number not valid") var mobileNumber: @NotBlank(message = "profile mobile not format is not valid. Please put like +27812815577 or 27812815577") String?,
-    var role: @NotNull(message = "profile role not valid") ProfileRoles?
+    // role is deliberately nullable. A null role is the first-class signal for an OTP-verified
+    // placeholder profile that has not yet completed signup (see WhatsAppOtpService.createUserProfile()).
+    // The constraint that role MUST be present for a fully-registered user lives in
+    // UserProfileService.validateUserProfileForCreate(), applied only on the POST /user path.
+    // Do NOT add @NotNull here: if the use-site-target bug in this file's annotations is ever
+    // fixed globally (switching bare annotations to @field:/@param: targets), restoring @NotNull
+    // on this field would silently break the OTP placeholder creation path.
+    var role: ProfileRoles?
 ) : BaseModel() {
     var description: String? = null
     var yearsInService = 0

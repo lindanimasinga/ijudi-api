@@ -12,7 +12,10 @@ class UserProfile(
     address: @NotBlank(message = "profile address not valid") String?,
     imageUrl: @NotBlank(message = "profile image url not valid") String?,
     mobileNumber: @NotBlank(message = "profile mobile number not valid") String?,
-    role: @NotNull(message = "role not valid") ProfileRoles?) : Profile(name, address, imageUrl, mobileNumber, role) {
+    // role is deliberately nullable — see Profile.role for the full rationale.
+    // WhatsAppOtpService.createUserProfile() passes null here; UserProfileService.validateUserProfileForCreate()
+    // enforces non-null only on the POST /user signup path.
+    role: ProfileRoles?) : Profile(name, address, imageUrl, mobileNumber, role) {
     var ambassadorId: String? = null
     var referralCode: String? = null
     /**
