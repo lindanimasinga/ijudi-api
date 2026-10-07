@@ -452,6 +452,84 @@ public class WhatsAppOtpServiceTest {
         verify(firebaseAuth, never()).createUser(any(UserRecord.CreateRequest.class));
     }
 
+    /**
+     * ONB-FIX: Verifies that the placeholder UserProfile created on a brand-new OTP verification
+     * has role == null, NOT ProfileRoles.CUSTOMER.
+     *
+     * A null role is the backend's intentional, first-class signal that this profile is an
+     * OTP-verified placeholder — the user has not yet completed their signup form.
+     * The frontend should key off role == null to distinguish a placeholder from a user who
+     * genuinely completed registration and was assigned an explicit role (e.g. CUSTOMER,
+     * MESSENGER, STORE_ADMIN).
+     *
+     * This invariant is enforced only here (WhatsAppOtpService.createUserProfile) — the
+     * self-service POST /user path (UserProfileService.create) still correctly requires a
+     * non-null role via validateUserProfileForCreate().
+     */
+    @Test
+    public void verifyOtp_newUser_placeholderProfileHasNullRole() throws Exception {
+        String normalized = "+27831000001";
+        String code = "888888";
+        String hash = service.hashCode(normalized, code);
+
+        var doc = makeDoc("docNull1", normalized, hash, 0, false);
+        when(otpRepository.findTopByMobileNumberAndUsedFalseOrderByCreatedAtDesc(normalized))
+                .thenReturn(Optional.of(doc));
+        when(otpRepository.atomicMarkUsed("docNull1")).thenReturn(doc);
+
+        // Brand-new number: no Mongo profile, no Firebase user
+        when(userProfileService.findUserByPhone(normalized)).thenReturn(null);
+        FirebaseAuthException notFound = mock(FirebaseAuthException.class);
+        when(notFound.getAuthErrorCode()).thenReturn(AuthErrorCode.USER_NOT_FOUND);
+        when(firebaseAuth.getUserByPhoneNumber(normalized)).thenThrow(notFound);
+
+        var newUser = mock(UserRecord.class);
+        when(newUser.getUid()).thenReturn("uid-null-role-test");
+        when(firebaseAuth.createUser(any(UserRecord.CreateRequest.class))).thenReturn(newUser);
+        when(firebaseAuth.createCustomToken(anyString(), anyMap())).thenReturn("token-null-role");
+
+        service.verifyOtp("0831000001", code);
+
+        // CRITICAL: the saved placeholder must have role == null, never CUSTOMER
+        verify(userProfileRepo).save(argThat(profile -> {
+            assertNull(
+                    profile.getRole(),
+                    "OTP placeholder profile must have role=null, got: " + profile.getRole());
+            return true;
+        }));
+    }
+
+    /**
+     * ONB-FIX complementary: verifies that when Firebase Auth already has a record for the phone
+     * (e.g. re-verify after a profile reset) the re-created placeholder still has role == null.
+     */
+    @Test
+    public void verifyOtp_existingFirebaseUserNoMongoProfile_placeholderHasNullRole() throws Exception {
+        String normalized = "+27831000002";
+        String code = "999888";
+        String hash = service.hashCode(normalized, code);
+
+        var doc = makeDoc("docNull2", normalized, hash, 0, false);
+        when(otpRepository.findTopByMobileNumberAndUsedFalseOrderByCreatedAtDesc(normalized))
+                .thenReturn(Optional.of(doc));
+        when(otpRepository.atomicMarkUsed("docNull2")).thenReturn(doc);
+
+        when(userProfileService.findUserByPhone(normalized)).thenReturn(null);
+        UserRecord existingFbUser = mock(UserRecord.class);
+        when(existingFbUser.getUid()).thenReturn("existing-uid-null-role");
+        when(firebaseAuth.getUserByPhoneNumber(normalized)).thenReturn(existingFbUser);
+        when(firebaseAuth.createCustomToken(anyString(), anyMap())).thenReturn("token-existing-null");
+
+        service.verifyOtp("0831000002", code);
+
+        verify(userProfileRepo).save(argThat(profile -> {
+            assertNull(
+                    profile.getRole(),
+                    "Re-created placeholder for existing Firebase user must have role=null, got: " + profile.getRole());
+            return true;
+        }));
+    }
+
     // ===================== helpers =====================
 
     private WhatsAppOtpDocument makeDoc(String id, String mobile, String hash, int attempts, boolean used) {

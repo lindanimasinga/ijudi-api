@@ -428,16 +428,25 @@ public class WhatsAppOtpService {
 
     private void createUserProfile(String normalized, String uid) {
         try {
+            // ONB-FIX: placeholder created with role=null, not CUSTOMER.
+            // A null role is the intentional signal that this profile is an OTP-verified
+            // placeholder — the user has not yet completed their signup form.
+            // CUSTOMER (and every other role) is only assigned once the user explicitly
+            // submits their profile via POST /user or PATCH /user/{id}.
+            // This lets downstream code (and the frontend) distinguish an incomplete
+            // placeholder (role==null) from a genuinely registered customer (role==CUSTOMER).
+            // There is no ValidatingMongoEventListener or other persistence-layer validation
+            // hook that would block saving a null role — confirmed by codebase audit.
             var profile = new UserProfile(
                     "Customer",
                     UserProfile.SignUpReason.BUY,
                     "",
                     "",
                     normalized,
-                    ProfileRoles.CUSTOMER);
+                    null);
             profile.setId(uid);
             userProfileRepo.save(profile);
-            LOG.info("Created UserProfile id={} mobileNumber={} via WhatsApp OTP login", uid, normalized);
+            LOG.info("Created placeholder UserProfile id={} mobileNumber={} role=null via WhatsApp OTP login", uid, normalized);
         } catch (Exception e) {
             LOG.error("Failed to create UserProfile for normalized={}", normalized, e);
             // Non-fatal: custom token can still be minted; profile creation can be retried on next login
