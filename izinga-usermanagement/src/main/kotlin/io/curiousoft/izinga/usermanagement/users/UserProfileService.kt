@@ -174,7 +174,7 @@ class UserProfileService(
     }
 
     fun pendingAproval(): List<UserProfile> {
-        return profileRepo.findByProfileApproved(false)
+        return profileRepo.findByProfileApprovedAndRoleNot(false, ProfileRoles.CUSTOMER)
     }
 
     fun findMessengersByAdminId(messengerAdminId: String): List<UserProfile> {
