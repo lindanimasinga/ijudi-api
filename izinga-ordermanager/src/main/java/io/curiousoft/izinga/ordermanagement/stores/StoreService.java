@@ -101,15 +101,26 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "MERCHANT_ICA_NOT_ACCEPTED");
         }
 
-        // STORE-BANK-01: Prefer the per-store bank submitted by the frontend (detected by a non-blank
-        // accountId); fall back to the owner's user-level bank only when the store did not provide
-        // a meaningful bank object. An empty or null bank means the merchant didn't fill in the
-        // bank section, so we inherit from their user profile as before.
+        // STORE-BANK-01: Prefer the per-store bank submitted by the frontend; fall back to the
+        // owner's user-level bank only when the store did not provide a meaningful bank object.
+        // An empty or null bank means the merchant didn't fill in the bank section, so we
+        // inherit from their user profile as before.
+        //
+        // "Meaningful" means:
+        //   (a) non-EWALLET type: a non-blank accountId (existing behavior), OR
+        //   (b) EWALLET type: a non-blank phone (EWALLET accounts are identified by phone;
+        //       accountId is intentionally absent — the prior condition incorrectly fired the
+        //       fallback in this case, silently overwriting the store's own EWALLET bank).
         //
         // No IDOR risk: the controller pins profile.ownerId to authentication.getName() (StoreControler
         // line 37) before calling this method, so the authenticated user IS the store owner —
         // trusting their submitted bank details is correct.
-        if (profile.getBank() == null || !StringUtils.hasText(profile.getBank().getAccountId())) {
+        Bank submittedBank = profile.getBank();
+        boolean hasMeaningfulBank = submittedBank != null && (
+                StringUtils.hasText(submittedBank.getAccountId())
+                || (submittedBank.getType() == BankAccType.EWALLET && StringUtils.hasText(submittedBank.getPhone()))
+        );
+        if (!hasMeaningfulBank) {
             profile.setBank(user.getBank());
         }
 

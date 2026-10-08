@@ -192,6 +192,94 @@ class StoreServiceBankSelectionTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────
+    // STORE-BANK-01 EWALLET fix — store submits its own EWALLET bank (phone set, accountId blank)
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Bug: prior condition `!StringUtils.hasText(accountId)` was true for any EWALLET bank
+     * (accountId is intentionally absent), so the fallback silently overwrote the store's own
+     * EWALLET bank with the user's personal bank.
+     *
+     * Fixed condition: EWALLET bank with non-blank phone is treated as "meaningfully submitted" —
+     * the fallback must NOT fire.
+     */
+    @Test
+    @DisplayName("STORE-BANK-01 EWALLET fix: store's own EWALLET bank (phone set, accountId blank) is kept — user bank NOT used")
+    void create_withOwnEwalletBank_phoneSet_noAccountId_usesStoreBankNotUserBank() throws Exception {
+        // given — owner's personal bank is a CHEQUE account with a distinct accountId
+        Bank userBank = bank("USER-CHEQUE-ACC", "FNB", "250655");
+        UserProfile owner = userWithBank("owner-ewallet-sel-01", userBank);
+
+        // given — store submits its own EWALLET bank: phone is the identifier; accountId is blank
+        Bank storeEwalletBank = new Bank();
+        storeEwalletBank.setType(BankAccType.EWALLET);
+        storeEwalletBank.setPhone("+27831234567");
+        // accountId intentionally NOT set — EWALLET accounts don't use one
+
+        StoreProfile store = storeProfile("owner-ewallet-sel-01");
+        store.setBank(storeEwalletBank);
+
+        when(userProfileRepo.findById("owner-ewallet-sel-01")).thenReturn(Optional.of(owner));
+        when(storeRepository.findOneByIdOrShortName(store.getId(), store.getShortName()))
+                .thenReturn(Optional.empty());
+        when(storeRepository.save(store)).thenReturn(store);
+
+        // when
+        StoreProfile result = storeService.create(store);
+
+        // then — the store's own EWALLET bank is used, NOT the user's CHEQUE bank
+        assertNotNull(result.getBank(), "bank must not be null after create");
+        assertEquals(BankAccType.EWALLET, result.getBank().getType(),
+                "bank type must be EWALLET (the store's own bank), not the user's CHEQUE bank");
+        assertEquals("+27831234567", result.getBank().getPhone(),
+                "EWALLET phone must be the store-submitted one, not the user's");
+        assertNull(result.getBank().getAccountId(),
+                "accountId must remain null — EWALLET banks do not have one");
+        // The user's personal bank must never have been used
+        assertNotEquals("USER-CHEQUE-ACC", result.getBank().getAccountId());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+    // STORE-BANK-01 EWALLET fallback — EWALLET bank with no phone is NOT meaningful → fallback fires
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * An EWALLET bank with a blank/null phone has no identifier at all and cannot be used
+     * for payouts. The updated condition correctly leaves it as non-meaningful, so the fallback
+     * still copies the user's personal bank — same as a null or empty bank.
+     */
+    @Test
+    @DisplayName("STORE-BANK-01 EWALLET fallback: EWALLET bank with blank phone is not meaningful — falls back to user bank")
+    void create_withEwalletBankMissingPhone_fallsBackToUserBank() throws Exception {
+        // given — owner's personal bank is a fully valid CHEQUE account
+        Bank userBank = bank("USER-CHEQUE-FALLBACK", "Standard Bank", "051001");
+        UserProfile owner = userWithBank("owner-ewallet-sel-02", userBank);
+
+        // given — store submits an EWALLET bank stub with NO phone (unusable for payouts)
+        Bank incompleteEwallet = new Bank();
+        incompleteEwallet.setType(BankAccType.EWALLET);
+        // phone intentionally NOT set — this EWALLET bank has no identifier
+
+        StoreProfile store = storeProfile("owner-ewallet-sel-02");
+        store.setBank(incompleteEwallet);
+
+        when(userProfileRepo.findById("owner-ewallet-sel-02")).thenReturn(Optional.of(owner));
+        when(storeRepository.findOneByIdOrShortName(store.getId(), store.getShortName()))
+                .thenReturn(Optional.empty());
+        when(storeRepository.save(store)).thenReturn(store);
+
+        // when
+        StoreProfile result = storeService.create(store);
+
+        // then — falls back to the user's personal CHEQUE bank (the EWALLET stub has no identifier)
+        assertNotNull(result.getBank(), "bank must not be null after fallback");
+        assertEquals("USER-CHEQUE-FALLBACK", result.getBank().getAccountId(),
+                "user-level bank must be used when the store's EWALLET bank has no phone");
+        assertEquals(BankAccType.CHEQUE, result.getBank().getType(),
+                "bank type must be the user's CHEQUE, not the meaningless EWALLET stub");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
     // STORE-BANK-01 multi-store: second store can route to a different account
     // ─────────────────────────────────────────────────────────────────────────────────────────────
 
