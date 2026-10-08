@@ -1,0 +1,73 @@
+# Production Spring profile — non-secret structural configuration only.
+#
+# The aws-secretsmanager:izinga-prod import is declared in application.yml (profile-conditional
+# document block, spring.config.activate.on-profile: prod) rather than here, so that the base
+# file is the single authoritative place for all config-loading strategy. (DEVOPS-001)
+#
+# Keys that MUST be present in the izinga-prod AWS Secrets Manager secret:
+#   spring.data.mongodb.uri              — production MongoDB Atlas connection string
+#   amz.accessKey / amz.secretKey        — AWS credentials for S3 and other services
+#   google.api.key                       — Firebase Cloud Messaging server key
+#   google.maps.api.key                  — Google Maps Platform key
+#   mailersend.apikey                    — Mailersend API key
+#   mailersend.template.new-order        — Mailersend template ID
+#   mailersend.template.notpaid-order    — Mailersend template ID
+#   mailersend.template.daily-payout     — Mailersend template ID
+#   ukheshe.password                     — Ukheshe live API password
+#   yoco.api.key                         — Yoco live secret key
+#   yoco.api.webhooksec                  — Yoco webhook HMAC secret
+#   zoomconnectsms.api.key               — ZoomConnectSMS API key
+#   payfast.subscription.merchant-key    — PayFast live merchant key (AC-20 / RISK-05)
+#   payfast.subscription.passphrase      — PayFast live passphrase  (AC-20 / RISK-05)
+
+allowed:
+    origins: https://api.izinga.co.za,https://biz.izinga.co.za,https://shop.izinga.co.za,https://pay.izinga.co.za,app://izinga,app://izinga-lambda
+
+izinga:
+    api:
+        url: https://api.izinga.co.za
+
+logging:
+    level:
+        io:
+            curiousoft: INFO
+        root: INFO
+
+# PayFast LIVE URLs — stated explicitly here so a future copy-from-UAT cannot accidentally
+# introduce sandbox endpoints. Base application.yml already defaults to live URLs.
+payfast:
+    subscription:
+        base-url: https://www.payfast.co.za/eng/process
+        validate-url: https://www.payfast.co.za/eng/query/validate
+
+promocodes:
+    verifier:
+        url: https://api.izinga.co.za/
+
+server:
+    port: 80
+
+# NOTE: ukheshe.apiUrl defaults to the sandbox URL in application.yml.
+# Before go-live on a new deployment, confirm the production Ukheshe API URL with Lindani
+# and add it here as: ukheshe.apiUrl: <live-url>
+# ukheshe.password is NOT defined here — resolved from izinga-prod secret.
+
+whatsapp:
+    cloud:
+        orderConfirmationCustomerTemplate: order_confirmed
+        orderConfirmationShopTemplate: order_management_1
+        orderConfirmationMessengerTemplate: order_management_messenger
+
+yoco:
+    api:
+        # yoco.api.key and yoco.api.webhooksec are NOT defined here — resolved from izinga-prod secret.
+        url: https://payments.yoco.com/api/
+    verifier:
+        order-manager-url: https://api.izinga.co.za
+
+zoomconnectsms:
+    api:
+        email: lindanimasinga@gmail.com
+        endpoint: https://www.zoomconnect.com/app/api/rest/v1/sms/send
+        # zoomconnectsms.api.key is NOT defined here — resolved from izinga-prod secret.
+    enable: true
