@@ -1,8 +1,11 @@
 package io.curiousoft.izinga.ordermanagement.service;
 
+import com.google.firebase.auth.FirebaseAuth;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.ordermanagement.stores.StoreAgreementAuditRepository;
+import io.curiousoft.izinga.ordermanagement.stores.StoreTierChangeAuditRepository;
 import io.curiousoft.izinga.ordermanagement.stores.StoreService;
 import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService;
 import org.junit.Assert;
@@ -31,12 +34,17 @@ public class StoreServiceReferralAttributionTest {
     @Mock UserProfileRepo userProfileRepo;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock ReferralCodeService referralCodeService;
+    @Mock StoreAgreementAuditRepository storeAgreementAuditRepository;
+    @Mock StoreTierChangeAuditRepository storeTierChangeAuditRepository;
+    @Mock FirebaseAuth firebaseAuth;
 
     private StoreService storeService;
 
     @Before
     public void setUp() {
-        storeService = new StoreService(storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, MARKUP, eventPublisher, referralCodeService);
+        storeService = new StoreService(storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, MARKUP,
+                eventPublisher, referralCodeService,
+                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth);
     }
 
     @Test
@@ -118,16 +126,23 @@ public class StoreServiceReferralAttributionTest {
         hours.add(new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date()));
         ArrayList<String> tags = new ArrayList<>();
         tags.add("food");
-        return new StoreProfile(
+        StoreProfile profile = new StoreProfile(
                 StoreType.FOOD, "Test Store", "test-store-unique",
                 "1 Store St", "https://img.test/s.png", "0811111111",
                 tags, hours, "owner-001", bank
         );
+        // DEFECT-ONB02-01 fix: ICA must be accepted for all callers including first-time CUSTOMER creators
+        profile.setIcaAccepted(true);
+        return profile;
     }
 
     private UserProfile ownerProfile() {
         Bank bank = new Bank();
         bank.setAccountId("acc-owner");
+        bank.setName("ukheshe");
+        bank.setPhone("0821111111");
+        bank.setBranchCode("051001"); // T-08: required for bank validation
+        bank.setType(BankAccType.CHEQUE);
         var p = new UserProfile("Owner", UserProfile.SignUpReason.SELL,
                 "1 Owner St", "https://img.test/o.png", "0821111111", ProfileRoles.CUSTOMER);
         p.setId("owner-001");

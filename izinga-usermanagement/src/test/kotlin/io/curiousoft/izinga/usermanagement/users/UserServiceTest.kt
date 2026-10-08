@@ -61,12 +61,14 @@ class UserServiceTest {
         )
 
         //when
+        // Production normalizes "081mobilenumb" → "+27obilenumb" before the duplicate check;
+        // stub and verify must use the post-normalization number.
         Mockito.`when`(profileRepo.save(initialProfile)).thenReturn(initialProfile)
-        Mockito.`when`(profileRepo.existsByMobileNumber(initialProfile.mobileNumber!!)).thenReturn(false)
+        Mockito.`when`(profileRepo.existsByMobileNumber("+27obilenumb")).thenReturn(false)
         val profile: Profile = profileService.create(initialProfile)
 
         //verify
-        Mockito.verify(profileRepo).existsByMobileNumber(initialProfile.mobileNumber!!)
+        Mockito.verify(profileRepo).existsByMobileNumber("+27obilenumb")
         Mockito.verify(profileRepo).save(initialProfile)
         Assert.assertNotNull(profile.id)
     }
@@ -86,11 +88,14 @@ class UserServiceTest {
         )
 
         //when
-        Mockito.`when`(profileRepo.existsByMobileNumber(initialProfile.mobileNumber!!)).thenReturn(true)
+        // Production normalizes "081mobilenumb" → "+27obilenumb" before calling existsByMobileNumber,
+        // so the stub must use the post-normalization value (last 9 chars + "+27" prefix).
+        Mockito.`when`(profileRepo.existsByMobileNumber("+27obilenumb")).thenReturn(true)
         try {
             val profile: Profile = profileService.create(initialProfile)
             Assert.fail()
         } catch (e: Exception) {
+            // initialProfile.mobileNumber was mutated to "+27obilenumb" by fomatMobileNumber()
             Assert.assertEquals("User with phone number " + initialProfile.mobileNumber + " already exist.", e.message)
         }
     }
@@ -124,7 +129,9 @@ class UserServiceTest {
         val profile: Profile = profileService.update(profileId, patchProfileRequest)
 
         //verify
-        Mockito.verify(profileRepo).findById(profileId)
+        // findById is called twice: once in UserProfileService.update() for the ICA-acceptance check,
+        // and once in the super (ProfileServiceImpl.update()) for the BeanUtils copy.
+        Mockito.verify(profileRepo, Mockito.times(2)).findById(profileId)
         Mockito.verify(profileRepo).save(initialProfile)
     }
 
@@ -161,7 +168,8 @@ class UserServiceTest {
         val profile: Profile? = profileService.findUserByPhone(phone)
 
         //verify
-        Mockito.verify(profileRepo).findByMobileNumber(phone)
+        // Production calls findByMobileNumber("0" + last9Digits) where last9 of "08128155778" = "128155778"
+        Mockito.verify(profileRepo).findByMobileNumber("0128155778")
     }
 
     @Test
@@ -268,9 +276,12 @@ class UserServiceTest {
         )
 
         //when
+        // findByLocation now delegates to findByRoleAndServiceTypeAndLatitudeBetweenAndLongitudeBetween
+        // (storeType was added to the bounding-box query to allow filtering by service type)
         Mockito.`when`(
-            profileRepo.findByRoleAndLatitudeBetweenAndLongitudeBetween(
+            profileRepo.findByRoleAndServiceTypeAndLatitudeBetweenAndLongitudeBetween(
                 ProfileRoles.MESSENGER,
+                StoreType.FOOD,
                 latitude - range, latitude + range, longitude - range, longitude + range
             )
         )
@@ -279,8 +290,9 @@ class UserServiceTest {
 
         //verify
         Assert.assertEquals(1L, messangers?.size?.toLong())
-        Mockito.verify(profileRepo).findByRoleAndLatitudeBetweenAndLongitudeBetween(
+        Mockito.verify(profileRepo).findByRoleAndServiceTypeAndLatitudeBetweenAndLongitudeBetween(
             ProfileRoles.MESSENGER,
+            StoreType.FOOD,
             latitude - range, latitude + range, longitude - range, longitude + range
         )
     }

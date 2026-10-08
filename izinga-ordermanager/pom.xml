@@ -54,6 +54,13 @@
             <version>1.0.0</version>
             <scope>runtime</scope>
         </dependency>
+        <!-- TIER-BILLING-01: PayFast subscription billing module -->
+        <dependency>
+            <groupId>io.curiousoft.izinga</groupId>
+            <artifactId>izinga-payfast</artifactId>
+            <version>1.0.0</version>
+            <scope>compile</scope>
+        </dependency>
         <dependency>
             <groupId>io.curiousoft.izinga</groupId>
             <artifactId>izinga-documentmanagement</artifactId>

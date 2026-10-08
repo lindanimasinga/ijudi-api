@@ -45,6 +45,10 @@ public class SecurityConfig {
                         // Rate-limited inside WhatsAppOtpService (per-phone + per-IP). SEC-01.
                         .requestMatchers(POST, "/auth/whatsapp/otp/send").permitAll()
                         .requestMatchers(POST, "/auth/whatsapp/otp/verify").permitAll()
+                        // SEC-TB01-01-E: PayFast ITN webhook — explicitly public (no JWT, PayFast server-to-server).
+                        // Security enforced by PayFast signature validation + server-to-server validate in PayFastItnHandler.
+                        // Never remove or move to authenticated() — PayFast cannot supply a Bearer token.
+                        .requestMatchers(POST, "/merchant/subscription/itn").permitAll()
                         .requestMatchers(GET, "/v2/promotion/**", "/v2/store/**").permitAll()
                         .requestMatchers(POST, "/v2/leads").permitAll()
                         .requestMatchers("/v2/**").authenticated()
@@ -55,6 +59,13 @@ public class SecurityConfig {
                         // SEC-01: store write endpoints require authentication; DELETE restricted to ADMIN
                         .requestMatchers(POST, "/store").authenticated()
                         .requestMatchers(PATCH, "/store/*", "/store/*/stock").authenticated()
+                        // SEC-ONB02-03-C: sub-resource PATCH paths have THREE path segments
+                        // (/store/{id}/ica-acceptance, /store/{id}/subscription-tier) and are NOT
+                        // covered by the single-segment wildcard above — explicit matchers required.
+                        .requestMatchers(PATCH, "/store/*/ica-acceptance").authenticated()
+                        .requestMatchers(PATCH, "/store/*/subscription-tier").authenticated()
+                        // TIER-BILLING-01: subscription initiate requires STORE_ADMIN (enforced via @PreAuthorize)
+                        .requestMatchers(POST, "/merchant/subscription/initiate").authenticated()
                         .requestMatchers(DELETE, "/store/*").hasRole("ADMIN")
                         .anyRequest().permitAll()
                 )

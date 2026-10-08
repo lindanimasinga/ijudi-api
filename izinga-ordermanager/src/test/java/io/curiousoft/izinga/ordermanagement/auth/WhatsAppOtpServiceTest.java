@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.ordermanagement.auth;
 
+import com.google.firebase.auth.AuthErrorCode;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.UserRecord;
@@ -12,23 +13,34 @@ import io.curiousoft.izinga.messaging.whatsapp.lines.WhatsappSenderResolver;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateRequest;
 import io.curiousoft.izinga.messaging.whatsapp.templates.WhatsappTemplateResponse;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import retrofit2.Call;
 import retrofit2.Response;
 
 import java.time.Instant;
 import java.util.Optional;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@RunWith(MockitoJUnitRunner.class)
+/**
+ * Unit tests for WhatsAppOtpService.
+ *
+ * Uses LENIENT strictness because setUp() stubs senderResolver for convenience (used only by
+ * sendOtp tests) and because some verify-path tests create local mocks that are only partially
+ * consumed (e.g. the notFound FirebaseAuthException in the new-user path is thrown twice but
+ * getAuthErrorCode() is only queried on the first catch).
+ */
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 public class WhatsAppOtpServiceTest {
 
     @Mock private WhatsAppOtpRepository otpRepository;
@@ -41,7 +53,7 @@ public class WhatsAppOtpServiceTest {
 
     private WhatsAppOtpService service;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         when(senderResolver.resolve(any(Audience.class), any())).thenReturn("testPhoneId");
         service = new WhatsAppOtpService(
@@ -66,14 +78,14 @@ public class WhatsAppOtpServiceTest {
         assertEquals("+27821234567", service.normalizeMobileNumber("27821234567"));
     }
 
-    @Test(expected = WhatsAppOtpException.class)
-    public void normalizeMobileNumber_tooShort_throwsException() throws WhatsAppOtpException {
-        service.normalizeMobileNumber("12345");
+    @Test
+    public void normalizeMobileNumber_tooShort_throwsException() {
+        assertThrows(WhatsAppOtpException.class, () -> service.normalizeMobileNumber("12345"));
     }
 
-    @Test(expected = WhatsAppOtpException.class)
-    public void normalizeMobileNumber_null_throwsException() throws WhatsAppOtpException {
-        service.normalizeMobileNumber(null);
+    @Test
+    public void normalizeMobileNumber_null_throwsException() {
+        assertThrows(WhatsAppOtpException.class, () -> service.normalizeMobileNumber(null));
     }
 
     // ===================== hashCode =====================
@@ -136,10 +148,13 @@ public class WhatsAppOtpServiceTest {
 
     @Test
     public void sendOtp_templateRecipientInBody_notInUrlPath() throws Exception {
-        // SSRF check: verify the normalized number goes into WhatsappTemplateRequest.to (body),
-        // not into the phoneId path parameter
+        // SSRF check: verify the normalized recipient number goes into WhatsappTemplateRequest.to
+        // (the request body), and the phone-line ID (from senderResolver) goes into the URL path.
+        // The critical invariant is that the URL path arg is the server-configured phone line ID,
+        // never the user-supplied recipient number.
         mockSuccessfulWhatsAppSend();
-        when(whatsappConfig.phoneId()).thenReturn("businessPhoneId");
+        // senderResolver is already stubbed in setUp() to return "testPhoneId" — this is the
+        // server-side phone line ID that should appear in the URL path, not the recipient number.
 
         service.sendOtp("0821234567", "10.0.0.1");
 
@@ -148,36 +163,32 @@ public class WhatsAppOtpServiceTest {
         ArgumentCaptor<String> phoneIdCaptor = ArgumentCaptor.forClass(String.class);
         verify(whatsAppService).sendMessage(phoneIdCaptor.capture(), captor.capture());
 
-        // phoneId in URL must be the WhatsApp Business phone ID, not the recipient
-        assertEquals("businessPhoneId", phoneIdCaptor.getValue());
+        // URL-path phoneId must be the server-configured line ID (from senderResolver), not the recipient
+        assertEquals("testPhoneId", phoneIdCaptor.getValue());
+        // Confirm the recipient number is NOT used as the phoneId in the URL path (SSRF guard)
+        assertNotEquals("+27821234567", phoneIdCaptor.getValue());
         // recipient goes into .to field (request body)
         assertEquals("+27821234567", captor.getValue().getTo());
     }
 
-    @Test(expected = WhatsAppOtpException.class)
+    @Test
     public void sendOtp_withinCooldown_throwsRateLimitException() throws Exception {
         mockSuccessfulWhatsAppSend();
         when(whatsappConfig.phoneId()).thenReturn("testPhoneId");
 
         service.sendOtp("0821234567", "192.168.1.1");
         // Second call within 60 s should throw
-        service.sendOtp("0821234567", "192.168.1.1");
+        assertThrows(WhatsAppOtpException.class, () -> service.sendOtp("0821234567", "192.168.1.1"));
     }
 
-    @Test(expected = WhatsAppOtpException.class)
+    @Test
     public void sendOtp_ipHourlyLimitExceeded_throwsRateLimitException() throws Exception {
-        mockSuccessfulWhatsAppSend();
-        when(whatsappConfig.phoneId()).thenReturn("testPhoneId");
-
         // Use a fresh service instance to avoid cross-test rate limit state
         WhatsAppOtpService freshService = new WhatsAppOtpService(
                 otpRepository, whatsAppService, whatsappConfig,
                 firebaseAuth, userProfileService, userProfileRepo, senderResolver);
 
-        // Exhaust IP limit with different phone numbers (simulating attacker cycling numbers)
-        // We need to send 10 requests from the same IP to different phone numbers
-        // but the per-phone cooldown prevents same-number rapid fire.
-        // Use reflection to inject the IP times directly to avoid the 60s cooldown.
+        // Inject the IP times directly to avoid the 60s cooldown
         var ipTimesField = WhatsAppOtpService.class.getDeclaredField("ipRequestTimes");
         ipTimesField.setAccessible(true);
         @SuppressWarnings("unchecked")
@@ -188,10 +199,10 @@ public class WhatsAppOtpServiceTest {
         for (int i = 0; i < 10; i++) times.add(now - 1000L * i);
         ipTimes.put("attacker-ip", times);
 
-        freshService.sendOtp("0829999999", "attacker-ip");
+        assertThrows(WhatsAppOtpException.class, () -> freshService.sendOtp("0829999999", "attacker-ip"));
     }
 
-    @Test(expected = WhatsAppOtpException.class)
+    @Test
     public void sendOtp_phoneHourlyLimitExceeded_throwsRateLimitException() throws Exception {
         WhatsAppOtpService freshService = new WhatsAppOtpService(
                 otpRepository, whatsAppService, whatsappConfig,
@@ -207,7 +218,7 @@ public class WhatsAppOtpServiceTest {
         for (int i = 0; i < 5; i++) times.add(now - 1000L * i);
         sendTimes.put("+27829999999", times);
 
-        freshService.sendOtp("0829999999", "some-ip");
+        assertThrows(WhatsAppOtpException.class, () -> freshService.sendOtp("0829999999", "some-ip"));
     }
 
     // ===================== verifyOtp =====================
@@ -264,14 +275,14 @@ public class WhatsAppOtpServiceTest {
         assertEquals(normalized, claimsCaptor.getValue().get("phone_number"));
     }
 
-    @Test(expected = WhatsAppOtpException.class)
-    public void verifyOtp_noActiveOtp_throwsException() throws Exception {
+    @Test
+    public void verifyOtp_noActiveOtp_throwsException() {
         when(otpRepository.findTopByMobileNumberAndUsedFalseOrderByCreatedAtDesc("+27821234567"))
                 .thenReturn(Optional.empty());
-        service.verifyOtp("0821234567", "123456");
+        assertThrows(WhatsAppOtpException.class, () -> service.verifyOtp("0821234567", "123456"));
     }
 
-    @Test(expected = WhatsAppOtpException.class)
+    @Test
     public void verifyOtp_wrongCode_incrementsAttemptAndThrows() throws Exception {
         String normalized = "+27821234567";
         var doc = makeDoc("doc3", normalized, "wronghash", 0, false);
@@ -281,24 +292,24 @@ public class WhatsAppOtpServiceTest {
         var updated = makeDoc("doc3", normalized, "wronghash", 1, false);
         when(otpRepository.atomicIncrementAttempt("doc3")).thenReturn(updated);
 
-        service.verifyOtp("0821234567", "999999");
+        assertThrows(WhatsAppOtpException.class, () -> service.verifyOtp("0821234567", "999999"));
 
         verify(otpRepository).atomicIncrementAttempt("doc3");
     }
 
-    @Test(expected = WhatsAppOtpException.class)
+    @Test
     public void verifyOtp_maxAttemptsReached_throwsException() throws Exception {
         String normalized = "+27821234567";
         var doc = makeDoc("doc4", normalized, "somehash", WhatsAppOtpService.MAX_VERIFY_ATTEMPTS, false);
         when(otpRepository.findTopByMobileNumberAndUsedFalseOrderByCreatedAtDesc(normalized))
                 .thenReturn(Optional.of(doc));
 
-        service.verifyOtp("0821234567", "123456");
+        assertThrows(WhatsAppOtpException.class, () -> service.verifyOtp("0821234567", "123456"));
         // Should throw before touching Firebase; no interaction with atomicMarkUsed
         verify(otpRepository, never()).atomicMarkUsed(anyString());
     }
 
-    @Test(expected = WhatsAppOtpException.class)
+    @Test
     public void verifyOtp_atomicMarkUsedReturnsNull_throwsException() throws Exception {
         // SEC-03: concurrent replay attempt — atomicMarkUsed returns null meaning already claimed
         String normalized = "+27821234567";
@@ -310,7 +321,7 @@ public class WhatsAppOtpServiceTest {
                 .thenReturn(Optional.of(doc));
         when(otpRepository.atomicMarkUsed("doc5")).thenReturn(null); // concurrent claim won
 
-        service.verifyOtp("0821234567", code);
+        assertThrows(WhatsAppOtpException.class, () -> service.verifyOtp("0821234567", code));
     }
 
     @Test
@@ -326,18 +337,197 @@ public class WhatsAppOtpServiceTest {
 
         // No existing profile
         when(userProfileService.findUserByPhone(normalized)).thenReturn(null);
-        // No existing Firebase user
+        // No existing Firebase user — stub getAuthErrorCode() so isUserNotFound() detects it via
+        // the primary auth-specific code check (not the message-contains fallback).
         FirebaseAuthException notFound = mock(FirebaseAuthException.class);
-        when(notFound.getMessage()).thenReturn("USER_NOT_FOUND");
+        when(notFound.getAuthErrorCode()).thenReturn(AuthErrorCode.USER_NOT_FOUND);
         when(firebaseAuth.getUserByPhoneNumber(normalized)).thenThrow(notFound);
+
         var newUser = mock(UserRecord.class);
         when(newUser.getUid()).thenReturn("new-uid-123");
         when(firebaseAuth.createUser(any(UserRecord.CreateRequest.class))).thenReturn(newUser);
-        when(firebaseAuth.createCustomToken(eq("new-uid-123"), anyMap())).thenReturn("token-new");
+        // createCustomToken is called with a UUID generated in resolveOrCreateFirebaseUser;
+        // use anyString() since the UID is not deterministic from the test's perspective.
+        when(firebaseAuth.createCustomToken(anyString(), anyMap())).thenReturn("token-new");
 
         String token = service.verifyOtp("0829999999", code);
         assertEquals("token-new", token);
         verify(userProfileRepo).save(any(UserProfile.class));
+    }
+
+    /**
+     * Regression test for the production bug where brand-new signups crashed with HTTP 500.
+     *
+     * Root cause: isUserNotFound() checked e.getErrorCode().name() against "USER_NOT_FOUND",
+     * but getErrorCode() returns the base ErrorCode enum which has no USER_NOT_FOUND constant
+     * (only NOT_FOUND). The auth-specific detail lives on getAuthErrorCode() which returns
+     * AuthErrorCode — that enum does have USER_NOT_FOUND. Additionally, the message-contains
+     * fallback checked for the literal substring "USER_NOT_FOUND" but the real Firebase SDK
+     * exception message is human-readable prose ("No user record found for the provided phone
+     * number: ...") which never contains that substring.
+     *
+     * As a result both conditions in the old isUserNotFound() were always false for the
+     * not-found case, the exception was re-thrown instead of triggering the create-user
+     * recovery path, and every brand-new signup (driver, customer, business) crashed.
+     *
+     * This test reproduces the exact production scenario. It would have thrown
+     * FirebaseAuthException (HTTP 500) on the old code; with the fix it returns a token.
+     */
+    @Test
+    public void verifyOtp_brandNewPhone_realFirebaseExceptionMessage_succeedsAndCreatesIdentity()
+            throws Exception {
+        String normalized = "+27839001122";
+        String code = "777777";
+        String hash = service.hashCode(normalized, code);
+
+        var doc = makeDoc("docBrandNew", normalized, hash, 0, false);
+        when(otpRepository.findTopByMobileNumberAndUsedFalseOrderByCreatedAtDesc(normalized))
+                .thenReturn(Optional.of(doc));
+        when(otpRepository.atomicMarkUsed("docBrandNew")).thenReturn(doc);
+
+        // No Mongo profile
+        when(userProfileService.findUserByPhone(normalized)).thenReturn(null);
+
+        // Simulate the EXACT exception the Firebase SDK throws for a brand-new number:
+        // - getAuthErrorCode() returns AuthErrorCode.USER_NOT_FOUND
+        // - getMessage() returns prose text with NO "USER_NOT_FOUND" substring
+        // With the old isUserNotFound() BOTH checks were false → exception re-thrown → 500.
+        FirebaseAuthException sdkException = mock(FirebaseAuthException.class);
+        when(sdkException.getAuthErrorCode()).thenReturn(AuthErrorCode.USER_NOT_FOUND);
+        when(sdkException.getMessage())
+                .thenReturn("No user record found for the provided phone number: " + normalized);
+        when(firebaseAuth.getUserByPhoneNumber(normalized)).thenThrow(sdkException);
+
+        var newUser = mock(UserRecord.class);
+        when(newUser.getUid()).thenReturn("brand-new-uid-9001");
+        when(firebaseAuth.createUser(any(UserRecord.CreateRequest.class))).thenReturn(newUser);
+        when(firebaseAuth.createCustomToken(anyString(), anyMap())).thenReturn("token-brand-new");
+
+        // Before fix: throws FirebaseAuthException → HTTP 500.  After fix: returns a token.
+        String token = service.verifyOtp("0839001122", code);
+
+        assertNotNull(token);
+        assertFalse(token.isBlank());
+        // Firebase user creation must have been attempted (brand-new identity minted)
+        verify(firebaseAuth).createUser(any(UserRecord.CreateRequest.class));
+        // UserProfile must have been persisted with the correct phone number
+        verify(userProfileRepo).save(argThat(profile ->
+                normalized.equals(profile.getMobileNumber())));
+    }
+
+    @Test
+    public void verifyOtp_noMongoProfileButFirebaseExists_reusesExistingFirebaseUid() throws Exception {
+        // Regression for identity-split bug: when a UserProfile was deleted (e.g. support/QA reset)
+        // but the Firebase Auth account still exists for the same phone, the SAME Firebase uid
+        // MUST be reused — not a new random one. Minting a new uid would permanently split the
+        // person across two Firebase identities, causing every subsequent auth token check to
+        // operate against the wrong identity (the real signed-in client carries the original uid).
+        String normalized = "+27812815707";
+        String code = "345678";
+        String hash = service.hashCode(normalized, code);
+
+        var doc = makeDoc("docReg1", normalized, hash, 0, false);
+        when(otpRepository.findTopByMobileNumberAndUsedFalseOrderByCreatedAtDesc(normalized))
+                .thenReturn(Optional.of(doc));
+        when(otpRepository.atomicMarkUsed("docReg1")).thenReturn(doc);
+
+        // No Mongo UserProfile exists (was deleted independently)
+        when(userProfileService.findUserByPhone(normalized)).thenReturn(null);
+        // Firebase Auth DOES have a verified user for this phone number
+        UserRecord existingFirebaseUser = mock(UserRecord.class);
+        when(existingFirebaseUser.getUid()).thenReturn("5jIWdGqg5IZ3wAyTtFNDPnRqLrn1");
+        when(firebaseAuth.getUserByPhoneNumber(normalized)).thenReturn(existingFirebaseUser);
+        when(firebaseAuth.createCustomToken(eq("5jIWdGqg5IZ3wAyTtFNDPnRqLrn1"), anyMap()))
+                .thenReturn("token-for-existing-user");
+
+        String token = service.verifyOtp("0812815707", code);
+
+        // Token must be minted for the EXISTING Firebase uid, not a new random one
+        assertEquals("token-for-existing-user", token);
+        // The missing UserProfile must be re-created against the EXISTING uid
+        verify(userProfileRepo).save(argThat(profile ->
+                "5jIWdGqg5IZ3wAyTtFNDPnRqLrn1".equals(profile.getId())
+                        && normalized.equals(profile.getMobileNumber())));
+        // A brand-new Firebase user must NOT be created
+        verify(firebaseAuth, never()).createUser(any(UserRecord.CreateRequest.class));
+    }
+
+    /**
+     * ONB-FIX: Verifies that the placeholder UserProfile created on a brand-new OTP verification
+     * has role == null, NOT ProfileRoles.CUSTOMER.
+     *
+     * A null role is the backend's intentional, first-class signal that this profile is an
+     * OTP-verified placeholder — the user has not yet completed their signup form.
+     * The frontend should key off role == null to distinguish a placeholder from a user who
+     * genuinely completed registration and was assigned an explicit role (e.g. CUSTOMER,
+     * MESSENGER, STORE_ADMIN).
+     *
+     * This invariant is enforced only here (WhatsAppOtpService.createUserProfile) — the
+     * self-service POST /user path (UserProfileService.create) still correctly requires a
+     * non-null role via validateUserProfileForCreate().
+     */
+    @Test
+    public void verifyOtp_newUser_placeholderProfileHasNullRole() throws Exception {
+        String normalized = "+27831000001";
+        String code = "888888";
+        String hash = service.hashCode(normalized, code);
+
+        var doc = makeDoc("docNull1", normalized, hash, 0, false);
+        when(otpRepository.findTopByMobileNumberAndUsedFalseOrderByCreatedAtDesc(normalized))
+                .thenReturn(Optional.of(doc));
+        when(otpRepository.atomicMarkUsed("docNull1")).thenReturn(doc);
+
+        // Brand-new number: no Mongo profile, no Firebase user
+        when(userProfileService.findUserByPhone(normalized)).thenReturn(null);
+        FirebaseAuthException notFound = mock(FirebaseAuthException.class);
+        when(notFound.getAuthErrorCode()).thenReturn(AuthErrorCode.USER_NOT_FOUND);
+        when(firebaseAuth.getUserByPhoneNumber(normalized)).thenThrow(notFound);
+
+        var newUser = mock(UserRecord.class);
+        when(newUser.getUid()).thenReturn("uid-null-role-test");
+        when(firebaseAuth.createUser(any(UserRecord.CreateRequest.class))).thenReturn(newUser);
+        when(firebaseAuth.createCustomToken(anyString(), anyMap())).thenReturn("token-null-role");
+
+        service.verifyOtp("0831000001", code);
+
+        // CRITICAL: the saved placeholder must have role == null, never CUSTOMER
+        verify(userProfileRepo).save(argThat(profile -> {
+            assertNull(
+                    profile.getRole(),
+                    "OTP placeholder profile must have role=null, got: " + profile.getRole());
+            return true;
+        }));
+    }
+
+    /**
+     * ONB-FIX complementary: verifies that when Firebase Auth already has a record for the phone
+     * (e.g. re-verify after a profile reset) the re-created placeholder still has role == null.
+     */
+    @Test
+    public void verifyOtp_existingFirebaseUserNoMongoProfile_placeholderHasNullRole() throws Exception {
+        String normalized = "+27831000002";
+        String code = "999888";
+        String hash = service.hashCode(normalized, code);
+
+        var doc = makeDoc("docNull2", normalized, hash, 0, false);
+        when(otpRepository.findTopByMobileNumberAndUsedFalseOrderByCreatedAtDesc(normalized))
+                .thenReturn(Optional.of(doc));
+        when(otpRepository.atomicMarkUsed("docNull2")).thenReturn(doc);
+
+        when(userProfileService.findUserByPhone(normalized)).thenReturn(null);
+        UserRecord existingFbUser = mock(UserRecord.class);
+        when(existingFbUser.getUid()).thenReturn("existing-uid-null-role");
+        when(firebaseAuth.getUserByPhoneNumber(normalized)).thenReturn(existingFbUser);
+        when(firebaseAuth.createCustomToken(anyString(), anyMap())).thenReturn("token-existing-null");
+
+        service.verifyOtp("0831000002", code);
+
+        verify(userProfileRepo).save(argThat(profile -> {
+            assertNull(
+                    profile.getRole(),
+                    "Re-created placeholder for existing Firebase user must have role=null, got: " + profile.getRole());
+            return true;
+        }));
     }
 
     // ===================== helpers =====================

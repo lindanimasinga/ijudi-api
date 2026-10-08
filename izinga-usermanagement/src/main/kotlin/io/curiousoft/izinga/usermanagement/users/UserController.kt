@@ -208,6 +208,17 @@ class AmbassadorAdminController(
 ) {
     private val logger = LoggerFactory.getLogger(AmbassadorAdminController::class.java)
 
+    companion object {
+        /**
+         * Placeholder used for the imageUrl field on admin-initiated ambassador records
+         * created before the ambassador has uploaded a profile photo.
+         * Mirrors the "no photo yet" default used by the izinga-onboarding frontend
+         * (UserUpdateComponent). Replace with an iZinga-hosted asset if this URL is
+         * ever rotated.
+         */
+        const val PENDING_PHOTO_URL = "https://pbs.twimg.com/media/C1OKE9QXgAAArDp.jpg"
+    }
+
     data class CreateAmbassadorRequest(
         val name: String,
         val mobileNumber: String,
@@ -230,11 +241,16 @@ class AmbassadorAdminController(
                 .body(mapOf("error" to "A user with this phone number already exists"))
         }
 
+        // address is intentionally blank: this is an admin-initiated record created before
+        // the ambassador has set a home address.  imageUrl uses PENDING_PHOTO_URL (a "no
+        // photo yet" placeholder) because the ambassador has not yet taken a selfie.
+        // UserProfileService.validateUserProfileForCreate() requires imageUrl to be non-blank
+        // on all profileService.create() calls; an empty string would cause a 400 here.
         val profile = UserProfile(
             request.name,
             UserProfile.SignUpReason.DELIVERY_DRIVER,
             "",
-            "",
+            PENDING_PHOTO_URL,
             request.mobileNumber,
             ProfileRoles.AMBASSADOR
         ).apply {

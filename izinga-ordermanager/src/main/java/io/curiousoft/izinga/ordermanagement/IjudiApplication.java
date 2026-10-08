@@ -26,7 +26,8 @@ import java.util.TimeZone;
 		"io.curiousoft.izinga.yocopay",
 		"io.curiousoft.izinga.usermanagement",
 		"io.curiousoft.izinga.qrcodegenerator",
-		"io.curiousoft.izinga.documentmanagement"})
+		"io.curiousoft.izinga.documentmanagement",
+		"io.curiousoft.izinga.payfast"})
 @EntityScan({"io.curiousoft.izinga.ordermanagement",
 		"io.curiousoft.izinga.commons",
 		"io.curiousoft.izinga.recon",
@@ -34,7 +35,8 @@ import java.util.TimeZone;
 		"io.curiousoft.izinga.yocopay",
 		"io.curiousoft.izinga.usermanagement",
 		"io.curiousoft.izinga.qrcodegenerator",
-		"io.curiousoft.izinga.documentmanagement"})
+		"io.curiousoft.izinga.documentmanagement",
+		"io.curiousoft.izinga.payfast"})
 @EnableMongoRepositories({"io.curiousoft.izinga.ordermanagement",
 		"io.curiousoft.izinga.commons",
 		"io.curiousoft.izinga.recon",

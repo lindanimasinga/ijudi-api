@@ -78,7 +78,7 @@ class AmbassadorIdValidationTest {
         val ambassador = buildAmbassadorProfile(approved = true)
         val newUser = buildNewUser(ambassadorId = "amb-001")
 
-        `when`(userProfileRepo.existsByMobileNumber("+27821234567")).thenReturn(false)
+        `when`(userProfileRepo.findByMobileNumber("+27821234567")).thenReturn(null)
         `when`(userProfileRepo.findById("amb-001")).thenReturn(Optional.of(ambassador))
         `when`(userProfileRepo.save(newUser)).thenReturn(newUser)
 
@@ -92,7 +92,7 @@ class AmbassadorIdValidationTest {
     fun `create with ambassador not found clears ambassadorId`() {
         val newUser = buildNewUser(ambassadorId = "no-such-id")
 
-        `when`(userProfileRepo.existsByMobileNumber("+27821234567")).thenReturn(false)
+        `when`(userProfileRepo.findByMobileNumber("+27821234567")).thenReturn(null)
         `when`(userProfileRepo.findById("no-such-id")).thenReturn(Optional.empty())
         `when`(userProfileRepo.save(newUser)).thenReturn(newUser)
 
@@ -106,7 +106,7 @@ class AmbassadorIdValidationTest {
         val notAmbassador = buildAmbassadorProfile(approved = true, role = ProfileRoles.MESSENGER)
         val newUser = buildNewUser(ambassadorId = "wrong-role-id")
 
-        `when`(userProfileRepo.existsByMobileNumber("+27821234567")).thenReturn(false)
+        `when`(userProfileRepo.findByMobileNumber("+27821234567")).thenReturn(null)
         `when`(userProfileRepo.findById("wrong-role-id")).thenReturn(Optional.of(notAmbassador))
         `when`(userProfileRepo.save(newUser)).thenReturn(newUser)
 
@@ -120,7 +120,7 @@ class AmbassadorIdValidationTest {
         val unapprovedAmbassador = buildAmbassadorProfile(approved = false)
         val newUser = buildNewUser(ambassadorId = "unapproved-amb")
 
-        `when`(userProfileRepo.existsByMobileNumber("+27821234567")).thenReturn(false)
+        `when`(userProfileRepo.findByMobileNumber("+27821234567")).thenReturn(null)
         `when`(userProfileRepo.findById("unapproved-amb")).thenReturn(Optional.of(unapprovedAmbassador))
         `when`(userProfileRepo.save(newUser)).thenReturn(newUser)
 
@@ -133,7 +133,7 @@ class AmbassadorIdValidationTest {
     fun `create with null ambassadorId skips lookup`() {
         val newUser = buildNewUser(ambassadorId = null)
 
-        `when`(userProfileRepo.existsByMobileNumber("+27821234567")).thenReturn(false)
+        `when`(userProfileRepo.findByMobileNumber("+27821234567")).thenReturn(null)
         `when`(userProfileRepo.save(newUser)).thenReturn(newUser)
 
         val result = profileService.create(newUser)
@@ -146,7 +146,7 @@ class AmbassadorIdValidationTest {
     fun `create with blank ambassadorId skips lookup`() {
         val newUser = buildNewUser(ambassadorId = "  ")
 
-        `when`(userProfileRepo.existsByMobileNumber("+27821234567")).thenReturn(false)
+        `when`(userProfileRepo.findByMobileNumber("+27821234567")).thenReturn(null)
         `when`(userProfileRepo.save(newUser)).thenReturn(newUser)
 
         // blank is treated as absent — isNullOrBlank() returns true, no lookup performed, no exception thrown
