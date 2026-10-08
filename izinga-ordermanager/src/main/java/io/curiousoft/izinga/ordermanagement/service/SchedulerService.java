@@ -279,17 +279,16 @@ import static java.lang.String.format;
                     //check missing required documents and send reminder if any
                     var missingFields = profileService.getAllMissingFields(profile);
                     boolean allFieldsProvided = missingFields.isEmpty();
-                    if (!allFieldsProvided && (profile.getMissingDocumentsReminderSent() == null || !profile.getMissingDocumentsReminderSent())) {
+                    if(allFieldsProvided) {
+                        LOG.warn("Driver {} has provided all required documents, Please review ", profile.getName());
+                    } else if (Boolean.TRUE.equals(profile.getMissingDocumentsReminderSent())) {
+                        LOG.warn("Driver {} has missing documents, but reminder already sent. Missing fields: {}", profile.getName(), missingFields);
+                    } else {
                         LOG.info("Sending missing documents reminder to driver: {}", profile.getName());
                         smsNotificationService.sendMissingDocumentReminder(profile.getMobileNumber(), profile.getName());
                         profile.setMissingDocumentsReminderSent(true);
                         LOG.info("Missing documents reminder sent to driver: {}", profile.getName());
-                    } else if (allFieldsProvided) {
-                        LOG.debug("All required documents provided for driver: {}", profile.getName());
-                    } else {
-                        LOG.debug("Missing documents reminder already sent for driver: {}", profile.getName());
                     }
-
                     userProfileRepo.save(profile);
                     LOG.debug("Driver profile saved successfully: {}", profile.getName());
                     counters[0]++;
