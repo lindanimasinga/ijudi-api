@@ -20,14 +20,15 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.springframework.context.ApplicationEventPublisher
 
 /**
- * Tests for the [UserProfileService.pendingAproval] fix that excludes CUSTOMER-role profiles
- * from the pending approvals list.
+ * Tests for [UserProfileService.pendingAproval].
  *
- * Prior behaviour: called profileRepo.findByProfileApproved(false) which returned ALL unapproved
- * profiles including CUSTOMER — causing them to appear on the admin Pending Approvals page.
- *
- * Fixed behaviour: calls profileRepo.findByProfileApprovedAndRoleNot(false, ProfileRoles.CUSTOMER),
- * which excludes CUSTOMER at the database layer.
+ * The method applies two exclusion layers:
+ *  1. DB layer — findByProfileApprovedAndRoleNot(false, CUSTOMER) removes docs where
+ *     role == "CUSTOMER".
+ *  2. In-memory filter — `.filter { it.role != null }` removes docs where the role field
+ *     is entirely absent from MongoDB. MongoDB's $ne does NOT exclude missing-field documents
+ *     (a missing value is "not equal to CUSTOMER" and passes through). These are incomplete
+ *     OTP-placeholder signups that never selected a service type.
  */
 @ExtendWith(MockitoExtension::class)
 class UserProfileServicePendingApprovalsTest {
@@ -81,8 +82,89 @@ class UserProfileServicePendingApprovalsTest {
         verify(profileRepo).findByProfileApprovedAndRoleNot(false, ProfileRoles.CUSTOMER)
     }
 
+    @Test
+    fun `pendingAproval returns unapproved STORE profiles`() {
+        val store = unapprovedProfile(ProfileRoles.STORE)
+        `when`(profileRepo.findByProfileApprovedAndRoleNot(false, ProfileRoles.CUSTOMER))
+            .thenReturn(listOf(store))
+
+        val result = profileService.pendingAproval()
+
+        assertEquals(listOf(store), result)
+        verify(profileRepo).findByProfileApprovedAndRoleNot(false, ProfileRoles.CUSTOMER)
+    }
+
+    @Test
+    fun `pendingAproval returns unapproved MESSENGER_ADMIN profiles`() {
+        val messengerAdmin = unapprovedProfile(ProfileRoles.MESSENGER_ADMIN)
+        `when`(profileRepo.findByProfileApprovedAndRoleNot(false, ProfileRoles.CUSTOMER))
+            .thenReturn(listOf(messengerAdmin))
+
+        val result = profileService.pendingAproval()
+
+        assertEquals(listOf(messengerAdmin), result)
+        verify(profileRepo).findByProfileApprovedAndRoleNot(false, ProfileRoles.CUSTOMER)
+    }
+
+    @Test
+    fun `pendingAproval returns unapproved REFERRAL_PARTNER profiles`() {
+        val partner = unapprovedProfile(ProfileRoles.REFERRAL_PARTNER)
+        `when`(profileRepo.findByProfileApprovedAndRoleNot(false, ProfileRoles.CUSTOMER))
+            .thenReturn(listOf(partner))
+
+        val result = profileService.pendingAproval()
+
+        assertEquals(listOf(partner), result)
+        verify(profileRepo).findByProfileApprovedAndRoleNot(false, ProfileRoles.CUSTOMER)
+    }
+
     // -------------------------------------------------------------------------
-    // Bug regression: the OLD findByProfileApproved must no longer be called
+    // Null-role exclusion (the follow-up fix for missing-field documents)
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `pendingAproval excludes profiles with null role`() {
+        val nullRoleProfile = unapprovedProfile(null)
+        // The repo returns the null-role doc (MongoDB $ne passes it through)
+        `when`(profileRepo.findByProfileApprovedAndRoleNot(false, ProfileRoles.CUSTOMER))
+            .thenReturn(listOf(nullRoleProfile))
+
+        val result = profileService.pendingAproval()
+
+        assertTrue(result.isEmpty(),
+            "A profile with role=null must be excluded from pending approvals")
+        verify(profileRepo).findByProfileApprovedAndRoleNot(false, ProfileRoles.CUSTOMER)
+    }
+
+    @Test
+    fun `pendingAproval excludes null role profile when mixed with valid service-provider profiles`() {
+        val nullRoleProfile = unapprovedProfile(null)
+        val messenger = unapprovedProfile(ProfileRoles.MESSENGER)
+        `when`(profileRepo.findByProfileApprovedAndRoleNot(false, ProfileRoles.CUSTOMER))
+            .thenReturn(listOf(nullRoleProfile, messenger))
+
+        val result = profileService.pendingAproval()
+
+        assertEquals(1, result.size)
+        assertEquals(ProfileRoles.MESSENGER, result[0].role)
+    }
+
+    @Test
+    fun `pendingAproval result contains no null-role entries`() {
+        val nullRoleProfile = unapprovedProfile(null)
+        val storeAdmin = unapprovedProfile(ProfileRoles.STORE_ADMIN)
+        `when`(profileRepo.findByProfileApprovedAndRoleNot(false, ProfileRoles.CUSTOMER))
+            .thenReturn(listOf(nullRoleProfile, storeAdmin))
+
+        val result = profileService.pendingAproval()
+
+        assertFalse(result.any { it.role == null },
+            "No null-role profiles must appear in pending approvals")
+        assertTrue(result.any { it.role == ProfileRoles.STORE_ADMIN })
+    }
+
+    // -------------------------------------------------------------------------
+    // Bug regression: CUSTOMER-role still excluded
     // -------------------------------------------------------------------------
 
     @Test
@@ -92,7 +174,7 @@ class UserProfileServicePendingApprovalsTest {
 
         profileService.pendingAproval()
 
-        // Correct new method is called with approved=false and excluding CUSTOMER
+        // Correct method is called with approved=false and excluding CUSTOMER
         verify(profileRepo).findByProfileApprovedAndRoleNot(false, ProfileRoles.CUSTOMER)
         // No other interactions — findByProfileApproved(false) must NOT be called
         verifyNoMoreInteractions(profileRepo)
@@ -131,7 +213,7 @@ class UserProfileServicePendingApprovalsTest {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private fun unapprovedProfile(role: ProfileRoles): UserProfile {
+    private fun unapprovedProfile(role: ProfileRoles?): UserProfile {
         val profile = UserProfile(
             "Test User",
             UserProfile.SignUpReason.BUY,
