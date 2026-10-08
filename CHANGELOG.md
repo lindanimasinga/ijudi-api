@@ -1,104 +1,71 @@
 # Changelog
 
-All notable changes to ijudi-api are documented here.
+## [1.12.0] — 2026-10-08
 
----
+**Release type:** Feature (P2)
 
-## [Unreleased] — WA-LINES-01 WhatsApp multi-line support
-
-**Feature Brief:** docs/feature-briefs/WA-LINES-01-feature-brief.md
-**Pre-deploy runbook:** docs/feature-briefs/WA-LINES-01-runbook.md
+**Summary:** Adds PayFast subscription billing (izinga-payfast module), store owner onboarding tiers (ONB-02), and a batch of OTP/signup bug fixes found during furniture-delivery E2E testing.
 
 ### Changes
 
-- [NEW] **WA-LINES-01: WhatsApp multi-line support** — introduces a `WhatsappLine` document and repository, enabling the backend to manage multiple WhatsApp Business phone numbers (lines) mapped to different audiences (CUSTOMER, DRIVER, MERCHANT).
-- [NEW] **WhatsappSenderResolver** — resolves the correct outbound phone number ID for a given context, replacing the previous single-line global config.
-- [NEW] **LineContext record** — threads explicit pipeline context (phoneNumberId, agentName, storeId) through the entire inbound event handler pipeline (REQ-10).
-- [NEW] **WhatsappLineBootstrap** — idempotent startup seeding that registers configured lines in MongoDB on application start.
-- [NEW] **WhatsappLineAdminController** — `/admin/whatsapp-lines` CRUD endpoints secured to ADMIN role with full audit logging (SEC-06).
-- [NEW] **WhatsappLineAuditRecord** — append-only audit log for all line configuration mutations (SEC-06).
-- [NEW] **Compound session lookup** — `WhatsappSession` extended with `phoneNumberId` and `agentName`; compound-key index `findByFromAndPhoneNumberId` added (SEC-02).
-- [NEW] **Per-agent conversation cache** — single-entry Caffeine cache replaced with `ConcurrentHashMap` keyed per agent name.
-- [NEW] **Per-agent `handleWhatsappQueryForAgent` overloads** — `AiAgentConfigService` exposes named-agent dispatch (REQ-20).
-- [NEW] **HMAC-SHA256 webhook signature verification** — inbound webhook requests are verified against `X-Hub-Signature-256`; configurable via `whatsapp.cloud.appSecret` (SEC-01).
-- [NEW] **HumanCorrectionSanitizer** — strips prompt-injection attempts from human-correction payloads before they reach the AI pipeline (SEC-04).
-- [NEW] **PhoneNumberUtil** — normalises `0`-prefix South African numbers to E.164 format with null-safety guards.
-- [NEW] **Audience enum** — `CUSTOMER`, `DRIVER`, `MERCHANT` categorisation on `WhatsappLine`.
-- [NEW] **Security rules** — Spring Security extended with `/forward/**` (authenticated) and `/admin/whatsapp-lines/**` (ADMIN) path rules (SEC-05/SEC-06).
-- [IMPROVED] **WhatsappConfig** — extended with `multiLineEnabled` flag and `appSecret` field for HMAC verification.
+- [NEW] `izinga-payfast` Maven module — full PayFast subscription billing: checkout initiation (`POST /merchant/subscription/initiate`), server-to-server ITN validation handler (`POST /merchant/subscription/itn`), `MerchantSubscription` lifecycle (PENDING_PAYMENT → ACTIVE / FAILED). Complies with all SEC-TB01 security requirements (atomic idempotency, server-side validate mandatory, `payFastToken` @JsonIgnore, no bypass path in production).
+- [NEW] `SubscriptionTier` enum in `izinga-commons` — FREE, PREMIUM_1, PREMIUM_2 with display labels and pricing constants. Contract test (`SubscriptionTierContractTest`) prevents accidental enum value changes.
+- [NEW] `StoreProfile` tier fields — `subscriptionTier`, `icaAccepted`, `icaAcceptedDate`, `icaVersion` (all additive, no breaking changes to existing API consumers).
+- [NEW] STORE_ADMIN role assignment path — store creators are now assigned STORE_ADMIN role; ICA acceptance gate blocks store activation until ICA is accepted.
+- [NEW] `StoreServiceSubscriptionEventListener` — activates store on `MerchantSubscriptionActivatedEvent` (PayFast ITN COMPLETE).
+- [NEW] QA test-plan library (`docs/test-plans/`) — structured test plans for customer furniture-booking, driver quote-fulfilment, and store PayFast billing flows.
+- [FIX] `ONB-FIX`: WhatsApp OTP placeholder created with `role=null` instead of `CUSTOMER` — prevents downstream signup rejection when the signup completes via `POST /user` (commits 73ff2a9, 361993f, 41b37ca).
+- [FIX] `mobileNumber` unique index scoped to `UserProfile` only — removes erroneous cross-collection uniqueness constraint that was blocking driver/customer registrations when a store owner with the same number existed (commit 6368659).
+- [FIX] Required-field validation — `@NotNull` / `@field:NotNull` use-site target applied correctly; profile create and update now reject missing `imageUrl`, `name`, `surname`, `emailAddress` (commits 22d0d11, 3340ec4, 2d1cb22).
+- [FIX] `isUserNotFound()` used wrong Firebase Admin SDK error-code accessor — brand-new Firebase sign-ups threw 500 instead of returning a clean "not found" signal; now uses `getErrorCode()` not `getMessage()` (commit 791cb68).
+- [FIX] `STORE-BANK-01`: store-submitted bank details are no longer unconditionally overwritten by the user's primary bank on store creation (commit 3e44483).
+- [FIX] Pre-existing test failures in recon, usermanagement, and yoco-pay modules resolved (commit 2734ed8).
+- [FIX] `ResponseStatusException` now propagates through `IjudiErrorHandler` — previously swallowed, causing opaque 500 responses for intentional HTTP error responses (commit ef84e8b).
+- [FIX] Firebase storeId JWT claim set on store creation — downstream PayFast checkout uses JWT claim for IDOR-safe storeId resolution (commit 29406e5).
+- [FIX] ICA gate bypass closed for CUSTOMER-role first-time store creators (commit 9f4b9e0).
 
 ### Breaking changes
 
-None — additive only. Existing single-line deployments continue to work with `multiLineEnabled=false` (default). The feature is production-gated: it activates only when `whatsapp.cloud.driverPhoneId` and `whatsapp.cloud.appSecret` are provisioned in Secrets Manager `izinga-prod` and the pre-deploy MongoDB runbook is executed.
+None. All API changes are additive. `SubscriptionTier` enum values must not be renamed — enforced by `SubscriptionTierContractTest`.
 
-### Production deployment prerequisites (NOT YET MET — deferred by Lindani)
+### Known issues (tracked separately — not blocking this release)
 
-1. Lindani provisions `whatsapp.cloud.driverPhoneId` and `whatsapp.cloud.appSecret` in Secrets Manager `izinga-prod`.
-2. Lindani executes the MongoDB runbook at `docs/feature-briefs/WA-LINES-01-runbook.md` against the production database.
-3. Lindani gives explicit go-ahead for the production release.
-
----
-
-## [1.7.0] — 2026-09-04
-
-**Release type:** Feature
-
-**Summary:** WhatsApp OTP login, CPA-compliant customer cancellation fee, store endpoint authentication hardening, and ownership-transfer prevention on PATCH.
-
-### Changes
-
-- [NEW] **WhatsApp OTP login** — customers can now authenticate via a WhatsApp one-time password instead of SMS OTP. Backend generates and validates OTP tokens delivered through the WhatsApp Business API channel.
-- [NEW] **ADR-019: CPA-compliant customer cancellation fee** — implements Phase 1 of the Consumer Protection Act-aligned cancellation fee policy for customer-initiated order cancellations. Fee calculation and enforcement logic added to the order cancellation flow.
-- [NEW] **SEC-01-02: Store endpoint authentication + Lambda token-refresh fix** — all store write endpoints now require authentication. The `store-menu-to-izinga-menu` Lambda now carries a token-refresh interceptor so outbound requests to izinga-api authenticate correctly.
-- [FIX] **NOTE-01: Strip `ownerId` from PATCH body** — ownership transfer is no longer possible via the PATCH endpoint; `ownerId` in the request body is silently ignored. Prevents inadvertent or malicious ownership reassignment.
-
-### Breaking changes
-
-None.
-
-### Accepted risk — documented for audit
-
-**SEC-01-02 / IZINGA_SERVICE_TOKEN provisioning on `store-menu-to-izinga-menu` Lambda not confirmed.**
-The Lambda token-refresh interceptor requires the `IZINGA_SERVICE_TOKEN` environment variable to be provisioned in the Lambda execution environment. As of this release, DevOps has not confirmed that this secret is present in production. If the variable is absent, franchise menu sync requests from the Lambda to izinga-api will receive HTTP 401 responses and menu sync will silently fail until the secret is provisioned.
-
-**Risk accepted by:** Lindani Masinga (co-founder, iZinga) — 2026-09-04
-
-**Mitigation:** DevOps to provision `IZINGA_SERVICE_TOKEN` in the `store-menu-to-izinga-menu` Lambda environment immediately after this release. Monitor CloudWatch logs for 401s on the `/store/{storeId}/menu` endpoint in the 24 hours post-deploy.
+- **SEC-CRIT-01**: Multiple production credentials hardcoded in `izinga-ordermanager/src/main/resources/application-prod.yml` — pre-existing, flagged 2026-10-02, credential rotation and git-history scrub tracked as high-priority issue per Lindani Masinga direct authorization 2026-10-08.
+- **SEC-IDOR-01**: `OrderServiceImpl.acceptQuote()` trusts client-supplied `messengerId` with no identity check — pre-existing, tracked as follow-up.
+- **BILLING-PROD-GATE**: PayFast merchant 16791971 production rate confirmation (Gate b) and BackOffice setup (Gate c) must be completed before Premium billing tiers are activated in production. Free tier activation is safe. PREMIUM_1 and PREMIUM_2 are disabled ("Coming Soon") in the frontend.
 
 ### Deployment sequence
 
-1. `ijudi-api` (this release) — backend first.
-2. No frontend repos are affected by this release.
+1. ijudi-api (this release) — deploy first; backend changes are additive and safe for existing frontend clients.
+2. izinga-onboarding v1.17.0 — deploy after backend is confirmed stable.
 
 ### Rollback steps
 
-1. On ECS: update the service to the previous task definition revision (task def that ran `1.6.0` image).
-2. In ECR: the `1.6.0` image is tagged and retained — redeploy it via `aws-ecr-push.yml` with `IMAGE_TAG=1.6.0` or trigger a manual ECS task definition rollback.
-3. If the `IZINGA_SERVICE_TOKEN` Lambda issue causes cascading 401s before rollback is possible, the Lambda can be temporarily disabled in the AWS console without affecting the main API.
-4. No database migrations in this release — no data rollback required.
+1. `git revert -m 1 <merge-commit-sha>` on master — reverts to v1.11.0 behavior; creates a revert commit rather than a forced reset.
+2. Redeploy the previous artifact (v1.11.0 tag on master, `49f3392`).
+3. If `MerchantSubscription` documents were written to MongoDB during the window: collection can remain; no foreign key constraints are broken by rolling back the code. Subscriptions will remain in PENDING_PAYMENT state until the next PayFast ITN lands — which will fail cleanly once the handler is restored in a hotfix.
+4. Notify Lindani and Hloniphani of the rollback trigger conditions (500 rate spike, PayFast ITN failures, OTP signup failure rate).
 
-### Smoke test plan
+### Smoke test plan (post-deploy — minimum checks within 15 minutes)
 
-1. **WhatsApp OTP login** — initiate login with a valid phone number; confirm OTP is delivered via WhatsApp and accepted by the API. Expected: HTTP 200 with a valid auth token.
-2. **Customer cancellation fee** — cancel an eligible order via the customer app; confirm the CPA cancellation fee is calculated and returned in the cancel response. Expected: fee amount present in response body, audit log entry created.
-3. **Store write endpoint auth** — attempt a store update (`PUT /store/{storeId}`) without an auth header. Expected: HTTP 401.
-4. **Store write endpoint auth (authenticated)** — perform the same store update with a valid Bearer token. Expected: HTTP 200, update persisted.
-5. **ownerId PATCH** — send a `PATCH /store/{storeId}` body containing `ownerId` pointing to a different user. Expected: HTTP 200 but `ownerId` unchanged in the database.
-6. **Franchise menu sync (Lambda)** — trigger a menu sync from the `store-menu-to-izinga-menu` Lambda (if `IZINGA_SERVICE_TOKEN` is provisioned) and confirm menus update correctly. Expected: HTTP 200 from izinga-api menu endpoint; if token not provisioned, 401 expected — monitor CloudWatch.
+1. `POST /user` with `role=null` body — new store owner OTP flow completes signup without 400/500 — expected: 200 with profile created.
+2. `POST /merchant/subscription/initiate` with valid STORE_ADMIN JWT — returns PayFast checkout URL and `mPaymentId` — expected: 200 with checkout params.
+3. `POST /merchant/subscription/itn` with a valid sandbox COMPLETE ITN payload — `MerchantSubscription` transitions to ACTIVE, store `subscriptionTier` updated — expected: 200.
+4. Store creation with different bank details from user bank — verify store retains submitted bank, not user's primary bank — expected: stored bank matches submitted values.
+5. New user registration (fresh Firebase account) — verify no 500 on `isUserNotFound()` path — expected: clean 404 or redirect to registration flow.
 
 ### Post-deployment monitoring
 
-- **15 min:** Check ECS service health — task count stable, no crash loops.
-- **1 hour:** CloudWatch logs — scan for 401s on `/store/*` endpoints from the Lambda (flag if seen and `IZINGA_SERVICE_TOKEN` not yet provisioned by DevOps).
-- **24 hours:** Order cancellation fee volume, WhatsApp OTP success/failure rate, store update error rate.
-- **Growth & Analytics:** Watch for anomalies in order cancellation volume (CPA fee may affect cancellation behaviour).
+- 15 min: Error rate on `/user`, `/merchant/subscription/initiate`, `/merchant/subscription/itn` — baseline < 1% errors.
+- 1 hour: Monitor MongoDB `merchant_subscriptions` collection for unexpected FAILED states; confirm PENDING_PAYMENT → ACTIVE transitions via PayFast sandbox ITN.
+- 24 hours: Growth & Analytics to check for OTP signup failure rate (target: < 2% drop-off at OTP step); store creation success rate.
 
-### Approved by
+### Gate citations
 
-Lindani Masinga — 2026-09-04
+- Feature Brief: Lindani Masinga — direct authorization 2026-10-08 (this conversation)
+- Code Review: PASS — iZinga Code Reviewer 2026-10-08
+- QA Gate 1: PASS — 1460 tests / 0 failures (ijudi-api, 2026-10-08)
+- Security gate (a): CONDITIONAL PASS — all six SEC-TB01 required changes verified in implementation
+- SEC-CRIT-01: Acknowledged by Lindani Masinga 2026-10-08; rotation tracked as separate issue
 
----
-
-## [1.6.0] — 2026-08 (previous release)
-
-Payout Reconciliation initiative — ambassador and referral partner payout bundle endpoints, admin-auth enforcement on recon endpoints.
+**Approved by:** Lindani Masinga — 2026-10-08
