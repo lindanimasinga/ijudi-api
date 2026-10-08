@@ -174,7 +174,15 @@ class UserProfileService(
     }
 
     fun pendingAproval(): List<UserProfile> {
-        return profileRepo.findByProfileApproved(false)
+        // Two exclusion layers:
+        // 1. DB layer: findByProfileApprovedAndRoleNot(CUSTOMER) removes explicitly-CUSTOMER docs.
+        // 2. In-memory: filter out docs where the role field is entirely absent from MongoDB
+        //    (null). MongoDB's $ne operator does NOT exclude missing-field documents — a missing
+        //    role is treated as "not equal to CUSTOMER" and passes through. These null-role records
+        //    are incomplete OTP-placeholder signups that never selected a service type; they have no
+        //    legitimate pending-approval status and must not appear in the admin queue.
+        return profileRepo.findByProfileApprovedAndRoleNot(false, ProfileRoles.CUSTOMER)
+            .filter { it.role != null }
     }
 
     fun findMessengersByAdminId(messengerAdminId: String): List<UserProfile> {
