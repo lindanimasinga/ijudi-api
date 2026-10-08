@@ -24,6 +24,7 @@ Each userType directory holds one file per feature. A feature that spans two use
 |---|---|---|---|
 | customer | Furniture/parcel booking | [customer/furniture-booking.md](customer/furniture-booking.md) | 2026-10-08 |
 | driver | Quote acceptance & delivery fulfilment | [driver/quote-acceptance-and-fulfilment.md](driver/quote-acceptance-and-fulfilment.md) | 2026-10-08 |
+| store | PayFast subscription billing — tier selection, checkout, ITN activation | [store/payfast-subscription-billing.md](store/payfast-subscription-billing.md) | 2026-10-08 |
 
 ## Maintenance rule
 
