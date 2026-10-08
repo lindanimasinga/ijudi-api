@@ -1,5 +1,54 @@
 # Changelog
 
+## [1.13.0] — 2026-10-08
+
+**Release type:** Patch (P1 — bug fix, no new features)
+
+**Summary:** Removes CUSTOMER-role profiles and null-role OTP placeholders from the admin Pending Approvals list so only genuine driver and store approval requests are surfaced.
+
+### Changes
+
+- [FIX] `GET /pending-approvals` no longer returns CUSTOMER-role profiles — new Spring Data derived query `findByProfileApprovedAndRoleNot` excludes the CUSTOMER role at the database level (commit `abec2f6`).
+- [FIX] `GET /pending-approvals` no longer returns null-role OTP placeholders — an in-memory post-query filter removes profiles where `role == null`; MongoDB `$ne` does not exclude documents with a missing field, so a code-level guard is required (commit `0173743`). The upstream cause (OTP placeholder created with `role=null`) was fixed in v1.12.0 (commit `73ff2a9`); this patch cleans up any pre-existing placeholders that already exist in production.
+
+### Breaking changes
+
+None. Change is additive and query-only; no API contract, response shape, or enum values altered.
+
+### Deployment sequence
+
+1. ijudi-api only — no frontend changes required; this is a backend-only patch.
+
+### Rollback steps
+
+1. Redeploy the v1.12.0 artifact (tag `1.12.0`, commit `a6f3f02` on master) via ECS to revert. No data migration required — the fix is query-only and leaves no persistent state.
+2. Notify Lindani of rollback; monitor `/pending-approvals` response count post-revert.
+
+### Smoke test plan (post-deploy — minimum checks within 15 minutes)
+
+1. `GET /pending-approvals` with admin JWT — confirm response contains zero CUSTOMER-role entries — expected: only DRIVER and STORE_ADMIN profiles in the list.
+2. `GET /pending-approvals` with admin JWT — confirm response contains zero null-role entries — expected: no profile with `role: null` present.
+3. Create a new store (triggers OTP with `role=null`), then do NOT complete signup — call `GET /pending-approvals` and confirm the placeholder does not appear in the list.
+4. Approve a driver and a store from the admin panel using the pending-approvals list — confirm approvals complete successfully end-to-end.
+5. Verify total pending count reflects only actionable requests (drivers awaiting approval + stores awaiting approval) — no noise from sign-up artifacts.
+
+### Post-deployment monitoring
+
+- 15 min: `GET /pending-approvals` response count — confirm the count is not inflated by customer/null-role noise; spot-check 3–5 results.
+- 1 hour: Admin panel error rate — confirm no 500s on the pending-approvals endpoint.
+- 24 hours: Growth & Analytics to confirm driver and store approval throughput is normal (no approvals silently blocked).
+
+### Gate citations
+
+- Bugfix Branch: `bugfix/pending-approvals-exclude-customer` — merged to develop 2026-10-08
+- Code Review: PASS WITH MINOR NOTES — iZinga Code Reviewer 2026-10-08 (both commits independently reviewed)
+- QA Gate 1: PASS — 249/249 tests, 100% branch coverage on changed method, Corretto 17, 2026-10-08
+- Live verification: pending count dropped 14 → 4, zero CUSTOMER/null-role records in raw JSON response
+- QA Gate 2 (regression): PASS — 249 tests, 0 failures, 0 errors, BUILD SUCCESS, Corretto 17, 2026-10-08
+- Product Owner sign-off: Lindani Masinga — "lets release" 2026-10-08
+
+---
+
 ## [1.12.0] — 2026-10-08
 
 **Release type:** Feature (P2)
