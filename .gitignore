@@ -46,5 +46,4 @@ izinga-qrcode-generator/.DS_Store
 izinga-recon/.DS_Store
 izinga-usermanagement/.DS_Store
 izinga-yoco-pay/.DS_Store
-# application-prod.yml is intentionally tracked — it contains NO secrets.
-# All credentials are loaded at runtime from aws-secretsmanager:izinga-prod (DEVOPS-001).
+izinga-ordermanager/src/main/resources/application-prod.yml
