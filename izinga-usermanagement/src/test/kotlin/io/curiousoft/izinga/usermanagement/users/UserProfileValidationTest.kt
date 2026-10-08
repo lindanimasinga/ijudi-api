@@ -521,4 +521,98 @@ class UserProfileValidationTest {
         profileService.update("testId", incoming)
         verify(userProfileRepo).save(persisted)
     }
+
+    // -----------------------------------------------------------------------
+    // EWALLET — create() bank validation
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `create accepts EWALLET bank with only phone and type set`() {
+        val bank = Bank().apply { phone = "0812815707"; type = BankAccType.EWALLET }
+        // accountId, name, branchCode all null — must not be required for EWALLET
+        val profile = UserProfile("John", UserProfile.SignUpReason.BUY, "address", "https://img", "+27812815707", ProfileRoles.CUSTOMER)
+        profile.bank = bank
+        // fomatMobileNumber normalizes "+27812815707" → last9="812815707" → "+27812815707"
+        `when`(userProfileRepo.findByMobileNumber("+27812815707")).thenReturn(null)
+        `when`(userProfileRepo.save(profile)).thenReturn(profile)
+        val result = profileService.create(profile)
+        verify(userProfileRepo).save(profile)
+    }
+
+    @Test
+    fun `create rejects EWALLET bank missing phone`() {
+        val bank = Bank().apply { phone = null; type = BankAccType.EWALLET }
+        val profile = UserProfile("John", UserProfile.SignUpReason.BUY, "address", "https://img", "+27812815707", ProfileRoles.CUSTOMER)
+        profile.bank = bank
+        val ex = assertThrows(ResponseStatusException::class.java) { profileService.create(profile) }
+        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
+        assertEquals("Bank phone is required", ex.reason)
+    }
+
+    @Test
+    fun `create still rejects CHEQUE bank missing accountId — regression guard`() {
+        val bank = Bank().apply { accountId = null; name = "FNB"; branchCode = "250655"; phone = "0800"; type = BankAccType.CHEQUE }
+        val profile = UserProfile("John", UserProfile.SignUpReason.BUY, "address", "https://img", "+27812815707", ProfileRoles.CUSTOMER)
+        profile.bank = bank
+        val ex = assertThrows(ResponseStatusException::class.java) { profileService.create(profile) }
+        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
+        assertEquals("Bank account ID is required", ex.reason)
+    }
+
+    @Test
+    fun `create still rejects CHEQUE bank missing name — regression guard`() {
+        val bank = Bank().apply { accountId = "12345678"; name = null; branchCode = "250655"; phone = "0800"; type = BankAccType.CHEQUE }
+        val profile = UserProfile("John", UserProfile.SignUpReason.BUY, "address", "https://img", "+27812815707", ProfileRoles.CUSTOMER)
+        profile.bank = bank
+        val ex = assertThrows(ResponseStatusException::class.java) { profileService.create(profile) }
+        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
+        assertEquals("Bank name is required", ex.reason)
+    }
+
+    @Test
+    fun `create still rejects CHEQUE bank missing branchCode — regression guard`() {
+        val bank = Bank().apply { accountId = "12345678"; name = "FNB"; branchCode = null; phone = "0800"; type = BankAccType.CHEQUE }
+        val profile = UserProfile("John", UserProfile.SignUpReason.BUY, "address", "https://img", "+27812815707", ProfileRoles.CUSTOMER)
+        profile.bank = bank
+        val ex = assertThrows(ResponseStatusException::class.java) { profileService.create(profile) }
+        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
+        assertEquals("Bank branch code is required", ex.reason)
+    }
+
+    // -----------------------------------------------------------------------
+    // EWALLET — update() bank validation
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `update accepts EWALLET bank with only phone and type set`() {
+        val bank = Bank().apply { phone = "0812815707"; type = BankAccType.EWALLET }
+        // accountId, name, branchCode all null — must not be required for EWALLET
+        val incoming = UserProfile("John", UserProfile.SignUpReason.BUY, "Cape Town", "https://img", "+27812815707", ProfileRoles.CUSTOMER)
+        incoming.bank = bank
+        val persisted = persistedProfile()
+        `when`(userProfileRepo.findById("testId")).thenReturn(Optional.of(persisted))
+        `when`(userProfileRepo.save(persisted)).thenReturn(persisted)
+        profileService.update("testId", incoming)
+        verify(userProfileRepo).save(persisted)
+    }
+
+    @Test
+    fun `update rejects EWALLET bank missing phone`() {
+        val bank = Bank().apply { phone = ""; type = BankAccType.EWALLET }
+        val incoming = UserProfile("John", UserProfile.SignUpReason.BUY, "Cape Town", "https://img", "+27812815707", ProfileRoles.CUSTOMER)
+        incoming.bank = bank
+        val ex = assertThrows(ResponseStatusException::class.java) { profileService.update("testId", incoming) }
+        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
+        assertEquals("Bank phone is required", ex.reason)
+    }
+
+    @Test
+    fun `update still rejects CHEQUE bank missing accountId — regression guard`() {
+        val bank = Bank().apply { accountId = null; name = "FNB"; branchCode = "250655"; phone = "0800"; type = BankAccType.CHEQUE }
+        val incoming = UserProfile("John", UserProfile.SignUpReason.BUY, "Cape Town", "https://img", "+27812815707", ProfileRoles.CUSTOMER)
+        incoming.bank = bank
+        val ex = assertThrows(ResponseStatusException::class.java) { profileService.update("testId", incoming) }
+        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
+        assertEquals("Bank account ID is required", ex.reason)
+    }
 }

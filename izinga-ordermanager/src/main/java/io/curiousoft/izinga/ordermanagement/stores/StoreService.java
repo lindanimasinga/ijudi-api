@@ -154,23 +154,15 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
      * T-08: Validates that the effective bank (user's registered bank) has all required fields
      * for store creation. Legacy BankAccType values {@code wallet} and {@code string} are rejected.
      *
+     * <p>EWALLET accounts are identified by phone number only — accountId, name, and branchCode
+     * are not applicable and are therefore not required when {@code bank.getType() == BankAccType.EWALLET}.
+     * This mirrors the logic in UserProfileService.validateBankForProfile().
+     *
      * @throws ResponseStatusException HTTP 400 if any required field is missing or invalid.
      */
     private void validateBankForCreate(Bank bank) {
         if (bank == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank details are required");
-        }
-        if (!StringUtils.hasText(bank.getAccountId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank account ID is required");
-        }
-        if (!StringUtils.hasText(bank.getName())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank name is required");
-        }
-        if (!StringUtils.hasText(bank.getBranchCode())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank branch code is required");
-        }
-        if (!StringUtils.hasText(bank.getPhone())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank phone is required");
         }
         if (bank.getType() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank account type is required");
@@ -179,6 +171,22 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         if (bank.getType() == BankAccType.wallet || bank.getType() == BankAccType.string) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Bank account type '" + bank.getType().name() + "' is not valid for store registration");
+        }
+        if (!StringUtils.hasText(bank.getPhone())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank phone is required");
+        }
+        // EWALLET accounts use phone as the account identifier — name, branchCode, and
+        // accountId are not applicable and must not be required for this type.
+        if (bank.getType() != BankAccType.EWALLET) {
+            if (!StringUtils.hasText(bank.getAccountId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank account ID is required");
+            }
+            if (!StringUtils.hasText(bank.getName())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank name is required");
+            }
+            if (!StringUtils.hasText(bank.getBranchCode())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank branch code is required");
+            }
         }
     }
 
