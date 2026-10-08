@@ -300,9 +300,12 @@ class ReconServiceTest {
             emailSubject = "email"
         )
 
-        every { messengerPayoutRepository.findByPayoutStage() } returns listOf(shopPayout1,payout2,payout3)
+        // First call returns 3 PENDING payouts; after updateBundle marks them PROCESSING, the repo
+        // would return 0 PENDING — simulate with andThen(emptyList()).
+        every { messengerPayoutRepository.findByPayoutStage() } returns listOf(shopPayout1,payout2,payout3) andThen emptyList()
 
         every { messengerPayoutRepository.save(any()) } returnsArgument 0
+        every { messengerPayoutRepository.saveAll(any<List<MessengerPayout>>()) } returnsArgument 0
         every { shopPayoutRepository.save(any()) } returnsArgument 0
 
         //mark payout as processing
@@ -317,7 +320,9 @@ class ReconServiceTest {
         assertEquals(0, paybundle.payouts.size)
         assertEquals(PayoutType.MESSENGER, paybundle.type)
         assertEquals(0, paybundle.numberOfPayouts)
-        assertEquals(0.00.toBigDecimal(), paybundle.payoutTotalAmount)
+        // Use compareTo(0) because BigDecimal.equals is scale-sensitive:
+        // 0.00.toBigDecimal() (scale 1) != BigDecimal(0) (scale 0) under equals().
+        assertEquals(0, paybundle.payoutTotalAmount.compareTo(BigDecimal.ZERO))
     }
 
     @Test
@@ -660,10 +665,14 @@ class ReconServiceTest {
         val ambassador = makeAmbassador(ambassadorId)
         val driver = makeDriver(driverId)
 
+        // findByTriggerDriverId is the current duplicate guard (replaced findByToIdAndPayoutStage)
+        every { ambassadorPayoutRepository.findByTriggerDriverId(driverId) } returns null
         every { ambassadorPayoutRepository.findByToIdAndPayoutStage(ambassadorId, PayoutStage.PENDING) } returns null
         val savedSlot = slot<AmbassadorPayout>()
         every { ambassadorPayoutRepository.save(capture(savedSlot)) } answers { savedSlot.captured.also { it.id = "PAY01" } }
-        every { applicationEventPublisher.publishEvent(any<Any>()) } just runs
+        // Use ApplicationEvent overload — AmbassadorPayoutEvent extends ApplicationEvent, so the
+        // more-specific overload is chosen by Java dispatch; any<Any>() only stubs the Object overload.
+        every { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) } just runs
 
         val result = sut.generatePayoutForAmbassadorAndApproval(driver, ambassador)
 
@@ -674,7 +683,8 @@ class ReconServiceTest {
         assertEquals(PayoutStage.PENDING, result.payoutStage)
         assertTrue(result.orders.isEmpty())
         verify { ambassadorPayoutRepository.save(any()) }
-        verify { applicationEventPublisher.publishEvent(any<Any>()) }
+        // AmbassadorPayoutEvent extends ApplicationEvent — verify the ApplicationEvent overload
+        verify { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) }
     }
 
     @Test
@@ -685,6 +695,8 @@ class ReconServiceTest {
 
         val existingPayout = mockk<AmbassadorPayout>()
         every { existingPayout.id } returns "EXIST"
+        // findByTriggerDriverId is the current duplicate guard — return the existing payout to trigger the null path
+        every { ambassadorPayoutRepository.findByTriggerDriverId("driver-002") } returns existingPayout
         every { ambassadorPayoutRepository.findByToIdAndPayoutStage(ambassadorId, PayoutStage.PENDING) } returns existingPayout
 
         val result = sut.generatePayoutForAmbassadorAndApproval(driver, ambassador)

@@ -73,6 +73,30 @@ class StoreProfile(
      */
     var referredByPartnerId: String? = null
 
+    // --- ONB-02: Store Owner Onboarding Tiers (ADR-022) ---
+
+    /** Subscription tier for this store. null is treated as FREE in all business logic. */
+    var subscriptionTier: SubscriptionTier? = null
+
+    /** Timestamp when the current subscription tier was applied. Set server-side only — clients must not supply. */
+    var subscriptionTierSince: Date? = null
+
+    /** Whether the store's STORE_ADMIN has accepted the Store/Merchant Partner Agreement (L-07). ADR-022 Decision 1. */
+    var icaAccepted: Boolean? = null
+
+    /** Timestamp of the ICA acceptance click. Corresponds to the StoreAgreementAudit record. */
+    var icaAcceptedDate: Date? = null
+
+    /** Version string of the accepted ICA, e.g. "merchant-v2". Follows the driver-ICA convention. */
+    var icaVersion: String? = null
+
+    /**
+     * Request signal only — no provisioning side-effect (ADR-022 Decision 5).
+     * When true, the iZinga ADMIN reads this flag from the admin dashboard and manually
+     * triggers WA-LINES-02 provisioning. Setting this field does NOT call StoreLineProvisioningService.
+     */
+    var whatsappLineRequested: Boolean? = null
+
     init {
         super.bank = bank
     }

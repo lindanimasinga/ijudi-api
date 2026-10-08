@@ -1,8 +1,12 @@
 package io.curiousoft.izinga.ordermanagement.service;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.ordermanagement.stores.StoreAgreementAuditRepository;
+import io.curiousoft.izinga.ordermanagement.stores.StoreTierChangeAuditRepository;
 import io.curiousoft.izinga.ordermanagement.stores.StoreService;
 import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService;
 import org.junit.Assert;
@@ -36,10 +40,18 @@ public class StoreServiceTest {
     private ApplicationEventPublisher applicationEventPublisher;
     @Mock
     private ReferralCodeService referralCodeService;
+    @Mock
+    private StoreAgreementAuditRepository storeAgreementAuditRepository;
+    @Mock
+    private StoreTierChangeAuditRepository storeTierChangeAuditRepository;
+    @Mock
+    private FirebaseAuth firebaseAuth;
 
     @Before
     public void setUp() {
-        storeService = new StoreService(storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, 0.1, applicationEventPublisher, referralCodeService);
+        storeService = new StoreService(storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, 0.1,
+                applicationEventPublisher, referralCodeService,
+                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth);
     }
 
     @Test
@@ -58,6 +70,7 @@ public class StoreServiceTest {
         bank.setName("ukheshe");
         bank.setPhone("phoneNumber");
         bank.setType(BankAccType.CHEQUE);
+        bank.setBranchCode("051001"); // T-08: required for bank validation
         user.setBank(bank);
 
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
@@ -75,6 +88,9 @@ public class StoreServiceTest {
                 "ownerId",
                 new Bank());
 
+        // DEFECT-ONB02-01 fix: ICA must be accepted for all callers including first-time CUSTOMER creators
+        initialProfile.setIcaAccepted(true);
+
         //when
         when(userProfileRepo.findById(initialProfile.getOwnerId())).thenReturn(Optional.of(user));
         when(storeRepository.findOneByIdOrShortName(initialProfile.getId(), initialProfile.getShortName())).thenReturn(Optional.empty());
@@ -85,6 +101,8 @@ public class StoreServiceTest {
         verify(userProfileRepo).findById(initialProfile.getOwnerId());
         verify(storeRepository).save(initialProfile);
         verify(userProfileRepo).save(user);
+        // TIER-BILLING-01: Firebase storeId claim must be set with the owner's uid and the new store's id
+        verify(firebaseAuth).setCustomUserClaims(eq(user.getId()), eq(Map.of("storeId", profile.getId())));
 
         Assert.assertNotNull(profile.getId());
         Assert.assertNotNull(profile.getOwnerId());
@@ -92,6 +110,171 @@ public class StoreServiceTest {
         Assert.assertEquals(user.getBank().getAccountId(), profile.getBank().getAccountId());
         Assert.assertEquals(user.getBank().getPhone(), profile.getBank().getPhone());
         Assert.assertEquals(ProfileRoles.STORE_ADMIN, user.getRole());
+    }
+
+    /**
+     * TIER-BILLING-01: Firebase claim setting — happy path.
+     * Verifies setCustomUserClaims is called with the correct uid and storeId.
+     */
+    @Test
+    public void create_setsFirebaseStoreIdClaim_onSuccess() throws Exception {
+        UserProfile user = new UserProfile("claim-user", UserProfile.SignUpReason.BUY,
+                "address", "https://img.url", "081000001", ProfileRoles.CUSTOMER);
+        Bank bank = new Bank();
+        bank.setAccountId("acc-1");
+        bank.setName("FNB");
+        bank.setPhone("081000001");
+        bank.setType(BankAccType.CHEQUE);
+        bank.setBranchCode("250655");
+        user.setBank(bank);
+        user.setId("firebase-uid-001");
+
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        businessHours.add(new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date()));
+        StoreProfile store = new StoreProfile(StoreType.FOOD, "Claim Store", "claim-store",
+                "1 Test St", "https://img.url", "081000001",
+                Collections.singletonList("food"), businessHours, "firebase-uid-001", new Bank());
+        store.setIcaAccepted(true);
+
+        when(userProfileRepo.findById("firebase-uid-001")).thenReturn(Optional.of(user));
+        when(storeRepository.findOneByIdOrShortName(store.getId(), store.getShortName())).thenReturn(Optional.empty());
+        when(storeRepository.save(store)).thenReturn(store);
+
+        StoreProfile result = storeService.create(store);
+
+        verify(firebaseAuth).setCustomUserClaims(eq("firebase-uid-001"), eq(Map.of("storeId", result.getId())));
+    }
+
+    /**
+     * TIER-BILLING-01: Firebase claim setting — error path.
+     * When setCustomUserClaims throws FirebaseAuthException, the store creation must still succeed
+     * (log-and-continue pattern — the store is the source of truth).
+     */
+    @Test
+    public void create_logsAndContinues_whenFirebaseClaimSetFails() throws Exception {
+        UserProfile user = new UserProfile("fb-fail-user", UserProfile.SignUpReason.BUY,
+                "address", "https://img.url", "081000002", ProfileRoles.CUSTOMER);
+        Bank bank = new Bank();
+        bank.setAccountId("acc-2");
+        bank.setName("Capitec");
+        bank.setPhone("081000002");
+        bank.setType(BankAccType.CHEQUE);
+        bank.setBranchCode("470010");
+        user.setBank(bank);
+        user.setId("firebase-uid-002");
+
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        businessHours.add(new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date()));
+        StoreProfile store = new StoreProfile(StoreType.FOOD, "Fail Claim Store", "fail-claim-store",
+                "2 Test St", "https://img.url", "081000002",
+                Collections.singletonList("food"), businessHours, "firebase-uid-002", new Bank());
+        store.setIcaAccepted(true);
+
+        when(userProfileRepo.findById("firebase-uid-002")).thenReturn(Optional.of(user));
+        when(storeRepository.findOneByIdOrShortName(store.getId(), store.getShortName())).thenReturn(Optional.empty());
+        when(storeRepository.save(store)).thenReturn(store);
+        doThrow(mock(FirebaseAuthException.class))
+                .when(firebaseAuth).setCustomUserClaims(anyString(), anyMap());
+
+        // Must not throw — log-and-continue
+        StoreProfile result = storeService.create(store);
+
+        Assert.assertNotNull(result);
+        Assert.assertEquals(ProfileRoles.STORE_ADMIN, user.getRole());
+        verify(storeRepository).save(store);
+        verify(userProfileRepo).save(user);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+    // STORE-BANK-01 — per-store payout bank
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * STORE-BANK-01 happy path: when the frontend submits a bank with a populated accountId
+     * the store is persisted with THAT bank — the owner's user-level bank must NOT overwrite it.
+     */
+    @Test
+    public void create_withPopulatedStoreLevelBank_usesStoreBankIgnoringUserBank() throws Exception {
+        // given — owner's personal profile bank
+        UserProfile user = new UserProfile("owner-bank-01", UserProfile.SignUpReason.BUY,
+                "address", "https://img.url", "081000010", ProfileRoles.CUSTOMER);
+        Bank userBank = new Bank();
+        userBank.setAccountId("USER-ACCOUNT-ID");
+        userBank.setName("FNB");
+        userBank.setPhone("081000010");
+        userBank.setType(BankAccType.CHEQUE);
+        userBank.setBranchCode("250655");
+        user.setBank(userBank);
+        user.setId("owner-bank-01-firebase-uid");
+
+        // given — store-specific bank with a different accountId
+        Bank storeBank = new Bank();
+        storeBank.setAccountId("STORE-ACCOUNT-ID");
+        storeBank.setName("Standard Bank");
+        storeBank.setPhone("081000010");
+        storeBank.setType(BankAccType.CHEQUE);
+        storeBank.setBranchCode("051001");
+
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        businessHours.add(new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date()));
+        StoreProfile store = new StoreProfile(StoreType.FOOD, "Store Bank Test", "store-bank-test",
+                "1 Test St", "https://img.url", "081000010",
+                Collections.singletonList("food"), businessHours, "owner-bank-01", null);
+        store.setBank(storeBank);
+        store.setIcaAccepted(true);
+
+        when(userProfileRepo.findById("owner-bank-01")).thenReturn(Optional.of(user));
+        when(storeRepository.findOneByIdOrShortName(store.getId(), store.getShortName())).thenReturn(Optional.empty());
+        when(storeRepository.save(store)).thenReturn(store);
+
+        // when
+        StoreProfile result = storeService.create(store);
+
+        // then — store's own bank is used, not the user's bank
+        Assert.assertNotNull("bank must not be null after create", result.getBank());
+        Assert.assertEquals("store-level accountId must be used, not user's",
+                "STORE-ACCOUNT-ID", result.getBank().getAccountId());
+        Assert.assertEquals("Standard Bank", result.getBank().getName());
+    }
+
+    /**
+     * STORE-BANK-01 fallback path: when the store has a null bank, the owner's user-level
+     * bank is used as the fallback — existing pre-fix behaviour preserved.
+     */
+    @Test
+    public void create_withNullBank_fallsBackToUserBank() throws Exception {
+        // given — owner's personal profile bank
+        UserProfile user = new UserProfile("owner-bank-02", UserProfile.SignUpReason.BUY,
+                "address", "https://img.url", "081000020", ProfileRoles.CUSTOMER);
+        Bank userBank = new Bank();
+        userBank.setAccountId("USER-FALLBACK-ACCOUNT");
+        userBank.setName("FNB");
+        userBank.setPhone("081000020");
+        userBank.setType(BankAccType.CHEQUE);
+        userBank.setBranchCode("250655");
+        user.setBank(userBank);
+        user.setId("owner-bank-02-firebase-uid");
+
+        ArrayList<BusinessHours> businessHours = new ArrayList<>();
+        businessHours.add(new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date()));
+        // bank explicitly null — merchant did not fill in the bank section
+        StoreProfile store = new StoreProfile(StoreType.FOOD, "Null Bank Store", "null-bank-store",
+                "2 Test St", "https://img.url", "081000020",
+                Collections.singletonList("food"), businessHours, "owner-bank-02", null);
+        store.setBank(null);
+        store.setIcaAccepted(true);
+
+        when(userProfileRepo.findById("owner-bank-02")).thenReturn(Optional.of(user));
+        when(storeRepository.findOneByIdOrShortName(store.getId(), store.getShortName())).thenReturn(Optional.empty());
+        when(storeRepository.save(store)).thenReturn(store);
+
+        // when
+        StoreProfile result = storeService.create(store);
+
+        // then — falls back to user's bank
+        Assert.assertNotNull("bank must not be null after create with fallback", result.getBank());
+        Assert.assertEquals("user-level accountId must be used as fallback",
+                "USER-FALLBACK-ACCOUNT", result.getBank().getAccountId());
     }
 
     @Test
@@ -111,6 +294,7 @@ public class StoreServiceTest {
         bank.setName("ukheshe");
         bank.setPhone("phoneNumber");
         bank.setType(BankAccType.CHEQUE);
+        bank.setBranchCode("051001"); // T-08: required for bank validation
         user.setBank(bank);
 
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
@@ -139,6 +323,8 @@ public class StoreServiceTest {
         set.add(stock5);
         set.add(stock6);
         initialProfile.setStockList(set);
+        // DEFECT-ONB02-01 fix: ICA must be accepted for all callers including first-time CUSTOMER creators
+        initialProfile.setIcaAccepted(true);
 
         when(userProfileRepo.findById(initialProfile.getOwnerId())).thenReturn(Optional.of(user));
         when(storeRepository.findOneByIdOrShortName(initialProfile.getId(), initialProfile.getShortName())).thenReturn(Optional.empty());
@@ -187,6 +373,7 @@ public class StoreServiceTest {
         bank.setName("ukheshe");
         bank.setPhone("phoneNumber");
         bank.setType(BankAccType.CHEQUE);
+        bank.setBranchCode("051001"); // T-08: required for bank validation
         user.setBank(bank);
 
         ArrayList<BusinessHours> businessHours = new ArrayList<>();
@@ -216,6 +403,8 @@ public class StoreServiceTest {
         set.add(stock5);
         set.add(stock6);
         initialProfile.setStockList(set);
+        // DEFECT-ONB02-01 fix: ICA must be accepted for all callers including first-time CUSTOMER creators
+        initialProfile.setIcaAccepted(true);
 
         when(userProfileRepo.findById(initialProfile.getOwnerId())).thenReturn(Optional.of(user));
         when(storeRepository.findOneByIdOrShortName(initialProfile.getId(), initialProfile.getShortName())).thenReturn(Optional.empty());

@@ -41,6 +41,21 @@ payfast:
             id: 11522007
         passphrase: izinga-For-clothing1
         url: https://api.payfast.co.za
+    # TIER-BILLING-01: Subscription billing credentials.
+    # AC-20 / RISK-05: merchant-key and passphrase MUST be provided via AWS Secrets Manager
+    # (izinga-prod secret) or environment variable — NEVER hardcode real values here.
+    # The izinga-prod AWS secret must include keys:
+    #   payfast.subscription.merchant-key
+    #   payfast.subscription.passphrase
+    subscription:
+        merchant-id: "16791971"
+        merchant-key: ${PAYFAST_SUBSCRIPTION_MERCHANT_KEY:REPLACE_WITH_SECRET_BEFORE_LAUNCH}
+        passphrase: ${PAYFAST_SUBSCRIPTION_PASSPHRASE:REPLACE_WITH_SECRET_BEFORE_LAUNCH}
+        base-url: https://www.payfast.co.za/eng/process
+        validate-url: https://www.payfast.co.za/eng/query/validate
+        return-url: https://biz.izinga.co.za/business/subscription-success
+        cancel-url: https://biz.izinga.co.za/business/subscription-cancel
+        notify-url: https://api.izinga.co.za/merchant/subscription/itn
 payment:
     process:
         pending:
@@ -64,26 +79,6 @@ service:
 feign:
     okhttp:
         enabled: true
-spring:
-    config:
-        import: aws-secretsmanager:izinga-prod
-    security:
-        oauth2:
-            resourceserver:
-                jwt:
-                    jws-algorithms: RS512
-                    issuer-uri: https://securetoken.google.com/ijudi-d19bd
-    data:
-        mongodb:
-            uri: mongodb+srv://onusmongouser:wfsuser@cluster0-7odiz.mongodb.net/ijudi?retryWrites=true&w=majority
-            auto-index-creation: true
-    mvc:
-        format:
-            date: yyyy-MM-dd
-            date-time: yyyy-MM-dd HH:mm:ss
-            time: HH:mm:ss
-    jackson:
-        date-format: yyyy-MM-dd HH:mm:ss
     ai:
         mcp:
             server:
@@ -165,3 +160,27 @@ store-scope:
 store:
   context:
     max-items: 50
+
+# DEVOPS-001: MongoDB URI must NOT be hardcoded. Loaded from:
+#   - env var SPRING_DATA_MONGODB_URI (local dev / CI)
+#   - aws-secretsmanager:izinga-uat (uat profile, via spring.config.import in profile yml)
+#   - aws-secretsmanager:izinga-prod (prod profile, via spring.config.import in application-prod.yml)
+# Default is intentionally invalid to fail loudly rather than silently connecting to production.
+spring:
+    jackson:
+        date-format: yyyy-MM-dd HH:mm:ss
+    security:
+        oauth2:
+            resourceserver:
+                jwt:
+                    jws-algorithms: RS512
+                    issuer-uri: https://securetoken.google.com/ijudi-d19bd
+    mvc:
+        format:
+            date: yyyy-MM-dd
+            date-time: yyyy-MM-dd HH:mm:ss
+            time: HH:mm:ss
+    data:
+        mongodb:
+            uri: ${SPRING_DATA_MONGODB_URI:REPLACE_WITH_SECRET_BEFORE_LAUNCH}
+            auto-index-creation: true

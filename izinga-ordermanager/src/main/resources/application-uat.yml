@@ -2,17 +2,15 @@ admin:
     cellNumber: 0812815707,0734396642,0815546658
 allowed:
     origins: http://localhost:4200,https://dev.celestemonique.com,https://api-uat.izinga.co.za,app://izinga,https://shop.izinga.co.za,app://izinga-lambda
-google:
-    api:
-        key: AAAASXcChds:APA91bGMdjB7knpWAtdyHELx9lvMiar2pHQ-_aZjky9YSphe1cJCEQe8ks5qy1e5W6T8mrPMxtPTCGrMNCjqxGM4eKzw0xPZCOWDRp9XAqID3SWhkcNx1HWcRK9Oo2ODMunaSU_n3X4X
-    maps:
-        api:
-            key: AIzaSyAZbvE4NBcJIplfzmy8cSEdSpbocBggylc
+# amz.accessKey and amz.secretKey are NOT defined here — resolved from aws-secretsmanager:izinga-uat
+# google.api.key and google.maps.api.key are NOT defined here — resolved from aws-secretsmanager:izinga-uat
 logging:
     level:
         io:
             curiousoft: INFO
         root: INFO
+# mailersend.apikey, mailersend.template.new-order, mailersend.template.notpaid-order
+# are NOT defined here — resolved from aws-secretsmanager:izinga-uat
 order:
     cleanup:
         unpaid:
@@ -21,12 +19,21 @@ ozow:
     api:
         key: 760c42eec84640cf98aa1558135a9d90
         url: https://api.ozow.com
+# TIER-BILLING-01: Sandbox PayFast subscription billing — replaces payfast.api.*
+# Sandbox Merchant ID: 10020746 (not secret — visible in payment form parameters)
+# merchant-key and passphrase MUST be provided via AWS Secrets Manager (izinga-uat secret)
+# or the PAYFAST_SUBSCRIPTION_MERCHANT_KEY / PAYFAST_SUBSCRIPTION_PASSPHRASE env vars
+# before any end-to-end test. AC-20 / RISK-05 apply.
 payfast:
-    api:
-        merchant:
-            id: 11522007
-        passphrase: izinga-For-clothing1
-        url: https://api.payfast.co.za
+    subscription:
+        merchant-id: "10020746"
+        merchant-key: ${PAYFAST_SUBSCRIPTION_MERCHANT_KEY:REPLACE_WITH_SECRET_BEFORE_TESTING}
+        passphrase: ${PAYFAST_SUBSCRIPTION_PASSPHRASE:REPLACE_WITH_SECRET_BEFORE_TESTING}
+        base-url: https://sandbox.payfast.co.za/eng/process
+        validate-url: https://sandbox.payfast.co.za/eng/query/validate
+        return-url: https://biz.izinga.co.za/business/subscription-success
+        cancel-url: https://biz.izinga.co.za/business/subscription-cancel
+        notify-url: https://api.izinga.co.za/merchant/subscription/itn
 payment:
     process:
         pending:
@@ -48,22 +55,23 @@ service:
     supportedApp:
         min: 2.1.1
 spring:
+    config:
+        import: aws-secretsmanager:izinga-uat
     data:
         mongodb:
-            uri: mongodb+srv://onusmongouser:wfsuser@cluster0-7odiz.mongodb.net/ijudi?retryWrites=true&w=majority
+            uri: mongodb+srv://onusmongouser:wfsuser@cluster0-7odiz.mongodb.net/izinga-sandbox?retryWrites=true&w=majority
             auto-index-creation: true
 ukheshe:
     apiUrl: https://ukheshe-sandbox.jini.rocks/ukheshe-conductor/rest/v1
     customerId: 534
     main:
         account: 2885091160
-    password: 111111
+    # ukheshe.password is NOT defined here — resolved from aws-secretsmanager:izinga-uat
     username: 812815707
 yoco:
     api:
-        key: sk_test_b03f2c6bMP0k5GY10ad45ddbb5dc
+        # yoco.api.key and yoco.api.webhooksec are NOT defined here — resolved from aws-secretsmanager:izinga-uat
         url: https://payments.yoco.com/api/
-        webhooksec: M0JGQUI3MTcwODQxMDg2MUMyNjk2OUQ4MzA1NTI0QUE=
     verifier:
         order-manager-url: https://api-uat.izinga.co.za
     dashboard-api:
@@ -74,8 +82,13 @@ zoomconnectsms:
     api:
         email: lindanimasinga@gmail.com
         endpoint: https://www.zoomconnect.com/app/api/rest/v1/sms/send
-        key: c0217d42-dd53-4d6b-811c-a79b584e5177
+        # zoomconnectsms.api.key is NOT defined here — resolved from aws-secretsmanager:izinga-uat
     enable: true
 promocodes:
     verifier:
         url: https://api-uat.izinga.co.za/
+whatsapp:
+    cloud:
+        orderConfirmationCustomerTemplate: order_confirmed
+        orderConfirmationShopTemplate: order_management_1
+        orderConfirmationMessengerTemplate: order_management_messenger

@@ -9,6 +9,7 @@
         <module>izinga-ordermanager</module>
         <module>izinga-messaging</module>
         <module>izinga-yoco-pay</module>
+        <module>izinga-payfast</module>
         <module>izinga-qrcode-generator</module>
         <module>izinga-documentmanagement</module>
     </modules>
