@@ -271,26 +271,33 @@ class UserProfileService(
      * StoreService.validateBankForCreate(). Legacy BankAccType values wallet and string
      * are rejected as they are not valid for real bank account registrations.
      *
+     * EWALLET accounts are identified by phone number only — accountId, name, and branchCode
+     * are not applicable and are therefore not required when bank.type == BankAccType.EWALLET.
+     *
      * @throws ResponseStatusException HTTP 400 if any required bank field is missing or invalid.
      */
     private fun validateBankForProfile(bank: Bank) {
-        if (bank.accountId.isNullOrBlank()) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank account ID is required")
-        }
-        if (bank.name.isNullOrBlank()) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank name is required")
-        }
-        if (bank.branchCode.isNullOrBlank()) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank branch code is required")
-        }
-        if (bank.phone.isNullOrBlank()) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank phone is required")
-        }
         if (bank.type == null) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank account type is required")
         }
         if (bank.type == BankAccType.wallet || bank.type == BankAccType.string) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank account type '${bank.type!!.name}' is not valid")
+        }
+        if (bank.phone.isNullOrBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank phone is required")
+        }
+        // EWALLET accounts use phone as the account identifier — name, branchCode, and
+        // accountId are not applicable and must not be required for this type.
+        if (bank.type != BankAccType.EWALLET) {
+            if (bank.accountId.isNullOrBlank()) {
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank account ID is required")
+            }
+            if (bank.name.isNullOrBlank()) {
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank name is required")
+            }
+            if (bank.branchCode.isNullOrBlank()) {
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Bank branch code is required")
+            }
         }
     }
 
