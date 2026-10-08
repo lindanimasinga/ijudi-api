@@ -163,8 +163,9 @@ store:
 
 # DEVOPS-001: MongoDB URI must NOT be hardcoded. Loaded from:
 #   - env var SPRING_DATA_MONGODB_URI (local dev / CI)
-#   - aws-secretsmanager:izinga-uat (uat profile, via spring.config.import in profile yml)
-#   - aws-secretsmanager:izinga-prod (prod profile, via spring.config.import in application-prod.yml)
+#   - aws-secretsmanager:izinga-uat (uat profile, via spring.config.import in application-uat.yml)
+#   - aws-secretsmanager:izinga-prod (prod profile, via spring.config.import in the
+#     profile-conditional document block at the END of this file — see "---" separator below)
 # Default is intentionally invalid to fail loudly rather than silently connecting to production.
 spring:
     jackson:
@@ -184,3 +185,14 @@ spring:
         mongodb:
             uri: ${SPRING_DATA_MONGODB_URI:REPLACE_WITH_SECRET_BEFORE_LAUNCH}
             auto-index-creation: true
+
+---
+# Profile-conditional document: active only when SPRING_PROFILES_ACTIVE=prod.
+# Triggers import of the izinga-prod AWS Secrets Manager secret so that
+# spring.data.mongodb.uri (and all other credentials) are resolved at startup
+# rather than keeping the REPLACE_WITH_SECRET_BEFORE_LAUNCH placeholder. (DEVOPS-001)
+spring:
+    config:
+        activate:
+            on-profile: prod
+        import: aws-secretsmanager:izinga-prod
