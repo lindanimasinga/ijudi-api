@@ -5,12 +5,16 @@ import io.curiousoft.izinga.recon.payout.AmbassadorPayout
 import io.curiousoft.izinga.recon.payout.PayoutStage
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 
 class AmbassadorPayoutTest {
 
-    private fun buildPayout(commission: BigDecimal = BigDecimal("150.00")) = AmbassadorPayout(
+    private fun buildPayout(
+        commission: BigDecimal = BigDecimal("150.00"),
+        vehicleType: String? = null
+    ) = AmbassadorPayout(
         toId = "ambassador-001",
         toName = "John Doe",
         toBankName = "FNB",
@@ -23,7 +27,8 @@ class AmbassadorPayoutTest {
         emailAddress = "john@example.com",
         emailSubject = "Ambassador payout",
         commissionAmount = commission,
-        triggerDriverId = "driver-abc-123"
+        triggerDriverId = "driver-abc-123",
+        triggerDriverVehicleType = vehicleType
     )
 
     @Test
@@ -62,5 +67,24 @@ class AmbassadorPayoutTest {
         val payout = buildPayout(BigDecimal("100.00"))
         payout.commissionAmount = BigDecimal("200.00")
         assertEquals(BigDecimal("200.00"), payout.total)
+    }
+
+    @Test
+    fun `triggerDriverVehicleType defaults to null when not supplied`() {
+        val payout = buildPayout()
+        assertNull(payout.triggerDriverVehicleType)
+    }
+
+    @Test
+    fun `triggerDriverVehicleType is stored correctly when supplied`() {
+        val payout = buildPayout(vehicleType = "BIKE")
+        assertEquals("BIKE", payout.triggerDriverVehicleType)
+    }
+
+    @Test
+    fun `triggerDriverVehicleType can be updated after construction`() {
+        val payout = buildPayout()
+        payout.triggerDriverVehicleType = "TRUCK"
+        assertEquals("TRUCK", payout.triggerDriverVehicleType)
     }
 }

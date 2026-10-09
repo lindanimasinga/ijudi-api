@@ -143,6 +143,8 @@ class ReconServiceImpl(
             return null
         }
 
+        val (commissionAmount, vehicleType) = resolveAmbassadorCommission(driver)
+
         val payout = AmbassadorPayout(
             toId = ambassadorId,
             toName = ambassador.name ?: "",
@@ -156,20 +158,21 @@ class ReconServiceImpl(
             emailAddress = ambassador.emailAddress,
             emailSubject = "iZinga Ambassador Commission",
             orders = mutableSetOf(),
-            commissionAmount = ambassadorProperties.commissionAmount,
+            commissionAmount = commissionAmount,
             triggerDriverId = driverId,
+            triggerDriverVehicleType = vehicleType,
             payoutStage = PayoutStage.PENDING
         )
 
         val saved = ambassadorPayoutRepository.save(payout)
-        logger.info("created ambassador payout {} for ambassador {} on driver approval {}", saved.id, ambassadorId, driverId)
+        logger.info("created ambassador payout {} for ambassador {} on driver approval {} vehicleType={}", saved.id, ambassadorId, driverId, vehicleType)
 
         applicationEventPublisher.publishEvent(
             AmbassadorPayoutEvent(
                 source = this,
                 ambassadorId = ambassadorId,
                 driverId = driverId,
-                commissionAmount = ambassadorProperties.commissionAmount,
+                commissionAmount = commissionAmount,
                 payoutId = saved.id!!
             )
         )
@@ -613,6 +616,38 @@ class ReconServiceImpl(
             }
 
         logger.info("[rp-009] reconciliation complete: created={} skipped={}", created, skipped)
+    }
+
+    /**
+     * Resolves the ambassador commission tier for a driver based on the driver's `description` field,
+     * which stores the vehicle category label (e.g. "Bike Delivery Driver", "Small/Medium Vehicle Driver",
+     * "Bakkie Delivery Driver", "Truck Delivery Driver").
+     *
+     * Returns a Pair of (commissionAmount, vehicleTypeLabel). The label is stored as a snapshot on the
+     * AmbassadorPayout at creation time and never recomputed after that point.
+     *
+     * This function never throws — any unrecognised or null description falls back to the default rate.
+     */
+    internal fun resolveAmbassadorCommission(driver: UserProfile): Pair<BigDecimal, String> {
+        val description = driver.description
+        return when {
+            description == null || description.isBlank() -> {
+                logger.warn("Ambassador commission: driver {} has no description, using fallback rate", driver.id)
+                ambassadorProperties.commissionAmount to "UNKNOWN"
+            }
+            description.contains("BIKE", ignoreCase = true) ->
+                ambassadorProperties.commissionAmountBike to "BIKE"
+            description.contains("SMALL", ignoreCase = true) || description.contains("MEDIUM", ignoreCase = true) ->
+                ambassadorProperties.commissionAmountCar to "CAR"
+            description.contains("BAKKIE", ignoreCase = true) ->
+                ambassadorProperties.commissionAmountBakkie to "BAKKIE"
+            description.contains("TRUCK", ignoreCase = true) ->
+                ambassadorProperties.commissionAmountTruck to "TRUCK"
+            else -> {
+                logger.warn("Ambassador commission: driver {} has unrecognised description '{}', using fallback rate", driver.id, description)
+                ambassadorProperties.commissionAmount to "UNKNOWN"
+            }
+        }
     }
 
     private fun normalizeBankAccountId(accountId: String?): String? = accountId?.replace("+27", "0")

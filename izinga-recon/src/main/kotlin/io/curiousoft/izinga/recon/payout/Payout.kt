@@ -105,7 +105,8 @@ class AmbassadorPayout(
     bundleId: String? = null,
     payoutStage: PayoutStage = PayoutStage.PENDING,
     var commissionAmount: BigDecimal,
-    var triggerDriverId: String
+    var triggerDriverId: String,
+    var triggerDriverVehicleType: String? = null
 ) : Payout(
     toId = toId, toName = toName, toType = toType, toBankName = toBankName, toAccountNumber = toAccountNumber,
     toBranchCode = toBranchCode, fromReference = fromReference, toReference = toReference, emailNotify = emailNotify,
