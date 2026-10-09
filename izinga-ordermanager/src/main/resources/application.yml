@@ -117,6 +117,10 @@ izinga:
         url: http://localhost
     ambassador:
         commission-amount: 70.00
+        commission-amount-bike: 50.00
+        commission-amount-car: 60.00
+        commission-amount-bakkie: 70.00
+        commission-amount-truck: 70.00
 
 cancellation:
     fee:
