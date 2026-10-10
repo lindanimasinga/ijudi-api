@@ -56,7 +56,13 @@ class GenerateAmbassadorPayoutTest {
             storeStage1CommissionRepo = storeStage1CommissionRepo,
             storeStage2CommissionRepo = storeStage2CommissionRepo,
             applicationEventPublisher = applicationEventPublisher,
-            ambassadorProperties = AmbassadorProperties(commissionAmount = BigDecimal("70.00"))
+            ambassadorProperties = AmbassadorProperties(
+                commissionAmount = BigDecimal("70.00"),
+                commissionAmountBike = BigDecimal("50.00"),
+                commissionAmountCar = BigDecimal("60.00"),
+                commissionAmountBakkie = BigDecimal("70.00"),
+                commissionAmountTruck = BigDecimal("70.00")
+            )
         )
     }
 
@@ -78,7 +84,7 @@ class GenerateAmbassadorPayoutTest {
         }
     }
 
-    private fun makeDriver(driverId: String): UserProfile {
+    private fun makeDriver(driverId: String, description: String? = null): UserProfile {
         return UserProfile(
             "Driver One",
             UserProfile.SignUpReason.DELIVERY_DRIVER,
@@ -88,6 +94,7 @@ class GenerateAmbassadorPayoutTest {
             ProfileRoles.MESSENGER
         ).also {
             it.id = driverId
+            it.description = description
         }
     }
 
@@ -112,6 +119,8 @@ class GenerateAmbassadorPayoutTest {
         assertEquals(ambassadorId, result!!.toId)
         assertEquals(BigDecimal("70.00"), result.commissionAmount)
         assertEquals(driverId, result.triggerDriverId)
+        // driver has no description → fallback tier
+        assertEquals("UNKNOWN", result.triggerDriverVehicleType)
         assertEquals(PayoutStage.PENDING, result.payoutStage)
         assertTrue(result.orders.isEmpty(), "orders set must be empty for approval-based payout")
 
@@ -121,6 +130,7 @@ class GenerateAmbassadorPayoutTest {
         val event = capturedEvent.captured as AmbassadorPayoutEvent
         assertEquals(ambassadorId, event.ambassadorId)
         assertEquals(driverId, event.driverId)
+        // driver has no description → fallback R70
         assertEquals(BigDecimal("70.00"), event.commissionAmount)
         assertEquals("PAY01", event.payoutId)
     }
@@ -192,4 +202,91 @@ class GenerateAmbassadorPayoutTest {
         verify(exactly = 0) { ambassadorPayoutRepository.save(any()) }
         verify(exactly = 0) { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) }
     }
+
+    @Test
+    fun `bike driver receives R50 commission and BIKE vehicle type`() {
+        val ambassadorId = "amb-005"
+        val driverId = "driver-005"
+        val ambassador = makeAmbassador(ambassadorId)
+        val driver = makeDriver(driverId, description = "Bike Delivery Driver")
+
+        every { ambassadorPayoutRepository.findByTriggerDriverId(driverId) } returns null
+        val capturedPayout = slot<AmbassadorPayout>()
+        every { ambassadorPayoutRepository.save(capture(capturedPayout)) } answers {
+            capturedPayout.captured.also { it.id = "PAY05" }
+        }
+        every { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) } just runs
+
+        val result = sut.generatePayoutForAmbassadorAndApproval(driver, ambassador)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("50.00"), result!!.commissionAmount)
+        assertEquals("BIKE", result.triggerDriverVehicleType)
+        verify(exactly = 1) { ambassadorPayoutRepository.save(any()) }
+        verify(exactly = 1) { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) }
+    }
+
+    @Test
+    fun `car (small vehicle) driver receives R60 commission and CAR vehicle type`() {
+        val ambassadorId = "amb-006"
+        val driverId = "driver-006"
+        val ambassador = makeAmbassador(ambassadorId)
+        val driver = makeDriver(driverId, description = "Small/Medium Vehicle Driver")
+
+        every { ambassadorPayoutRepository.findByTriggerDriverId(driverId) } returns null
+        val capturedPayout = slot<AmbassadorPayout>()
+        every { ambassadorPayoutRepository.save(capture(capturedPayout)) } answers {
+            capturedPayout.captured.also { it.id = "PAY06" }
+        }
+        every { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) } just runs
+
+        val result = sut.generatePayoutForAmbassadorAndApproval(driver, ambassador)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("60.00"), result!!.commissionAmount)
+        assertEquals("CAR", result.triggerDriverVehicleType)
+    }
+
+    @Test
+    fun `bakkie driver receives R70 commission and BAKKIE vehicle type`() {
+        val ambassadorId = "amb-007"
+        val driverId = "driver-007"
+        val ambassador = makeAmbassador(ambassadorId)
+        val driver = makeDriver(driverId, description = "Bakkie Delivery Driver")
+
+        every { ambassadorPayoutRepository.findByTriggerDriverId(driverId) } returns null
+        val capturedPayout = slot<AmbassadorPayout>()
+        every { ambassadorPayoutRepository.save(capture(capturedPayout)) } answers {
+            capturedPayout.captured.also { it.id = "PAY07" }
+        }
+        every { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) } just runs
+
+        val result = sut.generatePayoutForAmbassadorAndApproval(driver, ambassador)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("70.00"), result!!.commissionAmount)
+        assertEquals("BAKKIE", result.triggerDriverVehicleType)
+    }
+
+    @Test
+    fun `truck driver receives R70 commission and TRUCK vehicle type`() {
+        val ambassadorId = "amb-008"
+        val driverId = "driver-008"
+        val ambassador = makeAmbassador(ambassadorId)
+        val driver = makeDriver(driverId, description = "Truck Delivery Driver")
+
+        every { ambassadorPayoutRepository.findByTriggerDriverId(driverId) } returns null
+        val capturedPayout = slot<AmbassadorPayout>()
+        every { ambassadorPayoutRepository.save(capture(capturedPayout)) } answers {
+            capturedPayout.captured.also { it.id = "PAY08" }
+        }
+        every { applicationEventPublisher.publishEvent(any<ApplicationEvent>()) } just runs
+
+        val result = sut.generatePayoutForAmbassadorAndApproval(driver, ambassador)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("70.00"), result!!.commissionAmount)
+        assertEquals("TRUCK", result.triggerDriverVehicleType)
+    }
+
 }
