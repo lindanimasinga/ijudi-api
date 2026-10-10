@@ -1,5 +1,53 @@
 # Changelog
 
+## [1.14.0] — 2026-10-10
+
+**Release type:** Feature (P2 — new functionality)
+
+**Summary:** Introduces ambassador tiered commission payouts by vehicle type (ADR-019), broadens the missing-document scheduler notification to all non-CUSTOMER drivers, and removes a hardcoded debug phone filter that was silently suppressing onboarding notifications in production.
+
+### Changes
+
+- [NEW] Ambassador tiered commission by vehicle type (ADR-019): payout rates are now BIKE R50 / CAR R60 / BAKKIE_AND_TRUCK R70 per approved driver. `AmbassadorReconService` reads `ProfileVehicle` from the approved driver profile to select the commission tier. Introduced `VehicleTierCommission` entity, `VehicleTierCommissionRepository`, and `AmbassadorTieredCommissionService`. (commits `a433c67`, `f5cd1ed`)
+- [FIX] Missing-document onboarding notifications now fire for all non-CUSTOMER driver profiles. The scheduler role filter was narrowed incorrectly to `== MESSENGER`; it now uses `!= CUSTOMER` so DRIVER, STORE_ADMIN, and MESSENGER roles are all correctly included. Notification calls consolidated to a single `saveAll()` for efficiency; additional document-completeness checks added. (commit `07beff3`)
+- [FIX] Removed hardcoded debug phone filter `"+27735749416"` from the `newDrivers` scheduler job. The leftover `.filter()` would have silently suppressed onboarding notifications for every unapproved driver except that one number in production. (commit `f7ab426`)
+
+### Breaking changes
+
+None. All changes are additive — new entities and service methods; no REST API endpoint shapes, response models, enum values, or JWT/auth token structure altered.
+
+### Deployment sequence
+
+1. ijudi-api only — no frontend changes required.
+
+### Rollback steps
+
+1. Redeploy the v1.13.0 artifact (tag `1.13.0` on master) via ECS. No data migration rollback required — the tiered-commission entities are additive and the data is not read by any other service.
+2. Notify Lindani that rollback was triggered; monitor driver-approval notification delivery and ambassador payout recon for the 24 hours post-rollback.
+
+### Smoke test plan
+
+1. Approve a driver with vehicle type BIKE — verify ambassador commission payout of R50 is created in the recon payout table.
+2. Approve a driver with vehicle type CAR — verify ambassador commission payout of R60 is created.
+3. Approve a driver with vehicle type BAKKIE_AND_TRUCK — verify ambassador commission payout of R70 is created.
+4. Trigger the `newDrivers` scheduler job (or wait for the next scheduled run) with at least one unapproved non-CUSTOMER driver who has incomplete documents — verify a WhatsApp notification is dispatched to that driver's mobile number.
+5. Confirm no WhatsApp notification is sent to `+27735749416` unless that number is genuinely an unapproved driver in the system (i.e., the debug filter is gone and the job now processes all qualifying profiles).
+
+### Post-deployment monitoring
+
+- 15 min: Check scheduler logs — confirm `Processing N messenger drivers` where N > 1 (i.e., not filtered to a single number).
+- 1 hour: Confirm ambassador payout records in the recon collection show the correct tiered amounts for any driver approvals that occurred.
+- 24 hours: Growth & Analytics to confirm driver onboarding notification delivery rate is not anomalous; verify ambassador payout totals in the weekly recon.
+
+### Gate citations
+
+- Feature Brief: ADR-019 (ambassador tiered commission by vehicle type) — approved by Lindani Masinga
+- Code Review: PASS — iZinga Code Reviewer (commits `a433c67`, `f5cd1ed`, `07beff3` independently reviewed); PASS — Release Manager re-review of `f7ab426` (clean single-line deletion, confirmed via `git show`) 2026-10-10
+- QA Gate 2 (full regression): PASS — 258 tests, 0 failures, 0 errors, Skipped: 3 (pre-existing), BUILD SUCCESS, Corretto 17, 2026-10-10
+- Product Owner sign-off: Lindani Masinga — "The blocking defect is fixed" 2026-10-10
+
+---
+
 ## [1.13.0] — 2026-10-08
 
 **Release type:** Patch (P1 — bug fix, no new features)
