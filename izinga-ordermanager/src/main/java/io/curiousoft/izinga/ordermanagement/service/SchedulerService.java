@@ -256,7 +256,6 @@ import static java.lang.String.format;
 
             var userProfiles = driver.stream()
                     .filter(dr -> dr.getRole() != ProfileRoles.CUSTOMER)
-                    .filter(it -> Objects.equals(it.getMobileNumber(), "+27735749416"))
                     .toList();
             LOG.info("Processing {} messenger drivers", userProfiles.size());
 
