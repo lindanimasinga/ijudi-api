@@ -254,12 +254,13 @@ import static java.lang.String.format;
             var driver = userProfileRepo.findByProfileApproved(false);
             LOG.info("Found {} unapproved driver profiles", driver.size());
 
-            var messengerDrivers = driver.stream()
-                    .filter(dr -> dr.getRole() == ProfileRoles.MESSENGER)
+            var userProfiles = driver.stream()
+                    .filter(dr -> dr.getRole() != ProfileRoles.CUSTOMER)
+                    .filter(it -> Objects.equals(it.getMobileNumber(), "+27735749416"))
                     .toList();
-            LOG.info("Processing {} messenger drivers", messengerDrivers.size());
+            LOG.info("Processing {} messenger drivers", userProfiles.size());
 
-            messengerDrivers.forEach(profile -> {
+            userProfiles.forEach(profile -> {
                 try {
                     LOG.debug("Processing driver profile: {} ({})", profile.getName(), profile.getId());
                     LOG.info("Sending welcome message to driver {} with mobile {}",  profile.getName(), profile.getMobileNumber());
@@ -279,7 +280,11 @@ import static java.lang.String.format;
                     //check missing required documents and send reminder if any
                     var missingFields = profileService.getAllMissingFields(profile);
                     boolean allFieldsProvided = missingFields.isEmpty();
-                    if(allFieldsProvided) {
+                    boolean missingDescription = profile.getDescription() == null || profile.getDescription().isBlank();
+                    boolean missingAddress = profile.getAddress() == null || profile.getAddress().isBlank();
+                    boolean missingLocation = (profile.getLatitude() == 0 && profile.getLongitude() == 0);
+
+                    if(allFieldsProvided && !missingDescription && !missingAddress && !missingLocation) {
                         LOG.warn("Driver {} has provided all required documents, Please review ", profile.getName());
                     } else if (Boolean.TRUE.equals(profile.getMissingDocumentsReminderSent())) {
                         LOG.warn("Driver {} has missing documents, but reminder already sent. Missing fields: {}", profile.getName(), missingFields);
@@ -289,8 +294,6 @@ import static java.lang.String.format;
                         profile.setMissingDocumentsReminderSent(true);
                         LOG.info("Missing documents reminder sent to driver: {}", profile.getName());
                     }
-                    userProfileRepo.save(profile);
-                    LOG.debug("Driver profile saved successfully: {}", profile.getName());
                     counters[0]++;
                 } catch (Exception e) {
                     counters[1]++;
@@ -298,19 +301,9 @@ import static java.lang.String.format;
                 }
             });
 
+            userProfileRepo.saveAll(userProfiles);
+            LOG.debug("Driver profiles saved successfully: {}");
             LOG.info("Welcome message processing completed for new drivers");
-
-            List<UserProfile> driverList = userProfileRepo.findByRole(ProfileRoles.MESSENGER);
-            for (UserProfile drv : driverList) {
-                boolean missingDescription = drv.getDescription() == null || drv.getDescription().isBlank();
-                boolean missingAddress = drv.getAddress() == null || drv.getAddress().isBlank();
-                boolean missingLocation = (drv.getLatitude() == 0 && drv.getLongitude() == 0);
-                if (missingDescription || missingAddress || missingLocation) {
-                    LOG.info("Sending missing documents reminder to driver: {}", drv.getName());
-                    smsNotificationService.sendMissingDocumentReminder(drv.getMobileNumber(), drv.getName());
-                    LOG.info("Missing documents reminder sent to driver: {}", drv.getName());
-                }
-            }
         } catch (Exception e) {
             counters[1]++;
             LOG.error("Fatal error in newDrivers job", e);

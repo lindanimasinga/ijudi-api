@@ -28,7 +28,9 @@ Each userType directory holds one file per feature. A feature that spans two use
 | store | EWALLET bank validation carve-out + STORE-BANK-01 fallback fix (POST /user, PATCH /user/{id}, POST /store) | [store/ewallet-bank-validation.md](store/ewallet-bank-validation.md) | 2026-10-08 |
 | admin | Chat sessions — list, filter, thread view, send message | [admin/chat-sessions.md](admin/chat-sessions.md) | 2026-10-08 |
 | admin | Pending approvals — profile review, service-type filter, approve gate | [admin/pending-approvals.md](admin/pending-approvals.md) | 2026-10-08 |
-| customer (all roles) | Terms & ICA acceptance — all 4 branches, blank-imageUrl stripping, profile-incomplete CTA | [customer/terms-acceptance.md](customer/terms-acceptance.md) | 2026-10-08 |
+| customer (all roles) | Terms & ICA acceptance — all 4 branches, proactive dashboard profile-completeness gate (TC-PROF-01–06), blank-imageUrl stripping, profile-incomplete CTA, fixed-bottom button translucency fix (BUG-1), post-ICA training invisible button fix (BUG-2), Ambassador ICA v2→v3 version bump (TC-55, TC-56, TC-DASH-10b) | [customer/terms-acceptance.md](customer/terms-acceptance.md) | 2026-10-09 |
+| driver (all roles) | Phone verification & WhatsApp OTP login — OTP send/verify, double-submit guard (ONB-BUG-03), SMS fallback via triple-tap, phone normalisation, returnUrl redirect | [driver/phone-verification.md](driver/phone-verification.md) | 2026-10-09 |
+| individual / driver / ambassador | Welcome page card theme consistency — /indivisuals route, all 3 role contexts (individual benefits grid, driver 9-step flow, ambassador 4-step flow) | [individual/welcome-card-theme.md](individual/welcome-card-theme.md) | 2026-10-09 |
 
 ## Maintenance rule
 
