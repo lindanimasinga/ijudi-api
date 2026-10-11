@@ -1,5 +1,60 @@
 # Changelog
 
+## [1.14.1] — 2026-10-11
+
+**Release type:** Hotfix (P0 — production broken)
+
+**Summary:** Emergency fix for a YAML misconfiguration that silently disabled the WhatsApp AI assistant for all users across releases 1.12.0, 1.13.0, and 1.14.0 (approximately 3 days of outage, 2026-10-08 to 2026-10-11).
+
+### Incident summary
+
+Commit `2740db1` (2026-10-08) accidentally nested the `spring.ai.mcp.server` configuration block under `feign:` instead of `spring:`. Spring Boot therefore never loaded the MCP server config, leaving `StoreAiAgent` unable to resolve the MCP server and returning `null` on every WhatsApp AI request. Because `StoreAiAgent` catches the failure silently, affected users received no response — not even an error message. All customer, driver, and PRO store WhatsApp AI interactions were silently dropped for the full outage window.
+
+Root cause independently verified against the live file; fix is a pure YAML indentation move (8 lines, 1 file). This is the second key corrected by this fix — `spring.ai.mcp.server` mirrors an identical block (`spring.ai.mcp.client`) fixed in the same commit via `a4e13d6`.
+
+**Outage window:** ~2026-10-08 to 2026-10-11 (3 days). Post-mortem required within 24 hours.
+
+### Changes
+
+- [FIX] Move `spring.ai.mcp.server` configuration block from under `feign:` to under `spring:` where Spring Boot can load it. Affected file: `izinga-ordermanager/src/main/resources/application.yml`. (commit `1054f08`)
+
+### Breaking changes
+
+None. Pure YAML indentation correction — zero application code changes, no API shape, enum, or JWT structure altered.
+
+### Deployment sequence
+
+1. ijudi-api only — no frontend changes required.
+
+### Rollback steps
+
+1. Redeploy the v1.14.0 artifact (tag `1.14.0` on master) via ECS. The WhatsApp AI assistant will revert to the broken state, but no data is lost — this fix is configuration-only.
+2. Notify Lindani immediately if rollback is triggered.
+3. Note: rolling back to any version before this fix reactivates the silent failure; do not remain on a rolled-back version without a forward plan.
+
+### Smoke test plan
+
+1. Send a WhatsApp message to the iZinga AI assistant as a customer — verify a non-null response is returned (any valid AI response confirms the MCP server config loaded).
+2. Send a WhatsApp message as a driver — verify a non-null AI response.
+3. Send a WhatsApp message via a PRO store channel — verify a non-null AI response.
+4. Check application logs at startup for `izinga-mcp-server` registration — verify the MCP server appears in the Spring context startup output (previously absent).
+5. Confirm `StoreAiAgent` no longer logs null-return events for inbound WhatsApp messages in the 15 minutes post-deploy.
+
+### Post-deployment monitoring
+
+- 15 min: Check logs for MCP server startup registration and absence of null-return events in `StoreAiAgent`.
+- 1 hour: Confirm WhatsApp AI response volume has recovered to pre-incident levels; Growth & Analytics to watch for message delivery anomalies.
+- 24 hours: Full post-mortem completed; verify no secondary symptoms (missed orders or escalations) attributable to the 3-day outage window.
+
+### Gate citations
+
+- Root cause: independently verified by Lindani Masinga against live file (2026-10-11)
+- Code Review: PASS — iZinga Code Reviewer (commit `1054f08`); independently verified by Lindani Masinga
+- QA Gate 2 (full regression): PASS — 258 tests, 0 failures, 0 errors, BUILD SUCCESS, Corretto 17 (run on release/1.14.1, 2026-10-11)
+- P0 co-founder approval: Lindani Masinga — direct dispatch 2026-10-11
+
+---
+
 ## [1.14.0] — 2026-10-10
 
 **Release type:** Feature (P2 — new functionality)
