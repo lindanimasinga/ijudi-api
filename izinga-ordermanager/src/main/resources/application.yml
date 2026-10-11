@@ -79,14 +79,6 @@ service:
 feign:
     okhttp:
         enabled: true
-    ai:
-        mcp:
-            server:
-                protocol: STREAMABLE
-                name: izinga-mcp-server
-                version: 1.0.0
-                instructions: "Izinga marketplace API. Use the available tools to look up users and stores, create orders, and manage deliveries."
-                type: sync
 ukheshe:
     apiUrl: https://ukheshe-sandbox.jini.rocks/ukheshe-conductor/rest/v1
     customerId: 534
@@ -174,6 +166,14 @@ store:
 spring:
     jackson:
         date-format: yyyy-MM-dd HH:mm:ss
+    ai:
+        mcp:
+            server:
+                protocol: STREAMABLE
+                name: izinga-mcp-server
+                version: 1.0.0
+                instructions: "Izinga marketplace API. Use the available tools to look up users and stores, create orders, and manage deliveries."
+                type: sync
     security:
         oauth2:
             resourceserver:
