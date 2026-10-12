@@ -12,6 +12,7 @@ import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -115,7 +116,8 @@ class StoreDriverInviteServiceTest {
         contextId: String = storeId,
         driverPhone: String = normalizedDriverPhone,
         code: String = "test-code",
-        expired: Boolean = false
+        expired: Boolean = false,
+        contextType: StoreDriverInvitation.ContextType = StoreDriverInvitation.ContextType.STORE
     ): StoreDriverInvitation {
         val createdAt = Date()
         val expiresAt = Calendar.getInstance().apply {
@@ -125,7 +127,7 @@ class StoreDriverInviteServiceTest {
         return StoreDriverInvitation(
             id = "inv-id",
             contextId = contextId,
-            contextType = StoreDriverInvitation.ContextType.STORE,
+            contextType = contextType,
             invitedByUserId = invitedBy,
             driverMobileNumber = driverPhone,
             invitationCode = code,
@@ -597,5 +599,319 @@ class StoreDriverInviteServiceTest {
         // and now delegates to IzingaConstants (B-02)
         assertEquals(IzingaConstants.PENDING_PHOTO_URL, AmbassadorAdminController.PENDING_PHOTO_URL)
         assertEquals(UserProfile.SignUpReason.DELIVERY_DRIVER, profile.signUpReason)
+    }
+
+    // -----------------------------------------------------------------------
+    // TC-23 / TC-24: store / messenger-admin not found
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `inviteForStore returns 404 when store not found`() {
+        `when`(storeRepository.findById(storeId)).thenReturn(Optional.empty())
+
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            service.inviteForStore(storeId, invitedBy, inviteRequest())
+        }
+        assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+        verify(profileService, never()).create(anyKt<UserProfile>())
+        verify(invitationRepo, never()).save(any(StoreDriverInvitation::class.java))
+    }
+
+    @Test
+    fun `inviteForMessengerAdmin returns 404 when messenger admin not found`() {
+        `when`(userProfileRepo.findById(adminId)).thenReturn(Optional.empty())
+
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            service.inviteForMessengerAdmin(adminId, invitedBy, inviteRequest())
+        }
+        assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+        verify(profileService, never()).create(anyKt<UserProfile>())
+        verify(invitationRepo, never()).save(any(StoreDriverInvitation::class.java))
+    }
+
+    // -----------------------------------------------------------------------
+    // TC-25 / TC-26 / TC-27 / TC-28: inviteForMessengerAdmin — remaining outcomes
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `inviteForMessengerAdmin outcome 1 — no existing profile creates MESSENGER profile with messengerAdminId tag`() {
+        val adminProfile = aDriverProfile(id = adminId, phone = "+27800000001")
+        `when`(userProfileRepo.findById(adminId)).thenReturn(Optional.of(adminProfile))
+        `when`(userProfileRepo.findByMobileNumber(normalizedDriverPhone)).thenReturn(null)
+
+        var capturedProfile: UserProfile? = null
+        `when`(profileService.create(anyKt<UserProfile>())).thenAnswer { invocation ->
+            capturedProfile = invocation.getArgument<UserProfile>(0)
+            capturedProfile
+        }
+
+        val result = service.inviteForMessengerAdmin(adminId, invitedBy, inviteRequest())
+
+        assertEquals(StoreDriverInviteService.InviteOutcome.CREATED, result.outcome)
+        val profile = capturedProfile ?: error("profileService.create() was not called")
+        assertEquals(adminId, profile.tag["messengerAdminId"])
+        assertNull(profile.tag["storeId"])
+    }
+
+    @Test
+    fun `inviteForMessengerAdmin outcome 5 — pending non-expired invite already exists returns existing idempotently`() {
+        val adminProfile = aDriverProfile(id = adminId, phone = "+27800000001")
+        `when`(userProfileRepo.findById(adminId)).thenReturn(Optional.of(adminProfile))
+        `when`(userProfileRepo.findByMobileNumber(normalizedDriverPhone)).thenReturn(aDriverProfile())
+        val existingInvite = aPendingInvitation(
+            contextId = adminId, contextType = StoreDriverInvitation.ContextType.MESSENGER_ADMIN
+        )
+        `when`(invitationRepo.findByContextIdAndDriverMobileNumberAndStatus(
+            adminId, normalizedDriverPhone, StoreDriverInvitation.InvitationStatus.PENDING
+        )).thenReturn(existingInvite)
+
+        val result = service.inviteForMessengerAdmin(adminId, invitedBy, inviteRequest())
+
+        assertEquals(StoreDriverInviteService.InviteOutcome.INVITED, result.outcome)
+        assertEquals(existingInvite.invitationCode, result.invitation?.invitationCode)
+        verify(invitationRepo, never()).save(any(StoreDriverInvitation::class.java))
+    }
+
+    @Test
+    fun `inviteForMessengerAdmin outcome 4 — WhatsApp send failure does not propagate`() {
+        val adminProfile = aDriverProfile(id = adminId, phone = "+27800000001")
+        `when`(userProfileRepo.findById(adminId)).thenReturn(Optional.of(adminProfile))
+        `when`(userProfileRepo.findByMobileNumber(normalizedDriverPhone)).thenReturn(aDriverProfile())
+        `when`(invitationRepo.findByContextIdAndDriverMobileNumberAndStatus(
+            adminId, normalizedDriverPhone, StoreDriverInvitation.InvitationStatus.PENDING
+        )).thenReturn(null)
+        `when`(invitationRepo.save(any(StoreDriverInvitation::class.java))).thenAnswer { it.getArgument(0) }
+        doThrow(RuntimeException("Template not yet approved")).`when`(notificationPort)
+            .sendDriverStoreInvitation(anyString(), anyString(), anyString(), anyString())
+
+        // Must NOT throw — the exception from the notification port is absorbed
+        val result = service.inviteForMessengerAdmin(adminId, invitedBy, inviteRequest())
+        assertEquals(StoreDriverInviteService.InviteOutcome.INVITED, result.outcome)
+    }
+
+    @Test
+    fun `inviteForMessengerAdmin outcome 4 — expired existing invite is replaced by a new one`() {
+        val adminProfile = aDriverProfile(id = adminId, phone = "+27800000001")
+        `when`(userProfileRepo.findById(adminId)).thenReturn(Optional.of(adminProfile))
+        `when`(userProfileRepo.findByMobileNumber(normalizedDriverPhone)).thenReturn(aDriverProfile())
+        val expiredInvite = aPendingInvitation(
+            contextId = adminId, contextType = StoreDriverInvitation.ContextType.MESSENGER_ADMIN, expired = true
+        )
+        `when`(invitationRepo.findByContextIdAndDriverMobileNumberAndStatus(
+            adminId, normalizedDriverPhone, StoreDriverInvitation.InvitationStatus.PENDING
+        )).thenReturn(expiredInvite)
+        `when`(invitationRepo.save(any(StoreDriverInvitation::class.java))).thenAnswer { it.getArgument(0) }
+
+        val result = service.inviteForMessengerAdmin(adminId, invitedBy, inviteRequest())
+
+        assertEquals(StoreDriverInviteService.InviteOutcome.INVITED, result.outcome)
+
+        val captor = ArgumentCaptor.forClass(StoreDriverInvitation::class.java)
+        verify(invitationRepo, org.mockito.Mockito.times(2)).save(captor.capture())
+        val allSaved = captor.allValues
+
+        val expiredSaved = allSaved[0]
+        assertEquals(StoreDriverInvitation.InvitationStatus.EXPIRED, expiredSaved.status)
+        assertEquals(expiredInvite.invitationCode, expiredSaved.invitationCode)
+
+        val newSaved = allSaved[1]
+        assertEquals(StoreDriverInvitation.InvitationStatus.PENDING, newSaved.status)
+        assertNotNull(newSaved.invitationCode)
+        assert(newSaved.invitationCode != expiredInvite.invitationCode) { "New invite must have a different code" }
+    }
+
+    // -----------------------------------------------------------------------
+    // TC-29 / TC-30: acceptInvitation — not-found and caller-not-found guards
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `acceptInvitation returns 404 when invitation code not found`() {
+        `when`(invitationRepo.findByInvitationCode("missing-code")).thenReturn(null)
+
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            service.acceptInvitation(storeId, "missing-code", "driver-uid")
+        }
+        assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+    }
+
+    @Test
+    fun `acceptInvitation returns 403 when caller profile not found`() {
+        val code = "code"
+        val invitation = aPendingInvitation(code = code)
+        `when`(invitationRepo.findByInvitationCode(code)).thenReturn(invitation)
+        `when`(userProfileRepo.findById("missing-uid")).thenReturn(Optional.empty())
+
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            service.acceptInvitation(storeId, code, "missing-uid")
+        }
+        assertEquals(HttpStatus.FORBIDDEN, ex.statusCode)
+    }
+
+    // -----------------------------------------------------------------------
+    // TC-31 / TC-32 / TC-33: rejectInvitation — not-found, contextId mismatch,
+    // caller-not-found guards
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `rejectInvitation returns 404 when invitation code not found`() {
+        `when`(invitationRepo.findByInvitationCode("missing-code")).thenReturn(null)
+
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            service.rejectInvitation(storeId, "missing-code", "driver-uid", null)
+        }
+        assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+    }
+
+    @Test
+    fun `rejectInvitation returns 404 when contextId does not match invitation`() {
+        val code = "code"
+        val invitation = aPendingInvitation(contextId = storeId, code = code)
+        `when`(invitationRepo.findByInvitationCode(code)).thenReturn(invitation)
+
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            service.rejectInvitation("wrong-store-id", code, "driver-uid", null)
+        }
+        assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+    }
+
+    @Test
+    fun `rejectInvitation returns 403 when caller profile not found`() {
+        val code = "code"
+        val invitation = aPendingInvitation(code = code)
+        `when`(invitationRepo.findByInvitationCode(code)).thenReturn(invitation)
+        `when`(userProfileRepo.findById("missing-uid")).thenReturn(Optional.empty())
+
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            service.rejectInvitation(storeId, code, "missing-uid", null)
+        }
+        assertEquals(HttpStatus.FORBIDDEN, ex.statusCode)
+    }
+
+    // -----------------------------------------------------------------------
+    // TC-34 / TC-35: normalizePhoneForLookup boundary (exercised via inviteForStore)
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `normalizePhoneForLookup accepts exactly 9-character phone without prefix`() {
+        val store = aStore()
+        `when`(storeRepository.findById(storeId)).thenReturn(Optional.of(store))
+        `when`(userProfileRepo.findByMobileNumber(normalizedDriverPhone)).thenReturn(null)
+        `when`(profileService.create(anyKt<UserProfile>())).thenAnswer { it.getArgument(0) }
+
+        val result = service.inviteForStore(storeId, invitedBy, inviteRequest(mobile = "841234567"))
+
+        assertEquals(StoreDriverInviteService.InviteOutcome.CREATED, result.outcome)
+        verify(userProfileRepo).findByMobileNumber(normalizedDriverPhone)
+    }
+
+    @Test
+    fun `normalizePhoneForLookup throws 400 BAD_REQUEST for 8-character phone`() {
+        val store = aStore()
+        `when`(storeRepository.findById(storeId)).thenReturn(Optional.of(store))
+
+        val ex = assertThrows(ResponseStatusException::class.java) {
+            service.inviteForStore(storeId, invitedBy, inviteRequest(mobile = "84123456"))
+        }
+        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
+        verify(userProfileRepo, never()).findByMobileNumber(anyString())
+    }
+
+    // -----------------------------------------------------------------------
+    // TC-36 / TC-37: MESSENGER_ADMIN context dispatch for accept/reject
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `acceptInvitation via MESSENGER_ADMIN context sets messengerAdminId tag not storeId`() {
+        val code = "admin-accept-code"
+        val invitation = aPendingInvitation(
+            contextId = adminId, code = code, contextType = StoreDriverInvitation.ContextType.MESSENGER_ADMIN
+        )
+        val driver = aDriverProfile(id = "driver-uid")
+        `when`(invitationRepo.findByInvitationCode(code)).thenReturn(invitation)
+        `when`(userProfileRepo.findById("driver-uid")).thenReturn(Optional.of(driver))
+        `when`(userProfileRepo.save(any(UserProfile::class.java))).thenReturn(driver)
+        `when`(invitationRepo.save(any(StoreDriverInvitation::class.java))).thenAnswer { it.getArgument(0) }
+
+        service.acceptInvitation(adminId, code, "driver-uid")
+
+        assertEquals(adminId, driver.tag["messengerAdminId"])
+        assertNull(driver.tag["storeId"])
+    }
+
+    @Test
+    fun `rejectInvitation via MESSENGER_ADMIN context succeeds without modifying driver profile`() {
+        val code = "admin-reject-code"
+        val invitation = aPendingInvitation(
+            contextId = adminId, code = code, contextType = StoreDriverInvitation.ContextType.MESSENGER_ADMIN
+        )
+        val driver = aDriverProfile(id = "driver-uid")
+        `when`(invitationRepo.findByInvitationCode(code)).thenReturn(invitation)
+        `when`(userProfileRepo.findById("driver-uid")).thenReturn(Optional.of(driver))
+        `when`(invitationRepo.save(any(StoreDriverInvitation::class.java))).thenAnswer { it.getArgument(0) }
+
+        service.rejectInvitation(adminId, code, "driver-uid", "Not available")
+
+        val captor = ArgumentCaptor.forClass(StoreDriverInvitation::class.java)
+        verify(invitationRepo).save(captor.capture())
+        assertEquals(StoreDriverInvitation.InvitationStatus.REJECTED, captor.value.status)
+        verify(userProfileRepo, never()).save(any(UserProfile::class.java))
+    }
+
+    // -----------------------------------------------------------------------
+    // TC-38: findByCode
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `findByCode returns null when invitation repo has no match`() {
+        `when`(invitationRepo.findByInvitationCode("missing-code")).thenReturn(null)
+
+        val result = service.findByCode("missing-code")
+
+        assertNull(result)
+    }
+
+    // -----------------------------------------------------------------------
+    // TC-42 / TC-43 / TC-44: StoreDriverInvitation.isExpired boundary + guard
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `isExpired is false when expiresAt is one second in the future`() {
+        val invitation = StoreDriverInvitation(
+            contextId = storeId,
+            contextType = StoreDriverInvitation.ContextType.STORE,
+            invitedByUserId = invitedBy,
+            driverMobileNumber = normalizedDriverPhone,
+            invitationCode = "code",
+            expiresAt = Date(System.currentTimeMillis() + 1000)
+        )
+        assertEquals(false, invitation.isExpired)
+    }
+
+    @Test
+    fun `isExpired is true when expiresAt is one second in the past and status is PENDING`() {
+        val invitation = StoreDriverInvitation(
+            contextId = storeId,
+            contextType = StoreDriverInvitation.ContextType.STORE,
+            invitedByUserId = invitedBy,
+            driverMobileNumber = normalizedDriverPhone,
+            invitationCode = "code",
+            status = StoreDriverInvitation.InvitationStatus.PENDING,
+            expiresAt = Date(System.currentTimeMillis() - 1000)
+        )
+        assertEquals(true, invitation.isExpired)
+    }
+
+    @Test
+    fun `isExpired is false when status is ACCEPTED even though expiresAt is in the past`() {
+        val invitation = StoreDriverInvitation(
+            contextId = storeId,
+            contextType = StoreDriverInvitation.ContextType.STORE,
+            invitedByUserId = invitedBy,
+            driverMobileNumber = normalizedDriverPhone,
+            invitationCode = "code",
+            status = StoreDriverInvitation.InvitationStatus.ACCEPTED,
+            expiresAt = Date(System.currentTimeMillis() - 1000)
+        )
+        assertEquals(false, invitation.isExpired)
     }
 }

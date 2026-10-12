@@ -43,7 +43,9 @@ data class InviteCodeResponse(
     val status: String,
     val expiresAt: String,
     /** Last 4 digits only, e.g. "****1234". */
-    val driverMobileNumber: String
+    val driverMobileNumber: String,
+    /** "STORE" or "MESSENGER_ADMIN" — tells the frontend which accept/reject endpoint to call. */
+    val contextType: String
 )
 
 data class RejectRequest(val reason: String? = null)
@@ -183,7 +185,8 @@ class InviteCodeLookupController(
             storeImageUrl = contextImageUrl,
             status = invitation.status.name,
             expiresAt = expiresAtIso,
-            driverMobileNumber = maskedPhone
+            driverMobileNumber = maskedPhone,
+            contextType = invitation.contextType.name
         ))
     }
 
