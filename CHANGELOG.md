@@ -1,5 +1,54 @@
 # Changelog
 
+## [1.15.0] — 2026-10-12
+
+**Release type:** Feature (P2 — new functionality)
+
+**Summary:** ADR-018 — a store (or messenger-admin) can invite a driver to join by mobile number via WhatsApp, with 5-day expiry and public deep-link accept/reject.
+
+### Changes
+
+- [NEW] Store-driver invitation (ADR-018): `POST /store/{storeId}/invite` and `POST /messenger-admin/{adminId}/invite` create an invite for a driver by mobile number, mapped to 5 outcomes (CREATED, ALREADY_LINKED, CONFLICT 409, INVITED new, INVITED idempotent). `GET /invite/{code}` is a public, unauthenticated deep-link lookup for the WhatsApp message's URL button. Accept/reject via `POST .../invite/{code}/accept` and `.../reject` enforce caller-phone match against the invitation, 5-day expiry (410 GONE past expiry), and atomic re-check on accept to guard the race between two near-simultaneous accepts. New entity `StoreDriverInvitation`, repo `StoreDriverInvitationRepo`, service `StoreDriverInviteService`, and 3 controllers in `StoreDriverInviteController.kt`. Notification sent via new `driver_store_invite` WhatsApp template (UTILITY, Meta-approved 2026-10-12) through `DriverInviteNotificationPort`. (branch `feature/ADR-018-store-driver-invitation`)
+- [NEW] `InviteCodeResponse` includes `contextType` (STORE | MESSENGER_ADMIN) so the frontend can route accept/reject to the correct endpoint family.
+
+### Breaking changes
+
+None. All new endpoints are additive; no existing endpoint path, method, response field, or enum value was modified. `SecurityConfig` changes are additive rule insertions only.
+
+### Deployment sequence
+
+1. ijudi-api first (this release) — the frontend release depends on these endpoints already being live.
+2. izinga-onboarding (INVITE-DRV-01) follows immediately after.
+
+### Rollback steps
+
+1. Redeploy the v1.14.1 artifact (tag `1.14.1` on master) via ECS. No data migration rollback required — `StoreDriverInvitation` documents are additive and not read by any other service; a rollback simply stops new invites from being created or accepted.
+2. Notify Lindani that rollback was triggered.
+
+### Smoke test plan
+
+1. As a STORE_ADMIN, POST `/store/{storeId}/invite` with a new mobile number — verify 201 CREATED and a `driver_welcome_2` WhatsApp message is sent.
+2. Invite an existing-profile mobile number — verify 201/200 INVITED and a `driver_store_invite` WhatsApp message is sent with a working deep link.
+3. Open `GET /invite/{code}` unauthenticated — verify store name, masked phone, status, and expiry are returned with no auth required.
+4. Accept the invite as the matching driver — verify 200 and the invitation status moves to ACCEPTED.
+5. Attempt to accept as a different authenticated user — verify 403.
+6. Attempt to accept an expired invite — verify 410 GONE.
+
+### Post-deployment monitoring
+
+- 15 min: Confirm `POST /store/*/invite` and `GET /invite/*` appear in access logs with 2xx/404 responses only (no 5xx).
+- 1 hour: Confirm `driver_store_invite` WhatsApp sends return `message_status: accepted` in logs, not template-not-found errors.
+- 24 hours: Confirm no anomalous spike in 403 (phone-mismatch) or 410 (expired) responses that would indicate a client-side bug in the frontend's invite flow.
+
+### Gate citations
+
+- Feature Brief: INVITE-DRV-01 (store driver invitation UI) — approved by Lindani Masinga
+- Code Review: PASS, approved for deploy — iZinga Code Reviewer, 2026-10-12
+- QA Gate: SIGN-OFF — 258 tests, 0 failures, 0 errors, Skipped: 3 (pre-existing), BUILD SUCCESS, Corretto 17, 2026-10-12
+- Manual live verification: full end-to-end flow confirmed working against the real WhatsApp Graph API, including the live `driver_store_invite` template — Lindani Masinga + Claude, 2026-10-12
+
+---
+
 ## [1.14.1] — 2026-10-11
 
 **Release type:** Hotfix (P0 — production broken)
