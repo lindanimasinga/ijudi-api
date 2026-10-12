@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.usermanagement.users
 
+import io.curiousoft.izinga.commons.model.IzingaConstants
 import io.curiousoft.izinga.commons.model.Profile
 import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.StoreType
@@ -212,11 +213,11 @@ class AmbassadorAdminController(
         /**
          * Placeholder used for the imageUrl field on admin-initiated ambassador records
          * created before the ambassador has uploaded a profile photo.
-         * Mirrors the "no photo yet" default used by the izinga-onboarding frontend
-         * (UserUpdateComponent). Replace with an iZinga-hosted asset if this URL is
-         * ever rotated.
+         * Delegates to the shared [IzingaConstants.PENDING_PHOTO_URL] constant (B-02) so
+         * all modules use the same URL.  Kept here for backward compatibility with any
+         * test or callsite that references AmbassadorAdminController.PENDING_PHOTO_URL.
          */
-        const val PENDING_PHOTO_URL = "https://pbs.twimg.com/media/C1OKE9QXgAAArDp.jpg"
+        const val PENDING_PHOTO_URL = IzingaConstants.PENDING_PHOTO_URL
     }
 
     data class CreateAmbassadorRequest(
