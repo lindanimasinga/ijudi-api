@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import io.curiousoft.izinga.commons.notification.DriverInviteNotificationPort;
 import io.curiousoft.izinga.messaging.AdminOnlyNotificationService;
 
 import jakarta.validation.constraints.NotNull;
@@ -25,7 +26,7 @@ import static java.util.Optional.ofNullable;
 import static java.util.TimeZone.getTimeZone;
 
 @Service
-public class WhatsappNotificationService implements AdminOnlyNotificationService {
+public class WhatsappNotificationService implements AdminOnlyNotificationService, DriverInviteNotificationPort {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(WhatsappNotificationService.class);
     private final WhatsAppService whatsAppService;
@@ -702,6 +703,79 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
       request.setTemplate(buildNameOrderIdTemplate("driver_arrived_dropoff", displayName, order.getId(), false, "en"));
         whatsAppService.sendMessage(senderResolver.resolve(Audience.CUSTOMER, null), request).execute();
         LOGGER.info("Sent driver arrived for drop-off notification to {}", mobileNumber);
+    }
+
+    /**
+     * B-07: Sends a WhatsApp invitation to a driver to join a store's team.
+     *
+     * Template: {@code driver_store_invite}  (UTILITY, requires Meta Business approval before going live).
+     * Template structure:
+     *   BODY — two TEXT parameters: {{1}} = driverName, {{2}} = storeName
+     *   BUTTON (URL) — one TEXT parameter: the bare {@code invitationCode} appended to the
+     *       button's configured static URL prefix in the Meta template (e.g.
+     *       {@code https://driver.izinga.co.za/indivisuals/store-invite?code=}).
+     *
+     * This method silently absorbs all exceptions — a template-not-yet-approved or network
+     * failure must never propagate to the invite endpoint.  Callers rely on this contract.
+     */
+    @Override
+    public void sendDriverStoreInvitation(String driverMobileNumber, String driverName, String storeName, String invitationCode) {
+        try {
+            if (driverMobileNumber == null || driverMobileNumber.isBlank()) {
+                LOGGER.warn("sendDriverStoreInvitation: driverMobileNumber is null or blank — skipping");
+                return;
+            }
+
+            String to = driverMobileNumber.startsWith("0")
+                    ? driverMobileNumber.replaceFirst("0", "+27")
+                    : driverMobileNumber;
+
+            String safeDriverName  = (driverName  != null && !driverName.isBlank())  ? driverName  : "Driver";
+            String safeStoreName   = (storeName   != null && !storeName.isBlank())   ? storeName   : "the store";
+            String safeCode        = (invitationCode != null)                         ? invitationCode : "";
+
+            WhatsappTemplateRequest.Template template = new WhatsappTemplateRequest.Template();
+            template.setName("driver_store_invite");
+            var lang = new WhatsappTemplateRequest.Language();
+            lang.setCode("en");
+            template.setLanguage(lang);
+
+            // BODY — {{1}} driverName, {{2}} storeName
+            var nameParam = new WhatsappTemplateRequest.Parameter();
+            nameParam.setType(WhatsappTemplateRequest.ParameterType.TEXT);
+            nameParam.setText(safeDriverName);
+
+            var storeParam = new WhatsappTemplateRequest.Parameter();
+            storeParam.setType(WhatsappTemplateRequest.ParameterType.TEXT);
+            storeParam.setText(safeStoreName);
+
+            var bodyComponent = new WhatsappTemplateRequest.Component();
+            bodyComponent.setType(WhatsappTemplateRequest.ComponentType.BODY);
+            bodyComponent.setParameters(List.of(nameParam, storeParam));
+
+            // BUTTON (URL) — single TEXT parameter: the bare invitation code
+            var codeParam = new WhatsappTemplateRequest.Parameter();
+            codeParam.setType(WhatsappTemplateRequest.ParameterType.TEXT);
+            codeParam.setText(safeCode);
+
+            var buttonComponent = new WhatsappTemplateRequest.Component();
+            buttonComponent.setType(WhatsappTemplateRequest.ComponentType.BUTTON);
+            buttonComponent.setSub_type(WhatsappTemplateRequest.ButtonSubType.URL);
+            buttonComponent.setIndex(0);
+            buttonComponent.setParameters(List.of(codeParam));
+
+            template.setComponents(List.of(bodyComponent, buttonComponent));
+
+            WhatsappTemplateRequest request = new WhatsappTemplateRequest();
+            request.setTo(to);
+            request.setTemplate(template);
+
+            whatsAppService.sendMessage(senderResolver.resolve(Audience.DRIVER, null), request).execute();
+            LOGGER.info("Sent driver store invitation to {} for invitationCode={}", to, safeCode);
+        } catch (Exception e) {
+            LOGGER.error("Failed to send driver store invitation to {} — template may not yet be approved: {}",
+                    driverMobileNumber, e.getMessage(), e);
+        }
     }
 
     /**
