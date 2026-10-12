@@ -56,6 +56,15 @@ public class SecurityConfig {
                         .requestMatchers(POST, "/ambassador").hasRole("ADMIN")
                         // SEC-05: /forward/** requires ADMIN or STORE_ADMIN (human correction forwarding)
                         .requestMatchers(GET, "/forward/**").hasAnyRole("ADMIN", "STORE_ADMIN")
+                        // ADR-018 B-04: Store driver invite endpoint — STORE_ADMIN or ADMIN only
+                        .requestMatchers(POST, "/store/*/invite").hasAnyRole("ADMIN", "STORE_ADMIN")
+                        // ADR-018 B-06: Accept/reject require authentication (phone match enforced in service)
+                        .requestMatchers(POST, "/store/*/invite/*/accept", "/store/*/invite/*/reject").authenticated()
+                        // ADR-018 B-05: Public deep-link landing — no auth
+                        .requestMatchers(GET, "/invite/*").permitAll()
+                        // ADR-018 B-08: Messenger-admin invite — MESSENGER_ADMIN role only
+                        .requestMatchers(POST, "/messenger-admin/*/invite").hasRole("MESSENGER_ADMIN")
+                        .requestMatchers(POST, "/messenger-admin/*/invite/*/accept", "/messenger-admin/*/invite/*/reject").authenticated()
                         // SEC-01: store write endpoints require authentication; DELETE restricted to ADMIN
                         .requestMatchers(POST, "/store").authenticated()
                         .requestMatchers(PATCH, "/store/*", "/store/*/stock").authenticated()

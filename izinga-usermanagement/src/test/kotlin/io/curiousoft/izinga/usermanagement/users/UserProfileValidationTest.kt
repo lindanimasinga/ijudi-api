@@ -104,13 +104,19 @@ class UserProfileValidationTest {
         verify(userProfileRepo, never()).save(profile)
     }
 
+    /**
+     * B-01: signUpReason is now optional at create time — null is permitted.
+     * The AmbassadorAdminController always supplies an explicit SignUpReason value so it is
+     * unaffected.  The driver-invite endpoint (B-04) creates profiles with signUpReason = null,
+     * which this test covers.
+     */
     @Test
-    fun `create rejects null signUpReason`() {
+    fun `create accepts null signUpReason — B-01`() {
         val profile = UserProfile("John", null, "address", "https://img", "+27812815707", ProfileRoles.CUSTOMER)
-        val ex = assertThrows(ResponseStatusException::class.java) { profileService.create(profile) }
-        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
-        assertEquals("signUpReason is required", ex.reason)
-        verify(userProfileRepo, never()).save(profile)
+        `when`(userProfileRepo.findByMobileNumber("+27812815707")).thenReturn(null)
+        `when`(userProfileRepo.save(profile)).thenReturn(profile)
+        profileService.create(profile)
+        verify(userProfileRepo).save(profile)
     }
 
     @Test
