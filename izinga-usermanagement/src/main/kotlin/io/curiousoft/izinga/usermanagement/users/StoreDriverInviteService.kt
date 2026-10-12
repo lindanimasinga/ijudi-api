@@ -234,19 +234,19 @@ class StoreDriverInviteService(
                 tag[tagKey] = contextId
             }
             profileService.create(profile)
-            log.info("Created new MESSENGER profile for mobileNumber={} contextType={} contextId={}", normalizedPhone, contextType, contextId)
+            log.info("Created new MESSENGER profile for mobileNumber={} contextType={} contextId={}", maskPhone(normalizedPhone), contextType, contextId)
             InviteResult(InviteOutcome.CREATED)
         } else {
             val existingLink = existing.tag[tagKey]
             when {
                 existingLink == contextId -> {
                     // Outcome 2: already linked to this context
-                    log.info("Driver mobileNumber={} already linked to contextId={} — returning ALREADY_LINKED", normalizedPhone, contextId)
+                    log.info("Driver mobileNumber={} already linked to contextId={} — returning ALREADY_LINKED", maskPhone(normalizedPhone), contextId)
                     InviteResult(InviteOutcome.ALREADY_LINKED)
                 }
                 existingLink != null -> {
                     // Outcome 3: linked to a different context
-                    log.warn("Driver mobileNumber={} linked to different contextId={}, requested={}", normalizedPhone, existingLink, contextId)
+                    log.warn("Driver mobileNumber={} linked to different contextId={}, requested={}", maskPhone(normalizedPhone), existingLink, contextId)
                     throw ResponseStatusException(HttpStatus.CONFLICT, "DRIVER_LINKED_TO_OTHER_STORE")
                 }
                 else -> {
@@ -256,10 +256,16 @@ class StoreDriverInviteService(
                     )
                     if (existingInvite != null && !existingInvite.isExpired) {
                         // Outcome 5: valid pending invite already exists — return idempotently
-                        log.info("Returning existing PENDING invitation {} for mobileNumber={} contextId={}", existingInvite.id, normalizedPhone, contextId)
+                        log.info("Returning existing PENDING invitation {} for mobileNumber={} contextId={}", existingInvite.id, maskPhone(normalizedPhone), contextId)
                         InviteResult(InviteOutcome.INVITED, existingInvite)
                     } else {
-                        // Outcome 4: create a new invitation
+                        // Outcome 4: create a new invitation.
+                        // If there is an expired PENDING invitation, materialise it to EXPIRED before
+                        // creating the replacement — prevents duplicate PENDING records accumulating.
+                        existingInvite?.let {
+                            invitationRepo.save(it.copy(status = StoreDriverInvitation.InvitationStatus.EXPIRED))
+                            log.info("Materialised expired invitation {} to EXPIRED for mobileNumber={} contextId={}", it.id, maskPhone(normalizedPhone), contextId)
+                        }
                         val invitationCode = UUID.randomUUID().toString()
                         val createdAt = Date()
                         val expiresAt = Calendar.getInstance().apply {
@@ -278,7 +284,7 @@ class StoreDriverInviteService(
                             expiresAt = expiresAt
                         )
                         val saved = invitationRepo.save(invitation)
-                        log.info("Created invitation {} for mobileNumber={} contextId={}", invitationCode, normalizedPhone, contextId)
+                        log.info("Created invitation {} for mobileNumber={} contextId={}", invitationCode, maskPhone(normalizedPhone), contextId)
 
                         // Send WhatsApp notification — non-fatal: template may not yet be approved
                         val driverName = existing.name ?: "Driver"
@@ -313,11 +319,18 @@ class StoreDriverInviteService(
     /**
      * Normalize a phone number to +27XXXXXXXXX (E.164) format for lookup.
      * Uses the last 9 digits with a +27 prefix.
+     * Throws 400 BAD_REQUEST (not 500) when the input is shorter than 9 characters.
      */
     private fun normalizePhoneForLookup(phone: String): String {
-        require(phone.length >= 9) { "Mobile number too short: $phone" }
+        if (phone.length < 9) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Mobile number too short: $phone")
         val last9 = phone.substring(phone.length - 9)
         return "+27$last9"
+    }
+
+    /** Masks all but the last 4 digits for safe log output: "+27****1234". */
+    private fun maskPhone(phone: String): String {
+        if (phone.length <= 4) return "****"
+        return "****${phone.takeLast(4)}"
     }
 
     /**

@@ -261,7 +261,7 @@ class StoreDriverInviteServiceTest {
         val store = aStore()
         `when`(storeRepository.findById(storeId)).thenReturn(Optional.of(store))
         `when`(userProfileRepo.findByMobileNumber(normalizedDriverPhone)).thenReturn(aDriverProfile())
-        val expiredInvite = aPendingInvitation(expired = true)
+        val expiredInvite = aPendingInvitation(expired = true)  // id="inv-id", code="test-code"
         `when`(invitationRepo.findByContextIdAndDriverMobileNumberAndStatus(
             storeId, normalizedDriverPhone, StoreDriverInvitation.InvitationStatus.PENDING
         )).thenReturn(expiredInvite)
@@ -270,10 +270,23 @@ class StoreDriverInviteServiceTest {
         val result = service.inviteForStore(storeId, invitedBy, inviteRequest())
 
         assertEquals(StoreDriverInviteService.InviteOutcome.INVITED, result.outcome)
+
+        // TWO saves expected: first materialises the old invite as EXPIRED, second creates the new PENDING one.
         val captor = ArgumentCaptor.forClass(StoreDriverInvitation::class.java)
-        verify(invitationRepo).save(captor.capture())
-        // Must be a NEW invitation, not the expired one
-        assertEquals(StoreDriverInvitation.InvitationStatus.PENDING, captor.value.status)
+        verify(invitationRepo, org.mockito.Mockito.times(2)).save(captor.capture())
+        val allSaved = captor.allValues
+
+        // First save: the old expired invitation persisted with status=EXPIRED
+        val expiredSaved = allSaved[0]
+        assertEquals(StoreDriverInvitation.InvitationStatus.EXPIRED, expiredSaved.status)
+        assertEquals(expiredInvite.invitationCode, expiredSaved.invitationCode)  // same code, just status changed
+        assertEquals(expiredInvite.id, expiredSaved.id)
+
+        // Second save: brand-new invitation with status=PENDING and a different invitation code
+        val newSaved = allSaved[1]
+        assertEquals(StoreDriverInvitation.InvitationStatus.PENDING, newSaved.status)
+        assertNotNull(newSaved.invitationCode)
+        assert(newSaved.invitationCode != expiredInvite.invitationCode) { "New invite must have a different code" }
     }
 
     // -----------------------------------------------------------------------

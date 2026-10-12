@@ -15,6 +15,16 @@ import java.time.format.DateTimeFormatter
 import java.util.Date
 
 // ---------------------------------------------------------------------------
+// Shared phone masking utility (used in log statements — never for API responses)
+// ---------------------------------------------------------------------------
+
+/** Masks all but the last 4 digits for safe log output: "****1234". */
+private fun maskPhone(phone: String): String {
+    if (phone.length <= 4) return "****"
+    return "****${phone.takeLast(4)}"
+}
+
+// ---------------------------------------------------------------------------
 // DTOs
 // ---------------------------------------------------------------------------
 
@@ -78,7 +88,7 @@ class StoreDriverInviteController(
         @RequestBody request: DriverInviteRequest,
         @AuthenticationPrincipal jwt: Jwt
     ): ResponseEntity<InviteOutcomeResponse> {
-        log.info("POST /store/{}/invite mobileNumber={}", storeId, request.mobileNumber)
+        log.info("POST /store/{}/invite mobileNumber={}", storeId, maskPhone(request.mobileNumber))
         val invitedBy = jwt.subject ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "No subject in JWT")
         val result = inviteService.inviteForStore(storeId, invitedBy, StoreDriverInviteService.InviteRequest(
             mobileNumber = request.mobileNumber,
@@ -177,11 +187,6 @@ class InviteCodeLookupController(
         ))
     }
 
-    /** Masks all but the last 4 digits: "****1234". */
-    private fun maskPhone(phone: String): String {
-        if (phone.length <= 4) return "****"
-        return "****${phone.takeLast(4)}"
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +216,7 @@ class MessengerAdminDriverInviteController(
         @RequestBody request: DriverInviteRequest,
         @AuthenticationPrincipal jwt: Jwt
     ): ResponseEntity<InviteOutcomeResponse> {
-        log.info("POST /messenger-admin/{}/invite mobileNumber={}", adminId, request.mobileNumber)
+        log.info("POST /messenger-admin/{}/invite mobileNumber={}", adminId, maskPhone(request.mobileNumber))
         val invitedBy = jwt.subject ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "No subject in JWT")
         val result = inviteService.inviteForMessengerAdmin(adminId, invitedBy, StoreDriverInviteService.InviteRequest(
             mobileNumber = request.mobileNumber,
