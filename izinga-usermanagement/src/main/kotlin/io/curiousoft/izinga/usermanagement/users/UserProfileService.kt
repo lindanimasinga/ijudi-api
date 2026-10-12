@@ -226,9 +226,6 @@ class UserProfileService(
         if (profile.role == null) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "role is required")
         }
-        if (profile.signUpReason == null) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "signUpReason is required")
-        }
         if (profile.imageUrl.isNullOrBlank()) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "imageUrl is required")
         }
