@@ -5,6 +5,7 @@ import io.curiousoft.izinga.commons.model.UserProfile;
 import io.curiousoft.izinga.commons.repo.IcaAcceptanceLogRepo;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.ordermanagement.McpConfig;
+import io.curiousoft.izinga.ordermanagement.orders.McpOrderService;
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
 import io.curiousoft.izinga.ordermanagement.stores.StoreService;
 import io.curiousoft.izinga.recon.ReconServiceImpl;
@@ -83,6 +84,8 @@ class McpToolRegistrationTest {
     private ReferralCodeService referralCodeService;
     @Mock
     private DocumentUploadMcpService documentUploadMcpService;
+    @Mock
+    private McpOrderService mcpOrderService;
 
     @BeforeEach
     void setUp() {
@@ -97,7 +100,8 @@ class McpToolRegistrationTest {
                 orderService,
                 reconService,
                 storeService,
-                documentUploadMcpService
+                documentUploadMcpService,
+                mcpOrderService
         );
         assertNotNull(provider, "ToolCallbackProvider must not be null");
     }
@@ -109,7 +113,8 @@ class McpToolRegistrationTest {
             orderService,
             reconService,
             storeService,
-            documentUploadMcpService
+            documentUploadMcpService,
+            mcpOrderService
         );
         ToolCallback[] tools = provider.getToolCallbacks();
 
@@ -127,6 +132,9 @@ class McpToolRegistrationTest {
         assertTrue(toolNames.contains("create_document_upload_session"), "Tool 'create_document_upload_session' must be registered");
         assertTrue(toolNames.contains("attach_uploaded_document_to_user_tag"), "Tool 'attach_uploaded_document_to_user_tag' must be registered");
         assertTrue(toolNames.contains("recheck_required_documents"), "Tool 'recheck_required_documents' must be registered");
+        // ADR-020: new tools
+        assertTrue(toolNames.contains("find_stores"), "Tool 'find_stores' must be registered");
+        assertTrue(toolNames.contains("start_order"), "Tool 'start_order' must be registered");
     }
 
     @Test
@@ -136,7 +144,8 @@ class McpToolRegistrationTest {
             orderService,
             reconService,
             storeService,
-            documentUploadMcpService
+            documentUploadMcpService,
+            mcpOrderService
         );
         ToolCallback findUserTool = Arrays.stream(provider.getToolCallbacks())
                 .filter(t -> "find_user_by_phone".equals(t.getToolDefinition().name()))
@@ -155,7 +164,8 @@ class McpToolRegistrationTest {
             orderService,
             reconService,
             storeService,
-            documentUploadMcpService
+            documentUploadMcpService,
+            mcpOrderService
         );
         ToolCallback createUserTool = Arrays.stream(provider.getToolCallbacks())
                 .filter(t -> "create_user".equals(t.getToolDefinition().name()))

@@ -477,6 +477,73 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         return profileRepo.findByOwnerId(ownerId);
     }
 
+    /**
+     * ADR-020: MCP tool to find stores with optional filtering.
+     *
+     * <p>All parameters are optional. When none are provided all stores are returned.
+     * When one or more parameters are provided only stores matching ALL supplied filters
+     * are returned.
+     *
+     * <p>PII stripping: each returned StoreProfile has its bank {@code accountId} replaced
+     * with the platform's main pay account, matching the established pattern in
+     * {@link #findAll()} and {@link #findNearbyStores}. No raw bank account numbers
+     * reach the AI agent.
+     *
+     * @param city         Case-insensitive substring match against the store's {@code address}
+     *                     field. Pass {@code null} or blank to skip this filter.
+     * @param storeType    One of: FOOD, CLOTHING, SALON, CAR_WASH, MOVERS, TIPS, LICENSING, PARTS.
+     *                     Pass {@code null} to skip this filter.
+     * @param activeStatus When {@code true}, only stores whose {@code availability} is not
+     *                     {@code OFFLINE} are returned. When {@code false}, only OFFLINE stores
+     *                     are returned. Pass {@code null} to skip this filter.
+     */
+    @Tool(
+        name = "find_stores",
+        description = "Find stores with optional filters. " +
+            "All parameters are optional — pass null to skip a filter. " +
+            "city: case-insensitive substring of the store address. " +
+            "storeType: one of FOOD, CLOTHING, SALON, CAR_WASH, MOVERS, TIPS, LICENSING, PARTS. " +
+            "activeStatus: true = only available (non-OFFLINE) stores, false = only OFFLINE stores, null = all."
+    )
+    public List<StoreProfile> findStores(
+            @org.springframework.ai.tool.annotation.ToolParam(required = false, description = "Optional city name — case-insensitive substring match against store address. Pass null to skip.") String city,
+            @org.springframework.ai.tool.annotation.ToolParam(required = false, description = "Optional store type — one of FOOD, CLOTHING, SALON, CAR_WASH, MOVERS, TIPS, LICENSING, PARTS. Pass null to skip.") StoreType storeType,
+            @org.springframework.ai.tool.annotation.ToolParam(required = false, description = "Optional availability filter — true = non-OFFLINE stores only, false = OFFLINE stores only, null = no filter.") Boolean activeStatus) {
+
+        // Load base list: if storeType is supplied use the targeted repository query, else load all
+        List<StoreProfile> base = storeType != null
+                ? profileRepo.findByStoreType(storeType)
+                : super.findAll();
+
+        return base.stream()
+                .filter(profile -> {
+                    // city filter: case-insensitive substring of address
+                    if (StringUtils.hasText(city)) {
+                        String address = profile.getAddress();
+                        if (address == null) return false;
+                        if (!address.toLowerCase(java.util.Locale.ROOT)
+                                .contains(city.toLowerCase(java.util.Locale.ROOT))) {
+                            return false;
+                        }
+                    }
+                    // activeStatus filter
+                    if (activeStatus != null) {
+                        boolean isOffline = profile.getAvailability() == StoreProfile.AVAILABILITY.OFFLINE;
+                        if (activeStatus && isOffline) return false;
+                        if (!activeStatus && !isOffline) return false;
+                    }
+                    return true;
+                })
+                .peek(profile -> {
+                    // PII stripping — replace real bank account ID with platform account
+                    if (profile.getBank() != null) {
+                        profile.getBank().setAccountId(mainPayAccount);
+                    }
+                    profile.setMarkUp(markupPercentage);
+                })
+                .collect(Collectors.toList());
+    }
+
     public List<StoreProfile> findFeatured(double latitude,
                                            double longitude,
                                            StoreType storeType,
