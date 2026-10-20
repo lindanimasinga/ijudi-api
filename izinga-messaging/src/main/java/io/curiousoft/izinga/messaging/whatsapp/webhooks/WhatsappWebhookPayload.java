@@ -223,6 +223,29 @@ public class WhatsappWebhookPayload {
                 private Double longitude;
                 private String name;
                 private String url;
+
+                /**
+                 * Natural-language description of this location for display and for the AI
+                 * agent's conversation history. Includes the name/address only when present,
+                 * and the raw coordinates so the agent (or its tools) can act on them.
+                 */
+                public String describe() {
+                    StringBuilder sb = new StringBuilder("Customer shared their location");
+                    boolean hasName = name != null && !name.isBlank();
+                    boolean hasAddress = address != null && !address.isBlank();
+                    if (hasName || hasAddress) {
+                        sb.append(": ");
+                        if (hasName) sb.append(name);
+                        if (hasAddress) {
+                            if (hasName) sb.append(", ");
+                            sb.append(address);
+                        }
+                    }
+                    if (latitude != null && longitude != null) {
+                        sb.append(" (latitude: ").append(latitude).append(", longitude: ").append(longitude).append(")");
+                    }
+                    return sb.toString();
+                }
             }
 
             // Image message payload

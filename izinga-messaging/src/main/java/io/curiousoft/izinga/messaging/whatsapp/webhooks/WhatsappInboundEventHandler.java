@@ -243,7 +243,7 @@ public class WhatsappInboundEventHandler {
             return;
         }
         if ("location".equals(type) || message.getLocation() != null) {
-            handleLocationMessage(message);
+            handleLocationMessage(message, contacts, aiResponseToCustomer);
             return;
         }
         if ("image".equals(type) || message.getImage() != null) {
@@ -421,29 +421,65 @@ public class WhatsappInboundEventHandler {
         }
     }
 
-    private void handleLocationMessage(WhatsappWebhookPayload.Value.Message message) {
+    /**
+     * Persists an inbound location share to Firestore, including latitude/longitude/address in
+     * meta for downstream consumers. The AI agent has already seen this location (as a
+     * natural-language description — see {@code Location#describe()}) via
+     * {@code handlePreDispatchFlows}, which computed {@code aiResponseToCustomer} before
+     * dispatch; this method only persists both sides of that exchange for the chat history.
+     */
+    private void handleLocationMessage(WhatsappWebhookPayload.Value.Message message,
+                                       List<WhatsappWebhookPayload.Value.Contact> contacts,
+                                       String aiResponseToCustomer) {
         try {
             String from = message.getFrom();
             var loc = message.getLocation();
-            if (loc != null) {
-                LOG.info("Location message from {}: name={} address={} lat={} lon={}",
-                        from, loc.getName(), loc.getAddress(), loc.getLatitude(), loc.getLongitude());
+            if (loc == null) {
+                return;
+            }
+            LOG.info("Location message from {}: name={} address={} lat={} lon={}",
+                    from, loc.getName(), loc.getAddress(), loc.getLatitude(), loc.getLongitude());
 
-                // Optionally write location as a message to firestore
-                FireStoreTextMessage locMsg = FireStoreTextMessage.builder()
-                        .createdAt(Instant.now())
-                        .isRead(false)
-                        .message(String.format("[location] %s (%s,%s)", loc.getName(), loc.getLatitude(), loc.getLongitude()))
-                        .messageType(FireStoreTextMessage.MessageType.LOCATION)
-                        .senderId(from)
-                        .senderType(FireStoreTextMessage.SenderType.CUSTOMER)
-                        .timestamp(Instant.now())
-                        .build();
-                try {
-                    //firestoreService.writeMessageForCustomer(from, locMsg);
-                } catch (Exception e) {
-                    LOG.warn("Failed to persist location message for {}", from, e);
+            Map<String, Object> meta = new HashMap<>();
+            if (loc.getLatitude() != null) meta.put("latitude", loc.getLatitude());
+            if (loc.getLongitude() != null) meta.put("longitude", loc.getLongitude());
+            if (loc.getAddress() != null) meta.put("address", loc.getAddress());
+            if (loc.getName() != null) meta.put("name", loc.getName());
+            if (loc.getUrl() != null) meta.put("url", loc.getUrl());
+
+            FireStoreTextMessage locMsg = FireStoreTextMessage.builder()
+                    .createdAt(Instant.now())
+                    .isRead(false)
+                    .message(loc.describe())
+                    .messageType(FireStoreTextMessage.MessageType.LOCATION)
+                    .senderId(from)
+                    .senderType(FireStoreTextMessage.SenderType.CUSTOMER)
+                    .timestamp(Instant.now())
+                    .build();
+            if (!meta.isEmpty()) locMsg.setMeta(meta);
+
+            try {
+                String contactName = extractContactName(contacts);
+                String createdMsgId = contactName != null
+                        ? firestoreService.writeMessageForCustomer(from, contactName, locMsg)
+                        : firestoreService.writeMessageForCustomer(from, "Customer " + from, locMsg);
+                LOG.info("Written location message to firestore for customer {} messageId={}", from, createdMsgId);
+
+                if (aiResponseToCustomer != null && !aiResponseToCustomer.isBlank()) {
+                    FireStoreTextMessage aiMessage = FireStoreTextMessage.builder()
+                            .createdAt(Instant.now())
+                            .isRead(false)
+                            .message(aiResponseToCustomer)
+                            .messageType(FireStoreTextMessage.MessageType.TEXT)
+                            .senderId("AI_AGENT")
+                            .senderType(FireStoreTextMessage.SenderType.STORE)
+                            .timestamp(Instant.now())
+                            .build();
+                    String aiMsgId = firestoreService.writeMessageForCustomer(from, "AI Agent", aiMessage);
+                    LOG.info("Written AI response message to firestore for customer {} messageId={}", from, aiMsgId);
                 }
+            } catch (Exception e) {
+                LOG.error("Failed to write location message to firestore for from={}", from, e);
             }
         } catch (Exception e) {
             LOG.error("Error handling location message", e);
