@@ -195,17 +195,34 @@ public class AiCustomerServiceAgent {
      */
     public String handleWhatsappQueryForAgent(WhatsappWebhookPayload.Value.Message message, String from,
                                                String driverName, String agentName) {
-        if ((message == null || message.getText() == null || message.getText().getBody() == null) && message.getButton() == null) {
+        if (message == null) {
             LOG.warn("Received null or empty message from {}", from);
             return null;
         }
-        String userText = Optional.ofNullable(message.getText())
-                .map(it -> it.getBody().trim())
-                .orElse("");
-        if (userText.isBlank() && message.getButton() != null) {
-            userText = message.getButton().getText().trim();
+        String userText = extractUserText(message);
+        if (userText == null || userText.isBlank()) {
+            LOG.warn("Received null or empty message from {}", from);
+            return null;
         }
         return handleWhatsappQueryForAgent(userText, from, driverName, agentName);
+    }
+
+    /**
+     * Extracts the text to send to the AI agent: body text, button reply title, or — for a
+     * shared location — a natural-language description including latitude/longitude and the
+     * address/name when available (see {@link WhatsappWebhookPayload.Value.Message.Location#describe()}).
+     */
+    private String extractUserText(WhatsappWebhookPayload.Value.Message message) {
+        if (message.getText() != null && message.getText().getBody() != null) {
+            return message.getText().getBody().trim();
+        }
+        if (message.getButton() != null && message.getButton().getText() != null) {
+            return message.getButton().getText().trim();
+        }
+        if (message.getLocation() != null) {
+            return message.getLocation().describe();
+        }
+        return null;
     }
 
     /**

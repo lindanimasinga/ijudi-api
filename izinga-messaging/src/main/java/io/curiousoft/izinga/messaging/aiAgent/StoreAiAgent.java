@@ -285,6 +285,9 @@ public class StoreAiAgent {
         if (message.getButton() != null && message.getButton().getText() != null) {
             return message.getButton().getText().trim();
         }
+        if (message.getLocation() != null) {
+            return message.getLocation().describe();
+        }
         return null;
     }
 }
