@@ -44,11 +44,14 @@ interface OrderRepository : MongoRepository<Order?, String?> {
 
     /**
      * ADR-020 / start_order idempotency: looks up a recent order for the given customer
-     * that carries the specified idempotencyKey in its tag map. The caller filters by
-     * createdDate window in the service layer.
+     * that carries the specified idempotencyKey in its tag map. The createdDate window
+     * filter is applied inside the query itself via the {@code \$gte} clause.
+     * Note: {@code BaseModel.createdDate} is annotated {@code @JsonProperty("date")} for
+     * JSON serialisation only — the actual BSON field stored by Spring Data MongoDB is
+     * {@code createdDate} (no {@code @Field} override), so the query must use that name.
      * Sparse index on (customerId, tag.idempotencyKey) is declared on Order via @CompoundIndex.
      */
-    @Query("{ 'customerId': ?0, 'tag.idempotencyKey': ?1, 'date': { '\$gte': ?2 } }")
+    @Query("{ 'customerId': ?0, 'tag.idempotencyKey': ?1, 'createdDate': { '\$gte': ?2 } }")
     fun findFirstByCustomerIdAndTagIdempotencyKeyWithinWindow(
         customerId: String,
         idempotencyKey: String,

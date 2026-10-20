@@ -100,25 +100,25 @@ public class McpOrderService {
             @ToolParam(description = "JSON of the Basket with items array, e.g. {\"items\":[{\"name\":\"chips\",\"quantity\":2,\"price\":10,\"totalPrice\":20}]}") String basketJson,
             @ToolParam(required = false, description = "JSON of ShippingData (required for ONLINE orders). null for INSTORE orders.") String shippingDataJson) {
 
-        // Guard 2 — consent: must be first, before any data access
+        // Step 1 — consent (SA-022-01 Guard 2): evaluated first, before any data access
         if (!customerConfirmed) {
             return StartOrderResponse.rejected(
                 "Customer confirmation not recorded. Obtain explicit order confirmation before placing the order.");
         }
 
-        // Guard 3a — idempotency key presence
+        // Step 2 — idempotency key presence (SA-022-01 Guard 3a)
         if (!StringUtils.hasText(idempotencyKey)) {
             return StartOrderResponse.rejected(
                 "Idempotency key is required. Provide a unique key for this order attempt.");
         }
 
-        // Guard 1 — identity
+        // Step 3 — identity (SA-022-01 Guard 1): cheap existence check before the dedup query
         if (!userProfileRepo.existsById(customerId)) {
             return StartOrderResponse.rejected(
                 "No customer account found for the provided ID.");
         }
 
-        // Guard 3b — idempotency deduplication: check for an existing order in the window
+        // Step 4 — idempotency deduplication (SA-022-01 Guard 3b): check for an existing order in the window
         Date windowStart = new Date(System.currentTimeMillis() - TimeUnit.HOURS.toMillis(idempotencyWindowHours));
         Order existingOrder = orderRepository.findFirstByCustomerIdAndTagIdempotencyKeyWithinWindow(
                 customerId, idempotencyKey, windowStart);

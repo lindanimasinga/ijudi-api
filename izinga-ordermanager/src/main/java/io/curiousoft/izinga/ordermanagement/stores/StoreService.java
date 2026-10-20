@@ -515,33 +515,31 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
                 ? profileRepo.findByStoreType(storeType)
                 : super.findAll();
 
-        return base.stream()
-                .filter(profile -> {
-                    // city filter: case-insensitive substring of address
-                    if (StringUtils.hasText(city)) {
-                        String address = profile.getAddress();
-                        if (address == null) return false;
-                        if (!address.toLowerCase(java.util.Locale.ROOT)
-                                .contains(city.toLowerCase(java.util.Locale.ROOT))) {
-                            return false;
-                        }
-                    }
-                    // activeStatus filter
-                    if (activeStatus != null) {
-                        boolean isOffline = profile.getAvailability() == StoreProfile.AVAILABILITY.OFFLINE;
-                        if (activeStatus && isOffline) return false;
-                        if (!activeStatus && !isOffline) return false;
-                    }
-                    return true;
-                })
-                .peek(profile -> {
-                    // PII stripping — replace real bank account ID with platform account
-                    if (profile.getBank() != null) {
-                        profile.getBank().setAccountId(mainPayAccount);
-                    }
-                    profile.setMarkUp(markupPercentage);
-                })
-                .collect(Collectors.toList());
+        List<StoreProfile> result = new ArrayList<>();
+        for (StoreProfile profile : base) {
+            // city filter: case-insensitive substring of address
+            if (StringUtils.hasText(city)) {
+                String address = profile.getAddress();
+                if (address == null) continue;
+                if (!address.toLowerCase(java.util.Locale.ROOT)
+                        .contains(city.toLowerCase(java.util.Locale.ROOT))) {
+                    continue;
+                }
+            }
+            // activeStatus filter
+            if (activeStatus != null) {
+                boolean isOffline = profile.getAvailability() == StoreProfile.AVAILABILITY.OFFLINE;
+                if (activeStatus && isOffline) continue;
+                if (!activeStatus && !isOffline) continue;
+            }
+            // PII stripping — replace real bank account ID with platform account
+            if (profile.getBank() != null) {
+                profile.getBank().setAccountId(mainPayAccount);
+            }
+            profile.setMarkUp(markupPercentage);
+            result.add(profile);
+        }
+        return result;
     }
 
     public List<StoreProfile> findFeatured(double latitude,
