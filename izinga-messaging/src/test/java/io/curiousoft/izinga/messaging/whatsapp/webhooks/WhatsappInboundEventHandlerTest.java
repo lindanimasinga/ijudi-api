@@ -33,7 +33,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -176,6 +178,224 @@ class WhatsappInboundEventHandlerTest {
         );
         verify(firestoreService, never()).writeMessageForCustomer(anyString(), anyString(), any());
         verify(aiCustomerService, never()).handleWhatsappQuery(anyString(), anyString(), anyString());
+    }
+
+    // ── location message tests ─────────────────────────────────────────────────
+
+    /**
+     * End-to-end regression test for the location handler (previously a stub with its
+     * Firestore write commented out and no AI-agent wiring at all). An ongoing session with
+     * the AI agent active routes the location through handlePreDispatchFlows exactly like a
+     * text message does — handleLocationMessage only needs to persist both sides to Firestore.
+     */
+    @Test
+    void handleInbound_locationMessage_persistsLocationAndAiReplyToFirestore() throws Exception {
+        WhatsappWebhookPayload.Value.Message.Location location = new WhatsappWebhookPayload.Value.Message.Location();
+        location.setName("Sandton City");
+        location.setAddress("83 Rivonia Rd, Sandton");
+        location.setLatitude(-26.1076);
+        location.setLongitude(28.0526);
+
+        WhatsappWebhookPayload.Value.Message message = buildLocationMessage(location);
+        WhatsappWebhookPayload payload = buildPayload(message, "Lindani");
+
+        WhatsappSession session = new WhatsappSession(FROM);
+        session.setLastMessageDate(Instant.now());
+        session.setAIAgentActive(true);
+
+        when(whatsappSessionRepo.findByFrom(FROM)).thenReturn(Optional.of(session));
+        when(whatsappSessionRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
+        when(aiCustomerService.isEnabled()).thenReturn(true);
+        when(aiCustomerService.handleWhatsappQueryForAgent(any(WhatsappWebhookPayload.Value.Message.class), eq(FROM), isNull(), anyString()))
+                .thenReturn("Thanks, we've noted your location.");
+        when(firestoreService.writeMessageForCustomer(eq(FROM), anyString(), any())).thenReturn("msg-loc-1");
+
+        handler.handleInbound(new WhatsappInboundEvent(this, payload));
+
+        ArgumentCaptor<FireStoreTextMessage> msgCaptor = ArgumentCaptor.forClass(FireStoreTextMessage.class);
+        verify(firestoreService, times(2))
+                .writeMessageForCustomer(eq(FROM), anyString(), msgCaptor.capture());
+
+        FireStoreTextMessage locationMsg = msgCaptor.getAllValues().get(0);
+        assertEquals(FireStoreTextMessage.MessageType.LOCATION, locationMsg.getMessageType());
+        assertEquals(
+                "Customer shared their location: Sandton City, 83 Rivonia Rd, Sandton (latitude: -26.1076, longitude: 28.0526)",
+                locationMsg.getMessage()
+        );
+        assertNotNull(locationMsg.getMeta());
+        assertEquals(-26.1076, locationMsg.getMeta().get("latitude"));
+        assertEquals(28.0526, locationMsg.getMeta().get("longitude"));
+        assertEquals("83 Rivonia Rd, Sandton", locationMsg.getMeta().get("address"));
+        assertEquals("Sandton City", locationMsg.getMeta().get("name"));
+
+        FireStoreTextMessage aiReplyMsg = msgCaptor.getAllValues().get(1);
+        assertEquals(FireStoreTextMessage.MessageType.TEXT, aiReplyMsg.getMessageType());
+        assertEquals("Thanks, we've noted your location.", aiReplyMsg.getMessage());
+        assertEquals("AI_AGENT", aiReplyMsg.getSenderId());
+        // AC-04: sender type for an AI-agent reply must be STORE (not CUSTOMER)
+        assertEquals(FireStoreTextMessage.SenderType.STORE, aiReplyMsg.getSenderType());
+        verify(firestoreService).writeMessageForCustomer(eq(FROM), eq("Lindani"), eq(locationMsg));
+        verify(firestoreService).writeMessageForCustomer(eq(FROM), eq("AI Agent"), eq(aiReplyMsg));
+
+        // The AI reply was already sent out to the customer by handlePreDispatchFlows
+        verify(whatsappNotificationService).sendMessage(
+                FROM, "Thanks, we've noted your location.", Audience.CUSTOMER, null
+        );
+        // AC-07: CUSTOMER-audience location messages must never reach the StoreAiAgent
+        verify(storeAiAgent, never()).handleWhatsappQuery(
+                any(WhatsappWebhookPayload.Value.Message.class), anyString(), anyString(), anyString());
+    }
+
+    /**
+     * When the AI agent is not active for the session, handlePreDispatchFlows never computes
+     * an aiResponseToCustomer — the location is still persisted to Firestore (meta included),
+     * but no second (AI reply) Firestore write happens.
+     */
+    @Test
+    void handleInbound_locationMessage_persistsLocationOnly_whenAiAgentNotActive() throws Exception {
+        WhatsappWebhookPayload.Value.Message.Location location = new WhatsappWebhookPayload.Value.Message.Location();
+        location.setLatitude(-26.1076);
+        location.setLongitude(28.0526);
+
+        WhatsappWebhookPayload.Value.Message message = buildLocationMessage(location);
+        WhatsappWebhookPayload payload = buildPayload(message, "Lindani");
+
+        WhatsappSession session = new WhatsappSession(FROM);
+        session.setLastMessageDate(Instant.now());
+        session.setAIAgentActive(false);
+
+        when(whatsappSessionRepo.findByFrom(FROM)).thenReturn(Optional.of(session));
+        when(whatsappSessionRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
+        when(firestoreService.writeMessageForCustomer(eq(FROM), anyString(), any())).thenReturn("msg-loc-2");
+
+        handler.handleInbound(new WhatsappInboundEvent(this, payload));
+
+        verify(firestoreService, times(1)).writeMessageForCustomer(eq(FROM), eq("Lindani"), any());
+        verify(aiCustomerService, never()).handleWhatsappQueryForAgent(anyString(), anyString(), anyString(), anyString());
+        verify(whatsappNotificationService, never()).sendMessage(anyString(), anyString(), any(), any());
+    }
+
+    /**
+     * AC-06: STORE audience location message must be routed to StoreAiAgent, not
+     * AiCustomerServiceAgent. The AI call happens in handlePreDispatchFlows before
+     * handleLocationMessage is invoked; only the persistence side runs in the handler.
+     */
+    @Test
+    void handleInbound_locationMessage_storeAudienceRoutesToStoreAiAgent() throws Exception {
+        String storePhoneId = "line-store-123";
+        String storeId = "store-abc";
+
+        WhatsappLine storeLine = buildLine(storePhoneId, Audience.STORE, "store_support_store-abc");
+        storeLine.setStoreId(storeId);
+        when(whatsappLineService.findByPhoneNumberId(storePhoneId)).thenReturn(Optional.of(storeLine));
+
+        WhatsappWebhookPayload.Value.Message.Location location =
+                new WhatsappWebhookPayload.Value.Message.Location();
+        location.setLatitude(-26.1076);
+        location.setLongitude(28.0526);
+
+        WhatsappWebhookPayload.Value.Message message = buildLocationMessage(location);
+        WhatsappWebhookPayload payload = buildPayloadWithMetadata(message, "Store Customer", storePhoneId);
+
+        WhatsappSession session = new WhatsappSession(FROM);
+        session.setLastMessageDate(Instant.now());
+        session.setAIAgentActive(true);
+
+        when(whatsappSessionRepo.findByFromAndPhoneNumberId(eq(FROM), eq(storePhoneId)))
+                .thenReturn(Optional.of(session));
+        when(whatsappSessionRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
+        when(aiCustomerService.isEnabled()).thenReturn(true);
+        when(storeAiAgent.handleWhatsappQuery(
+                any(WhatsappWebhookPayload.Value.Message.class), eq(FROM), eq(storeId), anyString()))
+                .thenReturn("We noted your location, thanks!");
+        when(firestoreService.writeMessageForCustomer(eq(FROM), anyString(), any()))
+                .thenReturn("msg-store-loc-1");
+
+        handler.handleInbound(new WhatsappInboundEvent(this, payload));
+
+        // AC-06: StoreAiAgent must be called, AiCustomerServiceAgent must NOT be called
+        verify(storeAiAgent).handleWhatsappQuery(
+                any(WhatsappWebhookPayload.Value.Message.class), eq(FROM), eq(storeId), anyString());
+        verify(aiCustomerService, never()).handleWhatsappQueryForAgent(
+                any(WhatsappWebhookPayload.Value.Message.class), anyString(), any(), anyString());
+
+        // Both Firestore docs must be written (location + AI reply)
+        verify(firestoreService, times(2)).writeMessageForCustomer(eq(FROM), anyString(), any());
+    }
+
+    /**
+     * AC-08: when the Firestore write throws, the exception must be caught and logged —
+     * it must never propagate out of handleInbound.
+     */
+    @Test
+    void handleInbound_locationMessage_firestoreExceptionIsCaughtAndDoesNotPropagate() throws Exception {
+        WhatsappWebhookPayload.Value.Message.Location location =
+                new WhatsappWebhookPayload.Value.Message.Location();
+        location.setLatitude(-26.1076);
+        location.setLongitude(28.0526);
+
+        WhatsappWebhookPayload.Value.Message message = buildLocationMessage(location);
+        WhatsappWebhookPayload payload = buildPayload(message, "Lindani");
+
+        WhatsappSession session = new WhatsappSession(FROM);
+        session.setLastMessageDate(Instant.now());
+        session.setAIAgentActive(false);
+
+        when(whatsappSessionRepo.findByFrom(FROM)).thenReturn(Optional.of(session));
+        when(whatsappSessionRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
+        // Firestore write throws — must be caught internally, never propagated
+        when(firestoreService.writeMessageForCustomer(eq(FROM), anyString(), any()))
+                .thenThrow(new RuntimeException("Firestore unavailable"));
+
+        // Must not throw — if it does, the test fails with an unexpected exception
+        handler.handleInbound(new WhatsappInboundEvent(this, payload));
+
+        verify(firestoreService).writeMessageForCustomer(eq(FROM), anyString(), any());
+    }
+
+    /**
+     * AC-09: first message in a new session → landing-options flow runs, neither AI agent
+     * is called, and the location doc IS still persisted (consistent with every other
+     * message type) but no AI-reply doc is written.
+     */
+    @Test
+    void handleInbound_locationMessage_newSession_runsLandingOptionsNotAiAgent() throws Exception {
+        WhatsappWebhookPayload.Value.Message.Location location =
+                new WhatsappWebhookPayload.Value.Message.Location();
+        location.setName("Sandton City");
+        location.setLatitude(-26.1076);
+        location.setLongitude(28.0526);
+
+        WhatsappWebhookPayload.Value.Message message = buildLocationMessage(location);
+        WhatsappWebhookPayload payload = buildPayload(message, "Lindani");
+
+        // No lastMessageDate — treated as new session by upsertSession
+        WhatsappSession session = new WhatsappSession(FROM);
+
+        when(whatsappSessionRepo.findByFrom(FROM)).thenReturn(Optional.of(session));
+        when(whatsappSessionRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
+        when(firestoreService.writeMessageForCustomer(eq(FROM), anyString(), any()))
+                .thenReturn("msg-new-loc-1");
+
+        handler.handleInbound(new WhatsappInboundEvent(this, payload));
+
+        // Landing options must be sent (new session path)
+        verify(whatsappNotificationService).sendLandingOptions(
+                eq(FROM), anyString(), any(), any(), any(), any());
+        // Neither AI agent must be called
+        verify(aiCustomerService, never()).handleWhatsappQueryForAgent(
+                any(WhatsappWebhookPayload.Value.Message.class), anyString(), any(), anyString());
+        verify(storeAiAgent, never()).handleWhatsappQuery(
+                any(WhatsappWebhookPayload.Value.Message.class), anyString(), anyString(), any());
+        // Location doc IS written (1 write, no AI-reply doc)
+        verify(firestoreService, times(1)).writeMessageForCustomer(eq(FROM), anyString(), any());
+        // No AI reply sent via WhatsApp either
+        verify(whatsappNotificationService, never()).sendMessage(anyString(), anyString(), any(), any());
     }
 
     // ── multi-line routing tests ───────────────────────────────────────────────
@@ -335,6 +555,16 @@ class WhatsappInboundEventHandlerTest {
         message.setType("image");
         message.setTimestamp(String.valueOf(Instant.now().getEpochSecond()));
         message.setImage(image);
+        return message;
+    }
+
+    private WhatsappWebhookPayload.Value.Message buildLocationMessage(WhatsappWebhookPayload.Value.Message.Location location) {
+        WhatsappWebhookPayload.Value.Message message = new WhatsappWebhookPayload.Value.Message();
+        message.setFrom(FROM);
+        message.setId("wamid.HBgMOTEyMzQ1Njc5");
+        message.setType("location");
+        message.setTimestamp(String.valueOf(Instant.now().getEpochSecond()));
+        message.setLocation(location);
         return message;
     }
 }

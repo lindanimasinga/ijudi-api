@@ -32,6 +32,8 @@ Each userType directory holds one file per feature. A feature that spans two use
 | driver (all roles) | Phone verification & WhatsApp OTP login — OTP send/verify, double-submit guard (ONB-BUG-03), SMS fallback via triple-tap, phone normalisation, returnUrl redirect | [driver/phone-verification.md](driver/phone-verification.md) | 2026-10-09 |
 | individual / driver / ambassador | Welcome page card theme consistency — /indivisuals route, all 3 role contexts (individual benefits grid, driver 9-step flow, ambassador 4-step flow) | [individual/welcome-card-theme.md](individual/welcome-card-theme.md) | 2026-10-09 |
 | store / messenger-admin / driver | Store & messenger-admin driver invitation — 5-outcome invite form (StoreMessengersComponent, TeamMessengersComponent), StoreInviteComponent 7-state landing page, PhoneVerificationComponent returnUrl, public deep-link, accept/reject by contextType, AC-21 open-redirect guard (INVITE-DRV-01 / ADR-018) | [store/store-driver-invitation.md](store/store-driver-invitation.md) | 2026-10-12 |
+| customer | WhatsApp inbound location-message handling — describe() all null/blank variants, Firestore persistence with meta, AI-agent routing (CUSTOMER vs STORE audience), AC-07 StoreAiAgent guard | [customer/whatsapp-location-messages.md](customer/whatsapp-location-messages.md) | 2026-10-20 |
+| admin (platform integration) | MCP tools — find_stores + start_order; SA-022-01 guards (customerConfirmed, identity, idempotency); idempotent duplicate detection; domain exception sanitization; BSON field name fix (e5508de) | [admin/mcp-tools.md](admin/mcp-tools.md) | 2026-10-20 |
 
 ## Maintenance rule
 

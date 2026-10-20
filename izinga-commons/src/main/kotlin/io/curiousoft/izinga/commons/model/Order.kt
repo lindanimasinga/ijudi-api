@@ -2,6 +2,8 @@ package io.curiousoft.izinga.commons.model
 
 import io.curiousoft.izinga.commons.validator.ValidDeliveryInfo
 import io.curiousoft.izinga.commons.validator.ValidOrderType
+import org.springframework.data.mongodb.core.index.CompoundIndex
+import org.springframework.data.mongodb.core.index.CompoundIndexes
 import org.springframework.data.mongodb.core.mapping.Document
 import java.lang.StringBuilder
 import java.math.BigDecimal
@@ -17,6 +19,13 @@ import jakarta.validation.constraints.NotNull
 @ValidOrderType
 @ValidDeliveryInfo
 @Document
+@CompoundIndexes(
+    CompoundIndex(
+        name = "customer_idempotency_key",
+        def = "{'customerId': 1, 'tag.idempotencyKey': 1}",
+        sparse = true
+    )
+)
 open class Order : BaseModel() {
     var paymentTypesAllowed: MutableList<PaymentType>? = null
     var stage: @NotNull(message = "order stage is not valid") OrderStage? = null

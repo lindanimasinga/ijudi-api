@@ -1,5 +1,60 @@
 # Changelog
 
+## [1.16.0] — 2026-10-20
+
+**Release type:** Feature (P2 — new functionality)
+
+**Summary:** Adds WhatsApp inbound location-message handling (AI agents can now receive and act on a customer's live location pin) and two new MCP tools — `find_stores` and `start_order` — enabling AI agent-driven store discovery and order placement, plus a critical idempotency fix that prevented duplicate orders on repeated `start_order` calls.
+
+### Changes
+
+- [NEW] `feat(izinga-messaging)`: WhatsApp inbound location-message handling — `WhatsappInboundEventHandler` now parses `type: location` payloads and routes the customer's latitude, longitude, and optional label to `StoreAiAgent` and `AiCustomerServiceAgent` for location-aware responses. (merge commit 9b68f73, PR #149)
+- [NEW] `feat(ADR-020)`: `find_stores` MCP tool — Spring AI `@Tool` method on `StoreService` that returns nearby open stores given a latitude, longitude, and radius. Strips PII (owner details) and applies markup before returning results to the AI agent. (commit f37e04a, PR #150)
+- [NEW] `feat(ADR-020)`: `start_order` MCP tool — Spring AI `@Tool` method on `McpOrderService` that validates customer identity, confirms customer intent flag, performs idempotency check, and places an order on behalf of an AI agent session. Guards per SA-022-01: `customerConfirmed` must be `true` before the order is created. (commit f37e04a, PR #150)
+- [FIX] `fix`: Correct BSON field name in idempotency `@Query` (`OrderRepository`) — `BaseModel.createdDate` is stored in MongoDB as `createdDate` (not `date`, which is the Jackson `@JsonProperty` alias only). The wrong field name caused the `$gte` condition to evaluate false on a non-existent field, silently returning `null` for every idempotency lookup and allowing duplicate orders on repeated `start_order` calls. Corrected to `createdDate`. (commit e5508de)
+
+### Breaking changes
+
+None. All changes are additive. No REST endpoints added, removed, or modified. No MCP tool names changed or removed. No JWT/auth token structure changed. No enum values changed.
+
+### Legal & Compliance note
+
+This release was reviewed under addendum L-REVIEW-001-A2 (Legal & Compliance review, 2026-10-20) with verdict "AGREE-WITH-RESERVATIONS". The customer-identity binding code fix identified in L-REVIEW-001-A2 was deliberately excluded from this release at Lindani Masinga's direction; the AI agent's system prompt provides a compensating prompt-level instruction. A follow-up Security & Compliance review covering the identity-binding gap has been scoped as a separate backlog item and does not block this release.
+
+### Deployment sequence
+
+1. ijudi-api only — no frontend changes required. All new functionality is backend-only (WhatsApp webhook handling, MCP server tools).
+
+### Rollback steps
+
+1. Redeploy the v1.15.0 artifact (tip of `master` before this release, commit `1116430`) via ECS. The `find_stores` and `start_order` MCP tools will be unavailable and WhatsApp location messages will be unhandled (silently ignored at the webhook level). No data loss — no schema changes.
+2. Notify Lindani immediately if rollback is triggered.
+3. BSON field name fix note: rolling back removes the idempotency correction. Duplicate order risk on repeated `start_order` calls re-activates. Monitor order duplication metrics if rollback is held for more than 1 hour.
+
+### Smoke test plan
+
+1. **WhatsApp location message** — Send a WhatsApp message with a live location pin to the iZinga AI assistant number. Verify the AI agent acknowledges the location (responds with a location-aware reply, not a null or error response).
+2. **find_stores MCP tool** — Invoke `find_stores` via the MCP client with a valid lat/long pair inside a known store's delivery radius. Verify a list of open stores is returned with no raw owner PII fields visible.
+3. **start_order MCP tool — happy path** — Invoke `start_order` with `customerConfirmed: true`, valid customer ID, valid store ID, and a well-formed basket. Verify an order is created and the order ID is returned.
+4. **start_order idempotency** — Submit the same `start_order` call twice with the same idempotency key within the time window. Verify only one order is created in MongoDB (`createdDate` field must exist in the order document — verify via `db.orders.findOne()` that the field is present and typed as a date, not missing).
+5. **start_order guard — customerConfirmed: false** — Invoke `start_order` with `customerConfirmed: false`. Verify the call is rejected (400 or equivalent) and no order document is created.
+
+### Post-deployment monitoring
+
+- **15 min**: Check application logs for MCP server registration of both `find_stores` and `start_order` tools in the Spring context startup output. Verify no NullPointerException events from `WhatsappInboundEventHandler` on any inbound message type.
+- **1 hour**: Confirm no duplicate order complaints from customers; check order creation rates are within normal bounds (idempotency fix should reduce any previously-silent duplicates). Growth & Analytics to watch for anomalies in order volume.
+- **24 hours**: Verify MCP tool invocation logs if AI agent traffic is active; confirm `start_order` idempotency key lookup is hitting the `createdDate` field correctly in slow-query logs.
+
+### Gate citations
+
+- Code Review: PASS — iZinga Code Reviewer (both feature branches, Gate 1)
+- QA Gate 1: PASS — iZinga QA & Test Automation (per-feature, both branches)
+- Legal & Compliance: AGREE-WITH-RESERVATIONS — addendum L-REVIEW-001-A2, 2026-10-20
+- QA Gate 2 (full regression): PASS — iZinga QA & Test Automation, 0 failures / 0 errors across all 10 modules (full unscoped reactor, release/1.16.0, 2026-10-20, Corretto 17)
+- Deployment authorised by: Lindani Masinga — direct instruction 2026-10-20
+
+---
+
 ## [1.15.0] — 2026-10-12
 
 **Release type:** Feature (P2 — new functionality)
