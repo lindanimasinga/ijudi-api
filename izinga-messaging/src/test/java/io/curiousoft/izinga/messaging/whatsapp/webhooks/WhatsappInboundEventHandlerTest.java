@@ -233,6 +233,8 @@ class WhatsappInboundEventHandlerTest {
         assertEquals(FireStoreTextMessage.MessageType.TEXT, aiReplyMsg.getMessageType());
         assertEquals("Thanks, we've noted your location.", aiReplyMsg.getMessage());
         assertEquals("AI_AGENT", aiReplyMsg.getSenderId());
+        // AC-04: sender type for an AI-agent reply must be STORE (not CUSTOMER)
+        assertEquals(FireStoreTextMessage.SenderType.STORE, aiReplyMsg.getSenderType());
         verify(firestoreService).writeMessageForCustomer(eq(FROM), eq("Lindani"), eq(locationMsg));
         verify(firestoreService).writeMessageForCustomer(eq(FROM), eq("AI Agent"), eq(aiReplyMsg));
 
@@ -240,6 +242,9 @@ class WhatsappInboundEventHandlerTest {
         verify(whatsappNotificationService).sendMessage(
                 FROM, "Thanks, we've noted your location.", Audience.CUSTOMER, null
         );
+        // AC-07: CUSTOMER-audience location messages must never reach the StoreAiAgent
+        verify(storeAiAgent, never()).handleWhatsappQuery(
+                any(WhatsappWebhookPayload.Value.Message.class), anyString(), anyString(), anyString());
     }
 
     /**
