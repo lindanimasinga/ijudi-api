@@ -4,6 +4,7 @@ import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.commons.model.OrderStage
 import io.curiousoft.izinga.commons.model.ShippingData
 import org.springframework.data.mongodb.repository.MongoRepository
+import org.springframework.data.mongodb.repository.Query
 import java.time.LocalDate
 import java.util.*
 import jakarta.validation.constraints.NotNull
@@ -40,4 +41,20 @@ interface OrderRepository : MongoRepository<Order?, String?> {
     fun findByShippingDataMessengerIdIn(ids: List<String>): List<Order>
     fun findByShippingDataMessengerIdInAndStageNot(ids: List<String>, customerNotPaid: OrderStage): List<Order>
     fun findByStageNotIn(stages: List<OrderStage>): List<Order>
+
+    /**
+     * ADR-020 / start_order idempotency: looks up a recent order for the given customer
+     * that carries the specified idempotencyKey in its tag map. The createdDate window
+     * filter is applied inside the query itself via the {@code \$gte} clause.
+     * Note: {@code BaseModel.createdDate} is annotated {@code @JsonProperty("date")} for
+     * JSON serialisation only — the actual BSON field stored by Spring Data MongoDB is
+     * {@code createdDate} (no {@code @Field} override), so the query must use that name.
+     * Sparse index on (customerId, tag.idempotencyKey) is declared on Order via @CompoundIndex.
+     */
+    @Query("{ 'customerId': ?0, 'tag.idempotencyKey': ?1, 'createdDate': { '\$gte': ?2 } }")
+    fun findFirstByCustomerIdAndTagIdempotencyKeyWithinWindow(
+        customerId: String,
+        idempotencyKey: String,
+        afterDate: Date
+    ): Order?
 }

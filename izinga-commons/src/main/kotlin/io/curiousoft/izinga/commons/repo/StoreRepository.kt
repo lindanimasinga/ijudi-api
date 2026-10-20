@@ -17,4 +17,10 @@ interface StoreRepository : ProfileRepo<StoreProfile> {
     fun findOneByIdOrShortName(id: String?, shortname: String?): Optional<StoreProfile>?
     fun findByIdIn(shopIds: List<String>): List<StoreProfile>
     fun findByGenerateMissingImagesTrue(): List<StoreProfile>
+
+    /**
+     * ADR-020 / find_stores MCP tool: returns all stores with the given StoreType.
+     * Used by StoreService.findStores() when a storeType filter is provided.
+     */
+    fun findByStoreType(storeType: StoreType): List<StoreProfile>
 }

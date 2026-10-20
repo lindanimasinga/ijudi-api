@@ -1733,4 +1733,151 @@ public class StoreServiceTest {
         //verify
         verifyNoInteractions(storeRepository);
     }
+
+    // -------------------------------------------------------------------------
+    // ADR-020: find_stores tool tests
+    // -------------------------------------------------------------------------
+
+    private StoreProfile buildStore(String id, StoreType storeType, String address,
+                                    StoreProfile.AVAILABILITY availability) {
+        Bank bank = new Bank();
+        bank.setAccountId("real-account-123");
+        bank.setName("TestBank");
+        bank.setPhone("0812815707");
+        bank.setType(BankAccType.CHEQUE);
+
+        ArrayList<BusinessHours> hours = new ArrayList<>();
+        hours.add(new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date()));
+        List<String> tags = Collections.singletonList("Item");
+        StoreProfile store = new StoreProfile(storeType, "Store " + id, "short-" + id,
+                address, "https://img.url", "081mobile", tags, hours, "owner-" + id, bank);
+        store.setId(id);
+        store.setAvailability(availability);
+        return store;
+    }
+
+    @Test
+    public void findStores_noParams_returnsAllStores() {
+        // given
+        StoreProfile s1 = buildStore("s1", StoreType.FOOD, "12 Main Rd, Cape Town", StoreProfile.AVAILABILITY.ONLINE24_7);
+        StoreProfile s2 = buildStore("s2", StoreType.SALON, "5 Oak Ave, Johannesburg", StoreProfile.AVAILABILITY.OFFLINE);
+        when(storeRepository.findAll()).thenReturn(List.of(s1, s2));
+
+        // when
+        List<StoreProfile> result = storeService.findStores(null, null, null);
+
+        // then
+        Assert.assertEquals(2, result.size());
+        verify(storeRepository).findAll();
+        verify(storeRepository, never()).findByStoreType(any());
+        // PII: real account ID must be replaced with main pay account
+        result.forEach(p -> Assert.assertEquals(MAIN_PAY_ACCOUNT, p.getBank().getAccountId()));
+    }
+
+    @Test
+    public void findStores_storeTypeOnly_usesTargetedQuery() {
+        // given
+        StoreProfile s1 = buildStore("s1", StoreType.FOOD, "1 Food St, Cape Town", StoreProfile.AVAILABILITY.ONLINE24_7);
+        when(storeRepository.findByStoreType(StoreType.FOOD)).thenReturn(List.of(s1));
+
+        // when
+        List<StoreProfile> result = storeService.findStores(null, StoreType.FOOD, null);
+
+        // then
+        Assert.assertEquals(1, result.size());
+        verify(storeRepository).findByStoreType(StoreType.FOOD);
+        verify(storeRepository, never()).findAll();
+        Assert.assertEquals(MAIN_PAY_ACCOUNT, result.get(0).getBank().getAccountId());
+    }
+
+    @Test
+    public void findStores_cityOnly_filtersByAddressSubstringCaseInsensitive() {
+        // given
+        StoreProfile capeTown = buildStore("ct", StoreType.FOOD, "12 Main Rd, Cape Town", StoreProfile.AVAILABILITY.ONLINE24_7);
+        StoreProfile joburg = buildStore("jb", StoreType.SALON, "5 Oak Ave, Johannesburg", StoreProfile.AVAILABILITY.ONLINE24_7);
+        when(storeRepository.findAll()).thenReturn(List.of(capeTown, joburg));
+
+        // when: city search is case-insensitive
+        List<StoreProfile> result = storeService.findStores("CAPE TOWN", null, null);
+
+        // then
+        Assert.assertEquals(1, result.size());
+        Assert.assertEquals("ct", result.get(0).getId());
+    }
+
+    @Test
+    public void findStores_activeStatusTrue_excludesOfflineStores() {
+        // given
+        StoreProfile online = buildStore("on", StoreType.FOOD, "1 A St", StoreProfile.AVAILABILITY.ONLINE24_7);
+        StoreProfile offline = buildStore("off", StoreType.FOOD, "2 B St", StoreProfile.AVAILABILITY.OFFLINE);
+        when(storeRepository.findAll()).thenReturn(List.of(online, offline));
+
+        // when
+        List<StoreProfile> result = storeService.findStores(null, null, true);
+
+        // then
+        Assert.assertEquals(1, result.size());
+        Assert.assertEquals("on", result.get(0).getId());
+    }
+
+    @Test
+    public void findStores_activeStatusFalse_returnsOnlyOfflineStores() {
+        // given
+        StoreProfile online = buildStore("on", StoreType.FOOD, "1 A St", StoreProfile.AVAILABILITY.ONLINE24_7);
+        StoreProfile offline = buildStore("off", StoreType.FOOD, "2 B St", StoreProfile.AVAILABILITY.OFFLINE);
+        when(storeRepository.findAll()).thenReturn(List.of(online, offline));
+
+        // when
+        List<StoreProfile> result = storeService.findStores(null, null, false);
+
+        // then
+        Assert.assertEquals(1, result.size());
+        Assert.assertEquals("off", result.get(0).getId());
+    }
+
+    @Test
+    public void findStores_allFilters_combinationWorks() {
+        // given
+        StoreProfile match = buildStore("match", StoreType.SALON, "10 Main Rd, Durban", StoreProfile.AVAILABILITY.SPECIFIC_HOURS);
+        StoreProfile wrongCity = buildStore("wc", StoreType.SALON, "5 Oak Ave, Johannesburg", StoreProfile.AVAILABILITY.SPECIFIC_HOURS);
+        StoreProfile offline = buildStore("off", StoreType.SALON, "12 Beach Rd, Durban", StoreProfile.AVAILABILITY.OFFLINE);
+        when(storeRepository.findByStoreType(StoreType.SALON)).thenReturn(List.of(match, wrongCity, offline));
+
+        // when: city = Durban, type = SALON, activeStatus = true
+        List<StoreProfile> result = storeService.findStores("Durban", StoreType.SALON, true);
+
+        // then: only "match" satisfies all three filters
+        Assert.assertEquals(1, result.size());
+        Assert.assertEquals("match", result.get(0).getId());
+        verify(storeRepository).findByStoreType(StoreType.SALON);
+        Assert.assertEquals(MAIN_PAY_ACCOUNT, result.get(0).getBank().getAccountId());
+    }
+
+    @Test
+    public void findStores_noMatchingResults_returnsEmptyList() {
+        // given
+        StoreProfile store = buildStore("s1", StoreType.FOOD, "5 Cape Rd", StoreProfile.AVAILABILITY.ONLINE24_7);
+        when(storeRepository.findAll()).thenReturn(List.of(store));
+
+        // when: searching for a city that doesn't match
+        List<StoreProfile> result = storeService.findStores("Polokwane", null, null);
+
+        // then
+        Assert.assertTrue(result.isEmpty());
+    }
+
+    @Test
+    public void findStores_noPiiLeaks_bankAccountIdIsAlwaysReplaced() {
+        // given
+        StoreProfile store = buildStore("s1", StoreType.FOOD, "1 A St", StoreProfile.AVAILABILITY.ONLINE24_7);
+        store.getBank().setAccountId("SENSITIVE-ACCOUNT-NUMBER-9999");
+        when(storeRepository.findAll()).thenReturn(List.of(store));
+
+        // when
+        List<StoreProfile> result = storeService.findStores(null, null, null);
+
+        // then: real account never reaches caller
+        Assert.assertEquals(MAIN_PAY_ACCOUNT, result.get(0).getBank().getAccountId());
+        Assert.assertNotEquals("SENSITIVE-ACCOUNT-NUMBER-9999", result.get(0).getBank().getAccountId());
+    }
 }
