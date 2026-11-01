@@ -145,12 +145,14 @@ class ReconServiceImplCallerIdentityTest {
             // expected
         }
 
+        // FIX-04: audience is now captured on request thread and passed explicitly
         verify {
             agentIdentityAuditService.recordViolation(
                 callerPhone,
                 otherUserId,
                 AgentIdentityAuditLog.ViolationType.PAYOUT_NOT_OWNED,
-                "get_payouts_for_user"
+                "get_payouts_for_user",
+                "DRIVER"  // CallerIdentityContext.setAudience("DRIVER") was set in this test
             )
         }
     }

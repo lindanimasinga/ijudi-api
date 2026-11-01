@@ -200,6 +200,19 @@ public class StoreScopeValidatorTest {
         }
     }
 
+    @Test
+    public void validateCallerOwnsId_resolverReturnsNullAndIdIsNull_hardReject() {
+        // NOTE-03: both callerId and id are null — old code treated null==null as PASS (bug).
+        // Fix must treat a null resolved callerId as a HARD REJECT regardless of the supplied id.
+        StoreScopeContext.setAudience(Audience.DRIVER);
+        try {
+            StoreScopeValidator.validateCallerOwnsId(null, () -> null);
+            fail("Expected CallerIdentityViolationException — null callerId must be a hard reject");
+        } catch (CallerIdentityViolationException e) {
+            assertTrue(e.getMessage().startsWith("IDENTITY_REFUSAL:"));
+        }
+    }
+
     // ---- message text contract (ADR-024 non-negotiable) ----
 
     @Test

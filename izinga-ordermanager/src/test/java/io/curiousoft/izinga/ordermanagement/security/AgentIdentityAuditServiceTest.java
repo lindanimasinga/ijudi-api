@@ -47,6 +47,7 @@ public class AgentIdentityAuditServiceTest {
 
     @Test
     public void recordViolation_savesRecordToRepository() {
+        // FIX-04: audience is now passed explicitly; context set for documentation only
         StoreScopeContext.setAudience(Audience.CUSTOMER);
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -55,6 +56,7 @@ public class AgentIdentityAuditServiceTest {
                 "+27811111111",
                 AgentIdentityAuditLog.ViolationType.PHONE_MISMATCH,
                 "find_user_by_phone",
+                "CUSTOMER",
                 "driver_support",
                 null
         );
@@ -73,6 +75,7 @@ public class AgentIdentityAuditServiceTest {
 
     @Test
     public void recordViolation_repositoryThrows_doesNotPropagate() {
+        // FIX-04: audience is now passed explicitly; context set for documentation only
         StoreScopeContext.setAudience(Audience.DRIVER);
         doThrow(new RuntimeException("Mongo is down")).when(repository).save(any());
 
@@ -83,6 +86,7 @@ public class AgentIdentityAuditServiceTest {
                     "+27811111111",
                     AgentIdentityAuditLog.ViolationType.PHONE_MISMATCH,
                     "find_user_by_phone",
+                    "DRIVER",
                     "driver_support",
                     null
             );
@@ -93,6 +97,7 @@ public class AgentIdentityAuditServiceTest {
 
     @Test
     public void recordViolation_nullConversationId_recordSavedSuccessfully() {
+        // FIX-04: audience is now passed explicitly; context set for documentation only
         StoreScopeContext.setAudience(Audience.CUSTOMER);
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -101,6 +106,7 @@ public class AgentIdentityAuditServiceTest {
                 "some-order-id",
                 AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED,
                 "find_order_by_id",
+                "CUSTOMER",
                 "driver_support",
                 null
         );
@@ -110,7 +116,7 @@ public class AgentIdentityAuditServiceTest {
 
     @Test
     public void recordViolation_unknownAudience_audienceFieldIsUnknown() {
-        // No audience in context
+        // FIX-04: caller passes "UNKNOWN" explicitly when context is absent (no audience JWT)
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.recordViolation(
@@ -118,6 +124,7 @@ public class AgentIdentityAuditServiceTest {
                 "+27811111111",
                 AgentIdentityAuditLog.ViolationType.THIRD_PARTY_REGISTRATION,
                 "create_user",
+                "UNKNOWN",
                 "driver_support",
                 "conv-123"
         );

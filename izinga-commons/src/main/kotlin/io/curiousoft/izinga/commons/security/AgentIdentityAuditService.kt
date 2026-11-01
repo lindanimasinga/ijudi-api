@@ -31,10 +31,18 @@ class AgentIdentityAuditService(
      * and returns immediately from the caller's perspective. Exceptions thrown here
      * are caught and logged at ERROR but never rethrown.
      *
+     * FIX-04 (ADR-024 Legal C-2): [audience] is now an explicit parameter captured by the
+     * CALLER on the request thread BEFORE invoking this @Async method.  The previous
+     * implementation read [CallerIdentityContext.getAudience()] inside this method, which ran
+     * on a Spring TaskExecutor thread where the request-thread ThreadLocal is not visible,
+     * causing every audit record to be saved with audience = "UNKNOWN".
+     *
      * @param callerPhone        the authenticated caller's phone from the scope JWT (may be null)
      * @param suppliedIdentifier the phone/orderId/userId the agent tried to access
      * @param violationType      enum discriminator for dashboards and alerting
      * @param toolName           the MCP @Tool method name (e.g. "find_user_by_phone")
+     * @param audience           audience string captured on the REQUEST thread before async dispatch
+     *                           (e.g. "CUSTOMER", "DRIVER", "STORE"); use "UNKNOWN" when absent
      * @param agentName          the AI agent name; may be null
      * @param conversationId     WhatsApp conversation/session ID; may be null
      */
@@ -44,10 +52,10 @@ class AgentIdentityAuditService(
         suppliedIdentifier: String?,
         violationType: AgentIdentityAuditLog.ViolationType,
         toolName: String,
+        audience: String,
         agentName: String? = null,
         conversationId: String? = null,
     ) {
-        val audience = CallerIdentityContext.getAudience() ?: "UNKNOWN"
         // Belt-and-suspenders: structured WARN log line for log-pipeline alerting
         log.warn("[MCP-IDENTITY-VIOLATION] violationType={} toolName={} agentName={} audience={}",
             violationType, toolName, agentName, audience)

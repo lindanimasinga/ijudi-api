@@ -378,9 +378,12 @@ class ReconServiceImpl(
         try {
             CallerIdentityValidator.validateCallerOwnsId(toId) { resolveCallerUserId() }
         } catch (e: io.curiousoft.izinga.commons.security.CallerIdentityViolationException) {
+            // FIX-04: capture audience on the request thread before the @Async dispatch
+            val auditAudience = CallerIdentityContext.getAudience() ?: "UNKNOWN"
             agentIdentityAuditService.recordViolation(
                 CallerIdentityContext.getCallerPhone(), toId,
-                AgentIdentityAuditLog.ViolationType.PAYOUT_NOT_OWNED, "get_payouts_for_user"
+                AgentIdentityAuditLog.ViolationType.PAYOUT_NOT_OWNED, "get_payouts_for_user",
+                auditAudience
             )
             throw e
         }

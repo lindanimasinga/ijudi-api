@@ -55,9 +55,12 @@ class UserProfileService(
         try {
             CallerIdentityValidator.validateCallerPhone(phone)
         } catch (e: io.curiousoft.izinga.commons.security.CallerIdentityViolationException) {
+            // FIX-04: capture audience on the request thread before the @Async dispatch
+            val auditAudience = CallerIdentityContext.getAudience() ?: "UNKNOWN"
             agentIdentityAuditService.recordViolation(
                 CallerIdentityContext.getCallerPhone(), phone,
-                AgentIdentityAuditLog.ViolationType.PHONE_MISMATCH, "find_user_by_phone"
+                AgentIdentityAuditLog.ViolationType.PHONE_MISMATCH, "find_user_by_phone",
+                auditAudience
             )
             throw e
         }
@@ -114,9 +117,12 @@ class UserProfileService(
             try {
                 CallerIdentityValidator.validateCallerPhone(phoneForValidation)
             } catch (e: io.curiousoft.izinga.commons.security.CallerIdentityViolationException) {
+                // FIX-04: capture audience on the request thread before the @Async dispatch
+                val auditAudience = CallerIdentityContext.getAudience() ?: "UNKNOWN"
                 agentIdentityAuditService.recordViolation(
                     CallerIdentityContext.getCallerPhone(), phoneForValidation,
-                    AgentIdentityAuditLog.ViolationType.THIRD_PARTY_REGISTRATION, "create_user"
+                    AgentIdentityAuditLog.ViolationType.THIRD_PARTY_REGISTRATION, "create_user",
+                    auditAudience
                 )
                 throw e
             }

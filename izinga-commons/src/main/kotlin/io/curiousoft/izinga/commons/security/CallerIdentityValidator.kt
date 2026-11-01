@@ -87,7 +87,10 @@ object CallerIdentityValidator {
         if (audience != CUSTOMER && audience != DRIVER) return
 
         val callerId = callerIdResolver.get()
-        if (callerId != id) {
+        // NOTE-03: a null resolved callerId is a hard reject regardless of what `id` is.
+        // Previously `null != null` evaluated to false, allowing unresolved callers to pass
+        // through when the order also had no assigned messenger (messengerId=null).
+        if (callerId == null || callerId != id) {
             LOG.warn("[MCP-IDENTITY-VIOLATION] ID_NOT_OWNED: audience={}", audience)
             throw CallerIdentityViolationException(VIOLATION_MESSAGE)
         }

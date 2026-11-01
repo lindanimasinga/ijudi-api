@@ -158,8 +158,13 @@ class DocumentUploadMcpService(
     fun recheckRequiredDocuments(
         @ToolParam(description = "User phone number, for example +27812815577") phone: String,
     ): RequiredDocumentsForUserResponse {
-        // ADR-024: validation is handled inside getRequiredDocumentsForUser (which calls enforceCallerPhoneOrAudit)
-        return getRequiredDocumentsForUser(phone)
+        // NOTE-01: call enforceCallerPhoneOrAudit directly with the CORRECT tool name so audit
+        // records are attributed to "recheck_required_documents" not "get_required_documents_for_user".
+        enforceCallerPhoneOrAudit(phone, "recheck_required_documents")
+        val normalizedPhone = validatePhoneInput(phone)
+        val user = userProfileService.findUserByPhone(normalizedPhone)
+            ?: throw IllegalArgumentException("No user profile found for phone number: $phone")
+        return buildRequiredDocumentsResponse(user.mobileNumber ?: normalizedPhone, user.id)
     }
 
     private fun buildRequiredDocumentsResponse(phone: String, userId: String?): RequiredDocumentsForUserResponse {
@@ -235,18 +240,27 @@ class DocumentUploadMcpService(
      * ADR-024: Validates that the supplied phone belongs to the JWT caller.
      * Writes an async audit record on violation and re-throws so the @Tool method
      * surfaces the refusal message to the AI agent.
+     *
+     * NOTE-02: [agentName] is now a parameter (defaulting to null) instead of being
+     * hardcoded to "driver_support" so tools that are not exclusively for drivers can
+     * supply a more accurate agent name, and existing callers need no change.
+     *
+     * FIX-04: [audience] is captured here on the REQUEST thread before the @Async dispatch.
      */
-    private fun enforceCallerPhoneOrAudit(phone: String, toolName: String) {
+    private fun enforceCallerPhoneOrAudit(phone: String, toolName: String, agentName: String? = null) {
         try {
             CallerIdentityValidator.validateCallerPhone(phone)
         } catch (e: io.curiousoft.izinga.commons.security.CallerIdentityViolationException) {
+            // FIX-04: capture audience on the request thread before the @Async dispatch
+            val auditAudience = CallerIdentityContext.getAudience() ?: "UNKNOWN"
             agentIdentityAuditService.recordViolation(
-                CallerIdentityContext.getCallerPhone(),
-                phone,
-                AgentIdentityAuditLog.ViolationType.PHONE_MISMATCH,
-                toolName,
-                "driver_support",
-                null
+                callerPhone = CallerIdentityContext.getCallerPhone(),
+                suppliedIdentifier = phone,
+                violationType = AgentIdentityAuditLog.ViolationType.PHONE_MISMATCH,
+                toolName = toolName,
+                audience = auditAudience,
+                agentName = agentName,
+                conversationId = null
             )
             throw e
         }

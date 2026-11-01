@@ -277,6 +277,52 @@ public class OrderServiceImplCallerIdentityTest {
         sut.findOrderForMessenger("order-2");
     }
 
+    // ===== findOrderForMessenger — CUSTOMER audience (FIX-03) =====
+
+    @Test
+    public void findOrderForMessenger_customerAudience_ownOrder_passes() {
+        // FIX-03: CUSTOMER audience must be able to retrieve their own order's MessengerOrderDto
+        StoreScopeContext.setAudience(Audience.CUSTOMER);
+        StoreScopeContext.setCallerPhone(CALLER_PHONE);
+        stubCallerPhoneResolution();
+        Order o = orderOwnedByCaller(); // customerId = CALLER_USER_ID
+        o.setBasket(new Basket());
+        when(orderRepo.findById("order-1")).thenReturn(Optional.of(o));
+
+        sut.findOrderForMessenger("order-1");
+        // No exception → CUSTOMER can access their own order
+    }
+
+    @Test(expected = CallerIdentityViolationException.class)
+    public void findOrderForMessenger_customerAudience_thirdPartyOrder_throws() {
+        // FIX-03: CUSTOMER must NOT access another customer's MessengerOrderDto (data leak)
+        StoreScopeContext.setAudience(Audience.CUSTOMER);
+        StoreScopeContext.setCallerPhone(CALLER_PHONE);
+        stubCallerPhoneResolution();
+        Order o = orderOwnedByOther(); // customerId = OTHER_USER_ID
+        o.setBasket(new Basket());
+        when(orderRepo.findById("order-2")).thenReturn(Optional.of(o));
+
+        sut.findOrderForMessenger("order-2");
+    }
+
+    @Test
+    public void findOrderForMessenger_storeAudience_anyOrder_noOp() {
+        // FIX-03 regression: STORE audience must NOT be restricted by the new CUSTOMER branch
+        StoreScopeContext.setAudience(Audience.STORE);
+        StoreScopeContext.setCallerPhone(CALLER_PHONE);
+        Order o = orderOwnedByOther();
+        o.setBasket(new Basket());
+        when(orderRepo.findById("order-2")).thenReturn(Optional.of(o));
+
+        try {
+            sut.findOrderForMessenger("order-2");
+            // No exception → STORE audience is exempt from identity enforcement
+        } catch (CallerIdentityViolationException e) {
+            fail("STORE audience must not trigger identity enforcement: " + e.getMessage());
+        }
+    }
+
     // ===== startOrder SA-022-01 =====
 
     @Test(expected = CallerIdentityViolationException.class)

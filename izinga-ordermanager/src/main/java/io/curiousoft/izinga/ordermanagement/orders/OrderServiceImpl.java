@@ -154,10 +154,12 @@ public class OrderServiceImpl implements OrderService {
         try {
             StoreScopeValidator.validateCallerOwnsId(order.getCustomerId(), this::resolveCallerUserId);
         } catch (CallerIdentityViolationException e) {
+            // FIX-04: capture audience on the request thread before the @Async dispatch
+            String auditAudience = CallerIdentityContext.getAudience() != null ? CallerIdentityContext.getAudience() : "UNKNOWN";
             agentIdentityAuditService.recordViolation(
                     StoreScopeContext.getCallerPhone(), order.getCustomerId(),
                     AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED, "start_order",
-                    null, null);
+                    auditAudience, null, null);
             throw e;
         }
 
@@ -485,10 +487,11 @@ public class OrderServiceImpl implements OrderService {
                     StoreScopeValidator.validateCallerOwnsId(messengerId, this::resolveCallerUserId);
                 }
             } catch (CallerIdentityViolationException e) {
+                // FIX-04: audience already captured as local var on request thread
                 agentIdentityAuditService.recordViolation(
                         StoreScopeContext.getCallerPhone(), orderId,
                         AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED, "find_order_by_id",
-                        null, null);
+                        audience != null ? audience : "UNKNOWN", null, null);
                 throw e;
             }
         }
@@ -610,10 +613,12 @@ public class OrderServiceImpl implements OrderService {
         try {
             StoreScopeValidator.validateCallerOwnsId(userId, this::resolveCallerUserId);
         } catch (CallerIdentityViolationException e) {
+            // FIX-04: capture audience on the request thread before the @Async dispatch
+            String auditAudience = CallerIdentityContext.getAudience() != null ? CallerIdentityContext.getAudience() : "UNKNOWN";
             agentIdentityAuditService.recordViolation(
                     StoreScopeContext.getCallerPhone(), userId,
                     AgentIdentityAuditLog.ViolationType.ID_NOT_OWNED, "find_orders_by_user_id",
-                    null, null);
+                    auditAudience, null, null);
             throw e;
         }
         return orderRepo.findByCustomerId(userId).orElse(new ArrayList<>());
@@ -624,17 +629,31 @@ public class OrderServiceImpl implements OrderService {
     public Order findOrderForMessenger(String orderId) {
         Order order = orderRepo.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order with id " + orderId + " not found."));
-        // ADR-024: DRIVER must be assigned to this order.
+        // ADR-024: DRIVER must be assigned to this order; CUSTOMER must own it (FIX-03).
         String audience = CallerIdentityContext.getAudience();
         if ("DRIVER".equals(audience)) {
             try {
                 String messengerId = order.getShippingData() != null ? order.getShippingData().getMessengerId() : null;
                 StoreScopeValidator.validateCallerOwnsId(messengerId, this::resolveCallerUserId);
             } catch (CallerIdentityViolationException e) {
+                // FIX-04: audience already captured as local var on request thread
                 agentIdentityAuditService.recordViolation(
                         StoreScopeContext.getCallerPhone(), orderId,
                         AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED, "find_order_for_messenger",
-                        null, null);
+                        audience != null ? audience : "UNKNOWN", null, null);
+                throw e;
+            }
+        } else if ("CUSTOMER".equals(audience)) {
+            // FIX-03 (Legal C-4): CUSTOMER audience must own the order — prevents cross-customer
+            // data leak of full MessengerOrderDto (shipping details, iZinga commission, etc.).
+            try {
+                StoreScopeValidator.validateCallerOwnsId(order.getCustomerId(), this::resolveCallerUserId);
+            } catch (CallerIdentityViolationException e) {
+                // FIX-04: audience already captured as local var on request thread
+                agentIdentityAuditService.recordViolation(
+                        StoreScopeContext.getCallerPhone(), orderId,
+                        AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED, "find_order_for_messenger",
+                        audience, null, null);
                 throw e;
             }
         }
@@ -648,10 +667,12 @@ public class OrderServiceImpl implements OrderService {
         try {
             StoreScopeValidator.validateCallerPhone(phone);
         } catch (CallerIdentityViolationException e) {
+            // FIX-04: capture audience on the request thread before the @Async dispatch
+            String auditAudience = CallerIdentityContext.getAudience() != null ? CallerIdentityContext.getAudience() : "UNKNOWN";
             agentIdentityAuditService.recordViolation(
                     StoreScopeContext.getCallerPhone(), phone,
                     AgentIdentityAuditLog.ViolationType.PHONE_MISMATCH, "find_orders_by_phone_number",
-                    null, null);
+                    auditAudience, null, null);
             throw e;
         }
         if (phone.length() < 9) {
