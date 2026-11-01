@@ -147,10 +147,12 @@ client:
                 businessuuid: ${yoco.dashboard-api.businessuuid}
 
 # SEC-WA02-01-B: dedicated store-scope JWT secret — NOT derived from Firebase auth
-# Must be at least 32 chars. Configure a real secret in Secrets Manager for prod.
+# Must be at least 32 chars. No fallback — missing or empty value fails app startup loudly.
+# Local dev: export STORE_SCOPE_JWT_SECRET=local-dev-secret-for-testing-only-min-32-chars
+# UAT/prod:  provisioned via AWS Secrets Manager (izinga-uat / izinga-prod key).
 store-scope:
   jwt:
-    secret: ${STORE_SCOPE_JWT_SECRET:change-this-secret-to-minimum-32-chars!}
+    secret: ${STORE_SCOPE_JWT_SECRET}
 
 # T-09: cap on menu items injected per store prompt
 store:
