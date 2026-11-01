@@ -252,6 +252,92 @@ class StoreAiAgentPromptTest {
                 "When store is not found, the base prompt must be used unchanged");
     }
 
+    /**
+     * ADR-024: verifies that the scoped URL passed to OpenAI's tools list embeds the
+     * callerPhone ("from") in the JWT when tools ARE enabled.
+     *
+     * Uses a real StoreScopeJwtService (not a mock) so we can decode the JWT and
+     * confirm the callerPhone claim is present.
+     */
+    @Test
+    void buildScopedMcpTools_embedsCallerPhoneInJwt() {
+        // Use a real JWT service to decode the token after capture
+        StoreScopeJwtService realJwtService =
+                new StoreScopeJwtService("test-secret-at-least-32-chars-1234");
+
+        StoreAiAgent agentWithRealJwt = new StoreAiAgent(
+                true, "sk-test-key", "gpt-4.1-mini", restTemplate,
+                agentConfigService, conversationHistoryService,
+                storeContextResolver, storeRepository, realJwtService);
+
+        AiAgentConfig config = AiAgentConfig.builder()
+                .agentName("store_support_" + STORE_ID)
+                .systemPrompt(BASE_PROMPT)
+                .active(true)
+                .useTools(true)
+                .build();
+
+        io.curiousoft.izinga.messaging.aiAgent.config.McpServerConfig mcpCfg =
+                new io.curiousoft.izinga.messaging.aiAgent.config.McpServerConfig(
+                        "sse", "izinga-api", "iZinga tools",
+                        "https://api.izinga.co.za/mcp", "none", null);
+
+        when(agentConfigService.getActiveAgentConfig("store_support_" + STORE_ID)).thenReturn(config);
+        when(agentConfigService.buildPromptWithCorrections(config)).thenReturn(BASE_PROMPT);
+        when(agentConfigService.getMcpToolsForAgent("store_support_" + STORE_ID))
+                .thenReturn(List.of(mcpCfg));
+        when(storeRepository.findById(STORE_ID)).thenReturn(Optional.of(storeProfile));
+        when(storeContextResolver.buildContextBlock(storeProfile)).thenReturn(RESOLVED_CONTEXT_BLOCK);
+
+        ConversationHistory conversation = new ConversationHistory();
+        conversation.setId("conv-adr024-store");
+        when(conversationHistoryService.getOrCreateConversation(
+                eq("+27812345678"), eq("Customer"), eq("store_support_" + STORE_ID)))
+                .thenReturn(conversation);
+        when(conversationHistoryService.getContextMessages(conversation)).thenReturn(List.of());
+
+        @SuppressWarnings("unchecked")
+        ResponseEntity<Map> mockResponse = new ResponseEntity<>(
+                Map.of("output", List.of(
+                        Map.of("type", "message", "content",
+                                List.of(Map.of("type", "output_text", "text", "Hello!")))
+                )),
+                HttpStatus.OK
+        );
+
+        @SuppressWarnings({"rawtypes", "unchecked"})
+        ArgumentCaptor<HttpEntity> entityCaptor = ArgumentCaptor.forClass(HttpEntity.class);
+        when(restTemplate.postForEntity(anyString(), entityCaptor.capture(), eq(Map.class)))
+                .thenReturn(mockResponse);
+
+        // Act — pass 'from' = "+27812345678"
+        WhatsappWebhookPayload.Value.Message message = buildTextMessage("What are the hours?");
+        agentWithRealJwt.handleWhatsappQuery(message, "+27812345678", STORE_ID, null);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> requestBody = (Map<String, Object>) entityCaptor.getValue().getBody();
+        assertNotNull(requestBody);
+
+        @SuppressWarnings("unchecked")
+        List<io.curiousoft.izinga.messaging.aiAgent.config.McpServerConfig> tools =
+                (List<io.curiousoft.izinga.messaging.aiAgent.config.McpServerConfig>) requestBody.get("tools");
+        assertNotNull(tools, "tools list must be present when useTools=true");
+        assertFalse(tools.isEmpty(), "tools list must be non-empty");
+
+        // Extract the scoped URL from the first tool's server_url
+        String serverUrl = tools.get(0).getServerUrl();
+        assertNotNull(serverUrl, "server_url must be in the tool config");
+        assertTrue(serverUrl.contains("scope="), "URL must contain scope param");
+
+        // Decode the JWT to verify callerPhone
+        String token = serverUrl.substring(serverUrl.indexOf("scope=") + 6);
+        java.util.Map<String, String> claims = realJwtService.validateAndExtract(token);
+        assertEquals("+27812345678", claims.get("callerPhone"),
+                "ADR-024: callerPhone must be embedded in the scope JWT for store agent");
+        assertEquals("STORE", claims.get("audience"),
+                "STORE audience must be present in the scope JWT");
+    }
+
     // ---- helpers ----
 
     private WhatsappWebhookPayload.Value.Message buildTextMessage(String body) {

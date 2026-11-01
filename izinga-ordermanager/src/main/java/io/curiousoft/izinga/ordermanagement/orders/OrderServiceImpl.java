@@ -6,6 +6,12 @@ import io.curiousoft.izinga.commons.order.DeliveryPriceEstimateDto;
 import io.curiousoft.izinga.commons.order.MessengerOrderDto;
 import io.curiousoft.izinga.commons.order.OrderService;
 import io.curiousoft.izinga.commons.order.events.*;
+import io.curiousoft.izinga.commons.security.AgentIdentityAuditLog;
+import io.curiousoft.izinga.commons.security.AgentIdentityAuditService;
+import io.curiousoft.izinga.commons.security.CallerIdentityContext;
+import io.curiousoft.izinga.commons.security.CallerIdentityViolationException;
+import io.curiousoft.izinga.ordermanagement.security.StoreScopeContext;
+import io.curiousoft.izinga.ordermanagement.security.StoreScopeValidator;
 import io.curiousoft.izinga.ordermanagement.cancellation.CustomerCancellationService;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.order.OrderRepository;
@@ -73,6 +79,10 @@ public class OrderServiceImpl implements OrderService {
     @Autowired
     private CustomerCancellationService customerCancellationService;
 
+    // ADR-024: injected via field to avoid disrupting the existing constructor
+    @Autowired
+    private AgentIdentityAuditService agentIdentityAuditService;
+
     @Autowired
     public OrderServiceImpl(@Value("${service.delivery.standardFee}") double starndardDeliveryFee,
                             @Value("${service.delivery.standardKm}") double starndardDeliveryKm,
@@ -137,6 +147,18 @@ public class OrderServiceImpl implements OrderService {
 
         if (!userProfileRepo.existsById(order.getCustomerId())) {
             throw new IllegalArgumentException("user with id " + order.getCustomerId() + " does not exist");
+        }
+
+        // SA-022-01 / ADR-024: CUSTOMER agents may only start orders for themselves.
+        // DRIVER and STORE audiences are exempt (STORE places orders on behalf of customers).
+        try {
+            StoreScopeValidator.validateCallerOwnsId(order.getCustomerId(), this::resolveCallerUserId);
+        } catch (CallerIdentityViolationException e) {
+            agentIdentityAuditService.recordViolation(
+                    StoreScopeContext.getCallerPhone(), order.getCustomerId(),
+                    AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED, "start_order",
+                    null, null);
+            throw e;
         }
 
         Optional<StoreProfile> storeOptional = storeRepository.findById(order.getShopId());
@@ -431,10 +453,46 @@ public class OrderServiceImpl implements OrderService {
         return orderCompleted;
     }
 
+    /**
+     * ADR-024: Resolves the JWT caller's phone to their user profile ID.
+     * Uses the same last-9-digits prefix-loop pattern as findOrderByPhone().
+     * Returns null if the phone cannot be resolved (treated as mismatch by validator).
+     */
+    private String resolveCallerUserId() {
+        String callerPhone = StoreScopeContext.getCallerPhone();
+        if (callerPhone == null) return null;
+        String last9 = StoreScopeValidator.normalizeLast9(callerPhone);
+        if (last9 == null) return null;
+        for (String prefix : List.of("0", "+27", "27")) {
+            UserProfile u = userProfileRepo.findByMobileNumber(prefix + last9);
+            if (u != null) return u.getId();
+        }
+        return null;
+    }
+
     @Tool(name = "find_order_by_id", description = "Find order by id and return the order details")
     @Override
     public Order findOrder(String orderId) {
-        return orderRepo.findById(orderId).orElse(null);
+        Order order = orderRepo.findById(orderId).orElse(null);
+        if (order != null) {
+            // ADR-024: CUSTOMER must own the order; DRIVER must be assigned to it.
+            String audience = CallerIdentityContext.getAudience();
+            try {
+                if ("CUSTOMER".equals(audience)) {
+                    StoreScopeValidator.validateCallerOwnsId(order.getCustomerId(), this::resolveCallerUserId);
+                } else if ("DRIVER".equals(audience)) {
+                    String messengerId = order.getShippingData() != null ? order.getShippingData().getMessengerId() : null;
+                    StoreScopeValidator.validateCallerOwnsId(messengerId, this::resolveCallerUserId);
+                }
+            } catch (CallerIdentityViolationException e) {
+                agentIdentityAuditService.recordViolation(
+                        StoreScopeContext.getCallerPhone(), orderId,
+                        AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED, "find_order_by_id",
+                        null, null);
+                throw e;
+            }
+        }
+        return order;
     }
 
     @Override
@@ -548,20 +606,57 @@ public class OrderServiceImpl implements OrderService {
     @Tool(name = "find_orders_by_user_id", description = "Find orders by user id and return the order details")
     @Override
     public List<Order> findOrderByUserId(String userId) {
+        // ADR-024: CUSTOMER/DRIVER agents may only fetch orders for their own user ID.
+        try {
+            StoreScopeValidator.validateCallerOwnsId(userId, this::resolveCallerUserId);
+        } catch (CallerIdentityViolationException e) {
+            agentIdentityAuditService.recordViolation(
+                    StoreScopeContext.getCallerPhone(), userId,
+                    AgentIdentityAuditLog.ViolationType.ID_NOT_OWNED, "find_orders_by_user_id",
+                    null, null);
+            throw e;
+        }
         return orderRepo.findByCustomerId(userId).orElse(new ArrayList<>());
     }
 
     @Tool(name = "find_order_for_messenger", description = "Find order by id and return the order details as MessengerOrderDto")
     @Override
     public Order findOrderForMessenger(String orderId) {
-        return orderRepo.findById(orderId)
-                .map(ir -> new MessengerOrderDto(ir, izingaCommissionPerc))
+        Order order = orderRepo.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order with id " + orderId + " not found."));
+        // ADR-024: DRIVER must be assigned to this order.
+        String audience = CallerIdentityContext.getAudience();
+        if ("DRIVER".equals(audience)) {
+            try {
+                String messengerId = order.getShippingData() != null ? order.getShippingData().getMessengerId() : null;
+                StoreScopeValidator.validateCallerOwnsId(messengerId, this::resolveCallerUserId);
+            } catch (CallerIdentityViolationException e) {
+                agentIdentityAuditService.recordViolation(
+                        StoreScopeContext.getCallerPhone(), orderId,
+                        AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED, "find_order_for_messenger",
+                        null, null);
+                throw e;
+            }
+        }
+        return new MessengerOrderDto(order, izingaCommissionPerc);
     }
 
     @Tool(name = "find_orders_by_phone_number", description = "Find orders by phone number and return the order details")
     @Override
     public List<Order> findOrderByPhone(String phone) {
+        // ADR-024: CUSTOMER/DRIVER agents may only query orders for their own phone.
+        try {
+            StoreScopeValidator.validateCallerPhone(phone);
+        } catch (CallerIdentityViolationException e) {
+            agentIdentityAuditService.recordViolation(
+                    StoreScopeContext.getCallerPhone(), phone,
+                    AgentIdentityAuditLog.ViolationType.PHONE_MISMATCH, "find_orders_by_phone_number",
+                    null, null);
+            throw e;
+        }
+        if (phone.length() < 9) {
+            throw new IllegalArgumentException("phone must be at least 9 characters");
+        }
         String last9Digits = phone.substring(phone.length() - 9);
         for(String code : List.of("0", "+27", "27")) {
             Optional<UserProfile> user = Optional.ofNullable(userProfileRepo.findByMobileNumber("%s%s".formatted(code, last9Digits)));

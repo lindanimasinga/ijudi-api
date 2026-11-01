@@ -4,6 +4,7 @@ import io.curiousoft.izinga.commons.model.ProfileRoles;
 import io.curiousoft.izinga.commons.model.UserProfile;
 import io.curiousoft.izinga.commons.repo.IcaAcceptanceLogRepo;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.commons.security.AgentIdentityAuditService;
 import io.curiousoft.izinga.ordermanagement.McpConfig;
 import io.curiousoft.izinga.ordermanagement.orders.McpOrderService;
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
@@ -86,10 +87,12 @@ class McpToolRegistrationTest {
     private DocumentUploadMcpService documentUploadMcpService;
     @Mock
     private McpOrderService mcpOrderService;
+    @Mock
+    private AgentIdentityAuditService agentIdentityAuditService;
 
     @BeforeEach
     void setUp() {
-        userProfileService = new UserProfileService(userProfileRepo, eventPublisher, userConfig, icaAcceptanceLogRepo, referralCodeService);
+        userProfileService = new UserProfileService(userProfileRepo, eventPublisher, userConfig, icaAcceptanceLogRepo, referralCodeService, agentIdentityAuditService);
         mcpConfig = new McpConfig();
     }
 

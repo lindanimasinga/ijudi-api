@@ -11,6 +11,10 @@ import io.curiousoft.izinga.commons.payout.events.AmbassadorPayoutEvent
 import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
 import io.curiousoft.izinga.commons.payout.events.ReferralPartnerPayoutEvent
 import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent
+import io.curiousoft.izinga.commons.security.AgentIdentityAuditLog
+import io.curiousoft.izinga.commons.security.AgentIdentityAuditService
+import io.curiousoft.izinga.commons.security.CallerIdentityContext
+import io.curiousoft.izinga.commons.security.CallerIdentityValidator
 import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommissionRepo
 import io.curiousoft.izinga.commons.referral.FurnitureCustomerReferralCommissionRepo
 import io.curiousoft.izinga.commons.referral.ReferralCommissionStatus
@@ -53,7 +57,9 @@ class ReconServiceImpl(
     private val storeStage1CommissionRepo: StorePartnerStage1CommissionRepo,
     private val storeStage2CommissionRepo: StorePartnerStage2CommissionRepo,
     private val applicationEventPublisher: ApplicationEventPublisher,
-    private val ambassadorProperties: AmbassadorProperties
+    private val ambassadorProperties: AmbassadorProperties,
+    /** ADR-024: injected for async audit writes on identity violations. */
+    private val agentIdentityAuditService: AgentIdentityAuditService,
 ) : ReconService {
 
     private val logger = LoggerFactory.getLogger(ReconServiceImpl::class.java)
@@ -368,12 +374,33 @@ class ReconServiceImpl(
                                @ToolParam(description = "Date time format is like 2026-04-09T00:00:00.000+00:00") from: Date,
                                @ToolParam(description = "Date time format is like 2026-04-09T00:00:00.000+00:00") toDate: Date,
                                @ToolParam(description = "This is the Driver/Messenger id to use for lookup") toId: String): List<Payout> {
+        // ADR-024: CUSTOMER/DRIVER agents may only query payouts for their own toId.
+        try {
+            CallerIdentityValidator.validateCallerOwnsId(toId) { resolveCallerUserId() }
+        } catch (e: io.curiousoft.izinga.commons.security.CallerIdentityViolationException) {
+            agentIdentityAuditService.recordViolation(
+                CallerIdentityContext.getCallerPhone(), toId,
+                AgentIdentityAuditLog.ViolationType.PAYOUT_NOT_OWNED, "get_payouts_for_user"
+            )
+            throw e
+        }
         return when (payoutType) {
             PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetweenAndToId(from, toDate, toId)
             PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateBetweenAndToId(from, toDate, toId)
             PayoutType.AMBASSADOR -> ambassadorPayoutRepository.findByModifiedDateBetweenAndToId(from, toDate, toId)
             PayoutType.REFERRAL_PARTNER -> referralPartnerPayoutRepository.findByModifiedDateBetweenAndToId(from, toDate, toId)
         }
+    }
+
+    /**
+     * ADR-024: Resolves the JWT caller's phone to their user profile ID.
+     * Returns null if the phone is not set or cannot be resolved (treated as mismatch).
+     */
+    private fun resolveCallerUserId(): String? {
+        val callerPhone = CallerIdentityContext.getCallerPhone() ?: return null
+        val last9 = CallerIdentityValidator.normalizeLast9(callerPhone) ?: return null
+        return listOf("0", "+27", "27")
+            .firstNotNullOfOrNull { prefix -> userProfileRepo.findByMobileNumber("$prefix$last9")?.id }
     }
 
     override fun getAllPayoutsForMessengerAdmin(from: Date, toDate: Date, messengerAdminId: String, messengerId: String?): List<Payout> {

@@ -38,6 +38,8 @@ public class StoreScopeJwtService {
     private static final Logger LOG = LoggerFactory.getLogger(StoreScopeJwtService.class);
     private static final String CLAIM_STORE_ID = "storeId";
     private static final String CLAIM_AUDIENCE_KEY = "audience";
+    /** ADR-024: caller phone claim embedded in the scope JWT. */
+    private static final String CLAIM_CALLER_PHONE = "callerPhone";
     /** Token lifetime. Short-lived: one request cycle. */
     private static final long TOKEN_TTL_MINUTES = 5L;
     /** Query parameter name that the filter reads from incoming /mcp requests. */
@@ -55,13 +57,14 @@ public class StoreScopeJwtService {
     }
 
     /**
-     * Generate a scoped JWT embedding {@code storeId} and {@code audience}.
+     * Generate a scoped JWT embedding {@code storeId}, {@code audience}, and {@code callerPhone}.
      *
-     * @param storeId  the store this token is scoped to; may be null for non-STORE audiences
-     * @param audience the audience sourced from AiAgentConfig (SEC-WA02-01-D)
+     * @param storeId     the store this token is scoped to; may be null for non-STORE audiences
+     * @param audience    the audience sourced from AiAgentConfig (SEC-WA02-01-D)
+     * @param callerPhone ADR-024: the WhatsApp caller's phone number; may be null
      * @return signed JWT string
      */
-    public String generateScopeToken(String storeId, Audience audience) {
+    public String generateScopeToken(String storeId, Audience audience, String callerPhone) {
         var now = Instant.now();
         var builder = JWT.create()
                 .withIssuer("izinga-agent-scope")
@@ -71,9 +74,23 @@ public class StoreScopeJwtService {
         if (storeId != null) {
             builder = builder.withClaim(CLAIM_STORE_ID, storeId);
         }
+        if (callerPhone != null) {
+            builder = builder.withClaim(CLAIM_CALLER_PHONE, callerPhone);
+        }
         String token = builder.sign(algorithm);
-        LOG.debug("Generated scope token for storeId={} audience={}", storeId, audience);
+        LOG.debug("Generated scope token for storeId={} audience={} callerPhone=<redacted>", storeId, audience);
         return token;
+    }
+
+    /**
+     * Backward-compatible overload that omits callerPhone (used where no phone context is available).
+     *
+     * @param storeId  the store this token is scoped to; may be null for non-STORE audiences
+     * @param audience the audience sourced from AiAgentConfig (SEC-WA02-01-D)
+     * @return signed JWT string
+     */
+    public String generateScopeToken(String storeId, Audience audience) {
+        return generateScopeToken(storeId, audience, null);
     }
 
     /**
@@ -93,6 +110,9 @@ public class StoreScopeJwtService {
         claims.put(CLAIM_STORE_ID, storeIdClaim.isNull() ? null : storeIdClaim.asString());
         var audienceClaim = decoded.getClaim(CLAIM_AUDIENCE_KEY);
         claims.put(CLAIM_AUDIENCE_KEY, audienceClaim.isNull() ? null : audienceClaim.asString());
+        // ADR-024: extract callerPhone claim (nullable — absent in older tokens)
+        var callerPhoneClaim = decoded.getClaim(CLAIM_CALLER_PHONE);
+        claims.put(CLAIM_CALLER_PHONE, callerPhoneClaim.isNull() ? null : callerPhoneClaim.asString());
         return claims;
     }
 
@@ -100,6 +120,24 @@ public class StoreScopeJwtService {
      * Append the scope token as a query parameter to the given MCP server URL.
      *
      * SA-021-17 / SEC-WA02-01-A: query-parameter transport.
+     * ADR-024: includes callerPhone in the signed JWT.
+     *
+     * @param baseUrl     the MCP server base URL
+     * @param storeId     store scope (may be null for non-STORE agents)
+     * @param audience    sourced from AiAgentConfig.audience
+     * @param callerPhone ADR-024: the WhatsApp caller's phone; may be null
+     * @return URL with {@code ?scope=<jwt>} appended
+     */
+    public String buildScopedUrl(String baseUrl, String storeId, Audience audience, String callerPhone) {
+        String token = generateScopeToken(storeId, audience, callerPhone);
+        if (baseUrl.contains("?")) {
+            return baseUrl + "&" + SCOPE_PARAM + "=" + token;
+        }
+        return baseUrl + "?" + SCOPE_PARAM + "=" + token;
+    }
+
+    /**
+     * Backward-compatible overload that omits callerPhone (used where no phone context is available).
      *
      * @param baseUrl  the MCP server base URL
      * @param storeId  store scope (may be null for non-STORE agents)
@@ -107,10 +145,6 @@ public class StoreScopeJwtService {
      * @return URL with {@code ?scope=<jwt>} appended
      */
     public String buildScopedUrl(String baseUrl, String storeId, Audience audience) {
-        String token = generateScopeToken(storeId, audience);
-        if (baseUrl.contains("?")) {
-            return baseUrl + "&" + SCOPE_PARAM + "=" + token;
-        }
-        return baseUrl + "?" + SCOPE_PARAM + "=" + token;
+        return buildScopedUrl(baseUrl, storeId, audience, null);
     }
 }

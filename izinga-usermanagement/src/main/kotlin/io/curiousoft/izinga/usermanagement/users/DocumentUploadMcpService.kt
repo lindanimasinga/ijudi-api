@@ -1,5 +1,9 @@
 package io.curiousoft.izinga.usermanagement.users
 
+import io.curiousoft.izinga.commons.security.AgentIdentityAuditLog
+import io.curiousoft.izinga.commons.security.AgentIdentityAuditService
+import io.curiousoft.izinga.commons.security.CallerIdentityContext
+import io.curiousoft.izinga.commons.security.CallerIdentityValidator
 import io.curiousoft.izinga.usermanagement.userconfig.FieldDataType
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService
 import org.springframework.ai.tool.annotation.Tool
@@ -15,6 +19,8 @@ class DocumentUploadMcpService(
     private val userProfileService: UserProfileService,
     private val userConfigService: UserConfigService,
     private val documentUploadSessionRepo: DocumentUploadSessionRepo,
+    /** ADR-024: injected for async audit writes on identity violations. */
+    private val agentIdentityAuditService: AgentIdentityAuditService,
 ) {
 
     private val allowedMimeTypes = listOf(
@@ -37,6 +43,8 @@ class DocumentUploadMcpService(
     fun getRequiredDocumentsForUser(
         @ToolParam(description = "User phone number, for example +27812815577") phone: String,
     ): RequiredDocumentsForUserResponse {
+        // ADR-024: enforce caller identity before any data is returned
+        enforceCallerPhoneOrAudit(phone, "get_required_documents_for_user")
         val normalizedPhone = validatePhoneInput(phone)
         val user = userProfileService.findUserByPhone(normalizedPhone)
             ?: throw IllegalArgumentException("No user profile found for phone number: $phone")
@@ -53,6 +61,8 @@ class DocumentUploadMcpService(
         @ToolParam(description = "Original file name, for example id-card.jpg") originalFileName: String,
         @ToolParam(description = "MIME type, for example image/jpeg or application/pdf") mimeType: String,
     ): UploadSessionInstructionsResponse {
+        // ADR-024: enforce caller identity before any session is created
+        enforceCallerPhoneOrAudit(phone, "create_document_upload_session")
         val normalizedPhone = validatePhoneInput(phone)
         val user = userProfileService.findUserByPhone(normalizedPhone)
             ?: throw IllegalArgumentException("No user profile found for phone number: $phone")
@@ -95,6 +105,8 @@ class DocumentUploadMcpService(
         @ToolParam(description = "Document field name from user config, for example identityDocument") fieldName: String,
         @ToolParam(description = "Uploaded file public URL") fileUrl: String,
     ): AttachUploadedDocumentResponse {
+        // ADR-024: enforce caller identity before attaching a document
+        enforceCallerPhoneOrAudit(phone, "attach_uploaded_document_to_user_tag")
         val normalizedPhone = validatePhoneInput(phone)
         val user = userProfileService.findUserByPhone(normalizedPhone)
             ?: throw IllegalArgumentException("No user profile found for phone number: $phone")
@@ -146,6 +158,7 @@ class DocumentUploadMcpService(
     fun recheckRequiredDocuments(
         @ToolParam(description = "User phone number, for example +27812815577") phone: String,
     ): RequiredDocumentsForUserResponse {
+        // ADR-024: validation is handled inside getRequiredDocumentsForUser (which calls enforceCallerPhoneOrAudit)
         return getRequiredDocumentsForUser(phone)
     }
 
@@ -215,6 +228,27 @@ class DocumentUploadMcpService(
             allowedWhatsappHosts.any { host == it || host.endsWith(".$it") }
         } catch (_: Exception) {
             false
+        }
+    }
+
+    /**
+     * ADR-024: Validates that the supplied phone belongs to the JWT caller.
+     * Writes an async audit record on violation and re-throws so the @Tool method
+     * surfaces the refusal message to the AI agent.
+     */
+    private fun enforceCallerPhoneOrAudit(phone: String, toolName: String) {
+        try {
+            CallerIdentityValidator.validateCallerPhone(phone)
+        } catch (e: io.curiousoft.izinga.commons.security.CallerIdentityViolationException) {
+            agentIdentityAuditService.recordViolation(
+                CallerIdentityContext.getCallerPhone(),
+                phone,
+                AgentIdentityAuditLog.ViolationType.PHONE_MISMATCH,
+                toolName,
+                "driver_support",
+                null
+            )
+            throw e
         }
     }
 }

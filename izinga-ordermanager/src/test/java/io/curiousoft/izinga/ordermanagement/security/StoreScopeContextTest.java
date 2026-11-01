@@ -126,4 +126,51 @@ public class StoreScopeContextTest {
         assertNull(StoreScopeContext.getPermittedStoreId());
         assertNull(StoreScopeContext.getAudience());
     }
+
+    // ---- ADR-024: callerPhone ThreadLocal ----
+
+    @Test
+    public void setCallerPhone_andGet_returnsValue() {
+        StoreScopeContext.setCallerPhone("+27812345678");
+        assertEquals("+27812345678", StoreScopeContext.getCallerPhone());
+        StoreScopeContext.clear();
+    }
+
+    @Test
+    public void clear_removesCallerPhone() {
+        StoreScopeContext.setCallerPhone("+27811111111");
+        StoreScopeContext.clear();
+        assertNull("callerPhone must be null after clear()", StoreScopeContext.getCallerPhone());
+    }
+
+    @Test
+    public void clear_removesAllThreeFields_simultaneously() {
+        StoreScopeContext.setPermittedStoreId("store-abc");
+        StoreScopeContext.setAudience(Audience.CUSTOMER);
+        StoreScopeContext.setCallerPhone("+27812345678");
+        StoreScopeContext.clear();
+        assertNull("permittedStoreId must be null after clear()", StoreScopeContext.getPermittedStoreId());
+        assertNull("audience must be null after clear()", StoreScopeContext.getAudience());
+        assertNull("callerPhone must be null after clear()", StoreScopeContext.getCallerPhone());
+    }
+
+    @Test
+    public void callerPhone_noResidualState_acrossTwoRequests() throws Exception {
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        java.util.concurrent.atomic.AtomicReference<String> phoneAfterFirst = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+        executor.execute(() -> {
+            StoreScopeContext.setCallerPhone("+27812345678");
+            try {
+                assertEquals("+27812345678", StoreScopeContext.getCallerPhone());
+            } finally {
+                StoreScopeContext.clear();
+            }
+            phoneAfterFirst.set(StoreScopeContext.getCallerPhone());
+            done.countDown();
+        });
+        done.await();
+        executor.shutdown();
+        assertNull("callerPhone must be null after clear() on reused thread", phoneAfterFirst.get());
+    }
 }

@@ -8,6 +8,10 @@ import io.curiousoft.izinga.commons.model.StoreType
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.repo.IcaAcceptanceLogRepo
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
+import io.curiousoft.izinga.commons.security.AgentIdentityAuditLog
+import io.curiousoft.izinga.commons.security.AgentIdentityAuditService
+import io.curiousoft.izinga.commons.security.CallerIdentityContext
+import io.curiousoft.izinga.commons.security.CallerIdentityValidator
 import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService
 import io.curiousoft.izinga.usermanagement.userconfig.FieldSpec
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfig
@@ -30,7 +34,9 @@ class UserProfileService(
     val eventPublisher: ApplicationEventPublisher,
     userConfigService: UserConfigService,
     private val icaAcceptanceLogRepo: IcaAcceptanceLogRepo,
-    private val referralCodeService: ReferralCodeService
+    private val referralCodeService: ReferralCodeService,
+    /** ADR-024: injected for async audit writes on identity violations. */
+    private val agentIdentityAuditService: AgentIdentityAuditService,
 ) : ProfileServiceImpl<UserProfileRepo, UserProfile>(userProfileRepo, eventPublisher) {
 
     private val log = LoggerFactory.getLogger(UserProfileService::class.java)
@@ -44,6 +50,16 @@ class UserProfileService(
     fun findUserByPhone(phone: String): UserProfile? {
         if (phone.length < 9) {
             return null
+        }
+        // ADR-024: enforce that CUSTOMER/DRIVER agents only look up their own phone
+        try {
+            CallerIdentityValidator.validateCallerPhone(phone)
+        } catch (e: io.curiousoft.izinga.commons.security.CallerIdentityViolationException) {
+            agentIdentityAuditService.recordViolation(
+                CallerIdentityContext.getCallerPhone(), phone,
+                AgentIdentityAuditLog.ViolationType.PHONE_MISMATCH, "find_user_by_phone"
+            )
+            throw e
         }
         val last9Digits = phone.substring(phone.length - 9)
         return listOf("0", "+27", "27")
@@ -91,6 +107,20 @@ class UserProfileService(
     @Tool(name = "create_user", description = "Creates a new user profile. It can be a normal customer or a driver or a store owner depending on the role specified in the profile object.")
     @Throws(Exception::class)
     override fun create(profile: UserProfile): UserProfile {
+        // ADR-024: CUSTOMER/DRIVER agents must only register profiles for their own phone number.
+        // STORE audience is exempt — store agents may create customer profiles as part of checkout flows.
+        val phoneForValidation = profile.mobileNumber
+        if (!phoneForValidation.isNullOrBlank()) {
+            try {
+                CallerIdentityValidator.validateCallerPhone(phoneForValidation)
+            } catch (e: io.curiousoft.izinga.commons.security.CallerIdentityViolationException) {
+                agentIdentityAuditService.recordViolation(
+                    CallerIdentityContext.getCallerPhone(), phoneForValidation,
+                    AgentIdentityAuditLog.ViolationType.THIRD_PARTY_REGISTRATION, "create_user"
+                )
+                throw e
+            }
+        }
         validateUserProfileForCreate(profile)
         //remove empty spaces and dashes from the mobile number
         profile.mobileNumber = fomatMobileNumber(profile.mobileNumber!!)
@@ -315,6 +345,8 @@ class UserProfileService(
 
     @Tool(name = "get_missing_fields_by_phone", description = "Returns a list of missing mandatory field names for the user profile associated with the given mobile number.")
     fun getAllMissingFields(mobileNumber: String): List<String> {
+        // ADR-024: enforce that CUSTOMER/DRIVER agents only look up their own phone.
+        // Delegates to findUserByPhone which already calls CallerIdentityValidator.validateCallerPhone.
         return findUserByPhone(mobileNumber)?.let {
             getAllMissingFields(it)
         } ?: emptyList()
