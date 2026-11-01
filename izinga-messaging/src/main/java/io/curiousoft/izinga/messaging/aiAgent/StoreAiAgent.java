@@ -132,8 +132,8 @@ public class StoreAiAgent {
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setBearerAuth(openAiApiKey);
 
-            // SA-021-17: attach scope JWT to each MCP server URL
-            var mcpTools = buildScopedMcpTools(agentConfig, storeId);
+            // SA-021-17 + ADR-024: attach scope JWT with callerPhone for audit completeness
+            var mcpTools = buildScopedMcpTools(agentConfig, storeId, from);
 
             Map<String, Object> requestBody = new HashMap<>(Map.of("model", model, "input", messagesList));
             if (agentConfig.isUseTools() && !mcpTools.isEmpty()) {
@@ -234,17 +234,22 @@ public class StoreAiAgent {
                 "=== Store Context Begin ===\n" + contextBlock + "\n=== Store Context End ===");
     }
 
-    /** SA-021-17: attach scope JWT to each MCP server URL. SA-021-8: filter to allowedTools. */
-    private List<McpServerConfig> buildScopedMcpTools(AiAgentConfig config, String storeId) {
+    /**
+     * SA-021-17 / ADR-024: attach scope JWT to each MCP server URL.
+     * ADR-024: callerPhone is embedded in the JWT for audit completeness.
+     * STORE audience enforcement remains storeId-based only — no validateCallerPhone()
+     * is called anywhere on the store agent's tool path.
+     * SA-021-8: filter to allowedTools.
+     */
+    private List<McpServerConfig> buildScopedMcpTools(AiAgentConfig config, String storeId, String callerPhone) {
         List<McpServerConfig> all = agentConfigService.getMcpToolsForAgent(config.getAgentName());
-        List<String> allowed = config.getAllowedTools();
         List<McpServerConfig> result = new ArrayList<>(all.size());
         for (McpServerConfig cfg : all) {
             // SA-021-8: skip if allowedTools is non-empty and this server is not in the list
             // (server-level filtering — tool-level is handled by OpenAI "tools" filter)
             try {
                 String scopedUrl = storeScopeJwtService.buildScopedUrl(
-                        cfg.getServerUrl(), storeId, Audience.STORE);
+                        cfg.getServerUrl(), storeId, Audience.STORE, callerPhone);
                 result.add(new McpServerConfig(cfg.getType(), cfg.getServerLabel(),
                         cfg.getServerDescription(), scopedUrl, cfg.getRequireApproval(), cfg.getHeaders()));
             } catch (Exception e) {

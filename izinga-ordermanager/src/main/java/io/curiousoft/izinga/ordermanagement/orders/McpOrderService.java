@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.commons.security.CallerIdentityViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.annotation.Tool;
@@ -140,10 +141,15 @@ public class McpOrderService {
         // Stamp idempotency key before delegating to domain layer
         order.getTag().put("idempotencyKey", idempotencyKey);
 
-        // Delegate to domain service — catch IllegalArgumentException and translate
+        // Delegate to domain service — catch specific exceptions before the generic handler
         Order created;
         try {
             created = orderService.startOrder(order);
+        } catch (CallerIdentityViolationException e) {
+            // FIX-01 (Legal C-3): IDENTITY_REFUSAL prefix is machine-parseable — must NOT
+            // be sanitized. Pass the message through verbatim so the AI agent sees the refusal.
+            LOG.warn("start_order: identity violation for customerId={} — {}", customerId, e.getMessage());
+            return StartOrderResponse.rejected(e.getMessage());
         } catch (IllegalArgumentException e) {
             LOG.warn("start_order: domain layer rejected order for customerId={} — {}", customerId, e.getMessage());
             return StartOrderResponse.rejected(sanitizeMessage(e.getMessage()));

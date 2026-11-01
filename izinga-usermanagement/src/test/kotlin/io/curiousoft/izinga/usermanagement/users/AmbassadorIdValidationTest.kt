@@ -4,6 +4,7 @@ import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.repo.IcaAcceptanceLogRepo
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
+import io.curiousoft.izinga.commons.security.AgentIdentityAuditService
 import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService
 import org.junit.jupiter.api.Assertions.assertNull
@@ -39,12 +40,15 @@ class AmbassadorIdValidationTest {
     @Mock
     lateinit var referralCodeService: ReferralCodeService
 
+    @Mock
+    lateinit var agentIdentityAuditService: AgentIdentityAuditService
+
     lateinit var profileService: UserProfileService
 
     @BeforeEach
     fun setUp() {
         `when`(userConfigService.findAll()).thenReturn(emptyList())
-        profileService = UserProfileService(userProfileRepo, eventPublisher, userConfigService, icaAcceptanceLogRepo, referralCodeService)
+        profileService = UserProfileService(userProfileRepo, eventPublisher, userConfigService, icaAcceptanceLogRepo, referralCodeService, agentIdentityAuditService)
     }
 
     private fun buildNewUser(ambassadorId: String? = null): UserProfile {

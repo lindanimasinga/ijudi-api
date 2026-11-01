@@ -51,20 +51,24 @@ public class AiCustomerServiceAgent {
     }
 
     /**
-     * SA-021-17: Build the MCP tools list with scope JWTs appended to each server URL.
+     * SA-021-17 / ADR-024: Build the MCP tools list with scope JWTs appended to each server URL.
      * SEC-WA02-01-D: audience is sourced from AiAgentConfig (MongoDB), never from request payload.
+     * ADR-024: callerPhone is embedded in each JWT so StoreScopeValidationFilter can populate
+     * StoreScopeContext.callerPhone for every tool call.
      *
-     * @param agentName the agent config key
-     * @param storeId   the store ID (null for DRIVER/CUSTOMER agents)
+     * @param agentName   the agent config key
+     * @param storeId     the store ID (null for DRIVER/CUSTOMER agents)
+     * @param callerPhone ADR-024: the WhatsApp caller's phone number (the "from" field)
      */
-    protected List<McpServerConfig> buildScopedMcpTools(String agentName, String storeId) {
+    protected List<McpServerConfig> buildScopedMcpTools(String agentName, String storeId, String callerPhone) {
         var configs = agentConfigService.getMcpToolsForAgent(agentName);
         var agentConfig = agentConfigService.getActiveAgentConfig(agentName);
         var audience = (agentConfig != null) ? agentConfig.getAudience() : null;
         List<McpServerConfig> scoped = new ArrayList<>(configs.size());
         for (McpServerConfig cfg : configs) {
             try {
-                String scopedUrl = storeScopeJwtService.buildScopedUrl(cfg.getServerUrl(), storeId, audience);
+                String scopedUrl = storeScopeJwtService.buildScopedUrl(
+                        cfg.getServerUrl(), storeId, audience, callerPhone);
                 scoped.add(new McpServerConfig(cfg.getType(), cfg.getServerLabel(),
                         cfg.getServerDescription(), scopedUrl, cfg.getRequireApproval(), cfg.getHeaders()));
             } catch (Exception e) {
@@ -146,8 +150,8 @@ public class AiCustomerServiceAgent {
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setBearerAuth(openAiApiKey);
 
-            // SA-021-3 + SA-021-17: per-agent mcpServers with scope JWT in each URL
-            var mcpServerToolsForAgent = buildScopedMcpTools(DEFAULT_AGENT_NAME, null);
+            // SA-021-3 + SA-021-17 + ADR-024: per-agent mcpServers with scope JWT; callerPhone binds to 'from'
+            var mcpServerToolsForAgent = buildScopedMcpTools(DEFAULT_AGENT_NAME, null, from);
             Map<String, Object> requestBody = new HashMap<>(Map.of(
                     "model", model,
                     "input", messagesList
@@ -263,8 +267,8 @@ public class AiCustomerServiceAgent {
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setBearerAuth(openAiApiKey);
 
-            // SA-021-3 + SA-021-17: per-agent mcpServers with scope JWT in each URL (no storeId for DRIVER/CUSTOMER)
-            var mcpServerToolsForAgent = buildScopedMcpTools(resolvedAgent, null);
+            // SA-021-3 + SA-021-17 + ADR-024: per-agent mcpServers with scope JWT; callerPhone binds to 'from'
+            var mcpServerToolsForAgent = buildScopedMcpTools(resolvedAgent, null, from);
             Map<String, Object> requestBody = new HashMap<>(Map.of("model", model, "input", messagesList));
 
             var agent = agentConfigService.getActiveAgentConfig(resolvedAgent);

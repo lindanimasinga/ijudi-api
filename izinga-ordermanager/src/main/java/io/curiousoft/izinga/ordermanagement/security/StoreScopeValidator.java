@@ -1,11 +1,13 @@
 package io.curiousoft.izinga.ordermanagement.security;
 
+import io.curiousoft.izinga.commons.security.CallerIdentityValidator;
 import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * Helper called by store-scoped MCP {@code @Tool} methods to enforce that the tool
@@ -92,5 +94,34 @@ public final class StoreScopeValidator {
         throw new AudienceViolationException(
                 "Audience violation: caller audience '" + caller + "' is not in permitted set " +
                         Arrays.toString(permitted));
+    }
+
+    // ---- ADR-024: caller identity enforcement ----
+
+    /**
+     * ADR-024: Normalize a phone number to its last 9 digits.
+     * Delegates to {@link CallerIdentityValidator#normalizeLast9} from izinga-commons
+     * so the same normalization logic is shared across all modules.
+     */
+    public static String normalizeLast9(String phone) {
+        return CallerIdentityValidator.normalizeLast9(phone);
+    }
+
+    /**
+     * ADR-024: Validate that the supplied phone belongs to the authenticated caller.
+     * Delegates to {@link CallerIdentityValidator#validateCallerPhone} from izinga-commons.
+     * Throws {@link io.curiousoft.izinga.commons.security.CallerIdentityViolationException}
+     * on violation (which is a RuntimeException and propagates naturally).
+     */
+    public static void validateCallerPhone(String suppliedPhone) {
+        CallerIdentityValidator.validateCallerPhone(suppliedPhone);
+    }
+
+    /**
+     * ADR-024: Validate that the supplied ID belongs to the authenticated caller.
+     * Delegates to {@link CallerIdentityValidator#validateCallerOwnsId} from izinga-commons.
+     */
+    public static void validateCallerOwnsId(String id, Supplier<String> callerIdResolver) {
+        CallerIdentityValidator.validateCallerOwnsId(id, callerIdResolver);
     }
 }

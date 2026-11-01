@@ -4,6 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.commons.security.CallerIdentityViolationException;
+import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
+import io.curiousoft.izinga.ordermanagement.security.StoreScopeContext;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -41,9 +45,15 @@ public class McpOrderServiceTest {
 
     @Before
     public void setUp() {
+        StoreScopeContext.clear();
         mcpOrderService = new McpOrderService(
                 orderService, userProfileRepo, orderRepository,
                 objectMapper, idempotencyWindowHours);
+    }
+
+    @After
+    public void tearDown() {
+        StoreScopeContext.clear();
     }
 
     // -------------------------------------------------------------------------
@@ -222,6 +232,68 @@ public class McpOrderServiceTest {
         Assert.assertNotNull(response.getMessage());
         Assert.assertTrue(response.getMessage().toLowerCase().contains("could not be created"));
         verify(orderService).startOrder(any());
+    }
+
+    // -------------------------------------------------------------------------
+    // FIX-01/FIX-02: CallerIdentityViolationException must pass through verbatim
+    // (not replaced by the generic "could not be created" error)
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void startOrder_customerAudienceThirdPartyId_returnsRejectedWithIdentityRefusal() {
+        // FIX-02: CUSTOMER audience + caller phone set; customerId belongs to a DIFFERENT customer.
+        // The domain layer (mocked) throws CallerIdentityViolationException — the MCP layer must
+        // NOT replace it with a generic error. The IDENTITY_REFUSAL prefix must be visible.
+        StoreScopeContext.setAudience(Audience.CUSTOMER);
+        StoreScopeContext.setCallerPhone("+27801112222");
+
+        String thirdPartyId = "other-customer-id";
+        when(userProfileRepo.existsById(thirdPartyId)).thenReturn(true);
+        when(orderRepository.findFirstByCustomerIdAndTagIdempotencyKeyWithinWindow(
+                eq(thirdPartyId), eq(IDEMPOTENCY_KEY), any(Date.class)))
+                .thenReturn(null);
+        when(orderService.startOrder(any(Order.class)))
+                .thenThrow(new CallerIdentityViolationException(
+                        "IDENTITY_REFUSAL: I can only assist with queries for your own account. " +
+                        "For privacy and security reasons, I am not authorised to access another person's information. " +
+                        "Please contact iZinga support if you need further help."));
+
+        McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
+                thirdPartyId, true, IDEMPOTENCY_KEY, SHOP_ID,
+                "desc", "ONLINE", basketJson(), null);
+
+        // FIX-01: the response must be rejected, and the message must contain the
+        // machine-parseable IDENTITY_REFUSAL prefix — NOT the generic error string.
+        Assert.assertFalse(response.isSuccess());
+        Assert.assertNotNull(response.getMessage());
+        Assert.assertTrue(
+                "IDENTITY_REFUSAL prefix must be present in rejection message",
+                response.getMessage().contains("IDENTITY_REFUSAL"));
+        Assert.assertFalse(
+                "Generic error must not appear when an identity violation occurs",
+                response.getMessage().contains("could not be created"));
+    }
+
+    @Test
+    public void startOrder_storeAudience_happyPath_createsOrderSuccessfully() {
+        // FIX-02 regression: STORE audience must not be affected by the new catch block.
+        // A store-initiated order (placing an order on behalf of a customer) should succeed.
+        StoreScopeContext.setAudience(Audience.STORE);
+        StoreScopeContext.setCallerPhone("+27712345678");
+
+        when(userProfileRepo.existsById(CUSTOMER_ID)).thenReturn(true);
+        when(orderRepository.findFirstByCustomerIdAndTagIdempotencyKeyWithinWindow(
+                eq(CUSTOMER_ID), eq(IDEMPOTENCY_KEY), any(Date.class)))
+                .thenReturn(null);
+        Order created = buildOrder("store-placed-order-id", OrderStage.STAGE_0_CUSTOMER_NOT_PAID, 50.0);
+        when(orderService.startOrder(any(Order.class))).thenReturn(created);
+
+        McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
+                CUSTOMER_ID, true, IDEMPOTENCY_KEY, SHOP_ID,
+                "desc", "ONLINE", basketJson(), null);
+
+        Assert.assertTrue("STORE audience order must succeed", response.isSuccess());
+        Assert.assertEquals("store-placed-order-id", response.getOrderId());
     }
 
     // -------------------------------------------------------------------------

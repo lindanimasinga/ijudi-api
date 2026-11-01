@@ -78,7 +78,10 @@ public class StoreScopeValidationFilter extends OncePerRequestFilter {
                     Audience audience = parseAudience(audienceStr);
                     StoreScopeContext.setPermittedStoreId(storeId);
                     StoreScopeContext.setAudience(audience);
-                    LOG.debug("Scope token accepted: storeId={} audience={}", storeId, audience);
+                    // ADR-024: extract callerPhone claim and propagate to context
+                    String callerPhone = claims.get("callerPhone");
+                    StoreScopeContext.setCallerPhone(callerPhone);
+                    LOG.debug("Scope token accepted: storeId={} audience={} callerPhone=<redacted>", storeId, audience);
                 } catch (Exception e) {
                     // Invalid token — log and allow filter chain to proceed without scope
                     // (soft enforcement; tool methods will still throw if they require scope)

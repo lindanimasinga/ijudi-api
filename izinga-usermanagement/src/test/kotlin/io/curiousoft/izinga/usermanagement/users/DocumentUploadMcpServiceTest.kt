@@ -2,10 +2,14 @@ package io.curiousoft.izinga.usermanagement.users
 
 import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.UserProfile
+import io.curiousoft.izinga.commons.security.AgentIdentityAuditService
+import io.curiousoft.izinga.commons.security.CallerIdentityContext
+import io.curiousoft.izinga.commons.security.CallerIdentityViolationException
 import io.curiousoft.izinga.usermanagement.userconfig.FieldDataType
 import io.curiousoft.izinga.usermanagement.userconfig.FieldSpec
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfig
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -30,11 +34,19 @@ class DocumentUploadMcpServiceTest {
     @Mock
     private lateinit var documentUploadSessionRepo: DocumentUploadSessionRepo
 
+    @Mock
+    private lateinit var agentIdentityAuditService: AgentIdentityAuditService
+
     private lateinit var service: DocumentUploadMcpService
 
     @BeforeEach
     fun setUp() {
-        service = DocumentUploadMcpService(userProfileService, userConfigService, documentUploadSessionRepo)
+        service = DocumentUploadMcpService(userProfileService, userConfigService, documentUploadSessionRepo, agentIdentityAuditService)
+    }
+
+    @AfterEach
+    fun tearDown() {
+        CallerIdentityContext.clear()
     }
 
     @Test
@@ -203,6 +215,84 @@ class DocumentUploadMcpServiceTest {
         }
 
         assertTrue(error.message!!.contains("phone must contain at least 9"))
+    }
+
+    // ---- ADR-024: caller identity enforcement ----
+
+    @Test
+    fun getRequiredDocumentsForUser_customerAudience_ownPhone_passes() {
+        val phone = "+27812815577"
+        val user = testUser(phone)
+        CallerIdentityContext.setAudience("CUSTOMER")
+        CallerIdentityContext.setCallerPhone(phone)
+
+        Mockito.`when`(userProfileService.findUserByPhone(phone)).thenReturn(user)
+        Mockito.`when`(userProfileService.getAllMissingFields(phone)).thenReturn(emptyList())
+        Mockito.`when`(userConfigService.findAll()).thenReturn(listOf(testConfig()))
+
+        // Must not throw
+        service.getRequiredDocumentsForUser(phone)
+    }
+
+    @Test
+    fun getRequiredDocumentsForUser_customerAudience_thirdPartyPhone_throws() {
+        CallerIdentityContext.setAudience("CUSTOMER")
+        CallerIdentityContext.setCallerPhone("+27812815577")
+
+        val ex = assertThrows(CallerIdentityViolationException::class.java) {
+            service.getRequiredDocumentsForUser("+27811111111")
+        }
+        assertTrue(ex.message!!.startsWith("IDENTITY_REFUSAL:"))
+    }
+
+    @Test
+    fun createDocumentUploadSession_customerAudience_ownPhone_passes() {
+        val phone = "+27812815577"
+        val user = testUser(phone)
+        CallerIdentityContext.setAudience("CUSTOMER")
+        CallerIdentityContext.setCallerPhone(phone)
+
+        Mockito.`when`(userProfileService.findUserByPhone(phone)).thenReturn(user)
+        Mockito.`when`(userConfigService.findAll()).thenReturn(listOf(testConfig()))
+        Mockito.`when`(documentUploadSessionRepo.save(Mockito.any(DocumentUploadSession::class.java)))
+            .thenAnswer { invocation -> invocation.getArgument(0) }
+
+        // Must not throw
+        service.createDocumentUploadSession(phone, "identityDocument", "id.jpg", "image/jpeg")
+    }
+
+    @Test
+    fun createDocumentUploadSession_customerAudience_thirdPartyPhone_throws() {
+        CallerIdentityContext.setAudience("CUSTOMER")
+        CallerIdentityContext.setCallerPhone("+27812815577")
+
+        val ex = assertThrows(CallerIdentityViolationException::class.java) {
+            service.createDocumentUploadSession("+27811111111", "identityDocument", "id.jpg", "image/jpeg")
+        }
+        assertTrue(ex.message!!.startsWith("IDENTITY_REFUSAL:"))
+    }
+
+    @Test
+    fun attachUploadedDocumentToUserTag_customerAudience_thirdPartyPhone_throws() {
+        CallerIdentityContext.setAudience("CUSTOMER")
+        CallerIdentityContext.setCallerPhone("+27812815577")
+
+        val ex = assertThrows(CallerIdentityViolationException::class.java) {
+            service.attachUploadedDocumentToUserTag("+27811111111", "identityDocument", "https://files/id.png")
+        }
+        assertTrue(ex.message!!.startsWith("IDENTITY_REFUSAL:"))
+    }
+
+    @Test
+    fun recheckRequiredDocuments_customerAudience_thirdPartyPhone_throws() {
+        // recheckRequiredDocuments delegates to getRequiredDocumentsForUser which enforces identity
+        CallerIdentityContext.setAudience("CUSTOMER")
+        CallerIdentityContext.setCallerPhone("+27812815577")
+
+        val ex = assertThrows(CallerIdentityViolationException::class.java) {
+            service.recheckRequiredDocuments("+27811111111")
+        }
+        assertTrue(ex.message!!.startsWith("IDENTITY_REFUSAL:"))
     }
 
     private fun testUser(phone: String): UserProfile {
