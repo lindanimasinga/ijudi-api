@@ -561,8 +561,9 @@ class ReconServiceImpl(
     }
 
     /**
-     * RP-009 fallback reconciliation: runs daily (and on-demand) to pick up any PENDING commission
-     * records that were never connected to a payout — including backfill for records created by PR #114.
+     * RP-009 fallback reconciliation: runs daily at 02:30 (scheduled-only; no on-demand call site exists)
+     * to pick up any PENDING commission records that were never connected to a payout —
+     * including backfill for records created by PR #114.
      * Partners without bank details are skipped; they will be retried on the next run.
      */
     @Scheduled(cron = "0 30 2 * * *") // 02:30 daily — runs after the nightly payout bundle
