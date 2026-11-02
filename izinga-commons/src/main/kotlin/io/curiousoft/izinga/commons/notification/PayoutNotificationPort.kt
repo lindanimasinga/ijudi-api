@@ -27,4 +27,25 @@ interface PayoutNotificationPort {
      * @param driverName   display name of the driver (or a fallback like "Driver").
      */
     fun notifyDriverMissingBankDetails(mobileNumber: String, driverName: String)
+
+    /**
+     * Notifies a store owner that their store has no bank details on file and payout generation
+     * was skipped for the store.
+     *
+     * Template: `store_missing_bank_details`
+     * IMPORTANT: This template is pending Meta Business approval. The PO is submitting it in
+     * parallel with this wiring commit. Until the template is approved, the WhatsApp API call
+     * will fail with a "template not found" error — implementations MUST absorb all exceptions
+     * internally (log-and-swallow) so that a missing template never propagates to the payout
+     * generation path.
+     *
+     * Suggested template body (UTILITY category, en, single BODY TEXT parameter + URL button):
+     *   "Hi {{1}}, your iZinga store payout is ready but we could not send it because your bank
+     *    details are missing. Please log in to izinga.co.za to add your bank details."
+     *   Button: "Update Profile" -> https://izinga.co.za
+     *
+     * @param mobileNumber normalised or raw mobile number of the store owner.
+     * @param storeName    display name of the store (or a fallback like "Store").
+     */
+    fun notifyStoreMissingBankDetails(mobileNumber: String, storeName: String)
 }

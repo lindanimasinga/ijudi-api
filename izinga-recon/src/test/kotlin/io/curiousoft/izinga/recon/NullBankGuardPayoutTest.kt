@@ -159,6 +159,38 @@ class NullBankGuardPayoutTest {
     }
 
     @Test
+    fun `GAP-7 - store with null bank triggers PayoutNotificationPort`() {
+        val shopId = "shop-no-bank-notify"
+        val store = makeStoreWithPaymentAgreementWithoutBank(shopId)
+        val order = makeOrderForShop(shopId)
+
+        every { storeRepo.findById(shopId) } returns Optional.of(store)
+
+        sut.generatePayoutForShopAndOrder(order)
+
+        verify(exactly = 1) {
+            payoutNotificationPort.notifyStoreMissingBankDetails(
+                eq("0811234567"),
+                eq("Test Store")
+            )
+        }
+    }
+
+    @Test
+    fun `GAP-7 - store with null bank and null mobile does not call notification port`() {
+        val shopId = "shop-no-bank-no-mobile"
+        val store = makeStoreWithPaymentAgreementWithoutBank(shopId).also { it.mobileNumber = null }
+        val order = makeOrderForShop(shopId)
+
+        every { storeRepo.findById(shopId) } returns Optional.of(store)
+
+        val result = sut.generatePayoutForShopAndOrder(order)
+
+        assertNull(result)
+        verify(exactly = 0) { payoutNotificationPort.notifyStoreMissingBankDetails(any(), any()) }
+    }
+
+    @Test
     fun `GAP-7 - store with payment agreement and bank present proceeds to payout creation`() {
         val shopId = "shop-with-bank"
         val store = makeStoreWithPaymentAgreementAndBank(shopId)

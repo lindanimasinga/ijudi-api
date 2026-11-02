@@ -65,8 +65,10 @@ class ReconServiceImpl(
      * BUG-3/GAP-7: Optional notification port for alerting users about missing bank details.
      * Nullable to keep backward-compatibility with test setup that doesn't wire notifications.
      * Live implementation: WhatsappNotificationService (izinga-messaging), wired at ordermanager runtime.
-     * NOTE: the driver WhatsApp template `driver_missing_bank_details` requires Meta approval before
-     * notifications will actually reach drivers — see PayoutNotificationPort for details.
+     * Templates in use:
+     *   - `driver_missing_bank_details` (BUG-3, driver path) — pending Meta approval
+     *   - `store_missing_bank_details` (GAP-7, store path) — pending Meta approval
+     * Both templates fail gracefully (log-and-swallow) until approved by Meta Business Manager.
      */
     private val payoutNotificationPort: PayoutNotificationPort? = null,
 ) : ReconService {
@@ -86,17 +88,21 @@ class ReconServiceImpl(
         }
 
         // GAP-7: guard against NPE when store has no bank details on file.
-        // Store notification channel is a product decision — log and return null so the order is
-        // not lost (payout generation is idempotent; it will be retried on the next event).
-        // TODO(product): decide whether to notify store owners via WhatsApp, push, or admin dashboard
-        //                when their bank details are missing, and implement the chosen channel here.
+        // Notifies the store owner via WhatsApp using the `store_missing_bank_details` template
+        // (pending Meta approval — wired and ready, no-ops gracefully until approved).
         val bank = store?.bank
         if (bank == null) {
+            val storeId = store?.id
+            val storeName = store?.name ?: "Store"
+            val mobile = store?.mobileNumber
             logger.warn(
                 "store {} ('{}') has a payout agreement but no bank details on file; " +
                 "skipping payout for order {}. Store must add bank details to receive payouts.",
-                store?.id, store?.name, order.id
+                storeId, storeName, order.id
             )
+            if (!mobile.isNullOrBlank()) {
+                payoutNotificationPort?.notifyStoreMissingBankDetails(mobile, storeName)
+            }
             return null
         }
 

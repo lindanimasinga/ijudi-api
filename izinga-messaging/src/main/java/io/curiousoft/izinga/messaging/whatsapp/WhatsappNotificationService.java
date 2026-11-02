@@ -695,6 +695,60 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
         }
     }
 
+    /**
+     * GAP-7: Notifies a store owner that their store has no bank details on file and payout
+     * generation was skipped.
+     *
+     * Template: {@code store_missing_bank_details}
+     * IMPORTANT: This template is pending Meta Business approval — submitted by PO in parallel
+     * with this wiring commit. Until approved, the Meta API call will fail with "template not
+     * found" — the catch block below absorbs that failure so payout generation is never blocked.
+     *
+     * Suggested template body (UTILITY, en, single BODY TEXT param + URL button):
+     *   "Hi {{1}}, your iZinga store payout is ready but we could not send it because your bank
+     *    details are missing. Please log in to izinga.co.za to add your bank details."
+     *   Button: "Update Profile" -> https://izinga.co.za
+     */
+    @Override
+    public void notifyStoreMissingBankDetails(@org.jetbrains.annotations.NotNull String mobileNumber, @org.jetbrains.annotations.NotNull String storeName) {
+        try {
+            if (mobileNumber.isBlank()) {
+                LOGGER.warn("notifyStoreMissingBankDetails: mobileNumber is blank — skipping");
+                return;
+            }
+
+            String to = mobileNumber.startsWith("0") ? mobileNumber.replaceFirst("0", "+27") : mobileNumber;
+            String safeStoreName = (storeName != null && !storeName.isBlank()) ? storeName : "Store";
+
+            var requestStr = """
+                    {
+                      "name": "store_missing_bank_details",
+                      "language": { "code": "en" },
+                      "components": [
+                        {
+                          "type": "BODY",
+                          "parameters": [
+                            { "type": "TEXT", "text": "#name" }
+                          ]
+                        }
+                      ]
+                    }
+                    """;
+
+            requestStr = requestStr.replace("#name", safeStoreName);
+
+            WhatsappTemplateRequest request = new WhatsappTemplateRequest();
+            request.setTo(to);
+            var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
+            request.setTemplate(template);
+            whatsAppService.sendMessage(senderResolver.resolve(Audience.CUSTOMER, null), request).execute();
+            LOGGER.info("Sent missing bank details notification to store owner at {}", to);
+        } catch (Exception e) {
+            LOGGER.error("Failed to send store missing bank details notification to {} — template may not yet be approved: {}",
+                    mobileNumber, e.getMessage(), e);
+        }
+    }
+
     @Override
     public void sendMissingDocumentReminder(@Nullable String mobileNumber, @Nullable String name) {
         try {

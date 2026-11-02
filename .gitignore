@@ -47,3 +47,4 @@ izinga-recon/.DS_Store
 izinga-usermanagement/.DS_Store
 izinga-yoco-pay/.DS_Store
 izinga-ordermanager/src/main/resources/application-prod.yml
+.env
