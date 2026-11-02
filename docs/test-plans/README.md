@@ -36,6 +36,7 @@ Each userType directory holds one file per feature. A feature that spans two use
 | admin (platform integration) | MCP tools — find_stores + start_order; SA-022-01 guards (customerConfirmed, identity, idempotency); idempotent duplicate detection; domain exception sanitization; BSON field name fix (e5508de) | [admin/mcp-tools.md](admin/mcp-tools.md) | 2026-10-20 |
 | driver / customer | AI Customer Service Agent — WhatsApp inbound webhook live E2E trace; AiCustomerServiceAgent dispatch; new-session landing flow; resumed-session OpenAI call; Firestore + MongoDB conversation history; outbound WhatsApp delivery (CUSTOMER-audience confirmed; DRIVER-audience blocked by UAT gap) | [driver/ai-agent-whatsapp-live-trace.md](driver/ai-agent-whatsapp-live-trace.md) | 2026-11-01 |
 | driver / customer | AI Customer Service Agent — boundary discipline & identity integrity; 18-case live suite; cross-identity attack resistance; privacy guardrails; role-claim bypass; payout lookup scoping; 4 FAIL + 2 PARTIAL findings | [driver/ai-agent-boundary-discipline.md](driver/ai-agent-boundary-discipline.md) | 2026-11-01 |
+| engineering (CI) | Referral commission nightly scheduler wiring — `@Scheduled(cron = "0 30 2 * * *")` annotation present and correct on `ReconServiceImpl.reconcilePendingReferralCommissions`; closes GAP-5 from payout pass | [engineering/referral-commission-scheduler-wiring.md](engineering/referral-commission-scheduler-wiring.md) | 2026-11-02 |
 
 ## Maintenance rule
 
