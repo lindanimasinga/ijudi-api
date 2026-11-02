@@ -36,6 +36,7 @@ Each userType directory holds one file per feature. A feature that spans two use
 | admin (platform integration) | MCP tools — find_stores + start_order; SA-022-01 guards (customerConfirmed, identity, idempotency); idempotent duplicate detection; domain exception sanitization; BSON field name fix (e5508de) | [admin/mcp-tools.md](admin/mcp-tools.md) | 2026-10-20 |
 | driver / customer | AI Customer Service Agent — WhatsApp inbound webhook live E2E trace; AiCustomerServiceAgent dispatch; new-session landing flow; resumed-session OpenAI call; Firestore + MongoDB conversation history; outbound WhatsApp delivery (CUSTOMER-audience confirmed; DRIVER-audience blocked by UAT gap) | [driver/ai-agent-whatsapp-live-trace.md](driver/ai-agent-whatsapp-live-trace.md) | 2026-11-01 |
 | driver / customer | AI Customer Service Agent — boundary discipline & identity integrity; 18-case live suite; cross-identity attack resistance; privacy guardrails; role-claim bypass; payout lookup scoping; 4 FAIL + 2 PARTIAL findings | [driver/ai-agent-boundary-discipline.md](driver/ai-agent-boundary-discipline.md) | 2026-11-01 |
+| driver / admin / store | Payout disbursement — full pipeline: BUG-3 (null-bank NPE guard + WhatsApp notify, driver path), GAP-7 (same for store path), GAP-3 (PROCESSING→PENDING reversion with failureReason + attemptCount on paid=false), BUG-7 (RFC 4180 CSV quoting). 258/0/3-skipped full reactor PASS. | [driver/payout-disbursement.md](driver/payout-disbursement.md) | 2026-11-03 |
 
 ## Maintenance rule
 
