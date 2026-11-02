@@ -7,6 +7,7 @@ import io.curiousoft.izinga.commons.model.Bank
 import io.curiousoft.izinga.commons.model.BankAccType
 import io.curiousoft.izinga.commons.model.StoreProfile
 import io.curiousoft.izinga.commons.model.UserProfile
+import io.curiousoft.izinga.commons.notification.PayoutNotificationPort
 import io.curiousoft.izinga.commons.payout.events.AmbassadorPayoutEvent
 import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
 import io.curiousoft.izinga.commons.payout.events.ReferralPartnerPayoutEvent
@@ -60,6 +61,14 @@ class ReconServiceImpl(
     private val ambassadorProperties: AmbassadorProperties,
     /** ADR-024: injected for async audit writes on identity violations. */
     private val agentIdentityAuditService: AgentIdentityAuditService,
+    /**
+     * BUG-3/GAP-7: Optional notification port for alerting users about missing bank details.
+     * Nullable to keep backward-compatibility with test setup that doesn't wire notifications.
+     * Live implementation: WhatsappNotificationService (izinga-messaging), wired at ordermanager runtime.
+     * NOTE: the driver WhatsApp template `driver_missing_bank_details` requires Meta approval before
+     * notifications will actually reach drivers — see PayoutNotificationPort for details.
+     */
+    private val payoutNotificationPort: PayoutNotificationPort? = null,
 ) : ReconService {
 
     private val logger = LoggerFactory.getLogger(ReconServiceImpl::class.java)
@@ -76,14 +85,29 @@ class ReconServiceImpl(
             return null
         }
 
+        // GAP-7: guard against NPE when store has no bank details on file.
+        // Store notification channel is a product decision — log and return null so the order is
+        // not lost (payout generation is idempotent; it will be retried on the next event).
+        // TODO(product): decide whether to notify store owners via WhatsApp, push, or admin dashboard
+        //                when their bank details are missing, and implement the chosen channel here.
+        val bank = store?.bank
+        if (bank == null) {
+            logger.warn(
+                "store {} ('{}') has a payout agreement but no bank details on file; " +
+                "skipping payout for order {}. Store must add bank details to receive payouts.",
+                store?.id, store?.name, order.id
+            )
+            return null
+        }
+
         val payout = shopPayoutRepo.findByToIdAndPayoutStage(order.shopId, PayoutStage.PENDING) ?: ShopPayout(
-            toId = store?.id!!,
+            toId = store.id!!,
             toName = store.name!!,
-            toBankName = store.bank?.name!!,
-            toType = store.bank?.type!!,
-            toAccountNumber = getPayoutAccountNumber(store.bank?.accountId, store.bank?.type)!!,
+            toBankName = bank.name!!,
+            toType = bank.type!!,
+            toAccountNumber = getPayoutAccountNumber(bank.accountId, bank.type)!!,
             orders = mutableSetOf(),
-            toBranchCode = store.bank?.branchCode!!,
+            toBranchCode = bank.branchCode!!,
             fromReference = "Payment to ${store.name}",
             toReference = "iZinga pay",
             emailNotify = "",
@@ -102,15 +126,37 @@ class ReconServiceImpl(
             return null
         }
 
+        // BUG-3: guard against NPE when messenger has no bank details on file.
+        // Send a WhatsApp notification asking the driver to add their bank details.
+        // NOTE: template `driver_missing_bank_details` requires Meta Business approval before
+        // notifications reach drivers — the application code is wired and ready; the template
+        // submission is a product/PO action. Until approved, the notification call will fail
+        // gracefully inside the port implementation (log-and-swallow).
+        val bank = messng?.bank
+        if (bank == null) {
+            val messengerId = messng?.id
+            val messengerName = messng?.name ?: "Driver"
+            val mobile = messng?.mobileNumber
+            logger.warn(
+                "messenger {} ('{}') has no bank details on file; skipping payout for order {}. " +
+                "Driver must add bank details at https://driver.izinga.co.za to receive payouts.",
+                messengerId, messengerName, order.id
+            )
+            if (!mobile.isNullOrBlank()) {
+                payoutNotificationPort?.notifyDriverMissingBankDetails(mobile, messengerName)
+            }
+            return null
+        }
+
         //val tips = tipsService.getTodayTips()
-        val payout = messengerPayoutRepository.findByToIdAndPayoutStage(messng?.id!!, PayoutStage.PENDING) ?: MessengerPayout(
+        val payout = messengerPayoutRepository.findByToIdAndPayoutStage(messng.id!!, PayoutStage.PENDING) ?: MessengerPayout(
             toId = messng.id!!,
             toName = messng.name!!,
-            toBankName = messng.bank?.name!!,
-            toType = messng.bank?.type!!,
-            toAccountNumber = getPayoutAccountNumber(messng.bank?.accountId, messng.bank?.type)!!,
+            toBankName = bank.name!!,
+            toType = bank.type!!,
+            toAccountNumber = getPayoutAccountNumber(bank.accountId, bank.type)!!,
             orders = mutableSetOf(),
-            toBranchCode = messng.bank!!.branchCode!!,
+            toBranchCode = bank.branchCode!!,
             toReference = "iZinga pay",
             fromReference = "Payment to ${messng.name}",
             tips = mutableSetOf(),
@@ -234,67 +280,90 @@ class ReconServiceImpl(
     }
 
     override fun updatePayoutStatus(bundleResponse: PayoutBundleResults) {
+        // GAP-3: on paid=false, revert PROCESSING→PENDING so the payout is re-exported in the
+        // next CSV cycle. Also persist the failure reason and increment the attempt counter.
+
         bundleResponse.payoutItemResults
             .filter { it.type == PayoutType.SHOP }
-            .mapNotNull {
-                shopPayoutRepo.findByToIdAndPayoutStage(it.toId, PayoutStage.PROCESSING)
+            .mapNotNull { result ->
+                shopPayoutRepo.findByToIdAndPayoutStage(result.toId, PayoutStage.PROCESSING)
                     ?.let { payout ->
-                        payout.paid = it.paid
+                        payout.paid = result.paid
                         payout.bundleId = bundleResponse.bundleId
+                        payout.attemptCount++
+                        if (result.paid) {
+                            payout.payoutStage = PayoutStage.COMPLETED
+                            payout.failureReason = null
+                        } else {
+                            payout.failureReason = result.message
+                            payout.payoutStage = PayoutStage.PENDING
+                            logger.warn(
+                                "shop payout {} for {} reverted to PENDING after failed attempt {}; reason={}",
+                                payout.id, result.toId, payout.attemptCount, result.message
+                            )
+                        }
                         shopPayoutRepo.save(payout)
                         payout
                     }
             }
             .filter { it.paid }
-            .onEach {
-                it.payoutStage = PayoutStage.COMPLETED
-                shopPayoutRepo.save(it)
-            }
             .flatMap { it.orders }
             .forEach {
-                val payoutEvent = OrderPayoutEvent(
-                    source = this,
-                    orderId = it.id!!,
-                    isStorePaid = true
+                applicationEventPublisher.publishEvent(
+                    OrderPayoutEvent(source = this, orderId = it.id!!, isStorePaid = true)
                 )
-                applicationEventPublisher.publishEvent(payoutEvent)
             }
 
         bundleResponse.payoutItemResults
             .filter { it.type == PayoutType.MESSENGER }
-            .mapNotNull {
-                messengerPayoutRepository.findByToIdAndPayoutStage(it.toId, PayoutStage.PROCESSING)
+            .mapNotNull { result ->
+                messengerPayoutRepository.findByToIdAndPayoutStage(result.toId, PayoutStage.PROCESSING)
                     ?.let { payout ->
-                        payout.paid = it.paid
+                        payout.paid = result.paid
+                        payout.attemptCount++
+                        if (result.paid) {
+                            payout.payoutStage = PayoutStage.COMPLETED
+                            payout.failureReason = null
+                        } else {
+                            payout.failureReason = result.message
+                            payout.payoutStage = PayoutStage.PENDING
+                            logger.warn(
+                                "messenger payout {} for {} reverted to PENDING after failed attempt {}; reason={}",
+                                payout.id, result.toId, payout.attemptCount, result.message
+                            )
+                        }
                         messengerPayoutRepository.save(payout)
                         payout
                     }
             }
             .filter { it.paid }
-            .onEach {
-                it.payoutStage = PayoutStage.COMPLETED
-                messengerPayoutRepository.save(it)
-            }
             .flatMap { it.orders }
             .forEach {
-                val event  = OrderPayoutEvent(
-                    source = this,
-                    orderId = it.id!!,
-                    isMessengerPaid = true)
-                applicationEventPublisher.publishEvent(event)
+                applicationEventPublisher.publishEvent(
+                    OrderPayoutEvent(source = this, orderId = it.id!!, isMessengerPaid = true)
+                )
             }
 
         bundleResponse.payoutItemResults
             .filter { it.type == PayoutType.AMBASSADOR }
             .flatMap { result ->
                 ambassadorPayoutRepository.findAllByToIdAndPayoutStage(result.toId, PayoutStage.PROCESSING)
-                    .onEach { payout -> payout.paid = result.paid }
+                    .onEach { payout ->
+                        payout.paid = result.paid
+                        payout.attemptCount++
+                        if (result.paid) {
+                            payout.payoutStage = PayoutStage.COMPLETED
+                            payout.failureReason = null
+                        } else {
+                            payout.failureReason = result.message
+                            payout.payoutStage = PayoutStage.PENDING
+                            logger.warn(
+                                "ambassador payout {} for {} reverted to PENDING after failed attempt {}; reason={}",
+                                payout.id, result.toId, payout.attemptCount, result.message
+                            )
+                        }
+                    }
                     .also { payouts -> ambassadorPayoutRepository.saveAll(payouts) }
-            }
-            .filter { it.paid }
-            .onEach {
-                it.payoutStage = PayoutStage.COMPLETED
-                ambassadorPayoutRepository.save(it)
             }
 
         // RP-009: handle referral partner payout completions and sync commission status
@@ -302,12 +371,25 @@ class ReconServiceImpl(
             .filter { it.type == PayoutType.REFERRAL_PARTNER }
             .flatMap { result ->
                 referralPartnerPayoutRepository.findAllByToIdAndPayoutStage(result.toId, PayoutStage.PROCESSING)
-                    .onEach { payout -> payout.paid = result.paid }
+                    .onEach { payout ->
+                        payout.paid = result.paid
+                        payout.attemptCount++
+                        if (result.paid) {
+                            payout.payoutStage = PayoutStage.COMPLETED
+                            payout.failureReason = null
+                        } else {
+                            payout.failureReason = result.message
+                            payout.payoutStage = PayoutStage.PENDING
+                            logger.warn(
+                                "referral partner payout {} for {} reverted to PENDING after failed attempt {}; reason={}",
+                                payout.id, result.toId, payout.attemptCount, result.message
+                            )
+                        }
+                    }
                     .also { payouts -> referralPartnerPayoutRepository.saveAll(payouts) }
             }
             .filter { it.paid }
             .onEach { payout ->
-                payout.payoutStage = PayoutStage.COMPLETED
                 referralPartnerPayoutRepository.save(payout)
                 syncCommissionStatusToPaid(payout)
             }

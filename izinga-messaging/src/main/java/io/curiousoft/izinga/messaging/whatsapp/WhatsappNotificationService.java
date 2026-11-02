@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import io.curiousoft.izinga.commons.notification.DriverInviteNotificationPort;
+import io.curiousoft.izinga.commons.notification.PayoutNotificationPort;
 import io.curiousoft.izinga.messaging.AdminOnlyNotificationService;
 
 import jakarta.validation.constraints.NotNull;
@@ -26,7 +27,7 @@ import static java.util.Optional.ofNullable;
 import static java.util.TimeZone.getTimeZone;
 
 @Service
-public class WhatsappNotificationService implements AdminOnlyNotificationService, DriverInviteNotificationPort {
+public class WhatsappNotificationService implements AdminOnlyNotificationService, DriverInviteNotificationPort, PayoutNotificationPort {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(WhatsappNotificationService.class);
     private final WhatsAppService whatsAppService;
@@ -636,6 +637,61 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
             LOGGER.info("Sent criminal check consent request to {}", to);
         } catch (IOException e) {
             LOGGER.error("Failed to send criminal check consent to {}", mobileNumber, e);
+        }
+    }
+
+    /**
+     * BUG-3: Notifies a driver/messenger that their bank details are missing and payout generation
+     * was skipped for their account.
+     *
+     * Template: {@code driver_missing_bank_details}
+     * IMPORTANT: This template has NOT yet been submitted to Meta for approval.
+     * The application code is wired and ready; the template submission is a PO/product action.
+     * Until the template is approved, the Meta API call will fail with "template not found" —
+     * the catch block below absorbs that failure so payout generation is never blocked.
+     *
+     * Suggested template body (UTILITY category, en, single BODY TEXT parameter + URL button):
+     *   "Hi {{1}}, your iZinga payout is ready but we could not send it because your bank details
+     *    are missing. Please update your profile to receive your earnings."
+     *   Button: "Update Profile" → https://driver.izinga.co.za
+     */
+    @Override
+    public void notifyDriverMissingBankDetails(@org.jetbrains.annotations.NotNull String mobileNumber, @org.jetbrains.annotations.NotNull String driverName) {
+        try {
+            if (mobileNumber.isBlank()) {
+                LOGGER.warn("notifyDriverMissingBankDetails: mobileNumber is blank — skipping");
+                return;
+            }
+
+            String to = mobileNumber.startsWith("0") ? mobileNumber.replaceFirst("0", "+27") : mobileNumber;
+            String safeDriverName = (driverName != null && !driverName.isBlank()) ? driverName : "Driver";
+
+            var requestStr = """
+                    {
+                      "name": "driver_missing_bank_details",
+                      "language": { "code": "en" },
+                      "components": [
+                        {
+                          "type": "BODY",
+                          "parameters": [
+                            { "type": "TEXT", "text": "#name" }
+                          ]
+                        }
+                      ]
+                    }
+                    """;
+
+            requestStr = requestStr.replace("#name", safeDriverName);
+
+            WhatsappTemplateRequest request = new WhatsappTemplateRequest();
+            request.setTo(to);
+            var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
+            request.setTemplate(template);
+            whatsAppService.sendMessage(senderResolver.resolve(Audience.DRIVER, null), request).execute();
+            LOGGER.info("Sent missing bank details notification to {}", to);
+        } catch (Exception e) {
+            LOGGER.error("Failed to send missing bank details notification to {} — template may not yet be approved: {}",
+                    mobileNumber, e.getMessage(), e);
         }
     }
 

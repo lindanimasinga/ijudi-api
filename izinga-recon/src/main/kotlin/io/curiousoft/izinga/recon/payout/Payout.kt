@@ -32,7 +32,11 @@ abstract class Payout(
     var payoutStage: PayoutStage): BaseModel(id = generateId()) {
     abstract var paid: Boolean
     abstract val total: BigDecimal
-    var emailSent = false;
+    var emailSent = false
+    /** GAP-3: persisted failure reason from the bank reconciliation result, if available. */
+    var failureReason: String? = null
+    /** GAP-3: number of times this payout has been submitted and come back with paid=false. */
+    var attemptCount: Int = 0
 }
 
 class MessengerPayout(
