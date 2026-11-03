@@ -132,6 +132,20 @@ class ReconServiceImplCallerIdentityTest {
         // No exception → STORE is exempt
     }
 
+    @Test(expected = CallerIdentityViolationException::class)
+    fun `getAllPayouts - DRIVER audience null resolved caller throws NOTE-03`() {
+        // NOTE-03: null resolved callerId is a hard reject — null == null must NOT pass.
+        // Caller phone is set but all prefix lookups fail → callerId resolves to null.
+        CallerIdentityContext.setAudience("DRIVER")
+        CallerIdentityContext.setCallerPhone(callerPhone)
+        // All prefix variants return null → resolver returns null
+        every { userProfileRepo.findByMobileNumber("0$callerLast9") } returns null
+        every { userProfileRepo.findByMobileNumber("+27$callerLast9") } returns null
+        every { userProfileRepo.findByMobileNumber("27$callerLast9") } returns null
+
+        sut.getAllPayouts(PayoutType.MESSENGER, Date(), Date(), callerUserId)
+    }
+
     @Test
     fun `getAllPayouts - audit record written on violation`() {
         CallerIdentityContext.setAudience("DRIVER")

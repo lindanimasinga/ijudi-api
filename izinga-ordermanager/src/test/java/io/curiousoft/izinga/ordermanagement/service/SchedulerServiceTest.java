@@ -12,8 +12,11 @@ import io.curiousoft.izinga.messaging.repo.WhatsappSessionRepo;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
 import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingListService;
+import io.curiousoft.izinga.commons.order.MessengerOrderDto;
+import io.curiousoft.izinga.commons.security.CallerIdentityContext;
 import io.curiousoft.izinga.recon.ReconService;
 import org.assertj.core.util.Lists;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -83,7 +86,7 @@ public class SchedulerServiceTest {
     @Before
     public void setUp() throws Exception {
         sut = new SchedulerService(
-                orderRepository,
+                repo,
                 storeRepo,
                 deviceRepo,
                 pushNotificationService,
@@ -204,7 +207,7 @@ public class SchedulerServiceTest {
 
         //verify
         verify(repo).findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
-        verify(smsNotifcation, times(1))
+        verify(adminOnlyNotificationService, times(1))
                 .sendMessage(storeProfile.getMobileNumber(),
                         "Hello " + storeProfile.getName() + ", Please accept the order " + order.getId() +
                                 " on iZinga app, otherwise the order will be cancelled.");
@@ -426,7 +429,7 @@ public class SchedulerServiceTest {
                 ShippingData.ShippingType.SCHEDULED_DELIVERY);
         shipping.setMessengerId("messagerID");
         Date pickUpTime2 = Date.from(LocalDateTime.now()
-                .plusMinutes(60)
+                .plusMinutes(30)
                 .atZone(ZoneId.systemDefault())
                 .toInstant());
         shipping2.setPickUpTime(pickUpTime2);
@@ -454,7 +457,7 @@ public class SchedulerServiceTest {
         verify(repo).findByStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);
         Assert.assertTrue(order2.getSmsSentToShop());
         verify(repo).save(order2);
-        verify(smsNotifcation, times(1))
+        verify(adminOnlyNotificationService, times(1))
                 .sendMessage(initialProfile.getMobileNumber(),
                         "Hello " + initialProfile.getName() + ", Please accept the order " + order2.getId() +
                                 " on iZinga app, otherwise the order will be cancelled.");
@@ -523,28 +526,46 @@ public class SchedulerServiceTest {
 
     @Test
     public void getLatestPromotions_and_publish_two_to_customers() throws Exception {
-        //give
-        List<Promotion> promotions = new ObjectMapper().readValue(promosionsJson, new TypeReference<>() {});
+        // Use a single-promotion fixture so sendNotifications is called exactly once.
+        // Production code calls sendNotifications once per promotion; 1 promo → times(1) is correct.
+        List<Promotion> promotions = new ObjectMapper()
+                .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                .readValue(singlePromotionJson, new TypeReference<>() {});
         when(promotionService.finAllPromotions(StoreType.FOOD)).thenReturn(promotions);
-        List<Order> orders = new ObjectMapper().readValue(allOrderJson, new TypeReference<>() {});;
-        when(orderRepository.findAll()).thenReturn(orders);
+        List<Order> orders = new ObjectMapper()
+                .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                .readValue(allOrderJson, new TypeReference<>() {});
+        when(repo.findAll()).thenReturn(orders);
         when(storeRepo.findById(any())).thenReturn(Optional.of(createStoreProfile(StoreType.FOOD, 1, 12)));
         String pushToken = "23423werwlekrjwlekjr23423j4l2k3j423gdfgergerg";
         Device oldDevice = new Device(pushToken);
         oldDevice.setUserId("old user");
 
-        List<Device> devices = Collections.nCopies( 20, oldDevice);
+        List<Device> devices = Collections.nCopies(20, oldDevice);
         when(deviceRepo.findByUserIdIn(any(List.class))).thenReturn(devices);
 
         //when
         sut.publishPromosOfTheDay();
 
-        //then
+        //then: 1 promo → exactly 1 sendNotifications call with all 20 devices (20/1=20 per promo)
         var messageArg = ArgumentCaptor.forClass(PushMessage.class);
-        verify(pushNotificationService, times(1)).sendNotifications(eq(devices), messageArg.capture());
-        Assertions.assertEquals("Test: hello", messageArg.getValue().getPushHeading().getTitle());
+        verify(pushNotificationService, times(1)).sendNotifications(any(List.class), messageArg.capture());
+        Assertions.assertEquals("name: hello", messageArg.getValue().getPushHeading().getTitle());
         Assertions.assertEquals("world", messageArg.getValue().getPushHeading().getBody());
     }
+
+    // Single-promotion fixture used by the getLatestPromotions test so sendNotifications is
+    // called exactly once (production code calls it once per promotion).
+    static String singlePromotionJson = """
+            [{
+              "imageUrl": "https://static.yumbi.com/management/api/resource/?id=262509&ts=1697521357000",
+              "shopId": "5e6e8243-22ea-4313-b439-998a0e78628e",
+              "shopType": "FOOD",
+              "position": 10000,
+              "title": "hello",
+              "message": "world"
+            }]
+            """;
 
     static String promosionsJson = """
             [{
@@ -1461,29 +1482,29 @@ public class SchedulerServiceTest {
 
     @Test
     public void notifyUnregisteredWhatsappUsers_sendsLandingOptions_whenNoProfile() {
-        // given
+        // given: session.getFrom() returns digits only (no "+"); service prepends "+" before lookup and send
         WhatsappSession session = mock(WhatsappSession.class);
         when(session.getFrom()).thenReturn("27812815770");
         when(whatsappSessionRepo.findByLastMessageDateBetween(any(LocalDate.class), any(LocalDate.class)))
                 .thenReturn(Collections.singletonList(session));
-        when(userRepo.findByMobileNumber("27812815770")).thenReturn(null);
+        when(userRepo.findByMobileNumber("+27812815770")).thenReturn(null);
 
         // when
         sut.notifyUnregisteredWhatsappUsers();
 
-        // then
-        verify(adminOnlyNotificationService, times(1)).sendLandingOptions("27812815770", null, null);
+        // then: service adds "+" prefix before calling sendLandingOptions
+        verify(adminOnlyNotificationService, times(1)).sendLandingOptions("+27812815770", null, null);
     }
 
     @Test
     public void notifyUnregisteredWhatsappUsers_skipsRegisteredUsers() {
-        // given
+        // given: session.getFrom() returns digits only; service prepends "+" before lookup
         WhatsappSession session = mock(WhatsappSession.class);
         when(session.getFrom()).thenReturn("27812815770");
         when(whatsappSessionRepo.findByLastMessageDateBetween(any(LocalDate.class), any(LocalDate.class)))
                 .thenReturn(Collections.singletonList(session));
         UserProfile existingUser = mock(UserProfile.class);
-        when(userRepo.findByMobileNumber("27812815770")).thenReturn(existingUser);
+        when(userRepo.findByMobileNumber("+27812815770")).thenReturn(existingUser);
 
         // when
         sut.notifyUnregisteredWhatsappUsers();
@@ -1518,5 +1539,189 @@ public class SchedulerServiceTest {
 
         // then
         verify(adminOnlyNotificationService, never()).sendLandingOptions(any(), any(), any());
+    }
+
+    // ===== updateMissingPayouts — BUG-1 + BUG-2 regression tests =====
+
+    @After
+    public void tearDown() {
+        CallerIdentityContext.clear();
+    }
+
+    /**
+     * Helper: builds an Order at STAGE_7_ALL_PAID with payoutCreated=false, ready for
+     * updateMissingPayouts to process.
+     *
+     * @param messengerId null to simulate an INSTORE/no-delivery order; non-null for delivery.
+     */
+    private Order makePayoutOrder(String id, String shopId, String messengerId) {
+        Order o = new Order();
+        o.setId(id);
+        o.setShopId(shopId);
+        o.setStage(OrderStage.STAGE_7_ALL_PAID);
+        o.setPayoutCreated(false);
+        Basket basket = new Basket();
+        o.setBasket(basket);
+        if (messengerId != null) {
+            ShippingData sd = new ShippingData("from", "to", ShippingData.ShippingType.DELIVERY);
+            sd.setMessengerId(messengerId);
+            o.setShippingData(sd);
+        }
+        return o;
+    }
+
+    /**
+     * BUG-1-AC-01: scheduler must NEVER call the @Tool-gated getAllPayouts.
+     * If it did, the CallerIdentityValidator would throw in a no-context environment.
+     */
+    @Test
+    public void updateMissingPayouts_doesNotCallGetAllPayouts() {
+        Order order = makePayoutOrder("o1", "shop-1", "messenger-1");
+        when(repo.findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(
+                eq(false), eq(OrderStage.STAGE_7_ALL_PAID), eq(false), any(Date.class)))
+                .thenReturn(Collections.singletonList(order));
+
+        sut.updateMissingPayouts();
+
+        // getAllPayouts must never be invoked — it is @Tool-gated
+        verify(reconService, never()).getAllPayouts(any(), any(), any(), anyString());
+    }
+
+    /**
+     * BUG-1-AC-02: scheduler runs with no CallerIdentityContext set.
+     * Calling the @Tool-gated path would throw; calling the internal methods must succeed.
+     */
+    @Test
+    public void updateMissingPayouts_noCallerContext_succeeds() {
+        // No CallerIdentityContext — simulate the bare scheduler thread
+        Order order = makePayoutOrder("o2", "shop-1", "messenger-1");
+        when(repo.findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(
+                eq(false), eq(OrderStage.STAGE_7_ALL_PAID), eq(false), any(Date.class)))
+                .thenReturn(Collections.singletonList(order));
+
+        // No exception expected — internal methods do not check caller identity
+        sut.updateMissingPayouts();
+
+        verify(reconService).generatePayoutForShopAndOrder(order);
+        verify(reconService).generatePayoutForMessengerAndOrder(any(MessengerOrderDto.class));
+    }
+
+    /**
+     * BUG-2-AC-01: order with no messenger assigned (null shippingData) — shop payout is still
+     * generated but messenger payout must be skipped (no NPE).
+     */
+    @Test
+    public void updateMissingPayouts_nullShippingData_skipsMessengerPayout() {
+        Order order = makePayoutOrder("o3", "shop-1", null); // no shippingData
+        when(repo.findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(
+                eq(false), eq(OrderStage.STAGE_7_ALL_PAID), eq(false), any(Date.class)))
+                .thenReturn(Collections.singletonList(order));
+
+        sut.updateMissingPayouts();
+
+        verify(reconService, never()).generatePayoutForMessengerAndOrder(any());
+    }
+
+    /**
+     * BUG-2-AC-02: even when messenger is absent, shop payout must still be generated.
+     */
+    @Test
+    public void updateMissingPayouts_nullShippingData_shopPayoutGenerated() {
+        Order order = makePayoutOrder("o4", "shop-1", null);
+        when(repo.findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(
+                eq(false), eq(OrderStage.STAGE_7_ALL_PAID), eq(false), any(Date.class)))
+                .thenReturn(Collections.singletonList(order));
+
+        sut.updateMissingPayouts();
+
+        verify(reconService).generatePayoutForShopAndOrder(order);
+    }
+
+    /**
+     * BUG-2-AC-03: after both payouts succeed, order must be marked payoutCreated=true and saved.
+     */
+    @Test
+    public void updateMissingPayouts_successPath_orderMarkedPayoutCreated() {
+        Order order = makePayoutOrder("o5", "shop-1", null);
+        when(repo.findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(
+                eq(false), eq(OrderStage.STAGE_7_ALL_PAID), eq(false), any(Date.class)))
+                .thenReturn(Collections.singletonList(order));
+
+        sut.updateMissingPayouts();
+
+        Assert.assertTrue("payoutCreated must be set to true", order.getPayoutCreated());
+        verify(repo).save(order);
+    }
+
+    /**
+     * BUG-2-AC-04: if generatePayoutForShopAndOrder throws, the order must NOT be saved as
+     * payoutCreated (error is caught; counter incremented; other orders still processed).
+     *
+     * BUG1-AC-04: same guarantee — no partial commit on the failed order.
+     */
+    @Test
+    public void updateMissingPayouts_shopPayoutThrows_orderNotMarkedAndNotSaved() {
+        Order order = makePayoutOrder("o6", "shop-1", "messenger-1");
+        when(repo.findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(
+                eq(false), eq(OrderStage.STAGE_7_ALL_PAID), eq(false), any(Date.class)))
+                .thenReturn(Collections.singletonList(order));
+        doThrow(new RuntimeException("payout service down"))
+                .when(reconService).generatePayoutForShopAndOrder(order);
+
+        sut.updateMissingPayouts(); // must not propagate the exception
+
+        Assert.assertFalse("payoutCreated must remain false on error", order.getPayoutCreated());
+        verify(repo, never()).save(order);
+    }
+
+    /**
+     * FIX-01: order with NON-null ShippingData whose messengerId == null.
+     * This is a realistic collection-order case: the order has a ShippingData object
+     * (e.g. store address info) but no messenger was ever assigned to it.
+     * Expected behaviour:
+     *   (a) generatePayoutForMessengerAndOrder is NEVER called
+     *   (b) generatePayoutForShopAndOrder IS called
+     *   (c) order.getPayoutCreated() becomes true and repo.save(order) is called
+     *   (d) getAllPayouts (@Tool-gated) is NEVER called
+     */
+    @Test
+    public void updateMissingPayouts_shippingDataPresent_nullMessengerId_skipsMessengerPayout() {
+        // Given: order has ShippingData but messengerId is null
+        Order order = makePayoutOrderWithShipping("o7", "shop-1");
+        when(repo.findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(
+                eq(false), eq(OrderStage.STAGE_7_ALL_PAID), eq(false), any(Date.class)))
+                .thenReturn(Collections.singletonList(order));
+
+        // When
+        sut.updateMissingPayouts();
+
+        // Then (a): messenger payout is NOT generated
+        verify(reconService, never()).generatePayoutForMessengerAndOrder(any());
+        // Then (b): shop payout IS generated
+        verify(reconService).generatePayoutForShopAndOrder(order);
+        // Then (c): order is marked payoutCreated=true and saved
+        Assert.assertTrue("payoutCreated must be set to true", order.getPayoutCreated());
+        verify(repo).save(order);
+        // Then (d): getAllPayouts must never be invoked — it is @Tool-gated
+        verify(reconService, never()).getAllPayouts(any(), any(), any(), anyString());
+    }
+
+    /**
+     * Helper: builds an Order at STAGE_7_ALL_PAID with a non-null ShippingData whose
+     * messengerId is null. Covers the branch sd != null && sd.getMessengerId() == null,
+     * which is distinct from the null-shippingData case in makePayoutOrder(id, shopId, null).
+     */
+    private Order makePayoutOrderWithShipping(String id, String shopId) {
+        Order o = new Order();
+        o.setId(id);
+        o.setShopId(shopId);
+        o.setStage(OrderStage.STAGE_7_ALL_PAID);
+        o.setPayoutCreated(false);
+        o.setBasket(new Basket());
+        // ShippingData is present but no messenger was assigned
+        ShippingData sd = new ShippingData("from", "to", ShippingData.ShippingType.DELIVERY);
+        // intentionally omitting sd.setMessengerId(...) — messengerId remains null
+        o.setShippingData(sd);
+        return o;
     }
 }

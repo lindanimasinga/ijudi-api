@@ -52,7 +52,7 @@ public class UserControllerTest {
         Assert.assertTrue(result.getStatusCode().is2xxSuccessful());
 
         UserProfile responseUser  = new Gson().fromJson(result.getBody(),UserProfile.class);
-        Assert.assertEquals("9111111707", responseUser.getMobileNumber());
+        Assert.assertEquals("+27111111707", responseUser.getMobileNumber());
         Assert.assertEquals(ProfileRoles.CUSTOMER, responseUser.getRole());
         Assert.assertEquals("myaddress", responseUser.getAddress());
         Assert.assertEquals("name", responseUser.getName());

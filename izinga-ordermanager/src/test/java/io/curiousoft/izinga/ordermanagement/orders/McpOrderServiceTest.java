@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.ordermanagement.orders;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.order.OrderRepository;
@@ -36,7 +37,10 @@ public class McpOrderServiceTest {
     @Mock
     private OrderRepository orderRepository;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    // Mirror Spring Boot's production ObjectMapper behaviour: ignore unknown properties
+    // (e.g. computed vals such as BasketItem.totalPrice) rather than failing on them.
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private final long idempotencyWindowHours = 24L;
 
     private static final String CUSTOMER_ID = "cust-001";

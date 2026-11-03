@@ -15,8 +15,6 @@ import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationServic
 import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingListRunEvent;
 import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingListService;
 import io.curiousoft.izinga.recon.ReconService;
-import io.curiousoft.izinga.recon.payout.PayoutStage;
-import io.curiousoft.izinga.recon.payout.PayoutType;
 import io.curiousoft.izinga.usermanagement.userconfig.FieldSpec;
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfig;
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigRepo;
@@ -408,43 +406,27 @@ import static java.lang.String.format;
                     OrderStage.STAGE_7_ALL_PAID, false, fromDate);
             LOG.info("Found {} unpaid orders to check for missing payouts", unpaidOrders.size());
 
+            // BUG-1 fix: call internal generate methods directly — never call the @Tool
+            // getAllPayouts (gated by CallerIdentityValidator) from a scheduler with no caller context.
+            // BUG-2 fix: guard messenger call on non-null shippingData + messengerId to avoid NPE.
             unpaidOrders.stream()
                     .filter(it -> !it.getPayoutCreated())
                     .forEach(order -> {
                         try {
                             LOG.debug("Processing payout for order: {}", order.getId());
 
-                            var payoutCreatedForShop = reconService.getAllPayouts(PayoutType.SHOP,
-                                            fromDate,
-                                            toDate,
-                                            order.getShopId())
-                                    .stream()
-                                    .anyMatch(it -> it.getToId().equals(order.getShopId()) && it.getPayoutStage() == PayoutStage.PENDING);
+                            reconService.generatePayoutForShopAndOrder(order);
+                            LOG.info("Shop payout generated for order: {}", order.getId());
+                            counters[0]++;
 
-                            var payoutCreatedForMessenger = order.getShippingData().getMessengerId() != null && reconService.getAllPayouts(PayoutType.MESSENGER,
-                                            fromDate,
-                                            toDate,
-                                            order.getShippingData().getMessengerId())
-                                    .stream()
-                                    .anyMatch(it -> it.getToId().equals(order.getShopId()) && it.getPayoutStage() == PayoutStage.PENDING);
-
-                            if (!payoutCreatedForShop) {
-                                LOG.info("Generating missing shop payout for order: {}", order.getId());
-                                reconService.generatePayoutForShopAndOrder(order);
-                                LOG.info("Shop payout generated for order: {}", order.getId());
-                                counters[0]++;
-                            } else {
-                                LOG.debug("Shop payout already exists for order: {}", order.getId());
-                            }
-
-                            if (!payoutCreatedForMessenger) {
-                                LOG.info("Generating missing messenger payout for order: {}", order.getId());
+                            ShippingData sd = order.getShippingData();
+                            if (sd != null && sd.getMessengerId() != null) {
                                 var messengerOrderDto = new MessengerOrderDto(order, izingaCommissionPercentage);
                                 reconService.generatePayoutForMessengerAndOrder(messengerOrderDto);
                                 LOG.info("Messenger payout generated for order: {}", order.getId());
                                 counters[1]++;
                             } else {
-                                LOG.debug("Messenger payout already exists for order: {}", order.getId());
+                                LOG.info("Skipping messenger payout for order {}: no messenger assigned", order.getId());
                             }
 
                             order.setPayoutCreated(true);
@@ -553,7 +535,7 @@ import static java.lang.String.format;
             LOG.info("Found {} devices to send promotions to", devices.size());
 
             var deviceIterator = new LinkedList<>(devices);
-            devices.sort((s,b) -> random.nextBoolean() ? 1 : -1);
+            deviceIterator.sort((s,b) -> random.nextBoolean() ? 1 : -1);
 
             var promotions = promotionService.finAllPromotions(StoreType.FOOD)
                     .stream()
@@ -723,6 +705,10 @@ import static java.lang.String.format;
             LOG.info("Found {} WhatsApp sessions from yesterday to check", sessions.size());
 
             for (WhatsappSession session : sessions) {
+                if (session.getFrom() == null) {
+                    LOG.warn("Skipping WhatsApp session with null 'from' field");
+                    continue;
+                }
                 String from = "+" + session.getFrom();
                 try {
                     UserProfile user = userProfileRepo.findByMobileNumber(from);
