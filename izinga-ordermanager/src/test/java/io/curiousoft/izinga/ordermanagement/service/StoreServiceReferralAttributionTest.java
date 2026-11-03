@@ -37,6 +37,7 @@ public class StoreServiceReferralAttributionTest {
     @Mock StoreAgreementAuditRepository storeAgreementAuditRepository;
     @Mock StoreTierChangeAuditRepository storeTierChangeAuditRepository;
     @Mock FirebaseAuth firebaseAuth;
+    @Mock io.curiousoft.izinga.commons.security.AgentIdentityAuditService agentIdentityAuditService;
 
     private StoreService storeService;
 
@@ -44,7 +45,8 @@ public class StoreServiceReferralAttributionTest {
     public void setUp() {
         storeService = new StoreService(storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, MARKUP,
                 eventPublisher, referralCodeService,
-                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth);
+                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth,
+                agentIdentityAuditService);
     }
 
     @Test

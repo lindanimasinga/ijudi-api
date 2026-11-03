@@ -5,6 +5,14 @@ import com.google.firebase.auth.FirebaseAuthException;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.commons.security.AgentIdentityAuditLog;
+import io.curiousoft.izinga.commons.security.AgentIdentityAuditService;
+import io.curiousoft.izinga.commons.security.CallerIdentityContext;
+import io.curiousoft.izinga.commons.security.CallerIdentityValidator;
+import io.curiousoft.izinga.commons.security.CallerIdentityViolationException;
+import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
+import io.curiousoft.izinga.ordermanagement.security.StoreScopeContext;
+import io.curiousoft.izinga.ordermanagement.security.StoreScopeValidator;
 import io.curiousoft.izinga.ordermanagement.service.ProfileServiceImpl;
 import io.curiousoft.izinga.payfast.model.MerchantSubscriptionActivatedEvent;
 import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService;
@@ -40,6 +48,8 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
     private final StoreAgreementAuditRepository storeAgreementAuditRepository;
     private final StoreTierChangeAuditRepository storeTierChangeAuditRepository;
     private final FirebaseAuth firebaseAuth;
+    /** SEC-MCP-01/02: injected for async audit writes on MCP-surface violations. */
+    private final AgentIdentityAuditService agentIdentityAuditService;
 
     public StoreService(StoreRepository storeRepository,
                         UserProfileRepo userProfileRepo,
@@ -49,7 +59,8 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
                         ReferralCodeService referralCodeService,
                         StoreAgreementAuditRepository storeAgreementAuditRepository,
                         StoreTierChangeAuditRepository storeTierChangeAuditRepository,
-                        FirebaseAuth firebaseAuth) {
+                        FirebaseAuth firebaseAuth,
+                        AgentIdentityAuditService agentIdentityAuditService) {
         super(storeRepository, applicationEventPublisher);
         this.userProfileRepo = userProfileRepo;
         this.mainPayAccount = mainPayAccount;
@@ -58,6 +69,7 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         this.storeAgreementAuditRepository = storeAgreementAuditRepository;
         this.storeTierChangeAuditRepository = storeTierChangeAuditRepository;
         this.firebaseAuth = firebaseAuth;
+        this.agentIdentityAuditService = agentIdentityAuditService;
     }
 
     /**
@@ -398,6 +410,10 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         // SA-021-8: enforce store scope — throws StoreScopeViolationException if this
         // request's scope token is locked to a different store.
         io.curiousoft.izinga.ordermanagement.security.StoreScopeValidator.validate(id);
+        // SEC-MCP-02 (REQ-06): on MCP requests, require an authenticated audience
+        if (CallerIdentityContext.isMcpRequest()) {
+            StoreScopeValidator.validateAudience(Audience.STORE, Audience.DRIVER, Audience.CUSTOMER);
+        }
         StoreProfile store = profileRepo.findById(id).orElse(null);
         if (store != null && store.getBusinessHours() == null) {
             ArrayList<BusinessHours> hours = new ArrayList<>();
@@ -420,6 +436,14 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
                 profileRepo.save(store);
             }
             store.setMarkUp(markupPercentage);
+            // SEC-MCP-01 (CORRECTION 1): mask bank accountId only on MCP requests to prevent
+            // round-trip corruption (REST callers such as the onboarding app GET-then-PATCH
+            // the store; masking there would overwrite the real settlement account).
+            // This substitution is applied AFTER any profileRepo.save() above so the masked
+            // value is never written to Mongo.
+            if (CallerIdentityContext.isMcpRequest() && store.getBank() != null) {
+                store.getBank().setAccountId(mainPayAccount);
+            }
         }
         return store;
     }
@@ -474,7 +498,84 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
 
     @Tool(name = "find_stores_by_owner", description = "Find all store profiles owned by a specific user ID.")
     public List<StoreProfile> findByOwner(String ownerId) {
-        return profileRepo.findByOwnerId(ownerId);
+        // SEC-MCP-02 (CORRECTION 2): on MCP requests, enforce caller-ownership or store-scope.
+        if (CallerIdentityContext.isMcpRequest()) {
+            String audience = CallerIdentityContext.getAudience();
+            if (audience == null) {
+                agentIdentityAuditService.recordViolation(
+                        StoreScopeContext.getCallerPhone(), ownerId,
+                        AgentIdentityAuditLog.ViolationType.AUDIENCE_VIOLATION, "find_stores_by_owner",
+                        "UNKNOWN", null, null);
+                throw new CallerIdentityViolationException(
+                    "IDENTITY_REFUSAL: This tool requires an authenticated scope token. " +
+                    "Unauthenticated or tokenless requests are not permitted on the MCP surface. " +
+                    "Please contact iZinga support if you need further help.");
+            }
+            if ("STORE".equals(audience)) {
+                // STORE audience: permitted only when a store scope is set AND the store's owner matches
+                String permittedStoreId = StoreScopeContext.getPermittedStoreId();
+                if (permittedStoreId == null) {
+                    agentIdentityAuditService.recordViolation(
+                            StoreScopeContext.getCallerPhone(), ownerId,
+                            AgentIdentityAuditLog.ViolationType.AUDIENCE_VIOLATION, "find_stores_by_owner",
+                            audience, null, null);
+                    throw new CallerIdentityViolationException(
+                        "IDENTITY_REFUSAL: I can only assist with queries for your own account. " +
+                        "For privacy and security reasons, I am not authorised to access another person's information. " +
+                        "Please contact iZinga support if you need further help.");
+                }
+                StoreProfile permitted = profileRepo.findById(permittedStoreId).orElse(null);
+                if (permitted == null || !ownerId.equals(permitted.getOwnerId())) {
+                    agentIdentityAuditService.recordViolation(
+                            StoreScopeContext.getCallerPhone(), ownerId,
+                            AgentIdentityAuditLog.ViolationType.AUDIENCE_VIOLATION, "find_stores_by_owner",
+                            audience, null, null);
+                    throw new CallerIdentityViolationException(
+                        "IDENTITY_REFUSAL: I can only assist with queries for your own account. " +
+                        "For privacy and security reasons, I am not authorised to access another person's information. " +
+                        "Please contact iZinga support if you need further help.");
+                }
+            } else {
+                // Any other authenticated audience: resolve caller userId and compare with ownerId
+                String callerPhone = CallerIdentityContext.getCallerPhone();
+                String resolvedCallerId = resolveCallerUserId(callerPhone);
+                if (resolvedCallerId == null || !resolvedCallerId.equals(ownerId)) {
+                    agentIdentityAuditService.recordViolation(
+                            callerPhone, ownerId,
+                            AgentIdentityAuditLog.ViolationType.ID_NOT_OWNED, "find_stores_by_owner",
+                            audience, null, null);
+                    throw new CallerIdentityViolationException(
+                        "IDENTITY_REFUSAL: I can only assist with queries for your own account. " +
+                        "For privacy and security reasons, I am not authorised to access another person's information. " +
+                        "Please contact iZinga support if you need further help.");
+                }
+            }
+        }
+        List<StoreProfile> stores = profileRepo.findByOwnerId(ownerId);
+        // SEC-MCP-01 (CORRECTION 1): mask bank accountId only on MCP requests
+        if (CallerIdentityContext.isMcpRequest()) {
+            stores.forEach(s -> {
+                if (s.getBank() != null) {
+                    s.getBank().setAccountId(mainPayAccount);
+                }
+            });
+        }
+        return stores;
+    }
+
+    /**
+     * SEC-MCP-02 (CORRECTION 2): resolve a caller phone to their user profile ID.
+     * Used by findByOwner() for non-STORE audiences on MCP requests.
+     */
+    private String resolveCallerUserId(String callerPhone) {
+        if (callerPhone == null) return null;
+        String last9 = CallerIdentityValidator.normalizeLast9(callerPhone);
+        if (last9 == null) return null;
+        for (String prefix : List.of("0", "+27", "27")) {
+            UserProfile u = userProfileRepo.findByMobileNumber(prefix + last9);
+            if (u != null) return u.getId();
+        }
+        return null;
     }
 
     /**
@@ -510,6 +611,11 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
             @org.springframework.ai.tool.annotation.ToolParam(required = false, description = "Optional store type — one of FOOD, CLOTHING, SALON, CAR_WASH, MOVERS, TIPS, LICENSING, PARTS. Pass null to skip.") StoreType storeType,
             @org.springframework.ai.tool.annotation.ToolParam(required = false, description = "Optional availability filter — true = non-OFFLINE stores only, false = OFFLINE stores only, null = no filter.") Boolean activeStatus) {
 
+        // SEC-MCP-02 (REQ-05 / find_stores): on MCP requests, require an authenticated audience
+        if (CallerIdentityContext.isMcpRequest()) {
+            StoreScopeValidator.validateAudience(Audience.CUSTOMER, Audience.DRIVER, Audience.STORE);
+        }
+
         // Load base list: if storeType is supplied use the targeted repository query, else load all
         List<StoreProfile> base = storeType != null
                 ? profileRepo.findByStoreType(storeType)
@@ -532,7 +638,10 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
                 if (activeStatus && isOffline) continue;
                 if (!activeStatus && !isOffline) continue;
             }
-            // PII stripping — replace real bank account ID with platform account
+            // PII stripping — replace real bank account ID with platform account.
+            // findStores() masking is unconditional (pre-existing behaviour from develop):
+            // this method is only reachable via the @Tool surface; any REST callers reaching
+            // it also receive masked data, which is the safe default.
             if (profile.getBank() != null) {
                 profile.getBank().setAccountId(mainPayAccount);
             }

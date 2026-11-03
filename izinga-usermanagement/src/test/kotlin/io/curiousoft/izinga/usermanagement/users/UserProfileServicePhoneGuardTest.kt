@@ -161,4 +161,50 @@ class UserProfileServicePhoneGuardTest {
             // we are only asserting the identity check is not the failure.
         }
     }
+
+    // ---- SEC-MCP-BUG-01 / FIX-05: tokenless MCP guard is FIRST ----
+
+    /**
+     * Tokenless MCP call to find_user_by_phone with a SHORT phone must throw IDENTITY_REFUSAL
+     * and must NOT access the repo. The short-phone guard (`phone.length < 9 → null`) would
+     * previously produce a distinguishable `null` response instead of IDENTITY_REFUSAL.
+     */
+    @Test
+    fun findUserByPhone_mcpTokenless_shortPhone_throwsIdentityRefusalBeforeRepo() {
+        CallerIdentityContext.setMcpRequest(true)
+        // No audience — tokenless call
+        // No repo stubs — if repo were reached the test would have unnecessary stubs
+
+        val ex = assertThrows(CallerIdentityViolationException::class.java) {
+            service.findUserByPhone("123")
+        }
+        assertTrue(ex.message!!.startsWith("IDENTITY_REFUSAL"),
+            "Tokenless MCP call must be rejected with IDENTITY_REFUSAL before the short-phone null-return branch")
+        Mockito.verify(userProfileRepo, Mockito.never()).findByMobileNumber(Mockito.anyString())
+    }
+
+    /**
+     * Tokenless MCP call to create_user with a null phone must throw IDENTITY_REFUSAL and must
+     * NOT reach the validation check that produces a different error ("mobileNumber is required").
+     */
+    @Test
+    fun create_mcpTokenless_nullPhone_throwsIdentityRefusalBeforeValidation() {
+        CallerIdentityContext.setMcpRequest(true)
+        // No audience — tokenless call
+        val profile = UserProfile(
+            "Name",
+            UserProfile.SignUpReason.BUY,
+            "Address",
+            "https://image.url",
+            null,  // null phone — would produce "mobileNumber is required" if guard were not first
+            ProfileRoles.CUSTOMER,
+        )
+
+        val ex = assertThrows(CallerIdentityViolationException::class.java) {
+            service.create(profile)
+        }
+        assertTrue(ex.message!!.startsWith("IDENTITY_REFUSAL"),
+            "Tokenless MCP call must be rejected with IDENTITY_REFUSAL before the validation error branch")
+        Mockito.verify(userProfileRepo, Mockito.never()).findByMobileNumber(Mockito.anyString())
+    }
 }
