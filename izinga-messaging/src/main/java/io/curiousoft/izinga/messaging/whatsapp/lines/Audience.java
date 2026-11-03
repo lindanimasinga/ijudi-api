@@ -8,5 +8,8 @@ public enum Audience {
     DRIVER,
     CUSTOMER,
     STORE,
-    OTP
+    OTP,
+    /** AMD-01 (REQ-A1): ADMIN audience — minted at runtime only when caller is ProfileRoles.ADMIN
+     *  AND webhook signature verification is active. Never sourced from AiAgentConfig (REQ-A4). */
+    ADMIN
 }

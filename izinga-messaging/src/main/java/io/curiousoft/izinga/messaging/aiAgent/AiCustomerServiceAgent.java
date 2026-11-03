@@ -1,10 +1,16 @@
 package io.curiousoft.izinga.messaging.aiAgent;
 
+import io.curiousoft.izinga.commons.model.ProfileRoles;
+import io.curiousoft.izinga.commons.model.UserProfile;
+import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.commons.security.CallerIdentityValidator;
 import io.curiousoft.izinga.messaging.aiAgent.config.AiAgentConfigService;
 import io.curiousoft.izinga.messaging.aiAgent.config.McpServerConfig;
 import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistory;
 import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistoryService;
 import io.curiousoft.izinga.messaging.security.StoreScopeJwtService;
+import io.curiousoft.izinga.messaging.whatsapp.WhatsappConfig;
+import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsappWebhookPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +38,10 @@ public class AiCustomerServiceAgent {
     private final AiAgentConfigService agentConfigService;
     /** SA-021-17: attaches per-request scope JWT to MCP server URLs. */
     private final StoreScopeJwtService storeScopeJwtService;
+    /** AMD-01 (REQ-A2/REQ-A3): required for ADMIN audience minting. */
+    private final WhatsappConfig whatsappConfig;
+    /** AMD-01 (REQ-A2): used to resolve callerPhone to UserProfile for role check. */
+    private final UserProfileRepo userProfileRepo;
 
     public AiCustomerServiceAgent(
             @Value("${ai.agent.enabled:false}") boolean enabled,
@@ -40,7 +50,9 @@ public class AiCustomerServiceAgent {
             RestTemplate restTemplate,
             ConversationHistoryService conversationHistoryService,
             AiAgentConfigService agentConfigService,
-            StoreScopeJwtService storeScopeJwtService) {
+            StoreScopeJwtService storeScopeJwtService,
+            WhatsappConfig whatsappConfig,
+            UserProfileRepo userProfileRepo) {
         this.enabled = enabled;
         this.openAiApiKey = openAiApiKey;
         this.model = model;
@@ -48,6 +60,8 @@ public class AiCustomerServiceAgent {
         this.conversationHistoryService = conversationHistoryService;
         this.agentConfigService = agentConfigService;
         this.storeScopeJwtService = storeScopeJwtService;
+        this.whatsappConfig = whatsappConfig;
+        this.userProfileRepo = userProfileRepo;
     }
 
     /**
@@ -63,12 +77,50 @@ public class AiCustomerServiceAgent {
     protected List<McpServerConfig> buildScopedMcpTools(String agentName, String storeId, String callerPhone) {
         var configs = agentConfigService.getMcpToolsForAgent(agentName);
         var agentConfig = agentConfigService.getActiveAgentConfig(agentName);
-        var audience = (agentConfig != null) ? agentConfig.getAudience() : null;
+        Audience audience = (agentConfig != null) ? agentConfig.getAudience() : null;
+
+        // AMD-01 (REQ-A4): ADMIN must never come from AiAgentConfig/WhatsappLine audience.
+        // If someone misconfigured an agent with ADMIN audience, silently demote to CUSTOMER.
+        if (audience == Audience.ADMIN) {
+            LOG.warn("AMD-01/REQ-A4: configured audience is ADMIN for agent={} — ADMIN audience must be minted dynamically, not from AiAgentConfig. Treating as CUSTOMER.", agentName);
+            audience = Audience.CUSTOMER;
+        }
+
+        // AMD-01 (REQ-A2/REQ-A3): if signature verification is active AND callerPhone is known,
+        // check whether the caller is an ADMIN. If so, override audience to ADMIN and drop the storeId.
+        // When verification is disabled (production bypass state), skip the DB read entirely.
+        String mintStoreId = storeId;
+        if (callerPhone != null && whatsappConfig.isSignatureVerificationEnabled()) {
+            try {
+                String last9 = CallerIdentityValidator.normalizeLast9(callerPhone);
+                UserProfile caller = null;
+                if (last9 != null) {
+                    for (String prefix : List.of("0", "+27", "27")) {
+                        caller = userProfileRepo.findByMobileNumber(prefix + last9);
+                        if (caller != null) break;
+                    }
+                }
+                if (caller != null && caller.getRole() == ProfileRoles.ADMIN) {
+                    audience = Audience.ADMIN;
+                    mintStoreId = null; // ADMIN scope is not store-scoped
+                    LOG.info("AMD-01: minting ADMIN audience scope token agent={} phone=<redacted>", agentName);
+                }
+            } catch (Exception e) {
+                // AMD-01 (REQ-A3 / Architect plan fail-closed note): an admin-lookup failure must
+                // NOT drop the token. Log and fall back to the configured audience so the URL still
+                // carries a scope token.
+                LOG.warn("AMD-01: admin role lookup failed — falling back to configured audience for agent={}", agentName, e);
+            }
+        }
+
+        final Audience mintAudience = audience;
+        final String finalStoreId = mintStoreId;
+
         List<McpServerConfig> scoped = new ArrayList<>(configs.size());
         for (McpServerConfig cfg : configs) {
             try {
                 String scopedUrl = storeScopeJwtService.buildScopedUrl(
-                        cfg.getServerUrl(), storeId, audience, callerPhone);
+                        cfg.getServerUrl(), finalStoreId, mintAudience, callerPhone);
                 scoped.add(new McpServerConfig(cfg.getType(), cfg.getServerLabel(),
                         cfg.getServerDescription(), scopedUrl, cfg.getRequireApproval(), cfg.getHeaders()));
             } catch (Exception e) {

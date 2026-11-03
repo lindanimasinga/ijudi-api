@@ -44,13 +44,15 @@ public class StoreOnboardingServiceTest {
     @Mock private StoreAgreementAuditRepository storeAgreementAuditRepository;
     @Mock private StoreTierChangeAuditRepository storeTierChangeAuditRepository;
     @Mock private FirebaseAuth firebaseAuth;
+    @Mock private io.curiousoft.izinga.commons.security.AgentIdentityAuditService agentIdentityAuditService;
 
     @BeforeEach
     public void setUp() {
         storeService = new StoreService(
                 storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, 0.1,
                 eventPublisher, referralCodeService,
-                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth);
+                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth,
+                agentIdentityAuditService);
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────

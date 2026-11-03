@@ -48,6 +48,10 @@ class UserProfileService(
 
     @Tool(name = "find_user_by_phone", description = "Finds a user profile by phone number. It will try to find the userby adding different country code prefixes to the phone number provided.")
     fun findUserByPhone(phone: String): UserProfile? {
+        // SEC-MCP-01 / SEC-MCP-BUG-01: tokenless MCP request — hard reject BEFORE any
+        // input-dependent branch (the phone.length < 9 guard below) so a tokenless caller
+        // cannot distinguish a short phone (returns null) from IDENTITY_REFUSAL.
+        CallerIdentityValidator.rejectTokenlessMcp("find_user_by_phone")
         if (phone.length < 9) {
             return null
         }
@@ -75,6 +79,21 @@ class UserProfileService(
                        longitude: Double,
                        @ToolParam(description = "range is in degrees. 1 degree is approximately 111 km. So a range of 0.01 would be approximately 1.11 km") range: Double,
                        storeType: StoreType): List<UserProfile>? {
+        // AMD-01 (REQ-A6): find_users is ADMIN only (STORE removed by Lindani's explicit decision
+        // 2026-11-03). No code-seeded agent uses find_users; store template's allowedTools is only
+        // find_store_or_shops_by_id, and nothing in izinga-messaging references find_users.
+        // Non-MCP paths (REST, scheduler, event listener) are unaffected — isMcpRequest() == false.
+        try {
+            CallerIdentityValidator.validateMcpAudience("ADMIN")
+        } catch (e: io.curiousoft.izinga.commons.security.CallerIdentityViolationException) {
+            val auditAudience = CallerIdentityContext.getAudience() ?: "UNKNOWN"
+            agentIdentityAuditService.recordViolation(
+                CallerIdentityContext.getCallerPhone(), role.name,
+                AgentIdentityAuditLog.ViolationType.AUDIENCE_VIOLATION, "find_users",
+                auditAudience
+            )
+            throw e
+        }
         val maxLong = longitude + range
         val minLong = longitude - range
         val maxLat = latitude + range
@@ -110,6 +129,10 @@ class UserProfileService(
     @Tool(name = "create_user", description = "Creates a new user profile. It can be a normal customer or a driver or a store owner depending on the role specified in the profile object.")
     @Throws(Exception::class)
     override fun create(profile: UserProfile): UserProfile {
+        // SEC-MCP-01 / SEC-MCP-BUG-01: tokenless MCP request — hard reject BEFORE any
+        // input-dependent branch (the mobileNumber null/blank guard below) so a tokenless
+        // caller cannot distinguish a missing phone (validation error) from IDENTITY_REFUSAL.
+        CallerIdentityValidator.rejectTokenlessMcp("create_user")
         // ADR-024: CUSTOMER/DRIVER agents must only register profiles for their own phone number.
         // STORE audience is exempt — store agents may create customer profiles as part of checkout flows.
         val phoneForValidation = profile.mobileNumber
