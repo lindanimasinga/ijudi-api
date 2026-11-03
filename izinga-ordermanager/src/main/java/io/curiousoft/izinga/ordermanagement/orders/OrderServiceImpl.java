@@ -556,6 +556,19 @@ public class OrderServiceImpl implements OrderService {
     @Tool(name = "find_order_by_id", description = "Find order by id and return the order details")
     @Override
     public Order findOrder(String orderId) {
+        // SEC-MCP-01 / SEC-MCP-BUG-01: tokenless MCP request — hard reject BEFORE any
+        // repository access so a tokenless caller cannot probe order-ID existence
+        // (i.e. cannot distinguish "order not found" from IDENTITY_REFUSAL).
+        if (CallerIdentityContext.isMcpRequest() && CallerIdentityContext.getAudience() == null) {
+            agentIdentityAuditService.recordViolation(
+                    StoreScopeContext.getCallerPhone(), orderId,
+                    AgentIdentityAuditLog.ViolationType.AUDIENCE_VIOLATION, "find_order_by_id",
+                    "UNKNOWN", null, null);
+            throw new CallerIdentityViolationException(
+                "IDENTITY_REFUSAL: This tool requires an authenticated scope token. " +
+                "Unauthenticated or tokenless requests are not permitted on the MCP surface. " +
+                "Please contact iZinga support if you need further help.");
+        }
         Order order = orderRepo.findById(orderId).orElse(null);
         if (order != null) {
             // ADR-024: CUSTOMER must own the order; DRIVER must be assigned to it.
@@ -568,7 +581,6 @@ public class OrderServiceImpl implements OrderService {
                     StoreScopeValidator.validateCallerOwnsId(messengerId, this::resolveCallerUserId);
                 }
             } catch (CallerIdentityViolationException e) {
-                // FIX-04: audience already captured as local var on request thread
                 agentIdentityAuditService.recordViolation(
                         StoreScopeContext.getCallerPhone(), orderId,
                         AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED, "find_order_by_id",
@@ -712,10 +724,23 @@ public class OrderServiceImpl implements OrderService {
     @Tool(name = "find_order_for_messenger", description = "Find order by id and return the order details as MessengerOrderDto")
     @Override
     public Order findOrderForMessenger(String orderId) {
+        // SEC-MCP-01 / SEC-MCP-BUG-01: tokenless MCP request — hard reject BEFORE any
+        // repository access so a tokenless caller cannot probe order-ID existence
+        // (i.e. cannot distinguish "Order not found" from IDENTITY_REFUSAL).
+        String audience = CallerIdentityContext.getAudience();
+        if (CallerIdentityContext.isMcpRequest() && audience == null) {
+            agentIdentityAuditService.recordViolation(
+                    StoreScopeContext.getCallerPhone(), orderId,
+                    AgentIdentityAuditLog.ViolationType.AUDIENCE_VIOLATION, "find_order_for_messenger",
+                    "UNKNOWN", null, null);
+            throw new CallerIdentityViolationException(
+                "IDENTITY_REFUSAL: This tool requires an authenticated scope token. " +
+                "Unauthenticated or tokenless requests are not permitted on the MCP surface. " +
+                "Please contact iZinga support if you need further help.");
+        }
+        // ADR-024: DRIVER must be assigned to this order; CUSTOMER must own it (FIX-03).
         Order order = orderRepo.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order with id " + orderId + " not found."));
-        // ADR-024: DRIVER must be assigned to this order; CUSTOMER must own it (FIX-03).
-        String audience = CallerIdentityContext.getAudience();
         if ("DRIVER".equals(audience)) {
             try {
                 String messengerId = order.getShippingData() != null ? order.getShippingData().getMessengerId() : null;
@@ -783,6 +808,47 @@ public class OrderServiceImpl implements OrderService {
     @Tool(name = "find_orders_by_messenger_id", description = "Find orders by messenger id and return the order details as MessengerOrderDto")
     @Override
     public Set<Order> findOrderByMessengerId(String id, @ToolParam(required = false) boolean allStages) {
+        // SEC-MCP-02 (CORRECTION 2): on MCP requests enforce caller-scope gates.
+        if (CallerIdentityContext.isMcpRequest()) {
+            String audience = CallerIdentityContext.getAudience();
+            if (audience == null) {
+                agentIdentityAuditService.recordViolation(
+                        StoreScopeContext.getCallerPhone(), id,
+                        AgentIdentityAuditLog.ViolationType.AUDIENCE_VIOLATION, "find_orders_by_messenger_id",
+                        "UNKNOWN", null, null);
+                throw new CallerIdentityViolationException(
+                    "IDENTITY_REFUSAL: This tool requires an authenticated scope token. " +
+                    "Unauthenticated or tokenless requests are not permitted on the MCP surface. " +
+                    "Please contact iZinga support if you need further help.");
+            }
+            if ("DRIVER".equals(audience)) {
+                // DRIVER may only retrieve their own orders (caller userId == requested messenger id)
+                try {
+                    StoreScopeValidator.validateCallerOwnsId(id, this::resolveCallerUserId);
+                } catch (CallerIdentityViolationException e) {
+                    agentIdentityAuditService.recordViolation(
+                            StoreScopeContext.getCallerPhone(), id,
+                            AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED, "find_orders_by_messenger_id",
+                            audience, null, null);
+                    throw e;
+                }
+            } else if ("ADMIN".equals(audience)) {
+                // AMD-01 (REQ-A7): ADMIN has broad access — no ownership check, no store filter
+                LOG.debug("[MCP-ADMIN] find_orders_by_messenger_id pass-through for ADMIN audience");
+            } else {
+                // STORE, CUSTOMER and any other audience are not permitted to enumerate driver orders
+                // AMD-01 (REQ-A7): STORE path removed; STORE is now a hard reject with audit record
+                agentIdentityAuditService.recordViolation(
+                        StoreScopeContext.getCallerPhone(), id,
+                        AgentIdentityAuditLog.ViolationType.AUDIENCE_VIOLATION, "find_orders_by_messenger_id",
+                        audience, null, null);
+                throw new CallerIdentityViolationException(
+                    "IDENTITY_REFUSAL: I can only assist with queries for your own account. " +
+                    "For privacy and security reasons, I am not authorised to access another person's information. " +
+                    "Please contact iZinga support if you need further help.");
+            }
+        }
+
         var ordersAssigned = allStages ? orderRepo.findByShippingDataMessengerId(id) : orderRepo.findByShippingDataMessengerIdAndStageNot(id, OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
 
         var ordersQuoteRequested = quoteRepository.findBySentToMessengerIds(id)
@@ -803,6 +869,10 @@ public class OrderServiceImpl implements OrderService {
                 resultOrders = ordersFromQuotes;
             }
         }
+
+        // AMD-01 (REQ-A7): STORE post-query filter removed. STORE audience is now a hard reject above.
+        // No per-store filtering needed; DRIVER gets own orders only; ADMIN gets all unfiltered.
+
         return resultOrders.stream()
                 .map(it -> (Order) new MessengerOrderDto(it, izingaCommissionPerc))
                 .collect(Collectors.toSet());

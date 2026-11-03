@@ -1,31 +1,32 @@
 package io.curiousoft.izinga.ordermanagement.orders;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.commons.security.CallerIdentityContext;
 import io.curiousoft.izinga.commons.security.CallerIdentityViolationException;
 import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import io.curiousoft.izinga.ordermanagement.security.StoreScopeContext;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import io.curiousoft.izinga.ordermanagement.utils.DeliveryDistanceUnavailableException;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.DayOfWeek;
 import java.util.*;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for {@link McpOrderService#startOrder} — all three SA-022-01 guards
  * and the happy-path creation flow.
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class McpOrderServiceTest {
 
     private McpOrderService mcpOrderService;
@@ -37,25 +38,31 @@ public class McpOrderServiceTest {
     @Mock
     private OrderRepository orderRepository;
 
-    // Mirror Spring Boot's production ObjectMapper behaviour: ignore unknown properties
-    // (e.g. computed vals such as BasketItem.totalPrice) rather than failing on them.
+    // Spring Boot auto-registers the Kotlin module on its managed ObjectMapper, but tests
+    // create a raw ObjectMapper. Without the Kotlin module, Jackson cannot deserialize
+    // Kotlin classes that lack a no-arg constructor (e.g. BasketItem). Register it here
+    // so buildOrder() succeeds in unit tests exactly as it does at runtime.
+    // FAIL_ON_UNKNOWN_PROPERTIES is disabled to match Spring Boot's default ObjectMapper
+    // configuration and to tolerate extra JSON fields (e.g. computed Kotlin vals).
     private final ObjectMapper objectMapper = new ObjectMapper()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+            .registerModule(new com.fasterxml.jackson.module.kotlin.KotlinModule.Builder().build())
+            .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private final long idempotencyWindowHours = 24L;
 
     private static final String CUSTOMER_ID = "cust-001";
     private static final String SHOP_ID = "shop-001";
     private static final String IDEMPOTENCY_KEY = "order-key-abc123";
 
-    @Before
+    @BeforeEach
     public void setUp() {
         StoreScopeContext.clear();
+        CallerIdentityContext.setMcpRequest(false);
         mcpOrderService = new McpOrderService(
                 orderService, userProfileRepo, orderRepository,
                 objectMapper, idempotencyWindowHours);
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         StoreScopeContext.clear();
     }
@@ -66,14 +73,12 @@ public class McpOrderServiceTest {
 
     @Test
     public void startOrder_customerConfirmedFalse_rejectsWithoutDataAccess() {
-        // when
         McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
                 CUSTOMER_ID, false, IDEMPOTENCY_KEY, SHOP_ID,
                 "desc", "ONLINE", basketJson(), null);
 
-        // then: rejected before any repository call
-        Assert.assertFalse(response.isSuccess());
-        Assert.assertTrue(response.getMessage().toLowerCase().contains("confirmation"));
+        assertFalse(response.isSuccess());
+        assertTrue(response.getMessage().toLowerCase().contains("confirmation"));
         verifyNoInteractions(userProfileRepo, orderRepository, orderService);
     }
 
@@ -83,26 +88,22 @@ public class McpOrderServiceTest {
 
     @Test
     public void startOrder_blankIdempotencyKey_rejectsWithoutDataAccess() {
-        // when
         McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
                 CUSTOMER_ID, true, "  ", SHOP_ID,
                 "desc", "ONLINE", basketJson(), null);
 
-        // then: rejected before any repository call
-        Assert.assertFalse(response.isSuccess());
-        Assert.assertTrue(response.getMessage().toLowerCase().contains("idempotency"));
+        assertFalse(response.isSuccess());
+        assertTrue(response.getMessage().toLowerCase().contains("idempotency"));
         verifyNoInteractions(userProfileRepo, orderRepository, orderService);
     }
 
     @Test
     public void startOrder_nullIdempotencyKey_rejectsWithoutDataAccess() {
-        // when
         McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
                 CUSTOMER_ID, true, null, SHOP_ID,
                 "desc", "ONLINE", basketJson(), null);
 
-        // then
-        Assert.assertFalse(response.isSuccess());
+        assertFalse(response.isSuccess());
         verifyNoInteractions(userProfileRepo, orderRepository, orderService);
     }
 
@@ -112,18 +113,14 @@ public class McpOrderServiceTest {
 
     @Test
     public void startOrder_customerNotFound_rejectsWithGenericMessage() {
-        // given
         when(userProfileRepo.existsById(CUSTOMER_ID)).thenReturn(false);
 
-        // when
         McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
                 CUSTOMER_ID, true, IDEMPOTENCY_KEY, SHOP_ID,
                 "desc", "ONLINE", basketJson(), null);
 
-        // then
-        Assert.assertFalse(response.isSuccess());
-        Assert.assertTrue(response.getMessage().toLowerCase().contains("no customer account"));
-        // Domain service must never be reached
+        assertFalse(response.isSuccess());
+        assertTrue(response.getMessage().toLowerCase().contains("no customer account"));
         verify(orderService, never()).startOrder(any());
     }
 
@@ -133,23 +130,20 @@ public class McpOrderServiceTest {
 
     @Test
     public void startOrder_duplicateWithinWindow_returnsExistingOrderWithoutCreatingNew() {
-        // given
         when(userProfileRepo.existsById(CUSTOMER_ID)).thenReturn(true);
         Order existingOrder = buildOrder("existing-id", OrderStage.STAGE_1_WAITING_STORE_CONFIRM, 50.0);
         when(orderRepository.findFirstByCustomerIdAndTagIdempotencyKeyWithinWindow(
                 eq(CUSTOMER_ID), eq(IDEMPOTENCY_KEY), any(Date.class)))
                 .thenReturn(existingOrder);
 
-        // when
         McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
                 CUSTOMER_ID, true, IDEMPOTENCY_KEY, SHOP_ID,
                 "desc", "ONLINE", basketJson(), null);
 
-        // then: success with existing order data, domain startOrder() never called
-        Assert.assertTrue(response.isSuccess());
-        Assert.assertTrue(response.isIdempotent());
-        Assert.assertEquals("existing-id", response.getOrderId());
-        Assert.assertEquals(OrderStage.STAGE_1_WAITING_STORE_CONFIRM.name(), response.getOrderStatus());
+        assertTrue(response.isSuccess());
+        assertTrue(response.isIdempotent());
+        assertEquals("existing-id", response.getOrderId());
+        assertEquals(OrderStage.STAGE_1_WAITING_STORE_CONFIRM.name(), response.getOrderStatus());
         verify(orderService, never()).startOrder(any());
     }
 
@@ -159,7 +153,6 @@ public class McpOrderServiceTest {
 
     @Test
     public void startOrder_happyPath_createsOrderAndSetsIdempotencyTag() {
-        // given
         when(userProfileRepo.existsById(CUSTOMER_ID)).thenReturn(true);
         when(orderRepository.findFirstByCustomerIdAndTagIdempotencyKeyWithinWindow(
                 eq(CUSTOMER_ID), eq(IDEMPOTENCY_KEY), any(Date.class)))
@@ -168,19 +161,16 @@ public class McpOrderServiceTest {
         Order created = buildOrder("new-order-id", OrderStage.STAGE_0_CUSTOMER_NOT_PAID, 71.75);
         when(orderService.startOrder(any(Order.class))).thenReturn(created);
 
-        // when
         McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
                 CUSTOMER_ID, true, IDEMPOTENCY_KEY, SHOP_ID,
                 "delivery order", "ONLINE", basketJson(), shippingJson());
 
-        // then
-        Assert.assertTrue(response.isSuccess());
-        Assert.assertFalse(response.isIdempotent());
-        Assert.assertEquals("new-order-id", response.getOrderId());
-        Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID.name(), response.getOrderStatus());
-        Assert.assertNull(response.getMessage());
+        assertTrue(response.isSuccess());
+        assertFalse(response.isIdempotent());
+        assertEquals("new-order-id", response.getOrderId());
+        assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID.name(), response.getOrderStatus());
+        assertNull(response.getMessage());
 
-        // idempotency key must be stamped on the order passed to domain service
         verify(orderService).startOrder(argThat(order ->
                 IDEMPOTENCY_KEY.equals(order.getTag().get("idempotencyKey"))));
     }
@@ -191,7 +181,6 @@ public class McpOrderServiceTest {
 
     @Test
     public void startOrder_domainThrowsIllegalArgument_returnsSanitizedMessage() {
-        // given
         when(userProfileRepo.existsById(CUSTOMER_ID)).thenReturn(true);
         when(orderRepository.findFirstByCustomerIdAndTagIdempotencyKeyWithinWindow(
                 eq(CUSTOMER_ID), eq(IDEMPOTENCY_KEY), any(Date.class)))
@@ -201,24 +190,19 @@ public class McpOrderServiceTest {
         when(orderService.startOrder(any(Order.class)))
                 .thenThrow(new IllegalArgumentException(rawInternalMessage));
 
-        // when
         McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
                 CUSTOMER_ID, true, IDEMPOTENCY_KEY, SHOP_ID,
                 "delivery order", "ONLINE", basketJson(), shippingJson());
 
-        // then: success=false but raw MongoDB ObjectId is stripped from the message
-        Assert.assertFalse(response.isSuccess());
-        Assert.assertNotNull(response.getMessage());
-        // Raw 24-char hex ID must not appear in the response message
-        Assert.assertFalse("Raw internal ID must not leak",
-                response.getMessage().contains("abcdef1234567890abcdef12"));
-        // The readable part of the message may remain
-        Assert.assertTrue(response.getMessage().contains("does not exist"));
+        assertFalse(response.isSuccess());
+        assertNotNull(response.getMessage());
+        assertFalse(response.getMessage().contains("abcdef1234567890abcdef12"),
+                "Raw internal ID must not leak");
+        assertTrue(response.getMessage().contains("does not exist"));
     }
 
     @Test
     public void startOrder_domainThrowsUnexpectedException_returnsGenericMessage() {
-        // given
         when(userProfileRepo.existsById(CUSTOMER_ID)).thenReturn(true);
         when(orderRepository.findFirstByCustomerIdAndTagIdempotencyKeyWithinWindow(
                 eq(CUSTOMER_ID), eq(IDEMPOTENCY_KEY), any(Date.class)))
@@ -226,28 +210,22 @@ public class McpOrderServiceTest {
         when(orderService.startOrder(any(Order.class)))
                 .thenThrow(new RuntimeException("NullPointerException at line 347"));
 
-        // when
         McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
                 CUSTOMER_ID, true, IDEMPOTENCY_KEY, SHOP_ID,
                 "delivery order", "ONLINE", basketJson(), shippingJson());
 
-        // then
-        Assert.assertFalse(response.isSuccess());
-        Assert.assertNotNull(response.getMessage());
-        Assert.assertTrue(response.getMessage().toLowerCase().contains("could not be created"));
+        assertFalse(response.isSuccess());
+        assertNotNull(response.getMessage());
+        assertTrue(response.getMessage().toLowerCase().contains("could not be created"));
         verify(orderService).startOrder(any());
     }
 
     // -------------------------------------------------------------------------
     // FIX-01/FIX-02: CallerIdentityViolationException must pass through verbatim
-    // (not replaced by the generic "could not be created" error)
     // -------------------------------------------------------------------------
 
     @Test
     public void startOrder_customerAudienceThirdPartyId_returnsRejectedWithIdentityRefusal() {
-        // FIX-02: CUSTOMER audience + caller phone set; customerId belongs to a DIFFERENT customer.
-        // The domain layer (mocked) throws CallerIdentityViolationException — the MCP layer must
-        // NOT replace it with a generic error. The IDENTITY_REFUSAL prefix must be visible.
         StoreScopeContext.setAudience(Audience.CUSTOMER);
         StoreScopeContext.setCallerPhone("+27801112222");
 
@@ -266,22 +244,76 @@ public class McpOrderServiceTest {
                 thirdPartyId, true, IDEMPOTENCY_KEY, SHOP_ID,
                 "desc", "ONLINE", basketJson(), null);
 
-        // FIX-01: the response must be rejected, and the message must contain the
-        // machine-parseable IDENTITY_REFUSAL prefix — NOT the generic error string.
-        Assert.assertFalse(response.isSuccess());
-        Assert.assertNotNull(response.getMessage());
-        Assert.assertTrue(
-                "IDENTITY_REFUSAL prefix must be present in rejection message",
-                response.getMessage().contains("IDENTITY_REFUSAL"));
-        Assert.assertFalse(
-                "Generic error must not appear when an identity violation occurs",
-                response.getMessage().contains("could not be created"));
+        assertFalse(response.isSuccess());
+        assertNotNull(response.getMessage());
+        assertTrue(response.getMessage().contains("IDENTITY_REFUSAL"),
+                "IDENTITY_REFUSAL prefix must be present in rejection message");
+        assertFalse(response.getMessage().contains("could not be created"),
+                "Generic error must not appear when an identity violation occurs");
+    }
+
+    // -------------------------------------------------------------------------
+    // SEC-MCP-01 / CORRECTION 3: audience gate on start_order
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void startOrder_mcpNullAudience_returnsRejectedWithIdentityRefusal() {
+        CallerIdentityContext.setMcpRequest(true);
+
+        McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
+                CUSTOMER_ID, true, IDEMPOTENCY_KEY, SHOP_ID,
+                "desc", "ONLINE", basketJson(), null);
+
+        assertFalse(response.isSuccess());
+        assertNotNull(response.getMessage());
+        assertTrue(response.getMessage().contains("IDENTITY_REFUSAL"),
+                "Response must contain IDENTITY_REFUSAL");
+        verifyNoInteractions(userProfileRepo, orderRepository, orderService);
+    }
+
+    @Test
+    public void startOrder_mcpDriverAudience_returnsRejectedWithIdentityRefusal() {
+        CallerIdentityContext.setMcpRequest(true);
+        StoreScopeContext.setAudience(Audience.DRIVER);
+
+        McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
+                CUSTOMER_ID, true, IDEMPOTENCY_KEY, SHOP_ID,
+                "desc", "ONLINE", basketJson(), null);
+
+        assertFalse(response.isSuccess());
+        assertNotNull(response.getMessage());
+        assertTrue(response.getMessage().contains("IDENTITY_REFUSAL"),
+                "Response must contain IDENTITY_REFUSAL");
+        verifyNoInteractions(userProfileRepo, orderRepository, orderService);
+    }
+
+    @Test
+    public void startOrder_mcpCustomerAudience_proceedsToGuards() {
+        CallerIdentityContext.setMcpRequest(true);
+        StoreScopeContext.setAudience(Audience.CUSTOMER);
+
+        McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
+                CUSTOMER_ID, false, IDEMPOTENCY_KEY, SHOP_ID,
+                "desc", "ONLINE", basketJson(), null);
+
+        assertFalse(response.isSuccess());
+        assertTrue(response.getMessage().toLowerCase().contains("confirmation"),
+                "Should reach consent guard, not audience gate");
+    }
+
+    @Test
+    public void startOrder_nonMcpNullAudience_proceedsNormally() {
+        McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
+                CUSTOMER_ID, false, IDEMPOTENCY_KEY, SHOP_ID,
+                "desc", "ONLINE", basketJson(), null);
+
+        assertFalse(response.isSuccess());
+        assertTrue(response.getMessage().toLowerCase().contains("confirmation"),
+                "Must reach consent guard, not audience gate");
     }
 
     @Test
     public void startOrder_storeAudience_happyPath_createsOrderSuccessfully() {
-        // FIX-02 regression: STORE audience must not be affected by the new catch block.
-        // A store-initiated order (placing an order on behalf of a customer) should succeed.
         StoreScopeContext.setAudience(Audience.STORE);
         StoreScopeContext.setCallerPhone("+27712345678");
 
@@ -296,8 +328,75 @@ public class McpOrderServiceTest {
                 CUSTOMER_ID, true, IDEMPOTENCY_KEY, SHOP_ID,
                 "desc", "ONLINE", basketJson(), null);
 
-        Assert.assertTrue("STORE audience order must succeed", response.isSuccess());
-        Assert.assertEquals("store-placed-order-id", response.getOrderId());
+        assertTrue(response.isSuccess(), "STORE audience order must succeed");
+        assertEquals("store-placed-order-id", response.getOrderId());
+    }
+
+    /**
+     * AMD-01 (REQ-A9): ADMIN audience must be permitted to create orders.
+     * Follows the same happy-path pattern as storeAudience_happyPath_createsOrderSuccessfully.
+     */
+    @Test
+    public void startOrder_adminAudience_passes() {
+        CallerIdentityContext.setMcpRequest(true);
+        StoreScopeContext.setAudience(Audience.ADMIN);
+
+        when(userProfileRepo.existsById(CUSTOMER_ID)).thenReturn(true);
+        when(orderRepository.findFirstByCustomerIdAndTagIdempotencyKeyWithinWindow(
+                eq(CUSTOMER_ID), eq(IDEMPOTENCY_KEY), any(Date.class)))
+                .thenReturn(null);
+        Order created = buildOrder("admin-placed-order-id", OrderStage.STAGE_0_CUSTOMER_NOT_PAID, 50.0);
+        when(orderService.startOrder(any(Order.class))).thenReturn(created);
+
+        McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
+                CUSTOMER_ID, true, IDEMPOTENCY_KEY, SHOP_ID,
+                "desc", "ONLINE", basketJson(), null);
+
+        assertTrue(response.isSuccess(), "ADMIN audience order must succeed");
+        assertEquals("admin-placed-order-id", response.getOrderId());
+    }
+
+    /**
+     * AMD-01 regression: DRIVER must still be rejected even after ADMIN was added.
+     */
+    @Test
+    public void startOrder_driverAudience_rejected_unchanged() {
+        CallerIdentityContext.setMcpRequest(true);
+        StoreScopeContext.setAudience(Audience.DRIVER);
+
+        McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
+                CUSTOMER_ID, true, IDEMPOTENCY_KEY, SHOP_ID,
+                "desc", "ONLINE", basketJson(), null);
+
+        assertFalse(response.isSuccess());
+        assertTrue(response.getMessage().contains("IDENTITY_REFUSAL"),
+                "DRIVER audience must still be rejected with IDENTITY_REFUSAL");
+        verifyNoInteractions(userProfileRepo, orderRepository, orderService);
+    }
+
+    // -------------------------------------------------------------------------
+    // #155 — DeliveryDistanceUnavailableException → informative rejected message
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void startOrder_deliveryDistanceUnavailable_returnsInformativeMessage() {
+        when(userProfileRepo.existsById(CUSTOMER_ID)).thenReturn(true);
+        when(orderRepository.findFirstByCustomerIdAndTagIdempotencyKeyWithinWindow(
+                eq(CUSTOMER_ID), eq(IDEMPOTENCY_KEY), any(java.util.Date.class)))
+                .thenReturn(null);
+        when(orderService.startOrder(any(Order.class)))
+                .thenThrow(new DeliveryDistanceUnavailableException("Maps API unavailable"));
+
+        McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
+                CUSTOMER_ID, true, IDEMPOTENCY_KEY, SHOP_ID,
+                "delivery order", "ONLINE", basketJson(), shippingJson());
+
+        assertFalse(response.isSuccess());
+        assertNotNull(response.getMessage());
+        assertTrue(response.getMessage().toLowerCase().contains("maps service"),
+                "Message must mention the maps service so the agent can inform the customer");
+        assertFalse(response.getMessage().contains("Maps API unavailable"),
+                "Raw internal cause must not leak to the caller");
     }
 
     // -------------------------------------------------------------------------
@@ -305,7 +404,10 @@ public class McpOrderServiceTest {
     // -------------------------------------------------------------------------
 
     private String basketJson() {
-        return "{\"items\":[{\"name\":\"chips\",\"quantity\":2,\"price\":10,\"totalPrice\":20}]}";
+        // BasketItem constructor params are: name, quantity, price, discountPerc.
+        // totalPrice is a computed read-only val (price*quantity) — it cannot be used
+        // as a constructor param and must not appear in deserialization payloads.
+        return "{\"items\":[{\"name\":\"chips\",\"quantity\":2,\"price\":10,\"discountPerc\":0}]}";
     }
 
     private String shippingJson() {

@@ -43,6 +43,11 @@ data class AgentIdentityAuditLog(
         ORDER_NOT_OWNED,
         PAYOUT_NOT_OWNED,
         THIRD_PARTY_REGISTRATION,
-        ID_NOT_OWNED
+        ID_NOT_OWNED,
+        /**
+         * SEC-MCP-01 / SEC-MCP-02: MCP tool invoked without a valid scope token
+         * (null audience) or with an audience not permitted for this tool.
+         */
+        AUDIENCE_VIOLATION
     }
 }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
+import io.curiousoft.izinga.commons.security.CallerIdentityContext;
 import io.curiousoft.izinga.commons.security.CallerIdentityViolationException;
 import io.curiousoft.izinga.ordermanagement.utils.DeliveryDistanceUnavailableException;
 import org.slf4j.Logger;
@@ -101,6 +102,28 @@ public class McpOrderService {
             @ToolParam(description = "Order type: ONLINE or INSTORE") String orderType,
             @ToolParam(description = "JSON of the Basket with items array, e.g. {\"items\":[{\"name\":\"chips\",\"quantity\":2,\"price\":10,\"totalPrice\":20}]}") String basketJson,
             @ToolParam(required = false, description = "JSON of ShippingData (required for ONLINE orders). null for INSTORE orders.") String shippingDataJson) {
+
+        // Step 0 — SEC-MCP-01 (CORRECTION 3): reject tokenless MCP requests and disallowed audiences.
+        // Evidence: StoreAiAgent mints STORE audience tokens; AiCustomerServiceAgent's system prompt
+        // lists start_order tools for CUSTOMER audience. DRIVER agents have no legitimate order-creation use.
+        if (CallerIdentityContext.isMcpRequest()) {
+            String audience = CallerIdentityContext.getAudience();
+            if (audience == null) {
+                LOG.warn("start_order: HARD-REJECT — MCP request has no scope token (null audience) for customerId={}", customerId);
+                return StartOrderResponse.rejected(
+                    "IDENTITY_REFUSAL: This tool requires an authenticated scope token. " +
+                    "Unauthenticated or tokenless requests are not permitted on the MCP surface. " +
+                    "Please contact iZinga support if you need further help.");
+            }
+            // AMD-01 (REQ-A9): ADMIN is also permitted to create orders
+            if (!"CUSTOMER".equals(audience) && !"STORE".equals(audience) && !"ADMIN".equals(audience)) {
+                LOG.warn("start_order: HARD-REJECT — audience={} is not permitted to create orders for customerId={}", audience, customerId);
+                return StartOrderResponse.rejected(
+                    "IDENTITY_REFUSAL: I can only assist with queries for your own account. " +
+                    "For privacy and security reasons, I am not authorised to access another person's information. " +
+                    "Please contact iZinga support if you need further help.");
+            }
+        }
 
         // Step 1 — consent (SA-022-01 Guard 2): evaluated first, before any data access
         if (!customerConfirmed) {

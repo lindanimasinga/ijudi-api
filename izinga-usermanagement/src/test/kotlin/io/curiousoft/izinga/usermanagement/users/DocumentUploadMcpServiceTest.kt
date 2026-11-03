@@ -295,6 +295,101 @@ class DocumentUploadMcpServiceTest {
         assertTrue(ex.message!!.startsWith("IDENTITY_REFUSAL:"))
     }
 
+    // ---- AMD-01 (REQ-A10): ADMIN audience passes identity validators for document tools ----
+
+    /**
+     * AMD-01 (REQ-A10): get_required_documents_for_user with ADMIN audience must pass the identity
+     * gate for a third-party phone.
+     */
+    @Test
+    fun getRequiredDocumentsForUser_adminAudience_thirdPartyPhone_passes() {
+        val phone = "+27811111111"
+        val user = testUser(phone)
+        CallerIdentityContext.setMcpRequest(true)
+        CallerIdentityContext.setAudience("ADMIN")
+        // No callerPhone set — ADMIN bypasses phone matching
+
+        Mockito.`when`(userProfileService.findUserByPhone(phone)).thenReturn(user)
+        Mockito.`when`(userProfileService.getAllMissingFields(phone)).thenReturn(emptyList())
+        Mockito.`when`(userConfigService.findAll()).thenReturn(listOf(testConfig()))
+
+        // Must not throw CallerIdentityViolationException
+        service.getRequiredDocumentsForUser(phone)
+    }
+
+    /**
+     * AMD-01 (REQ-A10): create_document_upload_session with ADMIN audience must pass the identity
+     * gate for a third-party phone.
+     */
+    @Test
+    fun createDocumentUploadSession_adminAudience_thirdPartyPhone_passes() {
+        val phone = "+27811111111"
+        val user = testUser(phone)
+        CallerIdentityContext.setMcpRequest(true)
+        CallerIdentityContext.setAudience("ADMIN")
+
+        Mockito.`when`(userProfileService.findUserByPhone(phone)).thenReturn(user)
+        Mockito.`when`(userConfigService.findAll()).thenReturn(listOf(testConfig()))
+        Mockito.`when`(documentUploadSessionRepo.save(Mockito.any(DocumentUploadSession::class.java)))
+            .thenAnswer { invocation -> invocation.getArgument(0) }
+
+        // Must not throw CallerIdentityViolationException
+        service.createDocumentUploadSession(phone, "identityDocument", "id.jpg", "image/jpeg")
+    }
+
+    /**
+     * AMD-01 (REQ-A10): attach_uploaded_document_to_user_tag with ADMIN audience must pass the
+     * identity gate for a third-party phone.
+     */
+    @Test
+    fun attachUploadedDocumentToUserTag_adminAudience_thirdPartyPhone_passes() {
+        val phone = "+27811111111"
+        val user = testUser(phone)
+        CallerIdentityContext.setMcpRequest(true)
+        CallerIdentityContext.setAudience("ADMIN")
+
+        Mockito.`when`(userProfileService.findUserByPhone(phone)).thenReturn(user)
+        Mockito.`when`(userConfigService.findAll()).thenReturn(listOf(testConfig()))
+        Mockito.`when`(userProfileService.getAllMissingFields(phone)).thenReturn(emptyList())
+        Mockito.`when`(
+            documentUploadSessionRepo.findFirstByUserIdAndFieldNameAndConsumedAtIsNullAndExpiresAtAfterOrderByCreatedAtDesc(
+                any(), any(), any()
+            )
+        ).thenReturn(
+            DocumentUploadSession(
+                id = "session-admin",
+                userId = "user-1",
+                fieldName = "identityDocument",
+                originalFileName = "id.png",
+                mimeType = "image/png",
+                createdAt = java.time.Instant.now(),
+                expiresAt = java.time.Instant.now().plusSeconds(300),
+            )
+        )
+
+        // Must not throw CallerIdentityViolationException
+        service.attachUploadedDocumentToUserTag(phone, "identityDocument", "https://files/id.png")
+    }
+
+    /**
+     * AMD-01 (REQ-A10): recheck_required_documents with ADMIN audience must pass the identity
+     * gate for a third-party phone (delegates to getRequiredDocumentsForUser).
+     */
+    @Test
+    fun recheckRequiredDocuments_adminAudience_thirdPartyPhone_passes() {
+        val phone = "+27811111111"
+        val user = testUser(phone)
+        CallerIdentityContext.setMcpRequest(true)
+        CallerIdentityContext.setAudience("ADMIN")
+
+        Mockito.`when`(userProfileService.findUserByPhone(phone)).thenReturn(user)
+        Mockito.`when`(userProfileService.getAllMissingFields(phone)).thenReturn(emptyList())
+        Mockito.`when`(userConfigService.findAll()).thenReturn(listOf(testConfig()))
+
+        // Must not throw CallerIdentityViolationException
+        service.recheckRequiredDocuments(phone)
+    }
+
     private fun testUser(phone: String): UserProfile {
         val user = UserProfile(
             "Driver",

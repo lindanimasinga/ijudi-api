@@ -1,9 +1,11 @@
 package io.curiousoft.izinga.messaging.aiAgent;
 
+import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.messaging.aiAgent.config.AiAgentConfigService;
 import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistory;
 import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistoryService;
 import io.curiousoft.izinga.messaging.security.StoreScopeJwtService;
+import io.curiousoft.izinga.messaging.whatsapp.WhatsappConfig;
 import io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsappWebhookPayload;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +42,8 @@ class AiCustomerServiceAgentLocationTest {
     @Mock private ConversationHistoryService conversationHistoryService;
     @Mock private AiAgentConfigService agentConfigService;
     @Mock private StoreScopeJwtService storeScopeJwtService;
+    @Mock private WhatsappConfig whatsappConfig;
+    @Mock private UserProfileRepo userProfileRepo;
 
     private static final String FROM = "+27812345678";
     private static final String AGENT_NAME = "customer_support";
@@ -49,7 +53,8 @@ class AiCustomerServiceAgentLocationTest {
     @BeforeEach
     void setUp() {
         agent = new AiCustomerServiceAgent(true, "sk-test-key", "gpt-4.1-mini",
-                restTemplate, conversationHistoryService, agentConfigService, storeScopeJwtService);
+                restTemplate, conversationHistoryService, agentConfigService, storeScopeJwtService,
+                whatsappConfig, userProfileRepo);
     }
 
     @Test
