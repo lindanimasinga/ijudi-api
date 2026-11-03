@@ -162,6 +162,75 @@ class UserProfileServicePhoneGuardTest {
         }
     }
 
+    // ---- AMD-01 (REQ-A10): ADMIN audience passes identity validators on MCP path ----
+
+    /**
+     * AMD-01 (REQ-A10): find_user_by_phone with ADMIN audience must pass the identity gate
+     * and look up a third-party phone without throwing CallerIdentityViolationException.
+     */
+    @Test
+    fun `findUserByPhone adminAudience thirdPartyPhone passes`() {
+        CallerIdentityContext.setMcpRequest(true)
+        CallerIdentityContext.setAudience("ADMIN")
+        // No callerPhone set — ADMIN bypasses phone matching
+        Mockito.`when`(userProfileRepo.findByMobileNumber(Mockito.anyString())).thenReturn(null)
+
+        // Must not throw CallerIdentityViolationException
+        val result = service.findUserByPhone("+27811111111")
+        // Returns null because repo returns null — that is fine; identity gate passed
+        assertNull(result)
+    }
+
+    /**
+     * AMD-01 (REQ-A10): create_user with ADMIN audience must pass the identity gate even when
+     * the phone differs from the caller's.  The test verifies that no CallerIdentityViolationException
+     * is thrown; any subsequent validation error (missing field, duplicate check, etc.) is acceptable.
+     */
+    @Test
+    fun `create adminAudience thirdPartyPhone passesIdentityGate`() {
+        CallerIdentityContext.setMcpRequest(true)
+        CallerIdentityContext.setAudience("ADMIN")
+        Mockito.`when`(userProfileRepo.findByMobileNumber(Mockito.anyString())).thenReturn(null)
+
+        val profile = UserProfile(
+            "Other Driver",
+            UserProfile.SignUpReason.DELIVERY_DRIVER,
+            "Address",
+            "https://image.url",
+            "+27811111111",
+            ProfileRoles.CUSTOMER,
+        )
+
+        try {
+            service.create(profile)
+        } catch (e: CallerIdentityViolationException) {
+            throw AssertionError("ADMIN audience must not trigger CallerIdentityViolationException", e)
+        } catch (_: Exception) {
+            // Any other exception (validation, repo, etc.) is fine — identity gate passed
+        }
+    }
+
+    /**
+     * AMD-01 (REQ-A10): get_missing_fields_by_phone with ADMIN audience must pass the identity gate
+     * for a third-party phone.  getAllMissingFields delegates to findUserByPhone which applies the
+     * validateCallerPhone guard — ADMIN early return must fire before any rejection.
+     */
+    @Test
+    fun `getAllMissingFields adminAudience thirdPartyPhone passes`() {
+        CallerIdentityContext.setMcpRequest(true)
+        CallerIdentityContext.setAudience("ADMIN")
+        Mockito.`when`(userProfileRepo.findByMobileNumber(Mockito.anyString())).thenReturn(null)
+
+        // getAllMissingFields returns empty list when user is null (not found), must not throw
+        try {
+            service.getAllMissingFields("+27811111111")
+        } catch (e: CallerIdentityViolationException) {
+            throw AssertionError("ADMIN audience must not trigger CallerIdentityViolationException", e)
+        } catch (_: Exception) {
+            // Other exceptions (NullPointerException from null user, etc.) are acceptable
+        }
+    }
+
     // ---- SEC-MCP-BUG-01 / FIX-05: tokenless MCP guard is FIRST ----
 
     /**

@@ -21,9 +21,11 @@ import org.mockito.Mockito.`when`
 import org.mockito.junit.jupiter.MockitoExtension
 
 /**
- * SEC-MCP-02 (find_users): verifies that the STORE-only audience gate on
+ * SEC-MCP-02 / AMD-01 (find_users): verifies that the ADMIN-only audience gate on
  * [UserProfileService.findByLocation] is enforced on MCP requests and that
  * non-MCP (REST/scheduler) calls are unaffected.
+ *
+ * AMD-01 (REQ-A6): STORE audience removed from find_users; ADMIN is now the only permitted audience.
  *
  * JUnit 5 + MockitoExtension (izinga-usermanagement module convention).
  */
@@ -59,12 +61,13 @@ class UserProfileServiceFindByLocationMcpGateTest {
         CallerIdentityContext.clear()
     }
 
-    // ── SEC-MCP-02: STORE audience on MCP request ──────────────────────────────
+    // ── AMD-01 (REQ-A6): ADMIN audience passes; STORE now throws ─────────────
 
     @Test
-    fun `findByLocation STORE audience MCP request passes`() {
+    fun `findByLocation ADMIN audience MCP request passes`() {
+        // REQ-A6: ADMIN is now the only permitted audience for find_users
         CallerIdentityContext.setMcpRequest(true)
-        CallerIdentityContext.setAudience("STORE")
+        CallerIdentityContext.setAudience("ADMIN")
         `when`(userProfileRepo.findByRoleAndServiceTypeAndLatitudeBetweenAndLongitudeBetween(
             role, storeType,
             lat - range, lat + range,
@@ -73,6 +76,17 @@ class UserProfileServiceFindByLocationMcpGateTest {
 
         val result = service.findByLocation(role, lat, lon, range, storeType)
         assertNotNull(result)
+    }
+
+    @Test
+    fun `findByLocation STORE audience MCP request now throws`() {
+        // REQ-A6: STORE was removed from the permitted set for find_users
+        CallerIdentityContext.setMcpRequest(true)
+        CallerIdentityContext.setAudience("STORE")
+
+        assertThrows(CallerIdentityViolationException::class.java) {
+            service.findByLocation(role, lat, lon, range, storeType)
+        }
     }
 
     @Test

@@ -1,13 +1,17 @@
 package io.curiousoft.izinga.commons.security
 
 import io.curiousoft.izinga.commons.security.AgentIdentityAuditLog.ViolationType
-import org.junit.After
-import org.junit.Assert.*
-import org.junit.Before
-import org.junit.Test
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 
 /**
- * SEC-MCP-01 / SEC-MCP-02: Unit tests for [CallerIdentityValidator].
+ * SEC-MCP-01 / SEC-MCP-02 / AMD-01: Unit tests for [CallerIdentityValidator].
+ *
+ * Migrated from JUnit 4 to JUnit 5 (Jupiter) so surefire picks them up —
+ * izinga-commons has no junit-vintage-engine and JUnit 4 tests were silently skipped.
  *
  * Covers:
  *   - validateCallerPhone: null-audience hard reject on MCP path (SEC-MCP-01)
@@ -17,13 +21,15 @@ import org.junit.Test
  *   - validateCallerOwnsId: null-audience pass-through on non-MCP path (REST regression)
  *   - validateMcpAudience: null audience hard reject, non-permitted audience reject, permitted passes, non-MCP no-op
  *   - isMcpRequest / setMcpRequest / clear in CallerIdentityContext
+ *   - AMD-01 (REQ-A10): ADMIN audience passes validateCallerPhone and validateCallerOwnsId on MCP
+ *   - AMD-01 (REQ-A11): null audience on MCP still hard-rejects even with ADMIN tests present
  */
 class CallerIdentityValidatorTest {
 
-    @Before
+    @BeforeEach
     fun before() = CallerIdentityContext.clear()
 
-    @After
+    @AfterEach
     fun after() = CallerIdentityContext.clear()
 
     // ── CallerIdentityContext flag ──────────────────────────────────────────
@@ -48,22 +54,22 @@ class CallerIdentityValidatorTest {
 
     // ── validateCallerPhone: MCP path, null audience → HARD REJECT ──────────
 
-    @Test(expected = CallerIdentityViolationException::class)
+    @Test
     fun `validateCallerPhone throws on MCP request with null audience`() {
         CallerIdentityContext.setMcpRequest(true)
         // audience is null (no scope token)
-        CallerIdentityValidator.validateCallerPhone("+27812345678")
+        assertThrows<CallerIdentityViolationException> {
+            CallerIdentityValidator.validateCallerPhone("+27812345678")
+        }
     }
 
     @Test
     fun `validateCallerPhone MCP rejection message contains IDENTITY_REFUSAL`() {
         CallerIdentityContext.setMcpRequest(true)
-        try {
+        val ex = assertThrows<CallerIdentityViolationException> {
             CallerIdentityValidator.validateCallerPhone("+27812345678")
-            fail("Expected CallerIdentityViolationException")
-        } catch (e: CallerIdentityViolationException) {
-            assertTrue("Message must start with IDENTITY_REFUSAL", e.message!!.startsWith("IDENTITY_REFUSAL"))
         }
+        assertTrue(ex.message!!.startsWith("IDENTITY_REFUSAL"), "Message must start with IDENTITY_REFUSAL")
     }
 
     // ── validateCallerPhone: non-MCP path, null audience → pass-through ────
@@ -77,12 +83,14 @@ class CallerIdentityValidatorTest {
 
     // ── validateCallerPhone: CUSTOMER audience ──────────────────────────────
 
-    @Test(expected = CallerIdentityViolationException::class)
+    @Test
     fun `validateCallerPhone CUSTOMER audience phone mismatch throws`() {
         CallerIdentityContext.setMcpRequest(true)
         CallerIdentityContext.setAudience("CUSTOMER")
         CallerIdentityContext.setCallerPhone("+27811111111")
-        CallerIdentityValidator.validateCallerPhone("+27822222222")
+        assertThrows<CallerIdentityViolationException> {
+            CallerIdentityValidator.validateCallerPhone("+27822222222")
+        }
     }
 
     @Test
@@ -93,12 +101,14 @@ class CallerIdentityValidatorTest {
         CallerIdentityValidator.validateCallerPhone("+27812345678") // must not throw
     }
 
-    @Test(expected = CallerIdentityViolationException::class)
+    @Test
     fun `validateCallerPhone CUSTOMER audience null callerPhone throws`() {
         CallerIdentityContext.setMcpRequest(true)
         CallerIdentityContext.setAudience("CUSTOMER")
         // callerPhone not set → null
-        CallerIdentityValidator.validateCallerPhone("+27812345678")
+        assertThrows<CallerIdentityViolationException> {
+            CallerIdentityValidator.validateCallerPhone("+27812345678")
+        }
     }
 
     // ── validateCallerPhone: STORE audience → no-op ─────────────────────────
@@ -113,21 +123,21 @@ class CallerIdentityValidatorTest {
 
     // ── validateCallerOwnsId: MCP path, null audience → HARD REJECT ─────────
 
-    @Test(expected = CallerIdentityViolationException::class)
+    @Test
     fun `validateCallerOwnsId throws on MCP request with null audience`() {
         CallerIdentityContext.setMcpRequest(true)
-        CallerIdentityValidator.validateCallerOwnsId("some-id") { "some-id" }
+        assertThrows<CallerIdentityViolationException> {
+            CallerIdentityValidator.validateCallerOwnsId("some-id") { "some-id" }
+        }
     }
 
     @Test
     fun `validateCallerOwnsId MCP rejection message contains IDENTITY_REFUSAL`() {
         CallerIdentityContext.setMcpRequest(true)
-        try {
+        val ex = assertThrows<CallerIdentityViolationException> {
             CallerIdentityValidator.validateCallerOwnsId("some-id") { "some-id" }
-            fail("Expected CallerIdentityViolationException")
-        } catch (e: CallerIdentityViolationException) {
-            assertTrue(e.message!!.startsWith("IDENTITY_REFUSAL"))
         }
+        assertTrue(ex.message!!.startsWith("IDENTITY_REFUSAL"))
     }
 
     // ── validateCallerOwnsId: non-MCP path, null audience → pass-through ────
@@ -146,17 +156,21 @@ class CallerIdentityValidatorTest {
         CallerIdentityValidator.validateMcpAudience("STORE")
     }
 
-    @Test(expected = CallerIdentityViolationException::class)
+    @Test
     fun `validateMcpAudience throws on MCP request with null audience`() {
         CallerIdentityContext.setMcpRequest(true)
-        CallerIdentityValidator.validateMcpAudience("STORE")
+        assertThrows<CallerIdentityViolationException> {
+            CallerIdentityValidator.validateMcpAudience("STORE")
+        }
     }
 
-    @Test(expected = CallerIdentityViolationException::class)
+    @Test
     fun `validateMcpAudience throws on MCP request with non-permitted audience`() {
         CallerIdentityContext.setMcpRequest(true)
         CallerIdentityContext.setAudience("CUSTOMER")
-        CallerIdentityValidator.validateMcpAudience("STORE")
+        assertThrows<CallerIdentityViolationException> {
+            CallerIdentityValidator.validateMcpAudience("STORE")
+        }
     }
 
     @Test
@@ -188,6 +202,46 @@ class CallerIdentityValidatorTest {
     @Test
     fun `normalizeLast9 short phone returns null`() {
         assertNull(CallerIdentityValidator.normalizeLast9("1234567"))
+    }
+
+    // ── AMD-01 (REQ-A10): ADMIN audience passes validators on MCP path ────────
+
+    @Test
+    fun `validateCallerPhone adminAudience mcpRequest passes`() {
+        CallerIdentityContext.setMcpRequest(true)
+        CallerIdentityContext.setAudience("ADMIN")
+        // no callerPhone set — ADMIN must pass without phone
+        CallerIdentityValidator.validateCallerPhone("+27812345678") // must not throw
+    }
+
+    @Test
+    fun `validateCallerPhone nullAudience mcpRequest stillRejects`() {
+        // REQ-A11: null audience is still rejected even after ADMIN support was added
+        CallerIdentityContext.setMcpRequest(true)
+        // audience is null
+        val ex = assertThrows<CallerIdentityViolationException> {
+            CallerIdentityValidator.validateCallerPhone("+27812345678")
+        }
+        assertTrue(ex.message!!.startsWith("IDENTITY_REFUSAL"))
+    }
+
+    @Test
+    fun `validateCallerOwnsId adminAudience mcpRequest passes`() {
+        CallerIdentityContext.setMcpRequest(true)
+        CallerIdentityContext.setAudience("ADMIN")
+        // resolver returns null — ADMIN must not trigger id resolution
+        CallerIdentityValidator.validateCallerOwnsId("some-id") { null } // must not throw
+    }
+
+    @Test
+    fun `validateCallerOwnsId nullAudience mcpRequest stillRejects`() {
+        // REQ-A11: null audience is still rejected even after ADMIN support was added
+        CallerIdentityContext.setMcpRequest(true)
+        // audience is null
+        val ex = assertThrows<CallerIdentityViolationException> {
+            CallerIdentityValidator.validateCallerOwnsId("some-id") { "some-id" }
+        }
+        assertTrue(ex.message!!.startsWith("IDENTITY_REFUSAL"))
     }
 
     // ── AUDIENCE_VIOLATION ViolationType (new enum constant) ────────────────

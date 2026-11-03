@@ -114,7 +114,8 @@ public class McpOrderService {
                     "Unauthenticated or tokenless requests are not permitted on the MCP surface. " +
                     "Please contact iZinga support if you need further help.");
             }
-            if (!"CUSTOMER".equals(audience) && !"STORE".equals(audience)) {
+            // AMD-01 (REQ-A9): ADMIN is also permitted to create orders
+            if (!"CUSTOMER".equals(audience) && !"STORE".equals(audience) && !"ADMIN".equals(audience)) {
                 LOG.warn("start_order: HARD-REJECT — audience={} is not permitted to create orders for customerId={}", audience, customerId);
                 return StartOrderResponse.rejected(
                     "IDENTITY_REFUSAL: I can only assist with queries for your own account. " +

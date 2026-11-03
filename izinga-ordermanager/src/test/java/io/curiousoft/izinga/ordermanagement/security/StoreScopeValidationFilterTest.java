@@ -2,6 +2,8 @@ package io.curiousoft.izinga.ordermanagement.security;
 
 import io.curiousoft.izinga.commons.security.CallerIdentityContext;
 import io.curiousoft.izinga.messaging.security.StoreScopeJwtService;
+import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
+import io.curiousoft.izinga.ordermanagement.security.StoreScopeContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -144,6 +146,59 @@ public class StoreScopeValidationFilterTest {
                 "IS_MCP_REQUEST must be true during chain even with invalid token");
         assertFalse(CallerIdentityContext.isMcpRequest(),
                 "IS_MCP_REQUEST must be cleared after filter completes");
+    }
+
+    // ── FIX-01 / AMD-01 (REQ-A10): ADMIN token end-to-end through real JWT service ───
+
+    /**
+     * FIX-01 (AMD-01 Code Review): uses a REAL StoreScopeJwtService (test secret) to mint an
+     * ADMIN token, so the test covers the full JWT → filter → context path rather than a mocked
+     * claim map.  Assertions mirror doFilterInternal_validToken_populatesContextDuringChain but
+     * for ADMIN audience:
+     *   - StoreScopeContext.getAudience() == Audience.ADMIN during chain
+     *   - CallerIdentityContext.getAudience() == "ADMIN" during chain (set by StoreScopeContext.setAudience)
+     *   - CallerIdentityContext.isMcpRequest() is true during chain
+     *   - StoreScopeContext.getPermittedStoreId() is null (ADMIN has no storeId)
+     *   - All three are cleared after the filter returns
+     */
+    @Test
+    public void doFilterInternal_adminToken_populatesAdminContextDuringChainAndClearsAfter() throws Exception {
+        StoreScopeJwtService realJwtService = new StoreScopeJwtService("test-secret-at-least-32-chars-1234");
+        StoreScopeValidationFilter adminFilter = new StoreScopeValidationFilter(realJwtService);
+
+        String adminToken = realJwtService.generateScopeToken(null, Audience.ADMIN, "+27811111111");
+        when(request.getParameter(StoreScopeJwtService.SCOPE_PARAM)).thenReturn(adminToken);
+
+        AtomicBoolean adminAudienceDuringChain = new AtomicBoolean(false);
+        AtomicBoolean callerAudienceAdminDuringChain = new AtomicBoolean(false);
+        AtomicBoolean mcpFlagDuringChain = new AtomicBoolean(false);
+        AtomicBoolean permittedStoreIdNullDuringChain = new AtomicBoolean(false);
+
+        FilterChain capturingChain = (req, res) -> {
+            adminAudienceDuringChain.set(StoreScopeContext.getAudience() == Audience.ADMIN);
+            callerAudienceAdminDuringChain.set("ADMIN".equals(CallerIdentityContext.getAudience()));
+            mcpFlagDuringChain.set(CallerIdentityContext.isMcpRequest());
+            permittedStoreIdNullDuringChain.set(StoreScopeContext.getPermittedStoreId() == null);
+        };
+
+        adminFilter.doFilterInternal(request, response, capturingChain);
+
+        assertTrue(adminAudienceDuringChain.get(),
+                "StoreScopeContext.getAudience() must be ADMIN during chain");
+        assertTrue(callerAudienceAdminDuringChain.get(),
+                "CallerIdentityContext.getAudience() must be \"ADMIN\" during chain");
+        assertTrue(mcpFlagDuringChain.get(),
+                "CallerIdentityContext.isMcpRequest() must be true during chain");
+        assertTrue(permittedStoreIdNullDuringChain.get(),
+                "permittedStoreId must be null for ADMIN token (no storeId claim)");
+
+        // After filter — all must be cleared
+        assertNull(StoreScopeContext.getAudience(),
+                "StoreScopeContext.getAudience() must be null after filter");
+        assertNull(CallerIdentityContext.getAudience(),
+                "CallerIdentityContext.getAudience() must be null after filter");
+        assertFalse(CallerIdentityContext.isMcpRequest(),
+                "CallerIdentityContext.isMcpRequest() must be false after filter");
     }
 
     // ── shouldNotFilter: non-/mcp paths skip the filter ───────────────────────

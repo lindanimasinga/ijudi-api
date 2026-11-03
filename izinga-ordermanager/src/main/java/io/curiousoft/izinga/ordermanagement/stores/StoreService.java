@@ -8,7 +8,6 @@ import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.commons.security.AgentIdentityAuditLog;
 import io.curiousoft.izinga.commons.security.AgentIdentityAuditService;
 import io.curiousoft.izinga.commons.security.CallerIdentityContext;
-import io.curiousoft.izinga.commons.security.CallerIdentityValidator;
 import io.curiousoft.izinga.commons.security.CallerIdentityViolationException;
 import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import io.curiousoft.izinga.ordermanagement.security.StoreScopeContext;
@@ -411,8 +410,9 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         // request's scope token is locked to a different store.
         io.curiousoft.izinga.ordermanagement.security.StoreScopeValidator.validate(id);
         // SEC-MCP-02 (REQ-06): on MCP requests, require an authenticated audience
+        // AMD-01 (REQ-A10): ADMIN added to permitted set for find_store_or_shops_by_id
         if (CallerIdentityContext.isMcpRequest()) {
-            StoreScopeValidator.validateAudience(Audience.STORE, Audience.DRIVER, Audience.CUSTOMER);
+            StoreScopeValidator.validateAudience(Audience.STORE, Audience.DRIVER, Audience.CUSTOMER, Audience.ADMIN);
         }
         StoreProfile store = profileRepo.findById(id).orElse(null);
         if (store != null && store.getBusinessHours() == null) {
@@ -535,20 +535,21 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
                         "For privacy and security reasons, I am not authorised to access another person's information. " +
                         "Please contact iZinga support if you need further help.");
                 }
+            } else if ("ADMIN".equals(audience)) {
+                // AMD-01 (REQ-A8): ADMIN has broad access — pass through without ownership check
+                LOG.debug("[MCP-ADMIN] find_stores_by_owner pass-through for ADMIN audience");
             } else {
-                // Any other authenticated audience: resolve caller userId and compare with ownerId
-                String callerPhone = CallerIdentityContext.getCallerPhone();
-                String resolvedCallerId = resolveCallerUserId(callerPhone);
-                if (resolvedCallerId == null || !resolvedCallerId.equals(ownerId)) {
-                    agentIdentityAuditService.recordViolation(
-                            callerPhone, ownerId,
-                            AgentIdentityAuditLog.ViolationType.ID_NOT_OWNED, "find_stores_by_owner",
-                            audience, null, null);
-                    throw new CallerIdentityViolationException(
-                        "IDENTITY_REFUSAL: I can only assist with queries for your own account. " +
-                        "For privacy and security reasons, I am not authorised to access another person's information. " +
-                        "Please contact iZinga support if you need further help.");
-                }
+                // AMD-01 (REQ-A8): any other audience (CUSTOMER, DRIVER, etc.) is a hard reject.
+                // The "resolved-caller-phone == ownerId" branch is removed — only STORE (owner-match)
+                // and ADMIN are permitted. All others receive an audit record and rejection.
+                agentIdentityAuditService.recordViolation(
+                        StoreScopeContext.getCallerPhone(), ownerId,
+                        AgentIdentityAuditLog.ViolationType.AUDIENCE_VIOLATION, "find_stores_by_owner",
+                        audience, null, null);
+                throw new CallerIdentityViolationException(
+                    "IDENTITY_REFUSAL: I can only assist with queries for your own account. " +
+                    "For privacy and security reasons, I am not authorised to access another person's information. " +
+                    "Please contact iZinga support if you need further help.");
             }
         }
         List<StoreProfile> stores = profileRepo.findByOwnerId(ownerId);
@@ -561,21 +562,6 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
             });
         }
         return stores;
-    }
-
-    /**
-     * SEC-MCP-02 (CORRECTION 2): resolve a caller phone to their user profile ID.
-     * Used by findByOwner() for non-STORE audiences on MCP requests.
-     */
-    private String resolveCallerUserId(String callerPhone) {
-        if (callerPhone == null) return null;
-        String last9 = CallerIdentityValidator.normalizeLast9(callerPhone);
-        if (last9 == null) return null;
-        for (String prefix : List.of("0", "+27", "27")) {
-            UserProfile u = userProfileRepo.findByMobileNumber(prefix + last9);
-            if (u != null) return u.getId();
-        }
-        return null;
     }
 
     /**
@@ -612,8 +598,9 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
             @org.springframework.ai.tool.annotation.ToolParam(required = false, description = "Optional availability filter — true = non-OFFLINE stores only, false = OFFLINE stores only, null = no filter.") Boolean activeStatus) {
 
         // SEC-MCP-02 (REQ-05 / find_stores): on MCP requests, require an authenticated audience
+        // AMD-01 (REQ-A10): ADMIN added to permitted set for find_stores
         if (CallerIdentityContext.isMcpRequest()) {
-            StoreScopeValidator.validateAudience(Audience.CUSTOMER, Audience.DRIVER, Audience.STORE);
+            StoreScopeValidator.validateAudience(Audience.CUSTOMER, Audience.DRIVER, Audience.STORE, Audience.ADMIN);
         }
 
         // Load base list: if storeType is supplied use the targeted repository query, else load all

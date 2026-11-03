@@ -75,3 +75,52 @@ Non-MCP paths (REST, scheduler, internal callers) remain unaffected because `IS_
 **Alternative B — Unconditional audience gate (no IS_MCP_REQUEST flag):** Rejected because it would break REST endpoints that do not carry a scope token (e.g. admin console, SchedulerService). The IS_MCP_REQUEST sentinel ensures REST callers are never subject to MCP-specific enforcement.
 
 **Alternative C — Separate controller layer for MCP tools:** Noted in this ADR as a future improvement. The current approach intercepts at the service layer via ThreadLocal, which is testable and safe but mixes tool-surface concerns into domain services. This is tracked as reserved `ADR-026-mcp-tools-controller-layer-separation.md` (not yet written). A future author should evaluate moving all `@Tool` methods to a dedicated MCP controller layer, keeping domain services clean.
+
+---
+
+## Amendment AMD-01: ADMIN Audience (2026-11-03)
+
+**Status:** Accepted
+**Approved by:** Lindani Masinga (co-founder, CEO)
+**Branch:** fix/mcp-tokenless-auth-bypass
+
+### Context
+
+PR #156 adds ADMIN-level MCP tool access for iZinga admin users calling via WhatsApp. The ADMIN audience is minted at runtime when the caller's phone resolves to a `ProfileRoles.ADMIN` user profile AND webhook signature verification is active.
+
+### Changes
+
+#### REQ-A1: New Audience value
+`Audience.ADMIN` added to `io.curiousoft.izinga.messaging.whatsapp.lines.Audience`.
+
+#### REQ-A2/A3: ADMIN minting site
+The only minting site is `AiCustomerServiceAgent.buildScopedMcpTools()`. When `WhatsappConfig.isSignatureVerificationEnabled()` is `true` (appSecret non-blank), the caller phone is normalised and looked up against `UserProfileRepo`. If the resolved profile has `role == ProfileRoles.ADMIN`, the JWT audience is set to `ADMIN` and `storeId` is set to `null`. This override is JWT-only — LineContext, outbound routing, and WhatsappSenderResolver never see ADMIN.
+
+**Fail-closed (REQ-A3):** When signature verification is disabled (production bypass state, appSecret not configured), the DB lookup is skipped entirely. The configured audience is used unchanged. The moment appSecret is configured and the app restarts, ADMIN minting activates automatically with zero code change.
+
+#### REQ-A4: ADMIN never from AiAgentConfig
+If an AiAgentConfig or WhatsappLine is misconfigured with audience=ADMIN, `buildScopedMcpTools()` demotes it to CUSTOMER and logs a WARN before any minting. ADMIN is exclusively a runtime elevation.
+
+#### REQ-A5: Non-admin senders unchanged
+Phone lookup failure or a non-ADMIN role result in the configured audience being used — same as before AMD-01.
+
+#### REQ-A10: CallerIdentityValidator ADMIN pass-through
+`validateCallerPhone()` and `validateCallerOwnsId()` in `CallerIdentityValidator` short-circuit to a no-op for `audience == "ADMIN"`. The null-audience hard-reject is preserved as the first check — ADMIN pass-through comes strictly AFTER it.
+
+#### Tool gate before/after table
+
+| Tool | Before AMD-01 | After AMD-01 |
+|---|---|---|
+| `find_users` | STORE only | **ADMIN only** (REQ-A6; Lindani's explicit decision) |
+| `find_orders_by_messenger_id` | DRIVER (own), STORE (with permittedStoreId, filtered) | **DRIVER (own), ADMIN (broad, unfiltered)** (REQ-A7) |
+| `find_stores_by_owner` | STORE (owner-match), CUSTOMER/DRIVER (caller-phone resolves to ownerId) | **STORE (owner-match), ADMIN (broad)** — any other audience is a hard reject with audit (REQ-A8) |
+| `start_order` | CUSTOMER, STORE | **CUSTOMER, STORE, ADMIN** (REQ-A9) |
+| `find_store_or_shops_by_id` | STORE, DRIVER, CUSTOMER | **STORE, DRIVER, CUSTOMER, ADMIN** — bank masking still applies (REQ-A10) |
+| `find_stores` | CUSTOMER, DRIVER, STORE | **CUSTOMER, DRIVER, STORE, ADMIN** — bank masking still applies (REQ-A10) |
+| All other 12 tools | As per SEC-MCP-01/02 | Unchanged (REQ-A11 tokenless reject preserved) |
+
+#### find_users STORE removal rationale
+The STORE audience is removed from `find_users` by Lindani's explicit decision. Evidence that no production agent breaks: the store template's `allowedTools` list contains only `find_store_or_shops_by_id`; nothing in `izinga-messaging` references `find_users`. Production-edited agent configs in MongoDB are unverified but the store template does not list this tool.
+
+#### WhatsappConfig shared predicate
+`WhatsappConfig.isSignatureVerificationEnabled()` is the single predicate used by both `AiCustomerServiceAgent` (for ADMIN minting) and `WhatsAppWebhookController.verifyHmacSignature()` (indirectly — it checks `appSecret` directly). The predicate may be used in `verifyHmacSignature` in a future refactor without any behaviour change.

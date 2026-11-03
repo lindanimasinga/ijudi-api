@@ -747,22 +747,12 @@ public class OrderServiceImpl implements OrderService {
                             audience, null, null);
                     throw e;
                 }
-            } else if ("STORE".equals(audience)) {
-                // STORE audience: permitted only when a store scope is set
-                String permittedStoreId = StoreScopeContext.getPermittedStoreId();
-                if (permittedStoreId == null) {
-                    agentIdentityAuditService.recordViolation(
-                            StoreScopeContext.getCallerPhone(), id,
-                            AgentIdentityAuditLog.ViolationType.AUDIENCE_VIOLATION, "find_orders_by_messenger_id",
-                            audience, null, null);
-                    throw new CallerIdentityViolationException(
-                        "IDENTITY_REFUSAL: I can only assist with queries for your own account. " +
-                        "For privacy and security reasons, I am not authorised to access another person's information. " +
-                        "Please contact iZinga support if you need further help.");
-                }
-                // STORE callers receive only orders scoped to their permitted store (filtered below)
+            } else if ("ADMIN".equals(audience)) {
+                // AMD-01 (REQ-A7): ADMIN has broad access — no ownership check, no store filter
+                LOG.debug("[MCP-ADMIN] find_orders_by_messenger_id pass-through for ADMIN audience");
             } else {
-                // CUSTOMER and any other audience are not permitted to enumerate driver orders
+                // STORE, CUSTOMER and any other audience are not permitted to enumerate driver orders
+                // AMD-01 (REQ-A7): STORE path removed; STORE is now a hard reject with audit record
                 agentIdentityAuditService.recordViolation(
                         StoreScopeContext.getCallerPhone(), id,
                         AgentIdentityAuditLog.ViolationType.AUDIENCE_VIOLATION, "find_orders_by_messenger_id",
@@ -795,13 +785,8 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // SEC-MCP-02 (CORRECTION 2): STORE audience → filter to orders belonging to the permitted store
-        if (CallerIdentityContext.isMcpRequest() && "STORE".equals(CallerIdentityContext.getAudience())) {
-            String permittedStoreId = StoreScopeContext.getPermittedStoreId();
-            resultOrders = resultOrders.stream()
-                    .filter(o -> permittedStoreId.equals(o.getShopId()))
-                    .collect(Collectors.toList());
-        }
+        // AMD-01 (REQ-A7): STORE post-query filter removed. STORE audience is now a hard reject above.
+        // No per-store filtering needed; DRIVER gets own orders only; ADMIN gets all unfiltered.
 
         return resultOrders.stream()
                 .map(it -> (Order) new MessengerOrderDto(it, izingaCommissionPerc))

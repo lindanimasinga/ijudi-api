@@ -79,14 +79,12 @@ class UserProfileService(
                        longitude: Double,
                        @ToolParam(description = "range is in degrees. 1 degree is approximately 111 km. So a range of 0.01 would be approximately 1.11 km") range: Double,
                        storeType: StoreType): List<UserProfile>? {
-        // SEC-MCP-02 (REQ-05 / find_users): only STORE agents are permitted to enumerate drivers.
-        // Architect decision D-01: STORE-only. Evidence: no CUSTOMER or DRIVER agent config lists
-        // find_users in allowed tools; the tool searches MESSENGER profiles for dispatch routing
-        // which is a STORE (dispatch) concern only. CUSTOMER/DRIVER enumerating drivers is a
-        // privacy risk with no legitimate use case documented in any agent config.
+        // AMD-01 (REQ-A6): find_users is ADMIN only (STORE removed by Lindani's explicit decision
+        // 2026-11-03). No code-seeded agent uses find_users; store template's allowedTools is only
+        // find_store_or_shops_by_id, and nothing in izinga-messaging references find_users.
         // Non-MCP paths (REST, scheduler, event listener) are unaffected — isMcpRequest() == false.
         try {
-            CallerIdentityValidator.validateMcpAudience("STORE")
+            CallerIdentityValidator.validateMcpAudience("ADMIN")
         } catch (e: io.curiousoft.izinga.commons.security.CallerIdentityViolationException) {
             val auditAudience = CallerIdentityContext.getAudience() ?: "UNKNOWN"
             agentIdentityAuditService.recordViolation(

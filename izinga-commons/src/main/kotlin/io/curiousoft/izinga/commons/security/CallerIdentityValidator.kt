@@ -22,6 +22,8 @@ object CallerIdentityValidator {
 
     private const val CUSTOMER = "CUSTOMER"
     private const val DRIVER = "DRIVER"
+    /** AMD-01 (REQ-A10): ADMIN audience passes all phone/id validators. */
+    private const val ADMIN = "ADMIN"
 
     private const val VIOLATION_MESSAGE =
         "IDENTITY_REFUSAL: I can only assist with queries for your own account. " +
@@ -119,6 +121,12 @@ object CallerIdentityValidator {
             LOG.warn("[MCP-IDENTITY-VIOLATION] HARD-REJECT: MCP request has no scope token (null audience) on validateCallerPhone")
             throw CallerIdentityViolationException(MCP_UNAUTHENTICATED_MESSAGE)
         }
+        // AMD-01 (REQ-A10): ADMIN audience passes phone/id validators unconditionally.
+        // This check is intentionally placed AFTER the null-audience reject above.
+        if (audience == ADMIN) {
+            LOG.debug("[MCP-ADMIN] pass-through on validateCallerPhone — ADMIN audience")
+            return
+        }
         if (audience != CUSTOMER && audience != DRIVER) return
 
         val callerPhone = CallerIdentityContext.getCallerPhone()
@@ -154,6 +162,12 @@ object CallerIdentityValidator {
         if (CallerIdentityContext.isMcpRequest() && audience == null) {
             LOG.warn("[MCP-IDENTITY-VIOLATION] HARD-REJECT: MCP request has no scope token (null audience) on validateCallerOwnsId")
             throw CallerIdentityViolationException(MCP_UNAUTHENTICATED_MESSAGE)
+        }
+        // AMD-01 (REQ-A10): ADMIN audience passes phone/id validators unconditionally.
+        // This check is intentionally placed AFTER the null-audience reject above.
+        if (audience == ADMIN) {
+            LOG.debug("[MCP-ADMIN] pass-through on validateCallerOwnsId — ADMIN audience")
+            return
         }
         if (audience != CUSTOMER && audience != DRIVER) return
 

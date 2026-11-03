@@ -331,6 +331,48 @@ public class McpOrderServiceTest {
         assertEquals("store-placed-order-id", response.getOrderId());
     }
 
+    /**
+     * AMD-01 (REQ-A9): ADMIN audience must be permitted to create orders.
+     * Follows the same happy-path pattern as storeAudience_happyPath_createsOrderSuccessfully.
+     */
+    @Test
+    public void startOrder_adminAudience_passes() {
+        CallerIdentityContext.setMcpRequest(true);
+        StoreScopeContext.setAudience(Audience.ADMIN);
+
+        when(userProfileRepo.existsById(CUSTOMER_ID)).thenReturn(true);
+        when(orderRepository.findFirstByCustomerIdAndTagIdempotencyKeyWithinWindow(
+                eq(CUSTOMER_ID), eq(IDEMPOTENCY_KEY), any(Date.class)))
+                .thenReturn(null);
+        Order created = buildOrder("admin-placed-order-id", OrderStage.STAGE_0_CUSTOMER_NOT_PAID, 50.0);
+        when(orderService.startOrder(any(Order.class))).thenReturn(created);
+
+        McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
+                CUSTOMER_ID, true, IDEMPOTENCY_KEY, SHOP_ID,
+                "desc", "ONLINE", basketJson(), null);
+
+        assertTrue(response.isSuccess(), "ADMIN audience order must succeed");
+        assertEquals("admin-placed-order-id", response.getOrderId());
+    }
+
+    /**
+     * AMD-01 regression: DRIVER must still be rejected even after ADMIN was added.
+     */
+    @Test
+    public void startOrder_driverAudience_rejected_unchanged() {
+        CallerIdentityContext.setMcpRequest(true);
+        StoreScopeContext.setAudience(Audience.DRIVER);
+
+        McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
+                CUSTOMER_ID, true, IDEMPOTENCY_KEY, SHOP_ID,
+                "desc", "ONLINE", basketJson(), null);
+
+        assertFalse(response.isSuccess());
+        assertTrue(response.getMessage().contains("IDENTITY_REFUSAL"),
+                "DRIVER audience must still be rejected with IDENTITY_REFUSAL");
+        verifyNoInteractions(userProfileRepo, orderRepository, orderService);
+    }
+
     // -------------------------------------------------------------------------
     // Helper factories
     // -------------------------------------------------------------------------

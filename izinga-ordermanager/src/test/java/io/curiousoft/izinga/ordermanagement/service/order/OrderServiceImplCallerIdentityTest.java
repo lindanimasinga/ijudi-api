@@ -462,61 +462,37 @@ public class OrderServiceImplCallerIdentityTest {
                 sut.findOrderByMessengerId(OTHER_USER_ID, false));
     }
 
+    /**
+     * AMD-01 (REQ-A7): ADMIN audience passes findOrderByMessengerId without any ownership check.
+     * Both orders from any store should be returned (unfiltered).
+     */
     @Test
-    public void findOrderByMessengerId_storeWithPermittedStore_passes() {
+    public void findOrderByMessengerId_adminAudience_passes() {
         CallerIdentityContext.setMcpRequest(true);
-        StoreScopeContext.setAudience(Audience.STORE);
-        StoreScopeContext.setPermittedStoreId("permitted-store-1");
+        StoreScopeContext.setAudience(Audience.ADMIN);
+
         when(orderRepo.findByShippingDataMessengerIdAndStageNot("messenger-1", OrderStage.STAGE_0_CUSTOMER_NOT_PAID))
                 .thenReturn(new ArrayList<>());
         when(orderQuoteRepository.findBySentToMessengerIds("messenger-1")).thenReturn(new ArrayList<>());
 
         sut.findOrderByMessengerId("messenger-1", false); // must not throw
+        // no ownership check — userProfileRepo must not be queried
+        verify(userProfileRepo, never()).findByMobileNumber(anyString());
     }
 
+    /**
+     * AMD-01 (REQ-A7): STORE audience is now a hard reject on findOrderByMessengerId.
+     * Previously: STORE with permittedStoreId passed. Now: hard reject regardless.
+     */
     @Test
-    public void findOrderByMessengerId_storeNoPermittedStore_throws() {
+    public void findOrderByMessengerId_storeAudience_nowRejects() {
         CallerIdentityContext.setMcpRequest(true);
         StoreScopeContext.setAudience(Audience.STORE);
+        // Even with a permittedStoreId set, STORE must be rejected
+        StoreScopeContext.setPermittedStoreId("permitted-store-1");
 
         assertThrows(CallerIdentityViolationException.class, () ->
                 sut.findOrderByMessengerId("messenger-1", false));
-    }
-
-    @Test
-    public void findOrderByMessengerId_storeFiltersByPermittedStoreId() {
-        CallerIdentityContext.setMcpRequest(true);
-        StoreScopeContext.setAudience(Audience.STORE);
-        StoreScopeContext.setPermittedStoreId("permitted-store-1");
-
-        Order matchingOrder = new Order();
-        matchingOrder.setId("order-match");
-        matchingOrder.setShopId("permitted-store-1");
-        ShippingData sd1 = new ShippingData("A", "B", ShippingData.ShippingType.DELIVERY);
-        sd1.setMessengerId("messenger-1");
-        matchingOrder.setShippingData(sd1);
-        matchingOrder.setBasket(new Basket());
-
-        Order nonMatchingOrder = new Order();
-        nonMatchingOrder.setId("order-no-match");
-        nonMatchingOrder.setShopId("other-store-999");
-        ShippingData sd2 = new ShippingData("C", "D", ShippingData.ShippingType.DELIVERY);
-        sd2.setMessengerId("messenger-1");
-        nonMatchingOrder.setShippingData(sd2);
-        nonMatchingOrder.setBasket(new Basket());
-
-        List<Order> rawOrders = new ArrayList<>();
-        rawOrders.add(matchingOrder);
-        rawOrders.add(nonMatchingOrder);
-
-        when(orderRepo.findByShippingDataMessengerIdAndStageNot("messenger-1", OrderStage.STAGE_0_CUSTOMER_NOT_PAID))
-                .thenReturn(rawOrders);
-        when(orderQuoteRepository.findBySentToMessengerIds("messenger-1")).thenReturn(new ArrayList<>());
-
-        Set<Order> result = sut.findOrderByMessengerId("messenger-1", false);
-
-        assertEquals(1, result.size(), "Only orders for the permitted store must be returned");
-        assertEquals("order-match", result.iterator().next().getId());
     }
 
     @Test
@@ -526,6 +502,69 @@ public class OrderServiceImplCallerIdentityTest {
         when(orderQuoteRepository.findBySentToMessengerIds("messenger-1")).thenReturn(new ArrayList<>());
 
         sut.findOrderByMessengerId("messenger-1", false); // must not throw
+    }
+
+    // ===== AMD-01 (REQ-A10): ADMIN audience passes without identity enforcement =====
+
+    /**
+     * AMD-01 (REQ-A10): ADMIN audience passes find_order_by_id for any order (no ownership check).
+     */
+    @Test
+    public void findOrder_adminAudience_anyOrder_passes() {
+        CallerIdentityContext.setMcpRequest(true);
+        StoreScopeContext.setAudience(Audience.ADMIN);
+        when(orderRepo.findById("order-2")).thenReturn(Optional.of(orderOwnedByOther()));
+
+        sut.findOrder("order-2"); // must not throw — ADMIN has no ownership restriction
+        verify(userProfileRepo, never()).findByMobileNumber(anyString());
+    }
+
+    /**
+     * AMD-01 (REQ-A10): ADMIN audience passes find_order_for_messenger for any order.
+     */
+    @Test
+    public void findOrderForMessenger_adminAudience_anyOrder_passes() {
+        CallerIdentityContext.setMcpRequest(true);
+        StoreScopeContext.setAudience(Audience.ADMIN);
+        Order o = orderOwnedByOther();
+        o.setBasket(new Basket());
+        when(orderRepo.findById("order-2")).thenReturn(Optional.of(o));
+
+        sut.findOrderForMessenger("order-2"); // must not throw
+        verify(userProfileRepo, never()).findByMobileNumber(anyString());
+    }
+
+    /**
+     * AMD-01 (REQ-A10): ADMIN audience passes find_orders_by_user_id for another user's id.
+     */
+    @Test
+    public void findOrderByUserId_adminAudience_otherUserId_passes() {
+        CallerIdentityContext.setMcpRequest(true);
+        StoreScopeContext.setAudience(Audience.ADMIN);
+        when(orderRepo.findByCustomerId(OTHER_USER_ID)).thenReturn(Optional.of(new ArrayList<>()));
+
+        sut.findOrderByUserId(OTHER_USER_ID); // must not throw
+        verify(userProfileRepo, never()).findByMobileNumber(anyString());
+    }
+
+    /**
+     * AMD-01 (REQ-A10): ADMIN audience passes find_orders_by_phone_number for any phone.
+     */
+    @Test
+    public void findOrderByPhone_adminAudience_otherPhone_passes() {
+        CallerIdentityContext.setMcpRequest(true);
+        StoreScopeContext.setAudience(Audience.ADMIN);
+        // Phone resolution stubs for the OTHER_PHONE, not CALLER_PHONE —
+        // ADMIN early return fires before the lookup, so no stub is needed here.
+        // Call must complete without CallerIdentityViolationException.
+        when(userProfileRepo.findByMobileNumber(anyString())).thenReturn(null);
+        try {
+            sut.findOrderByPhone("+27811111111");
+        } catch (IllegalArgumentException e) {
+            // "User not found" is expected when there is no profile — not an identity violation
+        } catch (CallerIdentityViolationException e) {
+            fail("ADMIN audience must not trigger identity enforcement: " + e.getMessage());
+        }
     }
 
     // ===== startOrder SA-022-01 =====

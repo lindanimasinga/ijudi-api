@@ -26,19 +26,23 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
- * SEC-MCP-01 (CORRECTION 1) / SEC-MCP-02: Unit tests for StoreService MCP-surface security.
+ * SEC-MCP-01 (CORRECTION 1) / SEC-MCP-02 / AMD-01: Unit tests for StoreService MCP-surface security.
  *
  * Covers:
  * - find(): MCP path returns masked bank accountId, REST path returns real accountId
  * - find(): profileRepo.save() is never called with a masked accountId
  * - find(): MCP request without valid audience throws AudienceViolationException
- * - findByOwner(): MCP path masks bank accountId, REST path does not
+ * - find(): ADMIN audience passes gate and bank accountId is still masked (REQ-A10)
+ * - findByOwner(): MCP path (ADMIN audience) masks bank accountId, REST path does not
  * - findByOwner(): null audience on MCP path throws
  * - findByOwner(): STORE audience with valid permit passes
  * - findByOwner(): STORE audience without permit throws
- * - findByOwner(): non-STORE audience with matching owner passes
- * - findByOwner(): non-STORE audience with mismatching owner throws
+ * - findByOwner(): STORE audience with ownerId mismatch throws
+ * - findByOwner(): ADMIN audience passes without ownership check (REQ-A8)
+ * - findByOwner(): CUSTOMER audience is now hard-rejected (REQ-A8)
+ * - findByOwner(): DRIVER audience is now hard-rejected (REQ-A8)
  * - findStores(): MCP path requires authenticated audience
+ * - findStores(): ADMIN audience passes gate (REQ-A10)
  */
 @ExtendWith(MockitoExtension.class)
 public class StoreServiceBankMaskingTest {
@@ -133,17 +137,13 @@ public class StoreServiceBankMaskingTest {
 
     @Test
     public void findByOwner_mcpRequest_bankAccountIdMasked() {
+        // AMD-01 (REQ-A8): ADMIN audience used here because CUSTOMER is now hard-rejected
         io.curiousoft.izinga.commons.security.CallerIdentityContext.setMcpRequest(true);
-        StoreScopeContext.setAudience(Audience.CUSTOMER);
-        StoreScopeContext.setCallerPhone(CALLER_PHONE);
+        StoreScopeContext.setAudience(Audience.ADMIN);
 
         StoreProfile store = storeWithBank(STORE_ID, REAL_BANK_ACCOUNT);
         store.setOwnerId(OWNER_ID);
         when(storeRepository.findByOwnerId(OWNER_ID)).thenReturn(List.of(store));
-        UserProfile caller = new UserProfile("Caller", UserProfile.SignUpReason.BUY,
-                "1 St", "https://img.test/1.png", CALLER_PHONE, ProfileRoles.CUSTOMER);
-        caller.setId(OWNER_ID);
-        when(userProfileRepo.findByMobileNumber(anyString())).thenReturn(caller);
 
         List<StoreProfile> result = storeService.findByOwner(OWNER_ID);
         assertFalse(result.isEmpty());
@@ -217,44 +217,6 @@ public class StoreServiceBankMaskingTest {
                 storeService.findByOwner(OWNER_ID));
     }
 
-    // ── findByOwner(): non-STORE, caller owns owner → passes ────────────────
-
-    @Test
-    public void findByOwner_customerAudience_callerOwnsId_passes() {
-        io.curiousoft.izinga.commons.security.CallerIdentityContext.setMcpRequest(true);
-        StoreScopeContext.setAudience(Audience.CUSTOMER);
-        StoreScopeContext.setCallerPhone(CALLER_PHONE);
-
-        UserProfile caller = new UserProfile("Caller", UserProfile.SignUpReason.BUY,
-                "1 St", "https://img.test/1.png", CALLER_PHONE, ProfileRoles.CUSTOMER);
-        caller.setId(OWNER_ID);
-        when(userProfileRepo.findByMobileNumber(anyString())).thenReturn(caller);
-
-        StoreProfile store = storeWithBank(STORE_ID, REAL_BANK_ACCOUNT);
-        store.setOwnerId(OWNER_ID);
-        when(storeRepository.findByOwnerId(OWNER_ID)).thenReturn(List.of(store));
-
-        List<StoreProfile> result = storeService.findByOwner(OWNER_ID);
-        assertFalse(result.isEmpty());
-    }
-
-    // ── findByOwner(): non-STORE, caller does NOT own → throw ───────────────
-
-    @Test
-    public void findByOwner_customerAudience_callerNotOwner_throws() {
-        io.curiousoft.izinga.commons.security.CallerIdentityContext.setMcpRequest(true);
-        StoreScopeContext.setAudience(Audience.CUSTOMER);
-        StoreScopeContext.setCallerPhone(CALLER_PHONE);
-
-        UserProfile caller = new UserProfile("Caller", UserProfile.SignUpReason.BUY,
-                "1 St", "https://img.test/1.png", CALLER_PHONE, ProfileRoles.CUSTOMER);
-        caller.setId("some-other-id");
-        when(userProfileRepo.findByMobileNumber(anyString())).thenReturn(caller);
-
-        assertThrows(CallerIdentityViolationException.class, () ->
-                storeService.findByOwner(OWNER_ID));
-    }
-
     // ── findStores(): MCP requires audience ─────────────────────────────────
 
     @Test
@@ -316,6 +278,82 @@ public class StoreServiceBankMaskingTest {
         assertFalse(result.isEmpty(), "Expected at least one store in results");
         assertEquals(MAIN_PAY_ACCOUNT, result.get(0).getBank().getAccountId(),
                 "findStores() must mask bank accountId unconditionally (MCP path)");
+    }
+
+    // ── AMD-01: findByOwner() ADMIN / CUSTOMER / DRIVER audience gates ───────
+
+    /**
+     * REQ-A8: ADMIN audience must pass findByOwner() without any ownership check.
+     */
+    @Test
+    public void findByOwner_adminAudience_passes() {
+        io.curiousoft.izinga.commons.security.CallerIdentityContext.setMcpRequest(true);
+        StoreScopeContext.setAudience(Audience.ADMIN);
+
+        StoreProfile store = storeWithBank(STORE_ID, REAL_BANK_ACCOUNT);
+        store.setOwnerId(OWNER_ID);
+        when(storeRepository.findByOwnerId(OWNER_ID)).thenReturn(List.of(store));
+
+        List<StoreProfile> result = storeService.findByOwner(OWNER_ID);
+        assertFalse(result.isEmpty());
+    }
+
+    /**
+     * REQ-A8: CUSTOMER audience must now be hard-rejected by findByOwner().
+     * The prior "resolved-caller-phone == ownerId" path was removed in AMD-01.
+     */
+    @Test
+    public void findByOwner_customerAudience_nowRejects() {
+        io.curiousoft.izinga.commons.security.CallerIdentityContext.setMcpRequest(true);
+        StoreScopeContext.setAudience(Audience.CUSTOMER);
+
+        assertThrows(Exception.class, () ->
+                storeService.findByOwner(OWNER_ID));
+    }
+
+    /**
+     * REQ-A8: DRIVER audience must now be hard-rejected by findByOwner().
+     */
+    @Test
+    public void findByOwner_driverAudience_nowRejects() {
+        io.curiousoft.izinga.commons.security.CallerIdentityContext.setMcpRequest(true);
+        StoreScopeContext.setAudience(Audience.DRIVER);
+
+        assertThrows(Exception.class, () ->
+                storeService.findByOwner(OWNER_ID));
+    }
+
+    // ── AMD-01: findStores() ADMIN audience gate ─────────────────────────────
+
+    /**
+     * REQ-A10: ADMIN audience must pass the findStores() audience gate.
+     */
+    @Test
+    public void findStores_adminAudience_passes() {
+        io.curiousoft.izinga.commons.security.CallerIdentityContext.setMcpRequest(true);
+        StoreScopeContext.setAudience(Audience.ADMIN);
+        when(storeRepository.findAll()).thenReturn(Collections.emptyList());
+
+        storeService.findStores(null, null, null); // must not throw
+    }
+
+    // ── AMD-01: find() ADMIN audience gate with bank masking ─────────────────
+
+    /**
+     * REQ-A10: ADMIN audience must pass the find() audience gate; bank masking still applies.
+     */
+    @Test
+    public void find_adminAudience_passes_withBankMasking() {
+        io.curiousoft.izinga.commons.security.CallerIdentityContext.setMcpRequest(true);
+        StoreScopeContext.setAudience(Audience.ADMIN);
+
+        StoreProfile store = storeWithBank(STORE_ID, REAL_BANK_ACCOUNT);
+        when(storeRepository.findById(STORE_ID)).thenReturn(Optional.of(store));
+        when(storeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        StoreProfile result = storeService.find(STORE_ID);
+        assertEquals(MAIN_PAY_ACCOUNT, result.getBank().getAccountId(),
+                "ADMIN audience must still receive masked bank accountId");
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
