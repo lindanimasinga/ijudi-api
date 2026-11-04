@@ -1,6 +1,6 @@
 # ADR-026: MCP Tools Controller-Layer Separation
 
-**Status:** Proposed
+**Status:** Accepted (2026-11-04, Lindani Masinga, via answers to OQ-1 to OQ-7)
 **Date:** 2026-11-04
 **Requested by:** Lindani Masinga (co-founder), proposal of 2026-11-02
 **Baseline:** `develop` @ `d23a595` (after PR #151 ADR-024, PR #152, PR #155, PR #156 ADR-027/AMD-01)
@@ -137,15 +137,14 @@ ADR-025 is no longer the sequencing anchor, and it cannot be resumed as written.
 
 ## Decision
 
-### D1. One MCP adapter layer in `izinga-ordermanager`
+### D1. One MCP adapter layer in `izinga-ordermanager` — Decided
 
-**Package and language**
-- All MCP tool surfaces move to `io.curiousoft.izinga.ordermanagement.mcp`, written in Java. The package already exists on the test side (`McpToolRegistrationTest`, `McpSseEndpointTest`).
+**Package and language** — Decided: Java, single package `io.curiousoft.izinga.ordermanagement.mcp` in `izinga-ordermanager`. All MCP tool surfaces move to this package, written in Java. The package already exists on the test side (`McpToolRegistrationTest`, `McpSseEndpointTest`).
 - `izinga-ordermanager` is the only module that depends on every other module, and it already owns `McpConfig`, `StoreScopeValidationFilter`, `StoreScopeContext` and the typed `Audience` enum.
 - Usermanagement and recon cannot see `Audience`, which is why `CallerIdentityValidator` works with strings today.
 - `izinga-ordermanager` compiles no Kotlin. We will not add Kotlin compilation to it, given the non-deterministic Kotlin build failures already seen on `develop`.
 
-**Proposed controllers**
+**Naming — Decided: Option A.** `@McpToolController` class-level marker annotation; classes named `*McpController`. Matches the existing REST-controller naming convention even though these are not REST controllers.
 
 | Controller | Tools | Moves from |
 |---|---|---|
@@ -170,24 +169,27 @@ ADR-025 is no longer the sequencing anchor, and it cannot be resumed as written.
 - `ToolCallbackConverterAutoConfiguration` aggregates every `ToolCallbackProvider` bean but **de-duplicates by name silently** across providers. So we keep exactly one provider bean: a tool accidentally left on both a service and a controller then fails fast at startup instead of one copy silently winning.
 - `McpToolUtils` turns any exception from `ToolCallback.call()` into `CallToolResult(text = e.getMessage(), isError = true)`. Refusals thrown at the boundary reach the agent exactly as they do today.
 
-### D2. Authorization lives only at the boundary, in two tiers
+### D2. Authorization lives only at the boundary, in two tiers — Decided: plain GuardedToolCallback, no AOP
 
-**Tier 1: coarse audience allowlist (declarative, default-deny)**
+**Decided: plain wrapper in McpConfig, no AOP.** The `GuardedToolCallback` decorator around registered tool callbacks is the guard mechanism. No `spring-boot-starter-aop`, no `CallerIdentityCheckAspect`. The guard runs only when the MCP server dispatches a call; an internal Java call can never accidentally pass through it.
+
+**Tier 1: coarse isMcpRequest assert (and audience gating once OQ-4 is decided)**
 - Every `@Tool` method carries `@McpAudience({...})`, which must be non-empty.
 - `McpConfig` builds the single provider from the controller beans and wraps each `ToolCallback` in a `GuardedToolCallback` decorator. The decorator implements Spring AI's `ToolCallback` and delegates to the `MethodToolCallback`.
-- Before delegating, the decorator:
-  1. asserts `CallerIdentityContext.isMcpRequest()`. This fails closed if tool execution ever leaves the servlet thread. Today the sync server's `servletMcpSyncServerCustomizer` sets `immediateExecution(true)`; switching to `type: async` would silently break every ThreadLocal check.
-  2. rejects a null audience.
-  3. rejects any audience not in the allowlist.
-  4. writes the audit record.
-  5. throws one standard `IDENTITY_REFUSAL:` message taken from a single `McpRefusal` constants class.
-- No AOP and no `spring-boot-starter-aop`. The guard runs only when the MCP server dispatches a call, so an internal Java call can never accidentally pass through it, and never needs to.
+- **Phase 0 / OQ-4-deferred behavior:** The decorator asserts `CallerIdentityContext.isMcpRequest()` fail-closed. That is the only runtime check the wrapper applies while OQ-4 is deferred. Audience rejection, audit write, and refusal shaping are NOT in the wrapper in this phase, because three tools have non-standard refusal shapes that must remain unchanged:
+  - `start_order` returns `StartOrderResponse.rejected(...)` — a success-shaped payload.
+  - `find_stores` and `find_store_or_shops_by_id` throw `AudienceViolationException` without the `IDENTITY_REFUSAL:` prefix for tokenless and OTP callers.
+  Standardising these in the wrapper would change agent-visible shapes, which OQ-4 deferred explicitly forbids.
+- **IS_MCP_REQUEST verification:** `StoreScopeValidationFilter.doFilterInternal()` calls `CallerIdentityContext.setMcpRequest(true)` unconditionally before token parsing (line 76 in the filter, before the `if (scopeParam != null)` branch). So for every `/mcp/**` request — including tokenless ones — `isMcpRequest()` is `true`. The fail-closed assert therefore cannot fire on any current `/mcp` path. It fires only if a `GuardedToolCallback` is invoked outside the MCP servlet path: a scheduler, an internal caller, or a future switch to `type: async` transport where ThreadLocals do not propagate. No path that today returns a different shape is affected.
+- **When OQ-4 is decided:** the wrapper takes over steps 2–5 (null-audience reject, allowlist reject, audit write, standard `IDENTITY_REFUSAL:` throw). Controller bodies shrink. `McpAccessMatrixTest` is updated to assert the unified shapes.
 
 **Tier 2: fine-grained ownership (explicit, in the controller body)**
+- Per-tool audience checks, audit writes, and refusal shapes stay in each controller body, byte-equivalent to today's service implementations.
 - Checks like "this order's `customerId` is the caller", "this store is the permitted store" and "this phone is the caller's phone" stay explicit first statements in each controller method.
 - Per the persisted-state principle, they run against the entity loaded through the (now ungated) service, never against request parameters.
 - They use one `McpCaller` facade: audience, `callerPhone`, `permittedStoreId`, and a request-cached `resolveUserId()` that replaces the three duplicated prefix loops.
 - Bank-account masking and `markUp` decoration also move here, on the object returned to the agent. Controllers have no repository access (R5 below), so a masked entity can never be saved.
+- The `@McpAudience` annotation is a declarative contract checked by the R2 ArchUnit rule and by `McpAccessMatrixTest`. It is not used by the wrapper for runtime gating in Phase 0.
 
 **Services**
 - Services lose every `isMcpRequest()` branch and every `CallerIdentityValidator` / `StoreScopeValidator` call.
@@ -214,13 +216,19 @@ The trust chain, end to end:
   - one forged by someone who holds `STORE_SCOPE_JWT_SECRET`.
 - **Where defense-in-depth belongs, if wanted.** If the second case is a concern (the committed placeholder secret must be treated as compromised, and the AWS-side provisioning from PR #152 is not confirmed here), the right place is a single token-acceptance rule in `StoreScopeValidationFilter`: "reject `audience=ADMIN` while ADMIN minting is disabled". That is step 5, it is a separate change, and it is OQ-6.
 
+**OQ-6 deferred (2026-11-04 decision):** the filter-level ADMIN rejection when signature verification is off is out of scope for this migration. It is a separate change to be tracked independently.
+
 Inside the controller layer, ADMIN is just another allowlist member. Each tool's `@McpAudience` reproduces today's ADMIN reach exactly (all 18). Tier-2 ownership checks keep today's ADMIN pass-through (AMD-01 REQ-A10), expressed once in `McpCaller` instead of inside `CallerIdentityValidator`.
 
 ### D4. The migration preserves behaviour; tightening is separate
 
 Each move phase must reproduce today's allow/deny matrix exactly: F1 × {tokenless, DRIVER, CUSTOMER, STORE, ADMIN, OTP} × {own, other}, including today's permissive STORE/OTP cells.
 
+**OQ-5 decision (2026-11-04):** Preserve the current access matrix exactly during the migration. No access rule is tightened as part of moving a tool. The two known tightening items, F4-1 (allowedTools never enforced) and F4-2 (self-assignable ADMIN), go to a SEPARATE, later deployment, not this one. Note: this differs from the original recommendation, which was to fix F4-1 now in the current service gates. Lindani's decision is to defer both F4-1 and F4-2 entirely.
+
 Closing the F4 gaps, or changing any F1 cell, is a separate, explicitly approved change with its own before/after table, in the same style as AMD-01. This keeps every migration PR reviewable as a pure move.
+
+The only approved behaviour change inside the migration is OQ-7 (create_user role restriction). See the "OQ-7 Approved Behaviour Change" section below.
 
 ### D5. Mechanical enforcement (ArchUnit, `archunit-junit5`, approved by Lindani 2026-11-01)
 
@@ -233,10 +241,20 @@ Closing the F4 gaps, or changing any F1 cell, is a separate, explicitly approved
 
 Rules start with a named `LEGACY_EXCLUSIONS` list (the 6 current service classes; this pattern was approved 2026-11-01). Each phase shrinks the list. Phase 6 deletes it and the rules hard-fail.
 
+**LEGACY_EXCLUSIONS — confirmed sufficient on today's code.** The 6 service classes that hold `@Tool` methods today are also the only production classes outside `..mcp..` / `..security..` that call R4-restricted methods:
+- `OrderServiceImpl` — R1, R4 (`StoreScopeValidator.validateCallerOwnsId`, `validateCallerPhone`, `normalizeLast9`, `CallerIdentityContext.isMcpRequest`)
+- `McpOrderService` — R1, R4 (`CallerIdentityContext.isMcpRequest`, `getAudience`)
+- `StoreService` — R1, R4 (`StoreScopeValidator.validate`, `validateAudience`, `isMcpRequest`)
+- `ReconServiceImpl` — R1, R4 (`CallerIdentityValidator.validateCallerOwnsId`)
+- `UserProfileService` — R1, R4 (`CallerIdentityValidator.rejectTokenlessMcp`, `validateCallerPhone`, `validateMcpAudience`)
+- `DocumentUploadMcpService` — R1, R4 (`CallerIdentityValidator.validateCallerPhone`)
+
+No other production class calls R4-restricted methods. `AiCustomerServiceAgent` calls `CallerIdentityValidator.normalizeLast9`, which is a utility method not in the R4 restricted list (`validate*` / `rejectTokenlessMcp`). R6 is satisfied today: only `StoreScopeValidationFilter` calls `StoreScopeContext` setters and `CallerIdentityContext.setMcpRequest`.
+
 Two non-ArchUnit contract tests, written in Phase 0 against the current code and kept green through every phase:
 
 - **`McpToolContractSnapshotTest`:** a golden JSON file of all 18 `ToolDefinition`s (name, description, inputSchema). Any byte diff fails the build.
-- **`McpAccessMatrixTest`:** a parameterized characterization test of the D4 matrix.
+- **`McpAccessMatrixTest`:** a parameterized characterization test of the D4 matrix. This test pins all three current refusal shapes byte-exact (see D2). Any migration PR that changes a shape fails here. It is updated deliberately only in the OQ-7 Phase 2b PR (create_user role restriction) and when OQ-4 is eventually decided.
 
 ---
 
@@ -247,7 +265,7 @@ Two non-ArchUnit contract tests, written in Phase 0 against the current code and
 
 ## Affected agents
 
-- **WhatsApp agents** (`driver_support`, `customer_support`, per-store `StoreAiAgent` lines) and the external izinga MCP connector, including the "iZinga Driver Customer Service" agent. They see no tool contract change (the snapshot test enforces this). The only possible agent-visible change is the refusal-shape unification in OQ-4.
+- **WhatsApp agents** (`driver_support`, `customer_support`, per-store `StoreAiAgent` lines) and the external izinga MCP connector, including the "iZinga Driver Customer Service" agent. They see no tool contract change (the snapshot test enforces this). The only possible agent-visible change is the refusal-shape unification in OQ-4 (deferred).
 - **iZinga Backend Developer:** implements phases. Must not change tool names, parameter names or descriptions, and must not tighten any matrix cell inside a migration PR.
 - **iZinga QA & Test Automation:** ports the 14 test classes that exercise MCP gating to the controller layer. Runs live UAT verification of the matrix per phase.
 - **iZinga Code Reviewer:** reviews the ArchUnit `LEGACY_EXCLUSIONS` diff and the snapshot diff (which must be empty) on every phase.
@@ -257,10 +275,11 @@ Two non-ArchUnit contract tests, written in Phase 0 against the current code and
 
 **No.** Single deployable, no REST change, tool contract frozen and snapshot-enforced, access matrix frozen and characterization-tested.
 
-Two agent-visible refusal-text changes are proposed (OQ-4):
+**OQ-4 deferred — refusal shapes frozen:** All 18 tools keep their current rejection response shapes during this migration. The two proposed shape changes are deferred:
+- `start_order`: the success-shaped `rejected` payload remains unchanged.
+- `find_stores` / `find_store_or_shops_by_id`: the prefix-less `AudienceViolationException` for tokenless/OTP callers remains unchanged.
 
-- `start_order`: the success-shaped `rejected` payload would become a thrown `IDENTITY_REFUSAL`.
-- `find_stores` / `find_store_or_shops_by_id`: the tokenless and OTP refusal text would gain the `IDENTITY_REFUSAL:` prefix.
+No refusal-text changes in this migration. The proposed unification is deferred to a separate decision.
 
 ---
 
@@ -277,9 +296,10 @@ Every phase is independently deployable and revertible. No cross-repo sequencing
 
 | Phase | Scope | Behaviour change | Notes |
 |---|---|---|---|
-| **0. Foundation** | `@McpToolController`, `@McpAudience`, `GuardedToolCallback`, `McpCaller`, `McpRefusal`; `McpConfig` keeps one provider and wraps only controller-declared tools (none yet); `archunit-junit5` + R1–R6 with `LEGACY_EXCLUSIONS`; `McpToolContractSnapshotTest` + `McpAccessMatrixTest` written against current code | None | The two contract tests are the safety net for everything after. Write them first. |
-| **1. Existing adapters (5 tools)** | `McpOrderService` → `OrderCreationMcpController`; `DocumentUploadMcpService` (Kotlin) → `DocumentUploadMcpController` (Java); move the CUSTOMER ownership check out of `OrderServiceImpl.startOrder()` | None (or OQ-4) | Lowest risk: zero non-MCP callers. Proves the pattern end to end. |
+| **0. Foundation** | `@McpToolController`, `@McpAudience`, `GuardedToolCallback` (asserts `isMcpRequest()` only — no audience gate in Phase 0), `McpCaller`, `McpRefusal`; `McpConfig` keeps one provider and wraps only controller-declared tools (none yet); `archunit-junit5` + R1–R6 with `LEGACY_EXCLUSIONS` (6 service classes, confirmed sufficient); `McpToolContractSnapshotTest` + `McpAccessMatrixTest` written against current code, pinning all 3 refusal shapes | None | The two contract tests are the safety net for everything after. Write them first. |
+| **1. Existing adapters (5 tools)** | `McpOrderService` → `OrderCreationMcpController`; `DocumentUploadMcpService` (Kotlin) → `DocumentUploadMcpController` (Java); move the CUSTOMER ownership check out of `OrderServiceImpl.startOrder()` | None | Lowest risk: zero non-MCP callers. Proves the pattern end to end. |
 | **2. User tools (4)** | `find_user_by_phone`, `find_users`, `create_user`, `get_missing_fields_by_phone` → `UserMcpController`; strip gates from `UserProfileService` | None | Largest payoff. `FirebaseJwtAuthenticationConverter`, OTP, invites and `UserController` become context-free. |
+| **2b. create_user role restriction** | Dedicated PR: disable role assignment via MCP in `UserMcpController.create_user`. Before/after table (AMD-01 style). `McpAccessMatrixTest` and snapshot updated deliberately in this PR. | Tightening: MCP callers can no longer set role | Ships immediately after Phase 2. See "OQ-7 Approved Behaviour Change" section. |
 | **3. Order reads (5)** | `OrderServiceImpl` read tools → `OrderMcpController` | None | Highest REST fan-in; the matrix test carries the load. |
 | **4. Stores (3)** | `StoreService` tools → `StoreMcpController`; masking moves; `StoreScopeValidator.validate` leaves `StoreService.find` | None | Removes the masked-entity persistence hazard. The `find()` default-hours seeding side effect stays in the service, unchanged. |
 | **5. Payouts (1)** | `get_payouts_for_user` → `PayoutMcpController` | None | **Start only after `feature/payout-disbursement-fixes` merges.** It changes `ReconServiceImpl` by +172/-45. |
@@ -310,13 +330,14 @@ Phases 2–5 touch disjoint service classes. They can run in parallel after Phas
   - It makes the imperative checks declarative but leaves them on dual-use service methods. Internal callers still pass through the same aspect, which is the root problem.
   - It adds AOP proxying to classes that Spring AI invokes reflectively.
   - Its design docs no longer exist.
-  - What carries over: the ArchUnit + `LEGACY_EXCLUSIONS` approach, and the `RESOLVER_NOT_FOUND` / `OWNERSHIP_MISMATCH` audit split (in `stash@{5}`) for tier-2 audit records.
+  - **AOP not adopted, confirmed by Lindani 2026-11-04 ("don't do AOP for now").** The AOP part of Alternative A is not adopted.
+  - What carries over: the ArchUnit + `LEGACY_EXCLUSIONS` approach. The `RESOLVER_NOT_FOUND` / `OWNERSHIP_MISMATCH` audit-enum split (in `stash@{5}`) is NOT absorbed into Phase 0 (OQ-3 decision); it remains open for a later decision.
 - **B. Per-module `mcp` packages (usermanagement and recon keep Kotlin adapters; guard in `izinga-commons`).** Rejected for now:
   - It keeps string-typed audiences.
   - It spreads the boundary across 3 modules.
   - It needs a cross-module guard registry.
   - It would be the right choice only if a module ever needs to run its MCP tools without `izinga-ordermanager`, which nothing does today.
-- **C. Guard as an AOP aspect on `@McpToolController` classes.** Rejected in favour of the `ToolCallback` decorator. The decorator runs only on real MCP dispatch, needs no new dependency, and keeps controllers unproxied.
+- **C. Guard as an AOP aspect on `@McpToolController` classes.** **Rejected, confirmed by Lindani 2026-11-04 ("don't do AOP for now").** The `ToolCallback` decorator runs only on real MCP dispatch, needs no new dependency, and keeps controllers unproxied.
 - **D. Carry caller scope in `McpTransportContext` (a `McpTransportContextExtractor` on the streamable transport) instead of ThreadLocals.** Deferred. It removes the thread-affinity dependency entirely, but it changes the filter and the token plumbing, so it belongs in its own ADR. The controller layer makes it a one-class swap later (`McpCaller`).
 - **E. Big-bang move of all 18 tools in one PR.** Rejected: unreviewable, and it maximises conflicts with in-flight recon work.
 
@@ -324,16 +345,68 @@ Phases 2–5 touch disjoint service classes. They can run in parallel after Phas
 
 ## Open questions for Lindani
 
-1. **OQ-1. Placement and language:** one `ordermanagement.mcp` package, all controllers in Java (D1)? This moves 3 Kotlin tool surfaces into Java, unlike ADR-025's OQ-4 answer (Kotlin) for the annotation. Alternative B keeps Kotlin per module at the cost of string audiences and a split boundary. *Recommendation: Java, single package.*
-2. **OQ-2. Naming:** `*McpController` with `@McpToolController` (matches your proposal), or `*McpTools`? *Recommendation: `*McpController`.*
-3. **OQ-3. Retire ADR-025 / MCP-SEC-02 formally?** If yes: drop the `feature/mcp-sec-02-phase1-caller-identity-aop` branch, and either drop `stash@{5}` or keep its audit-enum change for Phase 0. *Recommendation: retire it; absorb the enum split.*
-4. **OQ-4. Unify refusal shape:** all boundary refusals become a thrown `IDENTITY_REFUSAL:` plus an audit record. This changes `start_order`'s `{success:false, message}` refusal and the prefix-less `AudienceViolationException` text on the two store tools. Do any production `AiAgentConfig` prompts depend on `start_order`'s `success:false` shape? Prompts live in MongoDB and are not visible from code. *Recommendation: unify.*
-5. **OQ-5. Preserve first, tighten separately (D4)?** Or fold F4-1 (13 STORE-unrestricted tools, OTP) and F4-3 into the migration phases? *Recommendation: preserve, and fix F4-1 now in the current service gates as its own security change. It should not wait for any phase.*
-6. **OQ-6. Defense-in-depth for ADMIN at the filter (step 5, never in controllers):** should `StoreScopeValidationFilter` reject `audience=ADMIN` tokens while `isSignatureVerificationEnabled()` is false? This guards against a forged ADMIN token if `STORE_SCOPE_JWT_SECRET` is or was compromised. It is a small change, but it couples the filter to WhatsApp config until a non-WhatsApp ADMIN channel exists. *Recommendation: yes, as a temporary rule, removed by the future ADMIN-channel ADR.*
-7. **OQ-7. `create_user` role allowlist over MCP:** which `ProfileRoles` may an AI agent create (CUSTOMER and MESSENGER only? STORE_ADMIN?). Separately, how urgent is closing REST `POST`/`PATCH /user` role self-assignment (F4-2) relative to configuring `appSecret`? This is a product and security call; this ADR only flags it.
+1. ~~**OQ-1. Placement and language:** one `ordermanagement.mcp` package, all controllers in Java (D1)? This moves 3 Kotlin tool surfaces into Java, unlike ADR-025's OQ-4 answer (Kotlin) for the annotation. Alternative B keeps Kotlin per module at the cost of string audiences and a split boundary. *Recommendation: Java, single package.*~~
+
+> **Decided (2026-11-04, Lindani Masinga):** Java, single package `io.curiousoft.izinga.ordermanagement.mcp` in `izinga-ordermanager`. D1 table names and Java-only compilation constraint confirmed.
+
+2. ~~**OQ-2. Naming:** `*McpController` with `@McpToolController` (matches your proposal), or `*McpTools`? *Recommendation: `*McpController`.*~~
+
+> **Decided (2026-11-04, Lindani Masinga):** Option A. `@McpToolController` class-level marker annotation; classes named `*McpController` (OrderMcpController, StoreMcpController, etc.). Matches the existing REST-controller naming convention even though these are not REST controllers.
+
+3. ~~**OQ-3. Retire ADR-025 / MCP-SEC-02 formally?** If yes: drop the `feature/mcp-sec-02-phase1-caller-identity-aop` branch, and either drop `stash@{5}` or keep its audit-enum change for Phase 0. *Recommendation: retire it; absorb the enum split.*~~
+
+> **Decided (2026-11-04, Lindani Masinga — partial):** ADR-025's AOP approach is NOT adopted. `feature/mcp-sec-02-phase1-caller-identity-aop` branch and `stash@{5}` are left untouched; disposal is not explicitly decided. The `RESOLVER_NOT_FOUND` / `OWNERSHIP_MISMATCH` audit-enum split is NOT absorbed into Phase 0. Open for Lindani.
+
+4. ~~**OQ-4. Unify refusal shape:** all boundary refusals become a thrown `IDENTITY_REFUSAL:` plus an audit record. This changes `start_order`'s `{success:false, message}` refusal and the prefix-less `AudienceViolationException` text on the two store tools. Do any production `AiAgentConfig` prompts depend on `start_order`'s `success:false` shape? Prompts live in MongoDB and are not visible from code. *Recommendation: unify.*~~
+
+> **Decided (2026-11-04, Lindani Masinga):** Undecided; revisit later. All 18 tools keep their current rejection response shapes during this migration. No refusal-text changes.
+
+5. ~~**OQ-5. Preserve first, tighten separately (D4)?** Or fold F4-1 (13 STORE-unrestricted tools, OTP) and F4-3 into the migration phases? *Recommendation: preserve, and fix F4-1 now in the current service gates as its own security change. It should not wait for any phase.*~~
+
+> **Decided (2026-11-04, Lindani Masinga):** Preserve the current access matrix exactly. F4-1 and F4-2 go to a separate, later deployment — not this migration. Note: this differs from the recommendation, which was to fix F4-1 now in the current service gates.
+
+6. ~~**OQ-6. Defense-in-depth for ADMIN at the filter (step 5, never in controllers):** should `StoreScopeValidationFilter` reject `audience=ADMIN` tokens while `isSignatureVerificationEnabled()` is false? This guards against a forged ADMIN token if `STORE_SCOPE_JWT_SECRET` is or was compromised. It is a small change, but it couples the filter to WhatsApp config until a non-WhatsApp ADMIN channel exists. *Recommendation: yes, as a temporary rule, removed by the future ADMIN-channel ADR.*~~
+
+> **Decided (2026-11-04, Lindani Masinga):** Deferred. Fix later; not part of this work.
+
+7. ~~**OQ-7. `create_user` role allowlist over MCP:** which `ProfileRoles` may an AI agent create (CUSTOMER and MESSENGER only? STORE_ADMIN?). Separately, how urgent is closing REST `POST`/`PATCH /user` role self-assignment (F4-2) relative to configuring `appSecret`? This is a product and security call; this ADR only flags it.~~
+
+> **Decided (2026-11-04, Lindani Masinga):** Disable role assignment via MCP entirely for now. The `create_user` MCP tool must not be able to set or change a profile's role at all until this is properly designed. This closes the F4-2 MCP vector specifically. The REST-side gap (POST /user, PATCH /user/{id}, issue #138) is separate and stays open. See "OQ-7 Approved Behaviour Change" section below.
+
+---
+
+## OQ-7 Approved Behaviour Change: create_user Role Restriction (Phase 2b)
+
+**Status:** Approved, 2026-11-04, Lindani Masinga
+**Scope:** NOT Phase 0. NOT inside any pure-move PR. Ships as its own dedicated, separately-reviewed PR, with a before/after table in AMD-01 style.
+**Default placement:** Phase 2b — immediately after `create_user` moves to `UserMcpController` (Phase 2). Lindani may pull it earlier as a standalone change before Phase 2 if the F4-2 security risk demands it.
+
+### Decision
+The `create_user` MCP tool must not be able to set or change a profile's role. Role assignment via MCP is disabled entirely until this is properly designed.
+
+This is the only exception to the "preserve exactly" rule in D4. All other migration PRs are pure moves.
+
+### Deployment gating
+- The Phase 0 `McpAccessMatrixTest` rows for `create_user` are updated deliberately in the Phase 2b PR. The diff is the reviewed evidence.
+- If the tool description or JSON schema changes (see pre-implementation question 4 below), the `McpToolContractSnapshotTest` golden file is updated in the same PR, and the diff is explicitly reviewed.
+
+### Separation from REST
+The REST-side role-assignment gap (POST /user, PATCH /user/{id}, issue #138) is separate and stays open. This change closes only the MCP vector.
+
+### Pre-implementation questions (not answered here — require Lindani's input before implementation)
+
+1. **WhatsApp self-registration flow.** The `create_user` `@Tool` description at `izinga-usermanagement/src/main/kotlin/io/curiousoft/izinga/usermanagement/users/UserProfileService.kt:129` says "It can be a normal customer or a driver or a store owner depending on the role specified in the profile object." WhatsApp driver and store-owner self-registration through agents may rely on setting role=MESSENGER or role=STORE_ADMIN via this tool. If role assignment is disabled, those flows break. Must be verified in production agent configs (MongoDB) before implementation.
+
+2. **Role-null placeholder collision.** `validateUserProfileForCreate` at `UserProfileService.kt:285-287` requires `role != null` and throws "role is required" when it is null. The ONB-FIX duplicate-detection logic at `UserProfileService.kt:157-176` treats a profile with `role == null` as an OTP placeholder (created by `WhatsAppOtpService`): "role == null → this is the OTP placeholder → completing it is the intended path." If the MCP tool strips or rejects role, the caller must somehow supply a role but it cannot take effect — or the validation must change to allow null with a server-assigned default. This needs explicit design before implementation.
+
+3. **Rejection vs. ignore.** Should a supplied ADMIN (or other privileged) role value be (a) rejected with an error (revealing to the caller that ADMIN is a known role), or (b) silently overridden to a safe default? The rejection shape interacts with the deferred OQ-4: a new error shape here may be inconsistent with today's other shapes and would itself be a snapshot contract question.
+
+4. **Tool description and schema change.** The `@Tool` name, description, and `@ToolParam` annotations at `UserProfileService.kt:129` are part of the frozen snapshot contract. Disabling role via MCP likely requires changing the description ("It can be a normal customer or a driver or a store owner depending on the role specified...") and may affect the `role` parameter schema. Any change is a `McpToolContractSnapshotTest` failure — it must be explicitly approved, and the updated golden file is reviewed evidence in the Phase 2b PR.
 
 ---
 
 ## Approved by
 
-Pending: Lindani Masinga. F4 items to be flagged to Lindani Masinga and Hloniphani Manzi before implementation.
+Accepted: Lindani Masinga (co-founder, CEO), 2026-11-04, via answers to OQ-1 to OQ-7.
+
+F4 items (F4-1: allowedTools never enforced; F4-2: self-assignable ADMIN role) still need to be flagged to Lindani Masinga and Hloniphani Manzi before implementation of any tightening change. There is no record that this notification has occurred as of this writing.
