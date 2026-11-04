@@ -55,7 +55,6 @@ import static org.junit.jupiter.api.Assertions.*;
  * </ul>
  */
 @Disabled("Requires a running MongoDB instance – run manually for local smoke testing")
-@RunWith(SpringRunner.class)
 @SpringBootTest(classes = IjudiApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class McpSseEndpointTest {

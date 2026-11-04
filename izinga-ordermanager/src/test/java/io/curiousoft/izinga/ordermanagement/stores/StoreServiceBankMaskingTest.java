@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -77,6 +78,7 @@ public class StoreServiceBankMaskingTest {
     @AfterEach
     public void tearDown() {
         StoreScopeContext.clear();
+        io.curiousoft.izinga.commons.security.CallerIdentityContext.clear();
     }
 
     // ── find(): bank masking ─────────────────────────────────────────────────
@@ -89,7 +91,6 @@ public class StoreServiceBankMaskingTest {
 
         StoreProfile store = storeWithBank(STORE_ID, REAL_BANK_ACCOUNT);
         when(storeRepository.findById(STORE_ID)).thenReturn(Optional.of(store));
-        when(storeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         StoreProfile result = storeService.find(STORE_ID);
         assertEquals(MAIN_PAY_ACCOUNT, result.getBank().getAccountId(),
@@ -100,7 +101,6 @@ public class StoreServiceBankMaskingTest {
     public void find_restRequest_bankAccountIdNotMasked() {
         StoreProfile store = storeWithBank(STORE_ID, REAL_BANK_ACCOUNT);
         when(storeRepository.findById(STORE_ID)).thenReturn(Optional.of(store));
-        when(storeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         StoreProfile result = storeService.find(STORE_ID);
         assertEquals(REAL_BANK_ACCOUNT, result.getBank().getAccountId(),
@@ -131,6 +131,49 @@ public class StoreServiceBankMaskingTest {
         // No stubs needed: audience gate fires before findById is called
         assertThrows(AudienceViolationException.class, () ->
                 storeService.find(STORE_ID));
+    }
+
+    /**
+     * FIX-01 (Code Review): Verifies that when businessHours == null (seeding branch),
+     * profileRepo.save() receives the REAL bank accountId (never the masked value), and that
+     * the returned store exposes the masked accountId to MCP callers.
+     *
+     * StoreService.find() mutates the same object after save():
+     *   store.getBank().setAccountId(mainPayAccount)
+     * A naive argThat on the saved argument would see the already-mutated (masked) value and
+     * give a false-negative. We capture accountId at call time via AtomicReference to get the
+     * value that was actually passed to save().
+     */
+    @Test
+    public void find_mcpRequest_businessHoursNull_saveCalledWithRealAccountId_returnedValueMasked() {
+        // Arrange: MCP request with ADMIN audience (permitted for find())
+        io.curiousoft.izinga.commons.security.CallerIdentityContext.setMcpRequest(true);
+        StoreScopeContext.setAudience(Audience.ADMIN);
+
+        // Store with businessHours = null (triggers seeding branch + save) and empty categories
+        StoreProfile store = storeWithBank(STORE_ID, REAL_BANK_ACCOUNT);
+        store.setBusinessHours(null);
+        // categories defaults to emptyList() — the find() seeding branch will call buildDefaultCategories()
+
+        // Capture the accountId passed to save() BEFORE find() mutates the object
+        AtomicReference<String> savedAccountId = new AtomicReference<>();
+        when(storeRepository.findById(STORE_ID)).thenReturn(Optional.of(store));
+        when(storeRepository.save(any())).thenAnswer(inv -> {
+            StoreProfile s = inv.getArgument(0);
+            savedAccountId.set(s.getBank().getAccountId());
+            return s;
+        });
+
+        // Act
+        StoreProfile result = storeService.find(STORE_ID);
+
+        // Assert: save() was called exactly once with the REAL account (not masked)
+        verify(storeRepository, times(1)).save(any());
+        assertEquals(REAL_BANK_ACCOUNT, savedAccountId.get(),
+                "profileRepo.save() must receive the real bank accountId, never the masked value");
+        // Assert: returned store has the masked accountId (MCP surface protection)
+        assertEquals(MAIN_PAY_ACCOUNT, result.getBank().getAccountId(),
+                "MCP path must return masked bank accountId after seeding save");
     }
 
     // ── findByOwner(): bank masking ──────────────────────────────────────────
@@ -349,7 +392,6 @@ public class StoreServiceBankMaskingTest {
 
         StoreProfile store = storeWithBank(STORE_ID, REAL_BANK_ACCOUNT);
         when(storeRepository.findById(STORE_ID)).thenReturn(Optional.of(store));
-        when(storeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         StoreProfile result = storeService.find(STORE_ID);
         assertEquals(MAIN_PAY_ACCOUNT, result.getBank().getAccountId(),

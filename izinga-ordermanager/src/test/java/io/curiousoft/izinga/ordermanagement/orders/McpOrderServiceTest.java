@@ -8,6 +8,7 @@ import io.curiousoft.izinga.commons.security.CallerIdentityContext;
 import io.curiousoft.izinga.commons.security.CallerIdentityViolationException;
 import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import io.curiousoft.izinga.ordermanagement.security.StoreScopeContext;
+import io.curiousoft.izinga.ordermanagement.utils.DeliveryDistanceUnavailableException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -371,6 +372,31 @@ public class McpOrderServiceTest {
         assertTrue(response.getMessage().contains("IDENTITY_REFUSAL"),
                 "DRIVER audience must still be rejected with IDENTITY_REFUSAL");
         verifyNoInteractions(userProfileRepo, orderRepository, orderService);
+    }
+
+    // -------------------------------------------------------------------------
+    // #155 — DeliveryDistanceUnavailableException → informative rejected message
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void startOrder_deliveryDistanceUnavailable_returnsInformativeMessage() {
+        when(userProfileRepo.existsById(CUSTOMER_ID)).thenReturn(true);
+        when(orderRepository.findFirstByCustomerIdAndTagIdempotencyKeyWithinWindow(
+                eq(CUSTOMER_ID), eq(IDEMPOTENCY_KEY), any(java.util.Date.class)))
+                .thenReturn(null);
+        when(orderService.startOrder(any(Order.class)))
+                .thenThrow(new DeliveryDistanceUnavailableException("Maps API unavailable"));
+
+        McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
+                CUSTOMER_ID, true, IDEMPOTENCY_KEY, SHOP_ID,
+                "delivery order", "ONLINE", basketJson(), shippingJson());
+
+        assertFalse(response.isSuccess());
+        assertNotNull(response.getMessage());
+        assertTrue(response.getMessage().toLowerCase().contains("maps service"),
+                "Message must mention the maps service so the agent can inform the customer");
+        assertFalse(response.getMessage().contains("Maps API unavailable"),
+                "Raw internal cause must not leak to the caller");
     }
 
     // -------------------------------------------------------------------------

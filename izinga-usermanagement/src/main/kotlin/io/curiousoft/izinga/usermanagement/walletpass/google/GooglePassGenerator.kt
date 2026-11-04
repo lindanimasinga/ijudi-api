@@ -39,7 +39,6 @@ class GooglePassGenerator : PassGenerator<String> {
         val walletKeyStream = ByteArrayInputStream(googleConfig.configAsJson().toByteArray())
         credentials = GoogleCredentials.fromStream(walletKeyStream)
                 .createScoped(List.of(WalletobjectsScopes.WALLET_OBJECT_ISSUER))
-        credentials.refresh()
         val httpTransport: HttpTransport = GoogleNetHttpTransport.newTrustedTransport()
 
         // Initialize Google Wallet API service

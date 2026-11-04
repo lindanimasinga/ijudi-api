@@ -15,14 +15,14 @@ import io.curiousoft.izinga.ordermanagement.orders.quote.OrderQuoteRepository;
 import io.curiousoft.izinga.ordermanagement.leads.LeadService;
 import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
-import io.curiousoft.izinga.ordermanagement.utils.IjudiUtils;
+import io.curiousoft.izinga.ordermanagement.utils.DeliveryCalculationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.*;
 
@@ -30,9 +30,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.CALLS_REAL_METHODS;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -65,6 +62,8 @@ public class OrderServiceDeliveryPriceEstimateTest {
     private OrderQuoteRepository quoteRepository;
     @Mock
     private LeadService leadService;
+    @Mock
+    private DeliveryCalculationService deliveryCalculationService;
 
     private OrderServiceImpl sut;
 
@@ -93,6 +92,8 @@ public class OrderServiceDeliveryPriceEstimateTest {
                 quoteRepository,
                 leadService
         );
+        // Inject the @Autowired field not in the constructor
+        ReflectionTestUtils.setField(sut, "deliveryCalculationService", deliveryCalculationService);
     }
 
     @Test
@@ -129,22 +130,20 @@ public class OrderServiceDeliveryPriceEstimateTest {
                 5.0
         );
 
-        try (MockedStatic<IjudiUtils> ijudiUtils = mockStatic(IjudiUtils.class, CALLS_REAL_METHODS)) {
-            ijudiUtils.when(() -> IjudiUtils.calculateDrivingDirectionKM(anyString(), any(Order.class), any(StoreProfile.class)))
-                    .thenReturn(geoData);
+        when(deliveryCalculationService.calculateDrivingDirectionKM(any(Order.class), any(StoreProfile.class)))
+                .thenReturn(geoData);
 
-            DeliveryPriceEstimateDto result = sut.getDeliveryPriceEstimate("Truck Delivery Driver", "From A", "To B", null);
+        DeliveryPriceEstimateDto result = sut.getDeliveryPriceEstimate("Truck Delivery Driver", "From A", "To B", null);
 
-            assertNotNull(result);
-            assertEquals("Truck Delivery Driver", result.getCategory());
-            assertEquals("From A", result.getFromAddress());
-            assertEquals("To B", result.getToAddress());
-            assertEquals(5.0, result.getDistanceKm(), 0.0);
-            assertEquals(15.0, result.getStandardFee(), 0.0);
-            assertEquals(3.0, result.getStandardKm(), 0.0);
-            assertEquals(5.0, result.getRatePerKm(), 0.0);
-            assertEquals(25.0, result.getEstimatedDeliveryFee(), 0.0);
-        }
+        assertNotNull(result);
+        assertEquals("Truck Delivery Driver", result.getCategory());
+        assertEquals("From A", result.getFromAddress());
+        assertEquals("To B", result.getToAddress());
+        assertEquals(5.0, result.getDistanceKm(), 0.0);
+        assertEquals(15.0, result.getStandardFee(), 0.0);
+        assertEquals(3.0, result.getStandardKm(), 0.0);
+        assertEquals(5.0, result.getRatePerKm(), 0.0);
+        assertEquals(25.0, result.getEstimatedDeliveryFee(), 0.0);
     }
 
     @Test
@@ -164,19 +163,17 @@ public class OrderServiceDeliveryPriceEstimateTest {
                 5.0
         );
 
-        try (MockedStatic<IjudiUtils> ijudiUtils = mockStatic(IjudiUtils.class, CALLS_REAL_METHODS)) {
-            ijudiUtils.when(() -> IjudiUtils.calculateDrivingDirectionKM(anyString(), any(Order.class), any(StoreProfile.class)))
-                    .thenReturn(geoData);
+        when(deliveryCalculationService.calculateDrivingDirectionKM(any(Order.class), any(StoreProfile.class)))
+                .thenReturn(geoData);
 
-            DeliveryPriceEstimateDto result = sut.getDeliveryPriceEstimate("Truck Delivery Driver", "From A", "To B", "shop-1");
+        DeliveryPriceEstimateDto result = sut.getDeliveryPriceEstimate("Truck Delivery Driver", "From A", "To B", "shop-1");
 
-            assertNotNull(result);
-            assertEquals(100.0, result.getStandardFee(), 0.0);
-            assertEquals(2.0, result.getStandardKm(), 0.0);
-            assertEquals(10.0, result.getRatePerKm(), 0.0);
-            assertEquals(130.0, result.getEstimatedDeliveryFee(), 0.0);
-            verify(storeRepository).findById("shop-1");
-        }
+        assertNotNull(result);
+        assertEquals(100.0, result.getStandardFee(), 0.0);
+        assertEquals(2.0, result.getStandardKm(), 0.0);
+        assertEquals(10.0, result.getRatePerKm(), 0.0);
+        assertEquals(130.0, result.getEstimatedDeliveryFee(), 0.0);
+        verify(storeRepository).findById("shop-1");
     }
 
     @Test
@@ -197,16 +194,14 @@ public class OrderServiceDeliveryPriceEstimateTest {
                 5.0
         );
 
-        try (MockedStatic<IjudiUtils> ijudiUtils = mockStatic(IjudiUtils.class, CALLS_REAL_METHODS)) {
-            ijudiUtils.when(() -> IjudiUtils.calculateDrivingDirectionKM(anyString(), any(Order.class), any(StoreProfile.class)))
-                    .thenReturn(geoData);
+        when(deliveryCalculationService.calculateDrivingDirectionKM(any(Order.class), any(StoreProfile.class)))
+                .thenReturn(geoData);
 
-            DeliveryPriceEstimateDto result = sut.getDeliveryPriceEstimate("Truck Delivery Driver", "From A", "To B", "shop-1");
+        DeliveryPriceEstimateDto result = sut.getDeliveryPriceEstimate("Truck Delivery Driver", "From A", "To B", "shop-1");
 
-            assertNotNull(result);
-            assertEquals(20.0, result.getRatePerKm(), 0.0);
-            assertEquals(160.0, result.getEstimatedDeliveryFee(), 0.0);
-        }
+        assertNotNull(result);
+        assertEquals(20.0, result.getRatePerKm(), 0.0);
+        assertEquals(160.0, result.getEstimatedDeliveryFee(), 0.0);
     }
 
     @Test
@@ -226,15 +221,13 @@ public class OrderServiceDeliveryPriceEstimateTest {
                 5.0
         );
 
-        try (MockedStatic<IjudiUtils> ijudiUtils = mockStatic(IjudiUtils.class, CALLS_REAL_METHODS)) {
-            ijudiUtils.when(() -> IjudiUtils.calculateDrivingDirectionKM(anyString(), any(Order.class), any(StoreProfile.class)))
-                    .thenReturn(geoData);
+        when(deliveryCalculationService.calculateDrivingDirectionKM(any(Order.class), any(StoreProfile.class)))
+                .thenReturn(geoData);
 
-            DeliveryPriceEstimateDto result = sut.getDeliveryPriceEstimate("Truck Delivery Driver", "From A", "To B", "shop-1");
+        DeliveryPriceEstimateDto result = sut.getDeliveryPriceEstimate("Truck Delivery Driver", "From A", "To B", "shop-1");
 
-            assertNotNull(result);
-            assertEquals(10.0, result.getRatePerKm(), 0.0);
-            assertEquals(130.0, result.getEstimatedDeliveryFee(), 0.0);
-        }
+        assertNotNull(result);
+        assertEquals(10.0, result.getRatePerKm(), 0.0);
+        assertEquals(130.0, result.getEstimatedDeliveryFee(), 0.0);
     }
 }

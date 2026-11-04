@@ -103,7 +103,8 @@ public class FirebaseNotificationService {
         FCMNotification notification = new FCMNotification(message.getPushHeading().getBody(),
                 message.getPushHeading().getTitle(),
                 null);
-        WebPush webPush = new WebPush(new WebPush.FcmOptions(message.getPushHeading().getLink()));
+        String link = message.getPushHeading().getLink();
+        WebPush webPush = link != null ? new WebPush(new WebPush.FcmOptions(link)) : null;
         return new FCMMessage(destination, notification, webPush);
     }
 

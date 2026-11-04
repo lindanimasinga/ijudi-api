@@ -390,7 +390,7 @@ TU-01 find_user_by_phone: isError=True | `IDENTITY_REFUSAL: This tool requires a
 
 **GROUP G — ThreadLocal bleed**
 
-TBL-01 ADMIN token → find_user_by_phone: isError=False, profile returned (gate accepted). 
+TBL-01 ADMIN token → find_user_by_phone: isError=False, profile returned (gate accepted).
 TBL-02 immediately after, same session, tokenless → find_user_by_phone: isError=True | IDENTITY_REFUSAL.
 No carry-over of ADMIN context. PASS — `CallerIdentityContext.clear()` in finally block confirmed effective.
 

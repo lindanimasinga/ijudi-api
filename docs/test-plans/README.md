@@ -36,6 +36,7 @@ Each userType directory holds one file per feature. A feature that spans two use
 | admin (platform integration) | MCP tools — tokenless auth bypass fix (SEC-MCP-01/02, 18 tools, FIX-03/04/05); find_stores + start_order; SA-022-01 guards; idempotent duplicate detection; domain exception sanitization | [admin/mcp-tools.md](admin/mcp-tools.md) | 2026-11-03 |
 | driver / customer | AI Customer Service Agent — WhatsApp inbound webhook live E2E trace; AiCustomerServiceAgent dispatch; new-session landing flow; resumed-session OpenAI call; Firestore + MongoDB conversation history; outbound WhatsApp delivery (CUSTOMER-audience confirmed; DRIVER-audience blocked by UAT gap) | [driver/ai-agent-whatsapp-live-trace.md](driver/ai-agent-whatsapp-live-trace.md) | 2026-11-01 |
 | driver / customer | AI Customer Service Agent — boundary discipline & identity integrity; 18-case live suite; cross-identity attack resistance; privacy guardrails; role-claim bypass; payout lookup scoping; 4 FAIL + 2 PARTIAL findings | [driver/ai-agent-boundary-discipline.md](driver/ai-agent-boundary-discipline.md) | 2026-11-01 |
+| admin (platform / engineering) | JUnit 4 engine fix (vintage-engine, Surefire 3.2.5) + Device.kt @field:NotBlank + OrderServiceImpl shippingData null guards + StoreService partial-PATCH OR guard + DeliveryCalculationService extraction | [admin/junit4-engine-and-production-null-guards.md](admin/junit4-engine-and-production-null-guards.md) | 2026-11-02 |
 
 ## Maintenance rule
 

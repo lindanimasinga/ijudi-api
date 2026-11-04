@@ -124,6 +124,11 @@ public class StoreServiceReferralAttributionTest {
     private StoreProfile storeProfile() {
         Bank bank = new Bank();
         bank.setAccountId("acc-1");
+        // T-08: validateBankForCreate requires type, name, phone, branchCode for non-EWALLET
+        bank.setType(BankAccType.CHEQUE);
+        bank.setName("Test Bank");
+        bank.setPhone("0811111111");
+        bank.setBranchCode("051001");
         ArrayList<BusinessHours> hours = new ArrayList<>();
         hours.add(new BusinessHours(DayOfWeek.MONDAY, new Date(), new Date()));
         ArrayList<String> tags = new ArrayList<>();

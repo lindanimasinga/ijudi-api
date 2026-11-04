@@ -6,10 +6,11 @@ import jakarta.validation.constraints.NotBlank
 
 class Device : BaseModel {
     @Indexed(unique = true)
-    var token: @NotBlank(message = "device token required") String? = null
+    @field:NotBlank(message = "device token required")
+    var token: String? = null
     var userId: String? = null
 
-    constructor(token: @NotBlank(message = "device token required") String?) : super(UUID.randomUUID().toString()) {
+    constructor(token: String?) : super(UUID.randomUUID().toString()) {
         this.token = token
     }
 

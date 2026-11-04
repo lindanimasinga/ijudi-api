@@ -91,8 +91,13 @@ class ReconServiceImpl(
             emailSubject = "iZinga pay",
         )
 
-        payout.orders.add(order)
-        payout.emailSent = false
+        // IDEMPOTENCY: Order.equals() is id-based but hashCode() is identity-based, so MutableSet
+        // dedup is identity-based. Guard explicitly by id to prevent duplicate order entries in the
+        // shop bundle (which would inflate ShopPayout.total and cause shop overpayment).
+        if (payout.orders.none { it.id == order.id }) {
+            payout.orders.add(order)
+            payout.emailSent = false
+        }
         return shopPayoutRepo.save(payout)
     }
 
@@ -121,7 +126,9 @@ class ReconServiceImpl(
             it.isPermEmployed = messng.isPermanentEmployed ?: false
         }
 
-        payout.orders.firstOrNull { it == order }
+        // IDEMPOTENCY: use explicit id comparison (not equals/hashCode) to guard against duplicate
+        // order entries caused by the Order.equals()/hashCode() mismatch in MutableSet.
+        payout.orders.firstOrNull { it.id == order.id }
             ?.let { logger.info("payout already processed for the order {}", it.id) } ?: run {
                 logger.info("adding order {} to messenger payout {}", order.id, payout.id)
                 payout.orders.add(order)

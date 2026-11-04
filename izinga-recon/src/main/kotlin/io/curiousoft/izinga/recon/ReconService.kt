@@ -10,8 +10,18 @@ import java.util.*
 
 interface ReconService {
 
+    /**
+     * INTERNAL — batch and event use only. MUST NEVER be annotated @Tool or registered
+     * in McpConfig / reachable from caller-facing MCP/HTTP paths.
+     * Caller-facing payout lookups must use the caller-identity-gated getAllPayouts().
+     */
     fun generatePayoutForShopAndOrder(order: Order): ShopPayout?
 
+    /**
+     * INTERNAL — batch and event use only. MUST NEVER be annotated @Tool or registered
+     * in McpConfig / reachable from caller-facing MCP/HTTP paths.
+     * Caller-facing payout lookups must use the caller-identity-gated getAllPayouts().
+     */
     fun generatePayoutForMessengerAndOrder(order: Order): MessengerPayout?
 
     fun generatePayoutForAmbassadorAndApproval(driver: UserProfile, ambassador: UserProfile): AmbassadorPayout?

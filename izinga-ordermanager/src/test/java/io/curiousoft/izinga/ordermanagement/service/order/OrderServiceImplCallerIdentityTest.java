@@ -14,6 +14,7 @@ import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import io.curiousoft.izinga.ordermanagement.leads.LeadService;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
+import io.curiousoft.izinga.ordermanagement.utils.DeliveryCalculationService;
 import io.curiousoft.izinga.ordermanagement.orders.RestrictedRegionService;
 import io.curiousoft.izinga.ordermanagement.orders.quote.OrderQuoteRepository;
 import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
@@ -66,6 +67,7 @@ public class OrderServiceImplCallerIdentityTest {
     @Mock private OrderQuoteRepository orderQuoteRepository;
     @Mock private LeadService leadService;
     @Mock private AgentIdentityAuditService agentIdentityAuditService;
+    @Mock private DeliveryCalculationService deliveryCalculationService;
 
     private OrderServiceImpl sut;
 
@@ -87,6 +89,7 @@ public class OrderServiceImplCallerIdentityTest {
                 restrictedRegionService, orderQuoteRepository, leadService
         );
         ReflectionTestUtils.setField(sut, "agentIdentityAuditService", agentIdentityAuditService);
+        ReflectionTestUtils.setField(sut, "deliveryCalculationService", deliveryCalculationService);
     }
 
     @AfterEach
@@ -110,7 +113,7 @@ public class OrderServiceImplCallerIdentityTest {
         Order o = new Order();
         o.setId("order-1");
         o.setCustomerId(CALLER_USER_ID);
-        o.setShopId("test-shop");
+        o.setShopId("shop-1");
         ShippingData sd = new ShippingData("From", "To", ShippingData.ShippingType.DELIVERY);
         sd.setMessengerId(CALLER_USER_ID);
         o.setShippingData(sd);
@@ -121,7 +124,7 @@ public class OrderServiceImplCallerIdentityTest {
         Order o = new Order();
         o.setId("order-2");
         o.setCustomerId(OTHER_USER_ID);
-        o.setShopId("test-shop");
+        o.setShopId("shop-1");
         ShippingData sd = new ShippingData("From", "To", ShippingData.ShippingType.DELIVERY);
         sd.setMessengerId(OTHER_USER_ID);
         o.setShippingData(sd);
@@ -258,7 +261,7 @@ public class OrderServiceImplCallerIdentityTest {
         Order o = new Order();
         o.setId("order-1");
         o.setCustomerId(OTHER_USER_ID);
-        o.setShopId("test-shop");
+        o.setShopId("shop-1");
         ShippingData sd = new ShippingData("From", "To", ShippingData.ShippingType.DELIVERY);
         sd.setMessengerId(CALLER_USER_ID);
         o.setShippingData(sd);
@@ -324,6 +327,50 @@ public class OrderServiceImplCallerIdentityTest {
         } catch (CallerIdentityViolationException e) {
             fail("STORE audience must not trigger identity enforcement: " + e.getMessage());
         }
+    }
+
+    // ===== NOTE-03: null resolved callerId is a hard reject (null == null must NOT pass) =====
+
+    @Test
+    public void findOrder_driverAudience_unresolvedCaller_nullMessengerId_throws() {
+        // DRIVER audience set but phone cannot be resolved to any user profile
+        StoreScopeContext.setAudience(Audience.DRIVER);
+        StoreScopeContext.setCallerPhone("+27899999999");
+        // All three prefix lookups return null → callerId resolves to null
+        when(userProfileRepo.findByMobileNumber("0899999999")).thenReturn(null);
+        when(userProfileRepo.findByMobileNumber("+27899999999")).thenReturn(null);
+        when(userProfileRepo.findByMobileNumber("27899999999")).thenReturn(null);
+
+        // Order has no messenger assigned (null shippingData → messengerId = null)
+        Order o = new Order();
+        o.setId("order-1");
+        o.setCustomerId(OTHER_USER_ID);
+        o.setShippingData(null);
+        when(orderRepo.findById("order-1")).thenReturn(Optional.of(o));
+
+        // NOTE-03: null callerId must throw even if id is also null (null == null must NOT pass)
+        assertThrows(CallerIdentityViolationException.class, () ->
+                sut.findOrder("order-1"));
+    }
+
+    @Test
+    public void findOrderForMessenger_driverAudience_unresolvedCaller_nullMessengerId_throws() {
+        StoreScopeContext.setAudience(Audience.DRIVER);
+        StoreScopeContext.setCallerPhone("+27899999999");
+        when(userProfileRepo.findByMobileNumber("0899999999")).thenReturn(null);
+        when(userProfileRepo.findByMobileNumber("+27899999999")).thenReturn(null);
+        when(userProfileRepo.findByMobileNumber("27899999999")).thenReturn(null);
+
+        Order o = new Order();
+        o.setId("order-1");
+        o.setCustomerId(OTHER_USER_ID);
+        o.setShippingData(null);
+        o.setBasket(new Basket());
+        when(orderRepo.findById("order-1")).thenReturn(Optional.of(o));
+
+        // NOTE-03: null callerId must throw even if id is also null
+        assertThrows(CallerIdentityViolationException.class, () ->
+                sut.findOrderForMessenger("order-1"));
     }
 
     // ===== findOrder — SEC-MCP-01: null-audience hard reject =====
@@ -577,6 +624,7 @@ public class OrderServiceImplCallerIdentityTest {
         when(userProfileRepo.existsById(OTHER_USER_ID)).thenReturn(true);
 
         Order order = new Order();
+        order.setOrderType(OrderType.ONLINE);
         order.setCustomerId(OTHER_USER_ID);
         order.setShopId("shop-1");
         ShippingData sd = new ShippingData("From", "To", ShippingData.ShippingType.DELIVERY);

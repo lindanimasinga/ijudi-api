@@ -6,6 +6,7 @@ import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.commons.security.CallerIdentityContext;
 import io.curiousoft.izinga.commons.security.CallerIdentityViolationException;
+import io.curiousoft.izinga.ordermanagement.utils.DeliveryDistanceUnavailableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.annotation.Tool;
@@ -173,6 +174,9 @@ public class McpOrderService {
             // be sanitized. Pass the message through verbatim so the AI agent sees the refusal.
             LOG.warn("start_order: identity violation for customerId={} — {}", customerId, e.getMessage());
             return StartOrderResponse.rejected(e.getMessage());
+        } catch (DeliveryDistanceUnavailableException e) {
+            LOG.warn("start_order: maps service unavailable for customerId={} — {}", customerId, e.getMessage());
+            return StartOrderResponse.rejected("Delivery distance could not be calculated at this time: the maps service is unavailable. Please try again shortly.");
         } catch (IllegalArgumentException e) {
             LOG.warn("start_order: domain layer rejected order for customerId={} — {}", customerId, e.getMessage());
             return StartOrderResponse.rejected(sanitizeMessage(e.getMessage()));

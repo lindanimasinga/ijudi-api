@@ -11,6 +11,32 @@ google:
     maps:
         api:
             key: AIzaSyAZbvE4NBcJIplfzmy8cSEdSpbocBggylc
+    # FAKE RSA KEY — TEST-ONLY, not used anywhere real; generated for unit test Spring context startup only
+    secrets:
+        type: service_account
+        project-id: test-project-izinga
+        private-key-id: test-key-id-for-unit-tests-only
+        private-key: "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCHsYyO09JFQX2m\nadXD/TVjzZHy9W9XcKESCBXlcTeuS97YSbi+muRbohFBnEBgrcWbFOF1EJbefrCn\nS2AWefYJPfmYkI6I5quB8OTA9VkrKxzRczQ9I25bxA9DrQ/aK2QE56f9DVm5v6G2\n5H/vBxWsw/+Bdu9mVlI3KFtAOHEJnXqVuYPQdny9K+UNE+45/PQqbW44HvZrteC8\nBNL9cI7zeqA/ERkj2f13iQqA7CgIhn3vvb9XpD4jqSZV5Q553ptap9MNWXqUEYzy\n+PT5YoiXMsea634V7uP0ZLZMGfpdcEy0hqfFPMQzQUIhzVFDVoG8VCSdhn/DwL/z\ntBUomWpBAgMBAAECggEAAZWw/LC6FV0CZQz6OCf0D4AIyWdA7lbbYnZqvixyxyrR\no729DCCzMDPW5QjohIGIidkUIM7Dfo5Q8Q/8h5gro7IWHPxKlhwwrG2fMA7IfIRY\nLZz5dyGjoPuzvn90GIUMXclcYiBtnemAS5poqSaYY/FZPbxxP2kUhFJs0gW7uhok\n5BWV7qXM/jqT3UdpUrA1ifuEJmNgYUfoEHVSWq0vYRVAUZFdAJpOHAOmjWWIQjRo\nDePQOflCUPApJsbFxuO9KZmnOeVqPgeMSggv0o9G53H46CUwqxo5R1f1MJD1hZSR\nDnJ2OKzTI37CdY2Qlocdnp4Hu5/TqXaIIVLxLGHqgQKBgQC9LSW/6pFC73aMjjuj\nfyJdAw1+5Rr5wyzFXyxFiZUWgLqd752fD6d29qjMCuaPND70bGtXBAZ8dg/+Nz4j\nxO96uVGJUAuj5OqHfvqwwNodGNcv3q8Ertt8j8Yx0gx+9/cRoTLclLS7UMMYTZwg\naXo7ZvFOybBX7TG4g2rev/zTgQKBgQC3oA4De/UzsIia9jtEHeyvftynKxRT/GWZ\nsO4Vg7COXZp7ZYsrXUvecMa36PZaUwZcDn7A+DjVKbhrqsNEJOMnGgb86kTnGNTV\ncL18Su/woIfdiZV6uJeDHFDIsKr02mtnYLAxLY7YCLQUnxJF7aAVZvFSiyB8DxT+\nrPkqV8D2wQKBgEJp9zbJQvYc26G8zXM4zveYesRx6maE/tLL9t7yzkR4LQwFc3DE\nLia1sczwhsD/tppY9dY2s5A+Yp79BfPIz8pmBRoP4AZJ94xaJ+ily+0rK2DC7O7X\n9HZmg046T+jDZRnrXc/S5SBd2iBOHuHCJgd0vILMi/xSaYI9oOdSv5ABAoGAUK6m\n+ajxqHCc1Vnz2I49fS8EzP8Ew5JXIhy3wARJA4TlZ+rKJ5eqymZLKmvWMwHf/Xrw\n/uESN7dJLSWu/rYmiPvKrj5RYCls+wu6dm6G1vfyOslFQNLy380FQek+dK+0GYxG\nXpVh+lJ4rcbnRIqQmFbPGjG/aENIOk7OfGhqhQECgYBKEWg3P3zhVURqfWPyb1ni\nUEjGxzMpoWTGtkJGTAxzK6Gdq1UbDtJTNfuvfCvMM28zY/YM6hqoBkOnnOC7Fno0\nRiW2fZ398WzHEVZIBaAw2okN8DIBXqzsXsRr5a5YbInJ1C/B5br76aLoaDc2RnXO\nrnjdsXucPOgfs6W2GtegMw==\n-----END PRIVATE KEY-----\n"
+        client-email: firebase-test@test-project-izinga.iam.gserviceaccount.com
+        client-id: "100000000000000000001"
+        auth-uri: https://accounts.google.com/o/oauth2/auth
+        token-uri: https://oauth2.googleapis.com/token
+        auth-provider-x509-cert-url: https://www.googleapis.com/oauth2/v1/certs
+        client-x509-cert-url: https://www.googleapis.com/robot/v1/metadata/x509/firebase-test%40test-project-izinga.iam.gserviceaccount.com
+        universe-domain: googleapis.com
+    firebase-messaging:
+        secrets:
+            type: service_account
+            project-id: test-project-izinga
+            private-key-id: test-key-id-for-unit-tests-only
+            private-key: "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCHsYyO09JFQX2m\nadXD/TVjzZHy9W9XcKESCBXlcTeuS97YSbi+muRbohFBnEBgrcWbFOF1EJbefrCn\nS2AWefYJPfmYkI6I5quB8OTA9VkrKxzRczQ9I25bxA9DrQ/aK2QE56f9DVm5v6G2\n5H/vBxWsw/+Bdu9mVlI3KFtAOHEJnXqVuYPQdny9K+UNE+45/PQqbW44HvZrteC8\nBNL9cI7zeqA/ERkj2f13iQqA7CgIhn3vvb9XpD4jqSZV5Q553ptap9MNWXqUEYzy\n+PT5YoiXMsea634V7uP0ZLZMGfpdcEy0hqfFPMQzQUIhzVFDVoG8VCSdhn/DwL/z\ntBUomWpBAgMBAAECggEAAZWw/LC6FV0CZQz6OCf0D4AIyWdA7lbbYnZqvixyxyrR\no729DCCzMDPW5QjohIGIidkUIM7Dfo5Q8Q/8h5gro7IWHPxKlhwwrG2fMA7IfIRY\nLZz5dyGjoPuzvn90GIUMXclcYiBtnemAS5poqSaYY/FZPbxxP2kUhFJs0gW7uhok\n5BWV7qXM/jqT3UdpUrA1ifuEJmNgYUfoEHVSWq0vYRVAUZFdAJpOHAOmjWWIQjRo\nDePQOflCUPApJsbFxuO9KZmnOeVqPgeMSggv0o9G53H46CUwqxo5R1f1MJD1hZSR\nDnJ2OKzTI37CdY2Qlocdnp4Hu5/TqXaIIVLxLGHqgQKBgQC9LSW/6pFC73aMjjuj\nfyJdAw1+5Rr5wyzFXyxFiZUWgLqd752fD6d29qjMCuaPND70bGtXBAZ8dg/+Nz4j\nxO96uVGJUAuj5OqHfvqwwNodGNcv3q8Ertt8j8Yx0gx+9/cRoTLclLS7UMMYTZwg\naXo7ZvFOybBX7TG4g2rev/zTgQKBgQC3oA4De/UzsIia9jtEHeyvftynKxRT/GWZ\nsO4Vg7COXZp7ZYsrXUvecMa36PZaUwZcDn7A+DjVKbhrqsNEJOMnGgb86kTnGNTV\ncL18Su/woIfdiZV6uJeDHFDIsKr02mtnYLAxLY7YCLQUnxJF7aAVZvFSiyB8DxT+\nrPkqV8D2wQKBgEJp9zbJQvYc26G8zXM4zveYesRx6maE/tLL9t7yzkR4LQwFc3DE\nLia1sczwhsD/tppY9dY2s5A+Yp79BfPIz8pmBRoP4AZJ94xaJ+ily+0rK2DC7O7X\n9HZmg046T+jDZRnrXc/S5SBd2iBOHuHCJgd0vILMi/xSaYI9oOdSv5ABAoGAUK6m\n+ajxqHCc1Vnz2I49fS8EzP8Ew5JXIhy3wARJA4TlZ+rKJ5eqymZLKmvWMwHf/Xrw\n/uESN7dJLSWu/rYmiPvKrj5RYCls+wu6dm6G1vfyOslFQNLy380FQek+dK+0GYxG\nXpVh+lJ4rcbnRIqQmFbPGjG/aENIOk7OfGhqhQECgYBKEWg3P3zhVURqfWPyb1ni\nUEjGxzMpoWTGtkJGTAxzK6Gdq1UbDtJTNfuvfCvMM28zY/YM6hqoBkOnnOC7Fno0\nRiW2fZ398WzHEVZIBaAw2okN8DIBXqzsXsRr5a5YbInJ1C/B5br76aLoaDc2RnXO\nrnjdsXucPOgfs6W2GtegMw==\n-----END PRIVATE KEY-----\n"
+            client-email: firebase-test@test-project-izinga.iam.gserviceaccount.com
+            client-id: "100000000000000000001"
+            auth-uri: https://accounts.google.com/o/oauth2/auth
+            token-uri: https://oauth2.googleapis.com/token
+            auth-provider-x509-cert-url: https://www.googleapis.com/oauth2/v1/certs
+            client-x509-cert-url: https://www.googleapis.com/robot/v1/metadata/x509/firebase-test%40test-project-izinga.iam.gserviceaccount.com
+            universe-domain: googleapis.com
 logging:
     level:
         httpclient:
@@ -23,6 +49,8 @@ mailersend:
     template:
         new-order: ynrw7gymyyjg2k8e
         notpaid-order: ynrw7gymyyjg2k8e
+        daily-payout: test-daily-payout-template-id
+        ambassador-payout: test-ambassador-payout-template-id
 order:
     cleanup:
         unpaid:
@@ -48,11 +76,21 @@ service:
         perc: 0.1
     supportedApp:
         min: 1.9.1
+    maintenance:
+        enabled: false
 spring:
+    jackson:
+        date-format: yyyy-MM-dd HH:mm:ss
+    security:
+        oauth2:
+            resourceserver:
+                jwt:
+                    jws-algorithms: RS512
+                    issuer-uri: https://securetoken.google.com/ijudi-d19bd
     data:
         mongodb:
             uri: mongodb+srv://onusmongouser:wfsuser@cluster0-7odiz.mongodb.net/ijudi-test?retryWrites=true&w=majority
-            auto-index-creation: true
+            auto-index-creation: false
 ukheshe:
     apiUrl: https://ukheshe-sandbox.jini.rocks/ukheshe-conductor/rest/v1
     customerId: 534
@@ -68,10 +106,19 @@ yoco:
     api:
         key: sk_test_b03f2c6bMP0k5GY10ad45ddbb5dc
         url: https://online.yoco.com/v1/
+        webhooksec: dGVzdC13ZWJob29rLXNlY3JldC1mb3ItdW5pdC10ZXN0cw==
     dashboard-api:
         url: https://portal.yoco.co.za/api/client/v2/
         user: test-user
         token: test-token
+        businessuuid: test-business-uuid
+    verifier:
+        order-manager-url: http://localhost/
+whatsapp:
+    cloud:
+        api:
+            key: test-whatsapp-token-for-unit-tests-only
+
 zoomconnectsms:
     api:
         email: lindanimasinga@gmail.com
@@ -83,6 +130,22 @@ cancellation:
     fee:
         hmac-secret: test-hmac-secret-for-unit-tests-only
         policy-cache-ttl-minutes: 5
+
+openai:
+    api:
+        key: test-openai-api-key-for-unit-tests-only
+
+payfast:
+    subscription:
+        merchantId: test-merchant-id
+        merchantKey: test-merchant-key
+        passphrase: test-passphrase
+        baseUrl: https://sandbox.payfast.co.za/eng/process
+        returnUrl: http://localhost/subscription-success
+        cancelUrl: http://localhost/subscription-cancel
+        notifyUrl: http://localhost/merchant/subscription/itn
+        validateUrl: https://sandbox.payfast.co.za/eng/query/validate
+        validateTimeoutSeconds: 5
 
 # SEC-WA02-01-B: dedicated store-scope JWT secret for unit tests (not the Firebase secret)
 store-scope:

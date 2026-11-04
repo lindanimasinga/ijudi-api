@@ -46,8 +46,8 @@ import java.util.stream.Collectors;
 import static io.curiousoft.izinga.commons.model.OrderKt.generateId;
 import static io.curiousoft.izinga.commons.model.OrderType.INSTORE;
 import static io.curiousoft.izinga.commons.model.OrderType.ONLINE;
+import io.curiousoft.izinga.ordermanagement.utils.DeliveryCalculationService;
 import static io.curiousoft.izinga.ordermanagement.utils.IjudiUtils.calculateDeliveryDistanceFee;
-import static io.curiousoft.izinga.ordermanagement.utils.IjudiUtils.calculateDrivingDirectionKM;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -82,6 +82,11 @@ public class OrderServiceImpl implements OrderService {
     // ADR-024: injected via field to avoid disrupting the existing constructor
     @Autowired
     private AgentIdentityAuditService agentIdentityAuditService;
+
+    // Injected via field to avoid disrupting the existing constructor; wrapped so integration
+    // tests can replace it with @MockBean without fighting MockedStatic thread-locality.
+    @Autowired
+    private DeliveryCalculationService deliveryCalculationService;
 
     @Autowired
     public OrderServiceImpl(@Value("${service.delivery.standardFee}") double starndardDeliveryFee,
@@ -145,6 +150,10 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Order startOrder(Order order) {
 
+        if (order.getOrderType() == null) {
+            throw new IllegalArgumentException("order type is not valid");
+        }
+
         if (!userProfileRepo.existsById(order.getCustomerId())) {
             throw new IllegalArgumentException("user with id " + order.getCustomerId() + " does not exist");
         }
@@ -163,12 +172,25 @@ public class OrderServiceImpl implements OrderService {
             throw e;
         }
 
-        Optional<StoreProfile> storeOptional = storeRepository.findById(order.getShopId());
-        if (!storeOptional.isPresent()) {
-            throw new IllegalArgumentException("shop with id " + order.getShopId() + " does not exist");
+        // Guard shopId: lateinit var in Kotlin throws UninitializedPropertyAccessException if not set
+        String resolvedShopId;
+        try {
+            resolvedShopId = order.getShopId();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("order shop is not valid");
         }
 
-        if (!storeOptional.get().getScheduledDeliveryAllowed() && order.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY) {
+        Optional<StoreProfile> storeOptional = storeRepository.findById(resolvedShopId);
+        if (!storeOptional.isPresent()) {
+            throw new IllegalArgumentException("shop with id " + resolvedShopId + " does not exist");
+        }
+
+        // Guard shippingData: ONLINE orders require shipping data
+        if (order.getOrderType() == ONLINE && order.getShippingData() == null) {
+            throw new IllegalArgumentException("Please supply shipping info for delivery or If you are paying in store, shipping should be null");
+        }
+
+        if (order.getShippingData() != null && !storeOptional.get().getScheduledDeliveryAllowed() && order.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY) {
             throw new IllegalArgumentException("Collection or scheduled orders not allowed for " + storeOptional.get().getName());
         }
 
@@ -177,15 +199,27 @@ public class OrderServiceImpl implements OrderService {
         }
 
         if(order.getOrderType() == ONLINE
+                && order.getShippingData() != null
                 && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
                 && !storeOptional.get().isDeliverNowAllowed()) {
             throw new IllegalArgumentException("Only Scheduled delivery is allowed at this time");
         }
 
+        // Validate delivery address/building info before expensive stock check
+        var orderViolations = validator.validate(order);
+        if (!orderViolations.isEmpty()) {
+            throw new IllegalArgumentException(orderViolations.iterator().next().getMessage());
+        }
+
         List<String> stockItemNames = storeOptional.get()
                 .getStockList().stream().map(Stock::getName).toList();
-        List<String> basketItemNames = order
-                .getBasket().getItems().stream().map(BasketItem::getName).toList();
+        // Guard basket: lateinit var in Kotlin throws UninitializedPropertyAccessException if not set
+        List<String> basketItemNames;
+        try {
+            basketItemNames = order.getBasket().getItems().stream().map(BasketItem::getName).toList();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("order basket is not valid");
+        }
 
         boolean isValidBasketItems = stockItemNames.containsAll(basketItemNames);
         if (!INSTORE.equals(order.getOrderType()) && !isValidBasketItems) {
@@ -216,7 +250,7 @@ public class OrderServiceImpl implements OrderService {
                             OrderStage.STAGE_2_STORE_PROCESSING) : List.of();
 
             // if there are current orders for this user and its same messenger than don't charge a delivery fee.
-            var shipingGeoData = calculateDrivingDirectionKM(googleMapsApiKey, order, storeOptional.get());
+            var shipingGeoData = deliveryCalculationService.calculateDrivingDirectionKM(order, storeOptional.get());
             if(allOrdersCurrentForCustomer.isEmpty()) {
                 double standardFee = resolveStandardDeliveryFee(order, storeOptional.get());
 
@@ -237,8 +271,14 @@ public class OrderServiceImpl implements OrderService {
 
             //if store has weight and volume fee, add to the total fee
             if(storeOptional.get().getRates() != null) {
-                order.setWeightFee(storeOptional.get().getRates().getRatePerWeightKg() * order.getTotalWeight());
-                order.setVolumeFee(storeOptional.get().getRates().getRatePerVolumeCM2() * order.getTotalArea());
+                Double ratePerWeightKg = storeOptional.get().getRates().getRatePerWeightKg();
+                if (ratePerWeightKg != null) {
+                    order.setWeightFee(ratePerWeightKg * order.getTotalWeight());
+                }
+                Double ratePerVolumeCM2 = storeOptional.get().getRates().getRatePerVolumeCM2();
+                if (ratePerVolumeCM2 != null) {
+                    order.setVolumeFee(ratePerVolumeCM2 * order.getTotalArea());
+                }
             }
 
             //if store has labour fee per floor, add to the total fee
@@ -270,7 +310,8 @@ public class OrderServiceImpl implements OrderService {
         order.setFreeDelivery(isEligibleForFreeDelivery);
 
         if (canChargeServiceFees(storeOptional.get())) {
-            order.setServiceFee(serviceFeePerc * (order.getBasketAmount() + (order.getFreeDelivery() ? 0 : order.getShippingData().getFee())));
+            double deliveryFeeForServiceCalc = (order.getFreeDelivery() || order.getShippingData() == null) ? 0 : order.getShippingData().getFee();
+            order.setServiceFee(serviceFeePerc * (order.getBasketAmount() + deliveryFeeForServiceCalc));
         }
 
         var isQuoteRequired = storeOptional.get().isQuoteRequired();
@@ -352,7 +393,7 @@ public class OrderServiceImpl implements OrderService {
         if (tag != null) {
             String vehicleType = tag.get("vehicleType");
             if (StringUtils.hasText(vehicleType)) {
-                return vehicleType.trim().toUpperCase(Locale.ROOT);
+                return normalizeVehicleType(vehicleType.trim());
             }
         }
 
@@ -360,6 +401,7 @@ public class OrderServiceImpl implements OrderService {
         if (shippingData != null && shippingData.getCategory() != null) {
             Optional<String> matchedVehicleType = shippingData.getCategory().stream()
                     .map(String::trim)
+                    .map(this::normalizeVehicleType)
                     .filter(it -> it.equalsIgnoreCase("Bakkie Delivery Driver") ||
                             it.equalsIgnoreCase("Truck Delivery Driver") ||
                             it.equalsIgnoreCase("Small/Medium Vehicle Driver") ||
@@ -373,6 +415,23 @@ public class OrderServiceImpl implements OrderService {
         return "";
     }
 
+    /**
+     * Normalizes short vehicle type labels (e.g. "CAR", "truck") to the canonical
+     * full names expected by the switch expressions in resolveStandardDeliveryFee
+     * and resolveRatePerKm. Unrecognised values are returned upper-cased so switch
+     * default branches handle them consistently.
+     */
+    private String normalizeVehicleType(String raw) {
+        if (raw == null) return "";
+        return switch (raw.trim().toUpperCase(Locale.ROOT)) {
+            case "CAR", "SMALL/MEDIUM VEHICLE DRIVER" -> "Small/Medium Vehicle Driver";
+            case "BIKE", "BIKE DELIVERY DRIVER" -> "Bike Delivery Driver";
+            case "BAKKIE", "BAKKIE DELIVERY DRIVER" -> "Bakkie Delivery Driver";
+            case "TRUCK", "TRUCK DELIVERY DRIVER" -> "Truck Delivery Driver";
+            default -> raw.trim().toUpperCase(Locale.ROOT);
+        };
+    }
+
     private boolean canChargeServiceFees(StoreProfile storeProfile) {
         return true;
     }
@@ -384,6 +443,25 @@ public class OrderServiceImpl implements OrderService {
 
         if(order.getStage() != OrderStage.STAGE_0_CUSTOMER_NOT_PAID) {
             return persistedOrder;
+        }
+
+        // Defensive validation on persisted state before processing payment
+        if (persistedOrder.getOrderType() == ONLINE && persistedOrder.getShippingData() == null) {
+            throw new IllegalArgumentException("Please supply shipping info for delivery or If you are paying in store, shipping should be null");
+        }
+        boolean hasBasket;
+        try {
+            hasBasket = persistedOrder.getBasket() != null;
+        } catch (Exception e) {
+            hasBasket = false;
+        }
+        if (!hasBasket) {
+            throw new IllegalArgumentException("order basket is not valid");
+        }
+
+        var finishViolations = validator.validate(persistedOrder);
+        if (!finishViolations.isEmpty()) {
+            throw new IllegalArgumentException(finishViolations.iterator().next().getMessage());
         }
 
         persistedOrder.setDescription(order.getDescription());
@@ -410,6 +488,7 @@ public class OrderServiceImpl implements OrderService {
         } else {
             persistedOrder.setStage(OrderStage.STAGE_7_ALL_PAID);
             persistedOrder.addStatusHistory(OrderStage.STAGE_7_ALL_PAID);
+            persistedOrder.setShopPaid(true);
         }
 
         var promoCode = order.getTag().get("promoCode");
@@ -444,14 +523,16 @@ public class OrderServiceImpl implements OrderService {
         store.setServicesCompleted(store.getServicesCompleted() + 1);
         storeRepository.save(store);
         LOG.info("New order placed. Order No. {}, Basket Amount. R{}", order.getId(), order.getBasketAmount());
-        LOG.info("New order placed. Order No. {}, Delivery Fee. R{}", order.getId(), order.getShippingData().getFee());
+        LOG.info("New order placed. Order No. {}, Delivery Fee. R{}", order.getId(), order.getShippingData() != null ? order.getShippingData().getFee() : 0);
         var orderCompleted = orderRepo.save(persistedOrder);
 
-        //send order event
-        OrderEvent newOrderEvent = orderCompleted.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY ?
-                new ScheduledOrderEvent(this, orderCompleted, persistedOrder.getShippingData().getMessengerId(), store)
-        : new NewOrderEvent(this, orderCompleted, persistedOrder.getShippingData().getMessengerId(), store);
-        applicationEventPublisher.publishEvent(newOrderEvent);
+        //send order event — guard against null shippingData (INSTORE orders have none)
+        if (orderCompleted.getShippingData() != null) {
+            OrderEvent newOrderEvent = orderCompleted.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY ?
+                    new ScheduledOrderEvent(this, orderCompleted, persistedOrder.getShippingData().getMessengerId(), store)
+            : new NewOrderEvent(this, orderCompleted, persistedOrder.getShippingData().getMessengerId(), store);
+            applicationEventPublisher.publishEvent(newOrderEvent);
+        }
         return orderCompleted;
     }
 
@@ -532,7 +613,7 @@ public class OrderServiceImpl implements OrderService {
         Order pricingOrder = new Order();
         pricingOrder.setShippingData(shippingData);
 
-        ShipingGeoData shipingGeoData = calculateDrivingDirectionKM(googleMapsApiKey, pricingOrder, pricingContextStore);
+        ShipingGeoData shipingGeoData = deliveryCalculationService.calculateDrivingDirectionKM(pricingOrder, pricingContextStore);
 
         double standardFee = resolveStandardDeliveryFee(pricingOrder, pricingContextStore);
         double standardDistance = Optional.ofNullable(pricingContextStore.getRates())
@@ -591,10 +672,14 @@ public class OrderServiceImpl implements OrderService {
 
         if(order.getStage() == OrderStage.CANCELLED) throw new IllegalArgumentException("Order with id " + orderId + " has been cancelled");
 
+        if (index < 0 || index >= onlineDeliveryStages.size() - 1) {
+            throw new IllegalArgumentException("Order with id " + orderId + " is already at the terminal stage and cannot progress further.");
+        }
         OrderStage stage = onlineDeliveryStages.get(index + 1);
         order.setStage(stage);
         order.addStatusHistory(stage, latitude, longitude);
-        var store = storeRepository.findById(order.getShopId()).get();
+        var store = storeRepository.findById(order.getShopId())
+                .orElseThrow(() -> new IllegalArgumentException("Store with id " + order.getShopId() + " not found."));
         OrderUpdatedEvent orderUpdatedEvent = new OrderUpdatedEvent(this, order, order.getShippingData().getMessengerId(), store);
         applicationEventPublisher.publishEvent(orderUpdatedEvent);
         return orderRepo.save(order);
