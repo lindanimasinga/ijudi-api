@@ -22,9 +22,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -89,11 +91,16 @@ class McpToolRegistrationTest {
     private McpOrderService mcpOrderService;
     @Mock
     private AgentIdentityAuditService agentIdentityAuditService;
+    @Mock
+    private ApplicationContext applicationContext;
 
     @BeforeEach
     void setUp() {
         userProfileService = new UserProfileService(userProfileRepo, eventPublisher, userConfig, icaAcceptanceLogRepo, referralCodeService, agentIdentityAuditService);
         mcpConfig = new McpConfig();
+        // Phase 0: no @McpToolController beans — return empty map
+        lenient().when(applicationContext.getBeansWithAnnotation(McpToolController.class))
+                .thenReturn(Collections.emptyMap());
     }
 
     @Test
@@ -104,7 +111,8 @@ class McpToolRegistrationTest {
                 reconService,
                 storeService,
                 documentUploadMcpService,
-                mcpOrderService
+                mcpOrderService,
+                applicationContext
         );
         assertNotNull(provider, "ToolCallbackProvider must not be null");
     }
@@ -117,7 +125,8 @@ class McpToolRegistrationTest {
             reconService,
             storeService,
             documentUploadMcpService,
-            mcpOrderService
+            mcpOrderService,
+            applicationContext
         );
         ToolCallback[] tools = provider.getToolCallbacks();
 
@@ -148,7 +157,8 @@ class McpToolRegistrationTest {
             reconService,
             storeService,
             documentUploadMcpService,
-            mcpOrderService
+            mcpOrderService,
+            applicationContext
         );
         ToolCallback findUserTool = Arrays.stream(provider.getToolCallbacks())
                 .filter(t -> "find_user_by_phone".equals(t.getToolDefinition().name()))
@@ -168,7 +178,8 @@ class McpToolRegistrationTest {
             reconService,
             storeService,
             documentUploadMcpService,
-            mcpOrderService
+            mcpOrderService,
+            applicationContext
         );
         ToolCallback createUserTool = Arrays.stream(provider.getToolCallbacks())
                 .filter(t -> "create_user".equals(t.getToolDefinition().name()))

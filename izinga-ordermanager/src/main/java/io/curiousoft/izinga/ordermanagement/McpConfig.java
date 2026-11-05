@@ -1,5 +1,7 @@
 package io.curiousoft.izinga.ordermanagement;
 
+import io.curiousoft.izinga.ordermanagement.mcp.GuardedToolCallback;
+import io.curiousoft.izinga.ordermanagement.mcp.McpToolController;
 import io.curiousoft.izinga.ordermanagement.orders.McpOrderService;
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
 import io.curiousoft.izinga.ordermanagement.stores.StoreService;
@@ -7,10 +9,18 @@ import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.recon.ReconServiceImpl;
 import io.curiousoft.izinga.usermanagement.users.DocumentUploadMcpService;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Configures Spring AI MCP (Model Context Protocol) server.
@@ -81,10 +91,46 @@ public class McpConfig {
                                                                 ReconService reconService,
                                                                 StoreService storeService,
                                                                 DocumentUploadMcpService documentUploadMcpService,
-                                                                McpOrderService mcpOrderService) {
-        return MethodToolCallbackProvider.builder()
-                .toolObjects(userProfileService, orderService, reconService, storeService,
-                        documentUploadMcpService, mcpOrderService)
+                                                                McpOrderService mcpOrderService,
+                                                                ApplicationContext applicationContext) {
+        // Collect legacy service tool objects (Phase 0 baseline — 18 tools)
+        Object[] legacyObjects = {userProfileService, orderService, reconService, storeService,
+                documentUploadMcpService, mcpOrderService};
+
+        // Collect @McpToolController beans (Phase 0: zero controllers, so this is empty)
+        Map<String, Object> controllerBeans =
+                applicationContext.getBeansWithAnnotation(McpToolController.class);
+
+        // Combine legacy + controller objects into a single MethodToolCallbackProvider
+        Object[] allToolObjects = Stream
+                .concat(Arrays.stream(legacyObjects), controllerBeans.values().stream())
+                .toArray();
+        MethodToolCallbackProvider combined = MethodToolCallbackProvider.builder()
+                .toolObjects(allToolObjects)
                 .build();
+
+        // Phase 0: no controllers → return unchanged provider (no GuardedToolCallback wrapping needed)
+        if (controllerBeans.isEmpty()) {
+            return combined;
+        }
+
+        // Phase 1+: identify which tool names came from controller beans, wrap only those
+        Set<String> controllerToolNames = controllerBeans.values().stream()
+                .flatMap(bean -> {
+                    ToolCallback[] callbacks = MethodToolCallbackProvider.builder()
+                            .toolObjects(bean)
+                            .build()
+                            .getToolCallbacks();
+                    return Arrays.stream(callbacks).map(tc -> tc.getToolDefinition().name());
+                })
+                .collect(Collectors.toSet());
+
+        ToolCallback[] guarded = Arrays.stream(combined.getToolCallbacks())
+                .map(tc -> controllerToolNames.contains(tc.getToolDefinition().name())
+                        ? new GuardedToolCallback(tc)
+                        : tc)
+                .toArray(ToolCallback[]::new);
+
+        return () -> guarded;
     }
 }
