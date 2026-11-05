@@ -43,6 +43,9 @@ import io.curiousoft.izinga.recon.payout.repo.ReferralPartnerPayoutRepository;
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository;
 import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService;
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService;
+import io.curiousoft.izinga.ordermanagement.mcp.DocumentUploadMcpController;
+import io.curiousoft.izinga.ordermanagement.mcp.McpCaller;
+import io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController;
 import io.curiousoft.izinga.usermanagement.users.DocumentUploadMcpService;
 import io.curiousoft.izinga.usermanagement.users.DocumentUploadSessionRepo;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
@@ -243,7 +246,7 @@ class McpAccessMatrixTest {
                 icaAcceptanceLogRepo, referralCodeService, agentIdentityAuditService);
 
         documentUploadMcpService = new DocumentUploadMcpService(
-                userProfileService, userConfig, documentUploadSessionRepo, agentIdentityAuditService);
+                userProfileService, userConfig, documentUploadSessionRepo);
 
         orderService = new OrderServiceImpl(
                 15.0, 3.0, 5.0, 0.025, 0.10, 5L,
@@ -275,15 +278,23 @@ class McpAccessMatrixTest {
                 storeStage1CommissionRepo, storeStage2CommissionRepo,
                 eventPublisher, new AmbassadorProperties(), agentIdentityAuditService);
 
-        // Build provider via same McpConfig factory as production
-        // Phase 0: no @McpToolController beans — return empty map so McpConfig takes the fast path
+        // Build Phase 1 controller instances backed by the real (non-mocked) services
+        McpCaller mcpCaller = new McpCaller(userProfileRepo);
+        OrderCreationMcpController orderCreationController =
+                new OrderCreationMcpController(mcpOrderService, mcpCaller, agentIdentityAuditService);
+        DocumentUploadMcpController documentUploadController =
+                new DocumentUploadMcpController(documentUploadMcpService, agentIdentityAuditService);
+        Map<String, Object> controllerBeans = new HashMap<>();
+        controllerBeans.put("orderCreationMcpController", orderCreationController);
+        controllerBeans.put("documentUploadMcpController", documentUploadController);
         when(applicationContext.getBeansWithAnnotation(McpToolController.class))
-                .thenReturn(Collections.emptyMap());
+                .thenReturn(controllerBeans);
+
+        // Build provider via same McpConfig factory as production (Phase 1: 5-param signature)
         McpConfig mcpConfig = new McpConfig();
         ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
                 userProfileService, orderService, reconService,
-                storeService, documentUploadMcpService, mcpOrderService,
-                applicationContext);
+                storeService, applicationContext);
 
         // Build lookup map by tool name
         toolCallbacks = new HashMap<>();

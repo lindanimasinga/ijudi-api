@@ -2,12 +2,10 @@ package io.curiousoft.izinga.ordermanagement;
 
 import io.curiousoft.izinga.ordermanagement.mcp.GuardedToolCallback;
 import io.curiousoft.izinga.ordermanagement.mcp.McpToolController;
-import io.curiousoft.izinga.ordermanagement.orders.McpOrderService;
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
 import io.curiousoft.izinga.ordermanagement.stores.StoreService;
 import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.recon.ReconServiceImpl;
-import io.curiousoft.izinga.usermanagement.users.DocumentUploadMcpService;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
@@ -76,28 +74,28 @@ import java.util.stream.Stream;
 public class McpConfig {
 
     /**
-     * Exposes {@link UserProfileService} methods annotated with
-     * {@code @Tool} as MCP tools.
+     * Exposes all MCP tools registered with this application.
      *
-     * <p>Currently registered tools:
-     * <ul>
-     *   <li>{@code find_user_by_phone} – look up a user profile by phone number.</li>
-     *   <li>{@code create_user} – create a new user profile (customer, driver, or store owner).</li>
-     * </ul>
+     * <p>The authoritative tool list (names, descriptions, parameter schemas) is maintained in
+     * {@code src/test/resources/mcp/tool-contract-snapshot.json}.
+     * {@link io.curiousoft.izinga.ordermanagement.mcp.McpToolContractSnapshotTest} verifies that
+     * the live tool set matches the snapshot on every build.</p>
+     *
+     * <p>During the ADR-026 migration, legacy tool objects are listed in {@code legacyObjects}
+     * and new {@link io.curiousoft.izinga.ordermanagement.mcp.McpToolController} beans are
+     * collected from the {@link ApplicationContext} and wrapped in
+     * {@link io.curiousoft.izinga.ordermanagement.mcp.GuardedToolCallback}.</p>
      */
     @Bean
     public ToolCallbackProvider userProfileToolCallbackProvider(UserProfileService userProfileService,
                                                                 OrderServiceImpl orderService,
                                                                 ReconService reconService,
                                                                 StoreService storeService,
-                                                                DocumentUploadMcpService documentUploadMcpService,
-                                                                McpOrderService mcpOrderService,
                                                                 ApplicationContext applicationContext) {
-        // Collect legacy service tool objects (Phase 0 baseline — 18 tools)
-        Object[] legacyObjects = {userProfileService, orderService, reconService, storeService,
-                documentUploadMcpService, mcpOrderService};
+        // Collect legacy service tool objects (Phase 1 baseline — 13 tools; 5 moved to controllers)
+        Object[] legacyObjects = {userProfileService, orderService, reconService, storeService};
 
-        // Collect @McpToolController beans (Phase 0: zero controllers, so this is empty)
+        // Collect @McpToolController beans and wrap their callbacks in GuardedToolCallback
         Map<String, Object> controllerBeans =
                 applicationContext.getBeansWithAnnotation(McpToolController.class);
 
@@ -109,7 +107,7 @@ public class McpConfig {
                 .toolObjects(allToolObjects)
                 .build();
 
-        // Phase 0: no controllers → return unchanged provider (no GuardedToolCallback wrapping needed)
+        // No controller beans → return provider as-is (no GuardedToolCallback wrapping needed)
         if (controllerBeans.isEmpty()) {
             return combined;
         }

@@ -24,7 +24,7 @@ import static org.mockito.Mockito.*;
  * - resolveUserId() returns null when callerPhone is shorter than 9 chars
  * - resolveUserId() tries prefixes 0, +27, 27 and returns the first match
  * - resolveUserId() returns null when no prefix finds a match
- * - resolveUserId() caches the result (repo called only once)
+ * - resolveUserId() resolves per-call (NOTE-01: no instance caching; repo called each time)
  * - getAudience() returns StoreScopeContext.getAudience()
  * - getCallerPhone() returns StoreScopeContext.getCallerPhone()
  * - getPermittedStoreId() returns StoreScopeContext.getPermittedStoreId()
@@ -161,7 +161,9 @@ class McpCallerTest {
     }
 
     @Test
-    void resolveUserId_calledTwice_repoCalled_onlyOnce() {
+    void resolveUserId_calledTwice_repoCalledTwice_noCaching() {
+        // NOTE-01: McpCaller is now a Spring singleton — instance-field caching removed to prevent
+        // cross-request leakage between concurrent threads. resolveUserId() resolves per call.
         StoreScopeContext.setCallerPhone(CALLER_PHONE);
         UserProfile profile = profileWithId(CALLER_ID);
         when(userProfileRepo.findByMobileNumber("0" + CALLER_LAST9)).thenReturn(profile);
@@ -173,8 +175,8 @@ class McpCallerTest {
 
         assertThat(result1).isEqualTo(CALLER_ID);
         assertThat(result2).isEqualTo(CALLER_ID);
-        // Repo called only once due to caching
-        verify(userProfileRepo, times(1)).findByMobileNumber("0" + CALLER_LAST9);
+        // Repo called twice — no instance caching (per-call resolution)
+        verify(userProfileRepo, times(2)).findByMobileNumber("0" + CALLER_LAST9);
     }
 
     // ---- getAudience ----

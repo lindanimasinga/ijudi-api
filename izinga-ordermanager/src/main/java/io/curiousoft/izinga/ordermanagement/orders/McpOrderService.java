@@ -4,13 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
-import io.curiousoft.izinga.commons.security.CallerIdentityContext;
-import io.curiousoft.izinga.commons.security.CallerIdentityViolationException;
 import io.curiousoft.izinga.ordermanagement.utils.DeliveryDistanceUnavailableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -84,46 +80,15 @@ public class McpOrderService {
      *                          may be null or blank for INSTORE orders.
      * @return a {@link StartOrderResponse} indicating success or the reason for rejection.
      */
-    @Tool(
-        name = "start_order",
-        description = "Creates a new order for a customer. " +
-            "customerConfirmed MUST be true — only call this after the customer has explicitly confirmed they want to place the order. " +
-            "idempotencyKey MUST be unique per order attempt; duplicate calls within 24 hours return the existing order. " +
-            "orderType must be ONLINE or INSTORE. " +
-            "basketJson is a JSON-serialised Basket with an items array. " +
-            "shippingDataJson is a JSON-serialised ShippingData (required for ONLINE orders, null for INSTORE)."
-    )
     public StartOrderResponse startOrder(
-            @ToolParam(description = "The customer's profile ID") String customerId,
-            @ToolParam(description = "Must be true — agent must have confirmed the customer's intent before placing the order") boolean customerConfirmed,
-            @ToolParam(description = "Unique key for this order attempt to prevent duplicate orders") String idempotencyKey,
-            @ToolParam(description = "The store/shop ID to place the order against") String shopId,
-            @ToolParam(description = "Brief description of the order") String description,
-            @ToolParam(description = "Order type: ONLINE or INSTORE") String orderType,
-            @ToolParam(description = "JSON of the Basket with items array, e.g. {\"items\":[{\"name\":\"chips\",\"quantity\":2,\"price\":10,\"totalPrice\":20}]}") String basketJson,
-            @ToolParam(required = false, description = "JSON of ShippingData (required for ONLINE orders). null for INSTORE orders.") String shippingDataJson) {
-
-        // Step 0 — SEC-MCP-01 (CORRECTION 3): reject tokenless MCP requests and disallowed audiences.
-        // Evidence: StoreAiAgent mints STORE audience tokens; AiCustomerServiceAgent's system prompt
-        // lists start_order tools for CUSTOMER audience. DRIVER agents have no legitimate order-creation use.
-        if (CallerIdentityContext.isMcpRequest()) {
-            String audience = CallerIdentityContext.getAudience();
-            if (audience == null) {
-                LOG.warn("start_order: HARD-REJECT — MCP request has no scope token (null audience) for customerId={}", customerId);
-                return StartOrderResponse.rejected(
-                    "IDENTITY_REFUSAL: This tool requires an authenticated scope token. " +
-                    "Unauthenticated or tokenless requests are not permitted on the MCP surface. " +
-                    "Please contact iZinga support if you need further help.");
-            }
-            // AMD-01 (REQ-A9): ADMIN is also permitted to create orders
-            if (!"CUSTOMER".equals(audience) && !"STORE".equals(audience) && !"ADMIN".equals(audience)) {
-                LOG.warn("start_order: HARD-REJECT — audience={} is not permitted to create orders for customerId={}", audience, customerId);
-                return StartOrderResponse.rejected(
-                    "IDENTITY_REFUSAL: I can only assist with queries for your own account. " +
-                    "For privacy and security reasons, I am not authorised to access another person's information. " +
-                    "Please contact iZinga support if you need further help.");
-            }
-        }
+            String customerId,
+            boolean customerConfirmed,
+            String idempotencyKey,
+            String shopId,
+            String description,
+            String orderType,
+            String basketJson,
+            String shippingDataJson) {
 
         // Step 1 — consent (SA-022-01 Guard 2): evaluated first, before any data access
         if (!customerConfirmed) {
@@ -169,11 +134,6 @@ public class McpOrderService {
         Order created;
         try {
             created = orderService.startOrder(order);
-        } catch (CallerIdentityViolationException e) {
-            // FIX-01 (Legal C-3): IDENTITY_REFUSAL prefix is machine-parseable — must NOT
-            // be sanitized. Pass the message through verbatim so the AI agent sees the refusal.
-            LOG.warn("start_order: identity violation for customerId={} — {}", customerId, e.getMessage());
-            return StartOrderResponse.rejected(e.getMessage());
         } catch (DeliveryDistanceUnavailableException e) {
             LOG.warn("start_order: maps service unavailable for customerId={} — {}", customerId, e.getMessage());
             return StartOrderResponse.rejected("Delivery distance could not be calculated at this time: the maps service is unavailable. Please try again shortly.");
@@ -187,6 +147,19 @@ public class McpOrderService {
 
         LOG.info("start_order: created orderId={} for customerId={}", created.getId(), customerId);
         return StartOrderResponse.success(created);
+    }
+
+    /**
+     * ADR-026 Phase 1: cheap existence check for the given customer ID.
+     * Called by {@link io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController}
+     * before the ownership check to satisfy the gate-ordering invariant
+     * (existence check BEFORE ownership check).
+     *
+     * @param customerId the customer profile ID to look up
+     * @return {@code true} if a UserProfile with the given ID exists, {@code false} otherwise
+     */
+    public boolean customerExists(String customerId) {
+        return userProfileRepo.existsById(customerId);
     }
 
     // -------------------------------------------------------------------------
@@ -267,11 +240,11 @@ public class McpOrderService {
             this.message = message;
         }
 
-        static StartOrderResponse rejected(String reason) {
+        public static StartOrderResponse rejected(String reason) {
             return new StartOrderResponse(false, null, null, 0.0, false, reason);
         }
 
-        static StartOrderResponse success(Order order) {
+        public static StartOrderResponse success(Order order) {
             return new StartOrderResponse(
                     true,
                     order.getId(),
@@ -281,7 +254,7 @@ public class McpOrderService {
                     null);
         }
 
-        static StartOrderResponse idempotent(Order existingOrder) {
+        public static StartOrderResponse idempotent(Order existingOrder) {
             return new StartOrderResponse(
                     true,
                     existingOrder.getId(),

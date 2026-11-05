@@ -58,16 +58,15 @@ class McpArchitectureTest {
     // ---- LEGACY_EXCLUSIONS ----------------------------------------------------------------
 
     /**
-     * The 6 service classes that hold {@code @Tool} methods today.
+     * The 4 service classes that still hold {@code @Tool} methods after Phase 1.
+     * McpOrderService and DocumentUploadMcpService were migrated in Phase 1.
      * Each phase of ADR-026 shrinks this list. Phase 6 deletes it.
      */
     static final Set<String> LEGACY_EXCLUSIONS = new HashSet<>(Arrays.asList(
             "io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl",
-            "io.curiousoft.izinga.ordermanagement.orders.McpOrderService",
             "io.curiousoft.izinga.ordermanagement.stores.StoreService",
             "io.curiousoft.izinga.recon.ReconServiceImpl",
-            "io.curiousoft.izinga.usermanagement.users.UserProfileService",
-            "io.curiousoft.izinga.usermanagement.users.DocumentUploadMcpService"
+            "io.curiousoft.izinga.usermanagement.users.UserProfileService"
     ));
 
     private static final DescribedPredicate<JavaClass> IS_LEGACY_EXCLUSION =
@@ -192,7 +191,6 @@ class McpArchitectureTest {
     /**
      * R2: Every {@code @Tool} method on an {@code @McpToolController} class must carry
      * a non-empty {@code @McpAudience} annotation.
-     * Vacuous today: no {@code @McpToolController} classes exist.
      *
      * <p>FIX-04: Uses {@link #HAVE_NON_EMPTY_MCP_AUDIENCE} instead of a plain presence check,
      * so an empty {@code @McpAudience({})} is also rejected.
@@ -204,14 +202,12 @@ class McpArchitectureTest {
                     .that().areAnnotatedWith(Tool.class)
                     .and().areDeclaredInClassesThat().areAnnotatedWith(McpToolController.class)
                     .should(HAVE_NON_EMPTY_MCP_AUDIENCE)
-                    .allowEmptyShould(true)
                     .as("R2: @Tool methods on @McpToolController must carry non-empty @McpAudience");
 
     // ---- R3: Nothing outside ..mcp.. depends on @McpToolController ----------------------
 
     /**
      * R3: No class outside the {@code ..mcp..} package may access an {@code @McpToolController} class.
-     * Vacuous today: no {@code @McpToolController} classes exist.
      */
     @ArchTest
     static final ArchRule R3_mcpControllersOnlyAccessedFromMcpPackage =
@@ -219,7 +215,6 @@ class McpArchitectureTest {
                     .that().areAnnotatedWith(McpToolController.class)
                     .should().onlyBeAccessed().byClassesThat()
                     .resideInAPackage("..ordermanagement.mcp..")
-                    .allowEmptyShould(true)
                     .as("R3: @McpToolController classes may only be accessed from within ..mcp..");
 
     // ---- R4: Context/validator calls restricted (LEGACY_EXCLUSIONS and security exempt) --
@@ -248,7 +243,6 @@ class McpArchitectureTest {
     /**
      * R5: {@code @McpToolController} classes must not depend on {@code *Repo} or {@code *Repository}
      * types. All persistence must go through service classes.
-     * Vacuous today: no {@code @McpToolController} classes exist.
      */
     @ArchTest
     static final ArchRule R5_mcpControllersDoNotUseRepos =
@@ -262,7 +256,6 @@ class McpArchitectureTest {
                                     return name.endsWith("Repo") || name.endsWith("Repository");
                                 }
                             })
-                    .allowEmptyShould(true)
                     .as("R5: @McpToolController classes must not depend on repository types");
 
     // ---- R6: Only StoreScopeValidationFilter may call StoreScopeContext setters ----------
@@ -284,10 +277,11 @@ class McpArchitectureTest {
 
     /**
      * Non-vacuity guard (a): Verifies the LEGACY_EXCLUSIONS list is complete and minimal.
-     * Without the exclusion list, R1 must flag exactly the 6 classes named in LEGACY_EXCLUSIONS.
+     * Without the exclusion list, R1 must flag exactly the 4 classes named in LEGACY_EXCLUSIONS
+     * (after Phase 1 migration of McpOrderService and DocumentUploadMcpService to controllers).
      * If this test fails with more violations, a new class has @Tool methods and must be added
      * to LEGACY_EXCLUSIONS or moved to a @McpToolController.
-     * If it fails with fewer violations, one of the 6 has been migrated and must be removed.
+     * If it fails with fewer violations, one of the 4 has been migrated and must be removed.
      */
     @Test
     void nonVacuityGuard_a_legacyExclusionsAreTheExactR1Violators() {
@@ -312,7 +306,7 @@ class McpArchitectureTest {
                 .collect(Collectors.toSet());
 
         assertThat(violatingClassNames)
-                .as("Without LEGACY_EXCLUSIONS, R1 must flag exactly the 6 legacy classes. " +
+                .as("Without LEGACY_EXCLUSIONS, R1 must flag exactly the 4 legacy classes (after Phase 1 migration). " +
                         "If a new class has @Tool methods, it must be a @McpToolController or added to LEGACY_EXCLUSIONS. " +
                         "If a legacy class was migrated, remove it from LEGACY_EXCLUSIONS.")
                 .containsExactlyInAnyOrderElementsOf(LEGACY_EXCLUSIONS);
@@ -322,8 +316,8 @@ class McpArchitectureTest {
 
     /**
      * Non-vacuity guard (b): Sanity assertion that the importer finds exactly 18 {@code @Tool} methods
-     * across exactly 6 classes. This guards against silent tool additions or removals that could
-     * invalidate the contract snapshot and access matrix tests.
+     * across exactly 6 classes (4 legacy services + 2 Phase 1 controllers). This guards against
+     * silent tool additions or removals that could invalidate the contract snapshot and access matrix tests.
      *
      * <p>If a new tool is added, {@code McpToolContractSnapshotTest}'s golden file must be updated
      * and this count must be bumped.</p>
@@ -430,7 +424,7 @@ class McpArchitectureTest {
                 "find_order_for_messenger",
                 "find_orders_by_phone_number",
                 "find_orders_by_messenger_id",
-                // McpOrderService (1)
+                // OrderCreationMcpController (1) — migrated from McpOrderService in Phase 1
                 "start_order",
                 // StoreService (3)
                 "find_store_or_shops_by_id",
@@ -441,7 +435,7 @@ class McpArchitectureTest {
                 "find_users",
                 "create_user",
                 "get_missing_fields_by_phone",
-                // DocumentUploadMcpService (4)
+                // DocumentUploadMcpController (4) — migrated from DocumentUploadMcpService in Phase 1
                 "get_required_documents_for_user",
                 "create_document_upload_session",
                 "attach_uploaded_document_to_user_tag",

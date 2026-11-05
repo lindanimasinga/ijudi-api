@@ -20,6 +20,9 @@ import io.curiousoft.izinga.messaging.AdminOnlyNotificationService;
 import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
 import io.curiousoft.izinga.ordermanagement.McpConfig;
 import io.curiousoft.izinga.ordermanagement.leads.LeadService;
+import io.curiousoft.izinga.ordermanagement.mcp.DocumentUploadMcpController;
+import io.curiousoft.izinga.ordermanagement.mcp.McpCaller;
+import io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.orders.McpOrderService;
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
@@ -170,10 +173,6 @@ class McpToolContractSnapshotTest {
 
     @BeforeEach
     void buildProvider() {
-        // Phase 0: no @McpToolController beans — same as production McpConfig fast path
-        when(applicationContext.getBeansWithAnnotation(McpToolController.class))
-                .thenReturn(Collections.emptyMap());
-
         // Build REAL service instances — this is the core of Item 6.
         // Any change to a service constructor, or to @Tool annotations on its methods,
         // will cause this setup to break or produce different tool definitions.
@@ -181,8 +180,9 @@ class McpToolContractSnapshotTest {
                 userProfileRepo, eventPublisher, userConfig,
                 icaAcceptanceLogRepo, referralCodeService, agentIdentityAuditService);
 
+        // ADR-026 Phase 1: 3-param constructor (agentIdentityAuditService removed from service)
         DocumentUploadMcpService documentUploadMcpService = new DocumentUploadMcpService(
-                userProfileService, userConfig, documentUploadSessionRepo, agentIdentityAuditService);
+                userProfileService, userConfig, documentUploadSessionRepo);
 
         OrderServiceImpl orderService = new OrderServiceImpl(
                 15.0, 3.0, 5.0, 0.025, 0.10, 5L,
@@ -214,14 +214,25 @@ class McpToolContractSnapshotTest {
                 storeStage1CommissionRepo, storeStage2CommissionRepo,
                 eventPublisher, new AmbassadorProperties(), agentIdentityAuditService);
 
+        // ADR-026 Phase 1: wire real controllers so their tool definitions appear in the snapshot.
+        McpCaller mcpCaller = new McpCaller(userProfileRepo);
+        OrderCreationMcpController orderCreationController =
+                new OrderCreationMcpController(mcpOrderService, mcpCaller, agentIdentityAuditService);
+        DocumentUploadMcpController documentUploadController =
+                new DocumentUploadMcpController(documentUploadMcpService, agentIdentityAuditService);
+
+        java.util.Map<String, Object> controllerBeans = new java.util.HashMap<>();
+        controllerBeans.put("orderCreationMcpController", orderCreationController);
+        controllerBeans.put("documentUploadMcpController", documentUploadController);
+        when(applicationContext.getBeansWithAnnotation(McpToolController.class))
+                .thenReturn(controllerBeans);
+
         McpConfig mcpConfig = new McpConfig();
         provider = mcpConfig.userProfileToolCallbackProvider(
                 userProfileService,
                 orderService,
                 reconService,
                 storeService,
-                documentUploadMcpService,
-                mcpOrderService,
                 applicationContext
         );
     }

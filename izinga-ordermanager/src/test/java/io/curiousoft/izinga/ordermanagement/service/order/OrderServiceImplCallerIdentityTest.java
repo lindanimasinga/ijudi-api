@@ -616,12 +616,18 @@ public class OrderServiceImplCallerIdentityTest {
 
     // ===== startOrder SA-022-01 =====
 
+    /**
+     * ADR-026 Phase 1: ownership enforcement was moved from {@link OrderServiceImpl} to
+     * {@link io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController}.
+     * {@code OrderServiceImpl.startOrder()} must NOT throw {@link CallerIdentityViolationException}
+     * for a third-party customerId — that check now lives exclusively at the controller layer.
+     */
     @Test
-    public void startOrder_customerAudience_thirdPartyCustomerId_throws() {
+    public void startOrder_customerAudienceThirdPartyId_ownershipNotEnforcedAtServiceLayer() {
         StoreScopeContext.setAudience(Audience.CUSTOMER);
         StoreScopeContext.setCallerPhone(CALLER_PHONE);
-        stubCallerPhoneResolution();
-        when(userProfileRepo.existsById(OTHER_USER_ID)).thenReturn(true);
+        // No phone resolution or existsById stubs required: Phase 1 moved those checks
+        // to OrderCreationMcpController. The service no longer reads caller identity here.
 
         Order order = new Order();
         order.setOrderType(OrderType.ONLINE);
@@ -630,7 +636,15 @@ public class OrderServiceImplCallerIdentityTest {
         ShippingData sd = new ShippingData("From", "To", ShippingData.ShippingType.DELIVERY);
         order.setShippingData(sd);
 
-        assertThrows(CallerIdentityViolationException.class, () ->
-                sut.startOrder(order));
+        // Phase 1: ownership enforcement lives at the controller layer, not the service layer.
+        // The service must NOT throw CIVE. Any other downstream failure is acceptable.
+        try {
+            sut.startOrder(order);
+        } catch (CallerIdentityViolationException e) {
+            fail("ADR-026 Phase 1: ownership enforcement moved to controller layer; "
+                    + "OrderServiceImpl must not throw CIVE: " + e.getMessage());
+        } catch (Exception e) {
+            // Other downstream failures (e.g. shop not found, missing data) are acceptable.
+        }
     }
 }

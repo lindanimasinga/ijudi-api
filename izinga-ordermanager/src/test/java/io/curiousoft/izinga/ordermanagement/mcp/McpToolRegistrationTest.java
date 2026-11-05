@@ -6,6 +6,9 @@ import io.curiousoft.izinga.commons.repo.IcaAcceptanceLogRepo;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.commons.security.AgentIdentityAuditService;
 import io.curiousoft.izinga.ordermanagement.McpConfig;
+import io.curiousoft.izinga.ordermanagement.mcp.DocumentUploadMcpController;
+import io.curiousoft.izinga.ordermanagement.mcp.McpCaller;
+import io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController;
 import io.curiousoft.izinga.ordermanagement.orders.McpOrderService;
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
 import io.curiousoft.izinga.ordermanagement.stores.StoreService;
@@ -27,7 +30,9 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -98,9 +103,17 @@ class McpToolRegistrationTest {
     void setUp() {
         userProfileService = new UserProfileService(userProfileRepo, eventPublisher, userConfig, icaAcceptanceLogRepo, referralCodeService, agentIdentityAuditService);
         mcpConfig = new McpConfig();
-        // Phase 0: no @McpToolController beans — return empty map
+        // ADR-026 Phase 1: wire real controllers so their tool definitions are registered.
+        McpCaller mcpCaller = new McpCaller(userProfileRepo);
+        OrderCreationMcpController orderCreationController =
+                new OrderCreationMcpController(mcpOrderService, mcpCaller, agentIdentityAuditService);
+        DocumentUploadMcpController documentUploadController =
+                new DocumentUploadMcpController(documentUploadMcpService, agentIdentityAuditService);
+        Map<String, Object> controllerBeans = new HashMap<>();
+        controllerBeans.put("orderCreationMcpController", orderCreationController);
+        controllerBeans.put("documentUploadMcpController", documentUploadController);
         lenient().when(applicationContext.getBeansWithAnnotation(McpToolController.class))
-                .thenReturn(Collections.emptyMap());
+                .thenReturn(controllerBeans);
     }
 
     @Test
@@ -110,8 +123,6 @@ class McpToolRegistrationTest {
                 orderService,
                 reconService,
                 storeService,
-                documentUploadMcpService,
-                mcpOrderService,
                 applicationContext
         );
         assertNotNull(provider, "ToolCallbackProvider must not be null");
@@ -124,8 +135,6 @@ class McpToolRegistrationTest {
             orderService,
             reconService,
             storeService,
-            documentUploadMcpService,
-            mcpOrderService,
             applicationContext
         );
         ToolCallback[] tools = provider.getToolCallbacks();
@@ -156,8 +165,6 @@ class McpToolRegistrationTest {
             orderService,
             reconService,
             storeService,
-            documentUploadMcpService,
-            mcpOrderService,
             applicationContext
         );
         ToolCallback findUserTool = Arrays.stream(provider.getToolCallbacks())
@@ -177,8 +184,6 @@ class McpToolRegistrationTest {
             orderService,
             reconService,
             storeService,
-            documentUploadMcpService,
-            mcpOrderService,
             applicationContext
         );
         ToolCallback createUserTool = Arrays.stream(provider.getToolCallbacks())

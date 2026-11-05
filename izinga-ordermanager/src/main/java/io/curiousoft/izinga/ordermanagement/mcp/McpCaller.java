@@ -7,6 +7,7 @@ import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import io.curiousoft.izinga.ordermanagement.security.StoreScopeContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
 
@@ -14,44 +15,39 @@ import java.util.List;
  * ADR-026 D2: Thin facade over the per-request caller-identity state populated by
  * {@link io.curiousoft.izinga.ordermanagement.security.StoreScopeValidationFilter}.
  *
- * <p>Controllers use this facade to access caller context rather than reading ThreadLocals
+ * <p>Controllers inject this bean to access caller context rather than reading ThreadLocals
  * directly. This decouples controllers from the specific ThreadLocal implementation and
  * replaces the three duplicated {@code resolveCallerUserId()} prefix-loop implementations
  * currently in {@code OrderServiceImpl}, {@code ReconServiceImpl}, and
  * {@code AiCustomerServiceAgent} with a single implementation here.</p>
  *
- * <h3>Phase 0 scope</h3>
- * <p>In Phase 0 no controllers exist yet, so this class is defined but not yet called
- * from production code. It becomes the dependency of Phase 1+ controllers. Its unit
- * tests run in Phase 0.</p>
+ * <h3>Singleton safety (NOTE-01)</h3>
+ * <p>This class is a Spring singleton {@link Component}. All state it accesses
+ * ({@link StoreScopeContext}, {@link io.curiousoft.izinga.commons.security.CallerIdentityContext})
+ * is stored in ThreadLocals set by {@code StoreScopeValidationFilter} on each request thread,
+ * so there is no cross-request state leakage. {@link #resolveUserId()} resolves per call
+ * (no instance-field caching) so that concurrent requests on different threads each see their
+ * own caller's phone. Instance-field caching was removed when this class became a singleton.</p>
  *
  * <h3>Key properties</h3>
  * <ul>
  *   <li>{@link #getAudience()} — typed audience from the scope JWT</li>
  *   <li>{@link #getCallerPhone()} — raw callerPhone claim from the scope JWT</li>
  *   <li>{@link #getPermittedStoreId()} — permitted store scope from the JWT</li>
- *   <li>{@link #resolveUserId()} — request-cached phone-to-userId lookup (lazy).
+ *   <li>{@link #resolveUserId()} — per-call phone-to-userId lookup.
  *       Replaces the three duplicated prefix-loop implementations across services.</li>
  * </ul>
- *
- * <p>The facade is NOT a Spring bean. Each controller creates it via
- * {@link #McpCaller(UserProfileRepo)} when needed, or is passed it as a constructor
- * parameter (the preferred approach for testability). Both are equally valid — no
- * shared state across requests because the ThreadLocals are per-request.</p>
  */
+@Component
 public final class McpCaller {
 
     private static final Logger LOG = LoggerFactory.getLogger(McpCaller.class);
 
     private final UserProfileRepo userProfileRepo;
 
-    // Single-threaded by design — McpCaller is created per tool call; no cross-thread sharing.
-    /** Lazy-resolved userId from the callerPhone. Null until first call to {@link #resolveUserId()}. */
-    private String cachedUserId;
-    private boolean userIdResolved;
-
     /**
      * Create a new {@code McpCaller} bound to the given repository for phone-to-userId lookups.
+     * Spring injects this bean automatically; the constructor is public for testability.
      *
      * @param userProfileRepo the user profile repository (must not be null)
      */
@@ -111,18 +107,16 @@ public final class McpCaller {
      * {@code ReconServiceImpl}, and (a variant in) {@code AiCustomerServiceAgent}.
      * Tried prefixes in order: {@code 0}, {@code +27}, {@code 27}.</p>
      *
-     * <p>The result is cached for the lifetime of this {@code McpCaller} instance
-     * (i.e. for the duration of a single tool call in Phase 1+).</p>
+     * <p>Resolution is per-call (no instance caching) because this class is a singleton
+     * and each concurrent request runs on a different thread with a different ThreadLocal
+     * callerPhone. Instance-field caching was removed in NOTE-01 to prevent cross-request
+     * cache leakage across threads sharing the same singleton instance.</p>
      *
      * @return the caller's user ID, or {@code null} if callerPhone is absent,
      *         shorter than 9 digits, or no matching profile exists
      */
     public String resolveUserId() {
-        if (!userIdResolved) {
-            userIdResolved = true;
-            cachedUserId = doResolveUserId();
-        }
-        return cachedUserId;
+        return doResolveUserId();
     }
 
     private String doResolveUserId() {

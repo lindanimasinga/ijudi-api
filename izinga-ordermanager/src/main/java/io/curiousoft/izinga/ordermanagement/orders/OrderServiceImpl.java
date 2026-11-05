@@ -158,20 +158,6 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalArgumentException("user with id " + order.getCustomerId() + " does not exist");
         }
 
-        // SA-022-01 / ADR-024: CUSTOMER agents may only start orders for themselves.
-        // DRIVER and STORE audiences are exempt (STORE places orders on behalf of customers).
-        try {
-            StoreScopeValidator.validateCallerOwnsId(order.getCustomerId(), this::resolveCallerUserId);
-        } catch (CallerIdentityViolationException e) {
-            // FIX-04: capture audience on the request thread before the @Async dispatch
-            String auditAudience = CallerIdentityContext.getAudience() != null ? CallerIdentityContext.getAudience() : "UNKNOWN";
-            agentIdentityAuditService.recordViolation(
-                    StoreScopeContext.getCallerPhone(), order.getCustomerId(),
-                    AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED, "start_order",
-                    auditAudience, null, null);
-            throw e;
-        }
-
         // Guard shopId: lateinit var in Kotlin throws UninitializedPropertyAccessException if not set
         String resolvedShopId;
         try {
