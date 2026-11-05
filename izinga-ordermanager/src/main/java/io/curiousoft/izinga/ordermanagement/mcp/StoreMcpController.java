@@ -152,7 +152,10 @@ public class StoreMcpController {
                             audience, null, null);
                     throw new CallerIdentityViolationException(VIOLATION_MESSAGE);
                 }
-                StoreProfile permitted = storeService.find(permittedStoreId);
+                // ADR-026 Step B: use findByIdNoSideEffects — the ownership probe must NOT trigger
+                // the lazy-seed of default business hours (which calls profileRepo.save). R5 is
+                // satisfied: this is a service method, not a direct repository call.
+                StoreProfile permitted = storeService.findByIdNoSideEffects(permittedStoreId);
                 if (permitted == null || !ownerId.equals(permitted.getOwnerId())) {
                     agentIdentityAuditService.recordViolation(
                             StoreScopeContext.getCallerPhone(), ownerId,

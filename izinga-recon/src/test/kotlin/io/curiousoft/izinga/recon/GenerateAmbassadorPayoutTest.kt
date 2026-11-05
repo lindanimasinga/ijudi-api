@@ -63,7 +63,6 @@ class GenerateAmbassadorPayoutTest {
                 commissionAmountBakkie = BigDecimal("70.00"),
                 commissionAmountTruck = BigDecimal("70.00")
             ),
-            agentIdentityAuditService = mockk(relaxed = true)
         )
     }
 

@@ -10,6 +10,7 @@ import io.curiousoft.izinga.ordermanagement.mcp.DocumentUploadMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.McpCaller;
 import io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.OrderMcpController;
+import io.curiousoft.izinga.ordermanagement.mcp.PayoutMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.StoreMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.UserMcpController;
 import io.curiousoft.izinga.ordermanagement.orders.McpOrderService;
@@ -118,29 +119,29 @@ class McpToolRegistrationTest {
                 new OrderMcpController(orderService, mcpCaller, agentIdentityAuditService);
         StoreMcpController storeMcpController =
                 new StoreMcpController(storeService, agentIdentityAuditService, "main-pay", 0.1);
+        // ADR-026 Phase 5: PayoutMcpController owns get_payouts_for_user
+        PayoutMcpController payoutMcpController =
+                new PayoutMcpController(reconService, mcpCaller, agentIdentityAuditService);
         Map<String, Object> controllerBeans = new HashMap<>();
         controllerBeans.put("orderCreationMcpController", orderCreationController);
         controllerBeans.put("documentUploadMcpController", documentUploadController);
         controllerBeans.put("userMcpController", userMcpController);
         controllerBeans.put("orderMcpController", orderMcpController);
         controllerBeans.put("storeMcpController", storeMcpController);
+        controllerBeans.put("payoutMcpController", payoutMcpController);
         lenient().when(applicationContext.getBeansWithAnnotation(McpToolController.class))
                 .thenReturn(controllerBeans);
     }
 
     @Test
     void userProfileToolCallbackProvider_isCreated() {
-        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
-            reconService, applicationContext
-        );
+        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(applicationContext);
         assertNotNull(provider, "ToolCallbackProvider must not be null");
     }
 
     @Test
     void userProfileTools_allExpectedToolsAreRegistered() {
-        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
-            reconService, applicationContext
-        );
+        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(applicationContext);
         ToolCallback[] tools = provider.getToolCallbacks();
 
         assertNotNull(tools, "Tool callbacks array must not be null");
@@ -164,9 +165,7 @@ class McpToolRegistrationTest {
 
     @Test
     void findUserByPhone_toolHasDescription() {
-        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
-            reconService, applicationContext
-        );
+        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(applicationContext);
         ToolCallback findUserTool = Arrays.stream(provider.getToolCallbacks())
                 .filter(t -> "find_user_by_phone".equals(t.getToolDefinition().name()))
                 .findFirst()
@@ -179,9 +178,7 @@ class McpToolRegistrationTest {
 
     @Test
     void createUser_toolHasDescription() {
-        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
-            reconService, applicationContext
-        );
+        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(applicationContext);
         ToolCallback createUserTool = Arrays.stream(provider.getToolCallbacks())
                 .filter(t -> "create_user".equals(t.getToolDefinition().name()))
                 .findFirst()

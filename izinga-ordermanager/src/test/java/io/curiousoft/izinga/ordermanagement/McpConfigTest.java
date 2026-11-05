@@ -8,11 +8,14 @@ import io.curiousoft.izinga.ordermanagement.mcp.GuardedToolCallback;
 import io.curiousoft.izinga.ordermanagement.mcp.McpCaller;
 import io.curiousoft.izinga.ordermanagement.mcp.McpToolController;
 import io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController;
+import io.curiousoft.izinga.ordermanagement.mcp.OrderMcpController;
+import io.curiousoft.izinga.ordermanagement.mcp.PayoutMcpController;
+import io.curiousoft.izinga.ordermanagement.mcp.StoreMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.UserMcpController;
 import io.curiousoft.izinga.ordermanagement.orders.McpOrderService;
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
 import io.curiousoft.izinga.ordermanagement.stores.StoreService;
-import io.curiousoft.izinga.recon.ReconServiceImpl;
+import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService;
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService;
 import io.curiousoft.izinga.usermanagement.users.DocumentUploadMcpService;
@@ -39,20 +42,25 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 /**
- * ADR-026 D5 Gap-C: Unit tests for {@link McpConfig#userProfileToolCallbackProvider}.
+ * ADR-026 Phase 6 (D5 / T-07): Unit tests for {@link McpConfig#userProfileToolCallbackProvider}.
+ *
+ * <p>Phase 6 lock-down: the legacy tool-object list is gone. ALL 18 tools live on
+ * {@link McpToolController} beans. The bean method now takes only {@link ApplicationContext};
+ * it collects {@code @McpToolController} beans, fails fast on duplicate names, and wraps
+ * EVERY callback unconditionally in {@link GuardedToolCallback}.
  *
  * <p>Verifies:
  * <ol>
- *   <li>Zero controllers (Phase 1): exactly 13 legacy tools, none wrapped in {@link GuardedToolCallback}.</li>
- *   <li>One controller bean: its callback IS wrapped in {@link GuardedToolCallback}; legacy callbacks are not.</li>
- *   <li>Duplicate tool name: {@link IllegalStateException} thrown by Spring AI.</li>
- *   <li>AC-03 (Phase 1): wiring real controllers produces 18 tools total; 5 controller tools are guarded.</li>
+ *   <li>Zero controllers: 0 tools, empty array — no legacy tools remain.</li>
+ *   <li>One controller bean: its callback IS wrapped in {@link GuardedToolCallback}.</li>
+ *   <li>Duplicate tool name: {@link IllegalStateException} thrown.</li>
+ *   <li>All real controllers: 18 tools total, all wrapped in {@link GuardedToolCallback}.</li>
  * </ol>
  */
 @ExtendWith(MockitoExtension.class)
 class McpConfigTest {
 
-    // ---- Mocked service collaborators (all legacy — never mocked controllers) ------------
+    // ---- Mocked service collaborators ---------------------------------------------------
 
     @Mock private UserProfileRepo            userProfileRepo;
     @Mock private ApplicationEventPublisher  eventPublisher;
@@ -62,7 +70,7 @@ class McpConfigTest {
     @Mock private AgentIdentityAuditService  agentIdentityAuditService;
 
     @Mock private OrderServiceImpl           orderService;
-    @Mock private ReconServiceImpl           reconService;
+    @Mock private ReconService               reconService;
     @Mock private StoreService               storeService;
     @Mock private DocumentUploadMcpService   documentUploadMcpService;
     @Mock private McpOrderService            mcpOrderService;
@@ -82,34 +90,25 @@ class McpConfigTest {
         mcpConfig = new McpConfig();
     }
 
-    // ---- Phase 4: zero controllers → 1 legacy definition (ReconServiceImpl only), none wrapped --
+    // ---- Phase 6: zero controllers → 0 tools, empty array -------------------------------
 
     @Test
-    void zeroControllers_returns1Tool_noneGuarded() {
+    void zeroControllers_returns0Tools_emptyArray() {
         when(applicationContext.getBeansWithAnnotation(McpToolController.class))
                 .thenReturn(Collections.emptyMap());
 
-        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
-                reconService, applicationContext);
+        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(applicationContext);
 
         ToolCallback[] callbacks = provider.getToolCallbacks();
-        // Phase 4 complete: only ReconServiceImpl retains @Tool — 1 legacy tool remains
-        assertThat(callbacks).hasSize(1);
-
-        for (ToolCallback tc : callbacks) {
-            assertThat(tc)
-                    .as("Legacy-only config: no callback should be wrapped in GuardedToolCallback (tool: %s)",
-                            tc.getToolDefinition().name())
-                    .isNotInstanceOf(GuardedToolCallback.class);
-        }
+        // Phase 6: no legacy tools, no controller beans → empty
+        assertThat(callbacks).isEmpty();
     }
 
-    // ---- Phase 1+: controller bean → its callback IS GuardedToolCallback, legacy not --
+    // ---- One controller bean → its callback IS GuardedToolCallback ----------------------
 
     /**
      * Minimal in-memory {@link McpToolController} bean with one tool named
-     * {@code test_controller_tool}. Must use a name that does NOT clash with the 1
-     * legacy tool (get_payouts_for_user).
+     * {@code test_controller_tool}. Must use a name that does NOT clash with any real tool.
      */
     @McpToolController
     static class TestMcpController {
@@ -120,73 +119,63 @@ class McpConfigTest {
     }
 
     @Test
-    void oneControllerBean_itsCallbackIsGuarded_legacyCallbacksAreNot() {
+    void oneControllerBean_itsCallbackIsGuarded() {
         TestMcpController controller = new TestMcpController();
         Map<String, Object> controllerBeans = new HashMap<>();
         controllerBeans.put("testMcpController", controller);
         when(applicationContext.getBeansWithAnnotation(McpToolController.class))
                 .thenReturn(controllerBeans);
 
-        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
-                reconService, applicationContext);
+        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(applicationContext);
 
         ToolCallback[] callbacks = provider.getToolCallbacks();
-        // 1 legacy (ReconServiceImpl) + 1 test controller = 2
-        assertThat(callbacks).hasSize(2);
-
-        for (ToolCallback tc : callbacks) {
-            String name = tc.getToolDefinition().name();
-            if ("test_controller_tool".equals(name)) {
-                assertThat(tc)
-                        .as("Controller tool must be wrapped in GuardedToolCallback")
-                        .isInstanceOf(GuardedToolCallback.class);
-            } else {
-                assertThat(tc)
-                        .as("Legacy tool '%s' must NOT be wrapped in GuardedToolCallback", name)
-                        .isNotInstanceOf(GuardedToolCallback.class);
-            }
-        }
+        // 1 controller tool → wrapped unconditionally in GuardedToolCallback
+        assertThat(callbacks).hasSize(1);
+        assertThat(callbacks[0])
+                .as("Controller tool must be wrapped in GuardedToolCallback")
+                .isInstanceOf(GuardedToolCallback.class);
+        assertThat(callbacks[0].getToolDefinition().name())
+                .isEqualTo("test_controller_tool");
     }
 
-    // ---- Duplicate tool name → IllegalStateException from Spring AI -------------------
+    // ---- Duplicate tool name → IllegalStateException ------------------------------------
 
     /**
-     * Controller that declares a tool whose name clashes with the one remaining legacy tool.
-     * ADR-026 Phase 4: only ReconServiceImpl retains @Tool, so the only legacy name is
-     * get_payouts_for_user.
+     * Two controllers that each declare the same tool name — the fail-fast guard must fire.
      */
     @McpToolController
-    static class DuplicateNameController {
-        @Tool(name = "get_payouts_for_user", description = "duplicate of the remaining legacy tool")
-        public String getPayoutsForUser(String userId) {
-            return userId;
+    static class AnotherControllerWithDuplicate {
+        @Tool(name = "test_controller_tool", description = "duplicate name from another controller")
+        public String testControllerTool(String input) {
+            return input;
         }
     }
 
     @Test
     void duplicateToolName_throwsIllegalStateException() {
-        DuplicateNameController controller = new DuplicateNameController();
         Map<String, Object> controllerBeans = new HashMap<>();
-        controllerBeans.put("duplicateNameController", controller);
+        controllerBeans.put("testMcpController", new TestMcpController());
+        controllerBeans.put("anotherControllerWithDuplicate", new AnotherControllerWithDuplicate());
         when(applicationContext.getBeansWithAnnotation(McpToolController.class))
                 .thenReturn(controllerBeans);
 
         assertThatThrownBy(() ->
-                mcpConfig.userProfileToolCallbackProvider(
-                reconService, applicationContext)
+                mcpConfig.userProfileToolCallbackProvider(applicationContext)
         ).isInstanceOf(IllegalStateException.class);
     }
 
-    // ---- AC-03 (Phase 2): real controllers → 18 tools total, 9 controller tools guarded ----
+    // ---- Phase 6: all real controllers → 18 tools, ALL guarded -------------------------
 
     /**
-     * AC-03: Wiring all Phase 1+2 real controllers (OrderCreationMcpController +
-     * DocumentUploadMcpController + UserMcpController) produces exactly 10 tools in total
-     * (1 legacy from ReconServiceImpl + 9 migrated), and each of the 9 controller tools is
-     * wrapped in {@link GuardedToolCallback} while the legacy tool is not.
+     * Phase 6: wiring all 6 real controllers produces exactly 18 tools, every one wrapped
+     * in {@link GuardedToolCallback} — no legacy callbacks remain.
+     *
+     * <p>Controllers: {@code OrderCreationMcpController} (1), {@code DocumentUploadMcpController} (4),
+     * {@code UserMcpController} (4), {@code OrderMcpController} (5), {@code StoreMcpController} (3),
+     * {@code PayoutMcpController} (1) = 18 tools, all guarded.</p>
      */
     @Test
-    void phase2RealControllers_returns10Tools_9controllerToolsGuarded() {
+    void allRealControllers_returns18Tools_allGuarded() {
         McpCaller mcpCaller = new McpCaller(userProfileRepo);
         OrderCreationMcpController orderCreationController =
                 new OrderCreationMcpController(mcpOrderService, mcpCaller, agentIdentityAuditService);
@@ -194,45 +183,39 @@ class McpConfigTest {
                 new DocumentUploadMcpController(documentUploadMcpService, agentIdentityAuditService);
         UserMcpController userMcpController =
                 new UserMcpController(userProfileService, agentIdentityAuditService);
+        OrderMcpController orderMcpController =
+                new OrderMcpController(orderService, mcpCaller, agentIdentityAuditService);
+        StoreMcpController storeMcpController =
+                new StoreMcpController(storeService, agentIdentityAuditService, "main-pay-account", 0.05);
+        PayoutMcpController payoutMcpController =
+                new PayoutMcpController(reconService, mcpCaller, agentIdentityAuditService);
 
         Map<String, Object> controllerBeans = new HashMap<>();
         controllerBeans.put("orderCreationMcpController", orderCreationController);
         controllerBeans.put("documentUploadMcpController", documentUploadController);
         controllerBeans.put("userMcpController", userMcpController);
+        controllerBeans.put("orderMcpController", orderMcpController);
+        controllerBeans.put("storeMcpController", storeMcpController);
+        controllerBeans.put("payoutMcpController", payoutMcpController);
         when(applicationContext.getBeansWithAnnotation(McpToolController.class))
                 .thenReturn(controllerBeans);
 
-        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
-                reconService, applicationContext);
+        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(applicationContext);
 
         ToolCallback[] callbacks = provider.getToolCallbacks();
-        // 1 legacy (ReconServiceImpl) + 9 Phase 1+2 controllers = 10
-        assertThat(callbacks).hasSize(10);
+        assertThat(callbacks)
+                .as("Phase 6: all 6 controllers together must produce exactly 18 tools")
+                .hasSize(18);
 
-        Set<String> controllerToolNames = Set.of(
-                // Phase 1
-                "start_order",
-                "get_required_documents_for_user",
-                "create_document_upload_session",
-                "attach_uploaded_document_to_user_tag",
-                "recheck_required_documents",
-                // Phase 2
-                "find_user_by_phone",
-                "find_users",
-                "create_user",
-                "get_missing_fields_by_phone");
-
+        // Every callback must be GuardedToolCallback — no legacy unguarded callbacks remain
+        Set<String> unguardedNames = new java.util.HashSet<>();
         for (ToolCallback tc : callbacks) {
-            String name = tc.getToolDefinition().name();
-            if (controllerToolNames.contains(name)) {
-                assertThat(tc)
-                        .as("Controller tool '%s' must be wrapped in GuardedToolCallback", name)
-                        .isInstanceOf(GuardedToolCallback.class);
-            } else {
-                assertThat(tc)
-                        .as("Legacy tool '%s' must NOT be wrapped in GuardedToolCallback", name)
-                        .isNotInstanceOf(GuardedToolCallback.class);
+            if (!(tc instanceof GuardedToolCallback)) {
+                unguardedNames.add(tc.getToolDefinition().name());
             }
         }
+        assertThat(unguardedNames)
+                .as("Phase 6: ALL tool callbacks must be GuardedToolCallback — found unguarded: %s", unguardedNames)
+                .isEmpty();
     }
 }

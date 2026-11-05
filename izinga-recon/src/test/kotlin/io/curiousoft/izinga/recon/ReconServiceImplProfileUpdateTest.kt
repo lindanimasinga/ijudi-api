@@ -69,7 +69,6 @@ class ReconServiceImplProfileUpdateTest {
             storeStage2CommissionRepo = storeStage2CommissionRepo,
             applicationEventPublisher = applicationEventPublisher,
             ambassadorProperties = AmbassadorProperties(),
-            agentIdentityAuditService = mockk(relaxed = true)
         )
     }
 

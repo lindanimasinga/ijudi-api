@@ -32,15 +32,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * ADR-026 D5: ArchUnit architectural rules R1–R6 for MCP controller-layer separation.
  *
- * <p>Phase 4 complete — OrderServiceImpl + StoreService migrated to OrderMcpController +
- * StoreMcpController. Only ReconServiceImpl remains in LEGACY_EXCLUSIONS.
- * Rules R1, R2, R4 carry {@code LEGACY_EXCLUSIONS} exempting the 1 remaining legacy class.
- * Rule R6 must already pass unconditionally.</p>
+ * <p>Phase 6 lock-down complete — all 18 tools now live on {@code @McpToolController} beans.
+ * LEGACY_EXCLUSIONS removed. R1, R4 hard-fail with no exemptions. {@code allowEmptyShould}
+ * removed everywhere. Rule R6 passes unconditionally.</p>
  *
  * <p>Non-vacuity guards ensure:
  * <ul>
- *   <li>(a) Without LEGACY_EXCLUSIONS, R1 would flag exactly the 1 exclusion class.</li>
- *   <li>(b) The importer finds exactly 18 {@code @Tool} methods across exactly 6 classes.</li>
+ *   <li>(a) Zero R1 violators — no class outside {@code ..mcp..} has {@code @Tool} methods.</li>
+ *   <li>(b) The importer finds exactly 18 {@code @Tool} methods across exactly 6 controller classes.</li>
  * </ul>
  * </p>
  */
@@ -55,27 +54,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 )
 class McpArchitectureTest {
 
-    // ---- LEGACY_EXCLUSIONS ----------------------------------------------------------------
-
-    /**
-     * The 1 service class that still holds {@code @Tool} methods after Phase 4.
-     * McpOrderService + DocumentUploadMcpService migrated in Phase 1.
-     * UserProfileService migrated in Phase 2 → UserMcpController.
-     * OrderServiceImpl migrated in Phase 3 → OrderMcpController.
-     * StoreService migrated in Phase 4 → StoreMcpController.
-     * Phase 5+ will migrate ReconServiceImpl. Phase 6 deletes this list.
-     */
-    static final Set<String> LEGACY_EXCLUSIONS = new HashSet<>(Arrays.asList(
-            "io.curiousoft.izinga.recon.ReconServiceImpl"
-    ));
-
-    private static final DescribedPredicate<JavaClass> IS_LEGACY_EXCLUSION =
-            new DescribedPredicate<JavaClass>("is an ADR-026 legacy exclusion class") {
-                @Override
-                public boolean test(JavaClass javaClass) {
-                    return LEGACY_EXCLUSIONS.contains(javaClass.getName());
-                }
-            };
+    // ---- LEGACY_EXCLUSIONS removed in Phase 6 -------------------------------------------
+    //
+    // All 18 @Tool methods now reside on @McpToolController beans in ..ordermanagement.mcp..
+    // R1, R4, and the non-vacuity guards carry no exemptions as of ADR-026 Phase 6 lock-down.
 
     private static final DescribedPredicate<JavaClass> HAS_TOOL_METHODS =
             new DescribedPredicate<JavaClass>("has at least one @Tool method") {
@@ -168,23 +150,22 @@ class McpArchitectureTest {
                 }
             };
 
-    // ---- R1: @Tool methods must be in @McpToolController (LEGACY_EXCLUSIONS exempt) ------
+    // ---- R1: @Tool methods must be in @McpToolController (no exemptions) ----------------
 
     /**
      * R1: Any class that declares a {@code @Tool} method must be annotated {@code @McpToolController}
      * and reside in the {@code ..ordermanagement.mcp..} package.
-     * The 6 LEGACY_EXCLUSIONS are exempt during the migration.
-     * This rule is vacuous in Phase 0 (all @Tool classes are excluded).
+     *
+     * <p>ADR-026 Phase 6 lock-down: LEGACY_EXCLUSIONS removed. This rule now hard-fails for any
+     * {@code @Tool} method outside the controller package — no exemptions remain.</p>
      */
     @ArchTest
     static final ArchRule R1_toolMethodsMustBeInMcpControllerPackage =
             classes()
                     .that(HAS_TOOL_METHODS)
-                    .and(not(IS_LEGACY_EXCLUSION))
                     .should().beAnnotatedWith(McpToolController.class)
                     .andShould().resideInAPackage("..ordermanagement.mcp..")
-                    .allowEmptyShould(true)
-                    .as("R1: @Tool classes outside LEGACY_EXCLUSIONS must be @McpToolController in ..mcp..");
+                    .as("R1: All @Tool classes must be @McpToolController in ..mcp.. (no exemptions)");
 
     // ---- R2: @Tool methods on @McpToolController must carry @McpAudience ----------------
 
@@ -217,13 +198,15 @@ class McpArchitectureTest {
                     .resideInAPackage("..ordermanagement.mcp..")
                     .as("R3: @McpToolController classes may only be accessed from within ..mcp..");
 
-    // ---- R4: Context/validator calls restricted (LEGACY_EXCLUSIONS and security exempt) --
+    // ---- R4: Context/validator calls restricted (no exemptions) -------------------------
 
     /**
-     * R4: Outside the {@code ..mcp..} and {@code ..security..} packages, no class (except
-     * the 6 LEGACY_EXCLUSIONS) may depend on the R4-restricted context or validator classes:
-     * {@code StoreScopeContext}, {@code CallerIdentityContext}, {@code CallerIdentityValidator},
-     * {@code StoreScopeValidator}.
+     * R4: Outside the {@code ..mcp..} and {@code ..security..} packages, no class may depend on
+     * the R4-restricted context or validator classes: {@code StoreScopeContext},
+     * {@code CallerIdentityContext}, {@code CallerIdentityValidator}, {@code StoreScopeValidator}.
+     *
+     * <p>ADR-026 Phase 6 lock-down: LEGACY_EXCLUSIONS removed. This rule now hard-fails for any
+     * such dependency outside the allowed packages — no exemptions remain.</p>
      */
     @ArchTest
     static final ArchRule R4_onlyMcpAndSecurityMayUseContextClasses =
@@ -234,9 +217,8 @@ class McpArchitectureTest {
                             // CallerIdentityValidator and CallerIdentityContext are co-located in commons.security;
                             // the validator calls the context — both are security infrastructure, not application code.
                             "..commons.security..")
-                    .and(not(IS_LEGACY_EXCLUSION))
                     .should().dependOnClassesThat(IS_R4_RESTRICTED)
-                    .as("R4: Only ..mcp.., ..security.., and commons security infrastructure may depend on context/validator classes");
+                    .as("R4: Only ..mcp.., ..security.., and commons security infrastructure may depend on context/validator classes (no exemptions)");
 
     // ---- R5: @McpToolController classes must not depend on repo types --------------------
 
@@ -273,19 +255,21 @@ class McpArchitectureTest {
                     .should().callMethodWhere(IS_SCOPE_SETTER)
                     .as("R6: Only StoreScopeValidationFilter may call StoreScopeContext setters or setMcpRequest");
 
-    // ---- Non-vacuity guard (a): without exclusions R1 flags exactly 6 classes ------------
+    // ---- Non-vacuity guard (a): zero R1 violators — all @Tool classes are controllers ----
 
     /**
-     * Non-vacuity guard (a): Verifies the LEGACY_EXCLUSIONS list is complete and minimal.
-     * Without the exclusion list, R1 must flag exactly the 3 classes named in LEGACY_EXCLUSIONS
-     * (after Phase 2 migration: Phase 1 moved McpOrderService+DocumentUploadMcpService,
-     * Phase 2 moved UserProfileService → UserMcpController).
-     * If this test fails with more violations, a new class has @Tool methods and must be added
-     * to LEGACY_EXCLUSIONS or moved to a @McpToolController.
-     * If it fails with fewer violations, one of the 3 has been migrated and must be removed.
+     * Non-vacuity guard (a): ADR-026 Phase 6 lock-down — LEGACY_EXCLUSIONS removed.
+     *
+     * <p>Verifies that there are ZERO classes with {@code @Tool} methods that are NOT also
+     * annotated {@code @McpToolController}. Any class failing this check has leaked a {@code @Tool}
+     * method outside the controller layer and must be migrated.</p>
+     *
+     * <p>Expected controllers (6): {@code OrderCreationMcpController}, {@code DocumentUploadMcpController},
+     * {@code UserMcpController}, {@code OrderMcpController}, {@code StoreMcpController},
+     * {@code PayoutMcpController}.</p>
      */
     @Test
-    void nonVacuityGuard_a_legacyExclusionsAreTheExactR1Violators() {
+    void nonVacuityGuard_a_zeroR1ViolatorsAllToolClassesAreControllers() {
         JavaClasses allProductionClasses = new ClassFileImporter()
                 .withImportOption(new ImportOption.DoNotIncludeTests())
                 .importPackages(
@@ -296,9 +280,7 @@ class McpArchitectureTest {
                 );
 
         // Find classes with @Tool methods that are NOT annotated @McpToolController.
-        // These are the classes that violate R1 without exclusions.
-        // anyMatch is correct: even if a Kotlin-generated bridge method duplicates a @Tool annotation,
-        // the class genuinely has @Tool methods. We care about WHICH CLASSES have them, not method count.
+        // Phase 6: this set must be empty — every @Tool method lives on a controller.
         Set<String> violatingClassNames = allProductionClasses.stream()
                 .filter(c -> c.getMethods().stream()
                         .anyMatch(m -> m.isAnnotatedWith(Tool.class)))
@@ -307,19 +289,23 @@ class McpArchitectureTest {
                 .collect(Collectors.toSet());
 
         assertThat(violatingClassNames)
-                .as("Without LEGACY_EXCLUSIONS, R1 must flag exactly the 1 legacy class (after Phase 4 migration). " +
-                        "If a new class has @Tool methods, it must be a @McpToolController or added to LEGACY_EXCLUSIONS. " +
-                        "If a legacy class was migrated, remove it from LEGACY_EXCLUSIONS.")
-                .containsExactlyInAnyOrderElementsOf(LEGACY_EXCLUSIONS);
+                .as("Phase 6 lock-down: zero classes may hold @Tool methods outside @McpToolController. " +
+                        "If a new class has @Tool methods outside the controller layer, it violates ADR-026 R1.")
+                .isEmpty();
     }
 
-    // ---- Non-vacuity guard (b): exactly 18 @Tool methods across 6 classes ---------------
+    // ---- Non-vacuity guard (b): exactly 18 @Tool methods across 6 controller classes ----
 
     /**
-     * Non-vacuity guard (b): Sanity assertion that the importer finds exactly 18 {@code @Tool} methods
-     * across exactly 6 classes (3 legacy services + 3 controllers: Phase 1 × 2 + Phase 2 × 1).
-     * This guards against silent tool additions or removals that could invalidate the contract snapshot
-     * and access matrix tests.
+     * Non-vacuity guard (b): ADR-026 Phase 6 lock-down.
+     *
+     * <p>Sanity assertion that the importer finds exactly 18 {@code @Tool} methods across exactly
+     * 6 {@code @McpToolController} classes (all in {@code ..ordermanagement.mcp..}). No legacy
+     * service classes hold {@code @Tool} methods as of Phase 6.</p>
+     *
+     * <p>Expected controllers: {@code OrderCreationMcpController} (1), {@code DocumentUploadMcpController}
+     * (4), {@code UserMcpController} (4), {@code OrderMcpController} (5), {@code StoreMcpController} (3),
+     * {@code PayoutMcpController} (1) = 18 tools, 6 classes.</p>
      *
      * <p>If a new tool is added, {@code McpToolContractSnapshotTest}'s golden file must be updated
      * and this count must be bumped.</p>
@@ -358,9 +344,10 @@ class McpArchitectureTest {
                 .hasSize(18);
 
         assertThat(classesWithToolMethods)
-                .as("Expected exactly 6 classes to hold @Tool methods " +
-                        "(1 legacy service + 5 controllers after Phase 4). " +
-                        "Update LEGACY_EXCLUSIONS if a new class is introduced.")
+                .as("Expected exactly 6 @McpToolController classes to hold @Tool methods " +
+                        "(Phase 6: OrderCreationMcpController, DocumentUploadMcpController, UserMcpController, " +
+                        "OrderMcpController, StoreMcpController, PayoutMcpController). " +
+                        "Update this guard if a new controller is introduced.")
                 .hasSize(6);
     }
 
@@ -443,7 +430,7 @@ class McpArchitectureTest {
                 "create_document_upload_session",
                 "attach_uploaded_document_to_user_tag",
                 "recheck_required_documents",
-                // ReconServiceImpl (1) — legacy, Phase 5 migration pending
+                // PayoutMcpController (1) — migrated from ReconServiceImpl in Phase 5
                 "get_payouts_for_user"
         );
     }
@@ -471,9 +458,8 @@ class McpArchitectureTest {
                         "..ordermanagement.mcp..",
                         "..ordermanagement.security..",
                         "..commons.security..")
-                .and(not(IS_LEGACY_EXCLUSION))
                 .should().dependOnClassesThat(IS_R4_RESTRICTED)
-                .as("R4: Only ..mcp.., ..security.., and commons security infrastructure may depend on context/validator classes");
+                .as("R4: Only ..mcp.., ..security.., and commons security infrastructure may depend on context/validator classes (no exemptions)");
 
         assertThatThrownBy(() -> r4ForFixture.check(fixtureClasses))
                 .as("R4 must flag R4ViolatorFixture — it depends on StoreScopeContext from outside the allowed packages")

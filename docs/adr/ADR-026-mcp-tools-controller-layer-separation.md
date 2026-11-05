@@ -410,3 +410,22 @@ The REST-side role-assignment gap (POST /user, PATCH /user/{id}, issue #138) is 
 Accepted: Lindani Masinga (co-founder, CEO), 2026-11-04, via answers to OQ-1 to OQ-7.
 
 F4 items (F4-1: allowedTools never enforced; F4-2: self-assignable ADMIN role) still need to be flagged to Lindani Masinga and Hloniphani Manzi before implementation of any tightening change. There is no record that this notification has occurred as of this writing.
+
+---
+
+## Implementation status
+
+**Branch:** `feature/adr-026-phase-0-foundation`
+
+| Phase | Description | Status |
+|---|---|---|
+| 0 | Foundation (annotations, GuardedToolCallback, McpConfig wiring, ArchUnit R1-R6, contract snapshot + access matrix) | Done — commit `c71d029` |
+| 1 | Move `start_order` + 4 document tools to `OrderCreationMcpController` / `DocumentUploadMcpController` | Done — commit `3c0ca9a` |
+| 2 | Move 4 user tools to `UserMcpController` | Done — commit `e996dc1` |
+| 3+4 | Move 5 order-read tools to `OrderMcpController`; move 3 store tools to `StoreMcpController` (bank masking at controller) | Done — commit `f77f647` |
+| Step B | `StoreService.findByIdNoSideEffects()` — side-effect-free ownership probe for `StoreMcpController.findByOwner` | Done (uncommitted — awaiting code review) |
+| 5 | Move `get_payouts_for_user` to `PayoutMcpController`; `ReconServiceImpl.getAllPayouts` becomes ungated | Done (uncommitted — awaiting code review) |
+| 6 | Lock-down: `LEGACY_EXCLUSIONS` deleted, R1/R4 hard-fail, `allowEmptyShould` removed, `McpConfig` takes only `ApplicationContext`, `@RequiresAudience` retired, all tests updated | Done (uncommitted — awaiting code review) |
+| 2b | `create_user` role restriction (OQ-7) | **Not implemented** — pre-implementation questions 1–4 remain unanswered. See "OQ-7 Approved Behaviour Change" section. |
+
+**Non-vacuity state (Phase 6):** 18 tools, 6 `@McpToolController` classes, 0 legacy service classes with `@Tool` methods.

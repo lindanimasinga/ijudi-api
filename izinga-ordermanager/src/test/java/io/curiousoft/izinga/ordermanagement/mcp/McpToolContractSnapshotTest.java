@@ -24,6 +24,7 @@ import io.curiousoft.izinga.ordermanagement.mcp.DocumentUploadMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.McpCaller;
 import io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.OrderMcpController;
+import io.curiousoft.izinga.ordermanagement.mcp.PayoutMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.StoreMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.UserMcpController;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
@@ -209,15 +210,16 @@ class McpToolContractSnapshotTest {
                 storeAgreementAuditRepository, storeTierChangeAuditRepository,
                 firebaseAuth);
 
+        // ADR-026 Phase 5: agentIdentityAuditService removed from ReconServiceImpl constructor
         ReconServiceImpl reconService = new ReconServiceImpl(
                 storeRepository, userProfileRepo, shopPayoutRepo,
                 messengerPayoutRepository, ambassadorPayoutRepository,
                 referralPartnerPayoutRepository, payoutBundleRepository,
                 foodCustomerCommissionRepo, furnitureCustomerCommissionRepo,
                 storeStage1CommissionRepo, storeStage2CommissionRepo,
-                eventPublisher, new AmbassadorProperties(), agentIdentityAuditService);
+                eventPublisher, new AmbassadorProperties());
 
-        // ADR-026 Phase 1-4: wire all real controllers so all 18 tool definitions appear in the snapshot.
+        // ADR-026 Phase 1-5: wire all real controllers so all 18 tool definitions appear in the snapshot.
         McpCaller mcpCaller = new McpCaller(userProfileRepo);
         OrderCreationMcpController orderCreationController =
                 new OrderCreationMcpController(mcpOrderService, mcpCaller, agentIdentityAuditService);
@@ -229,6 +231,8 @@ class McpToolContractSnapshotTest {
                 new OrderMcpController(orderService, mcpCaller, agentIdentityAuditService);
         StoreMcpController storeMcpController =
                 new StoreMcpController(storeService, agentIdentityAuditService, "main-pay-account", 0.05);
+        PayoutMcpController payoutMcpController =
+                new PayoutMcpController(reconService, mcpCaller, agentIdentityAuditService);
 
         java.util.Map<String, Object> controllerBeans = new java.util.HashMap<>();
         controllerBeans.put("orderCreationMcpController", orderCreationController);
@@ -236,13 +240,13 @@ class McpToolContractSnapshotTest {
         controllerBeans.put("userMcpController", userMcpController);
         controllerBeans.put("orderMcpController", orderMcpController);
         controllerBeans.put("storeMcpController", storeMcpController);
+        controllerBeans.put("payoutMcpController", payoutMcpController);
         when(applicationContext.getBeansWithAnnotation(McpToolController.class))
                 .thenReturn(controllerBeans);
 
         McpConfig mcpConfig = new McpConfig();
-        provider = mcpConfig.userProfileToolCallbackProvider(
-            reconService, applicationContext
-        );
+        // ADR-026 Phase 6: McpConfig.userProfileToolCallbackProvider takes only ApplicationContext
+        provider = mcpConfig.userProfileToolCallbackProvider(applicationContext);
     }
 
     // ---- Main snapshot assertion ---------------------------------------------------------

@@ -183,7 +183,8 @@ public class StoreMcpControllerTest {
 
         StoreProfile permitted = storeWithBank(REAL_ACCOUNT);
         permitted.setOwnerId(OWNER_ID);
-        when(storeService.find(STORE_ID)).thenReturn(permitted);
+        // ADR-026 Step B: controller must use findByIdNoSideEffects (no save side-effect)
+        when(storeService.findByIdNoSideEffects(STORE_ID)).thenReturn(permitted);
 
         StoreProfile resultStore = storeWithBank(REAL_ACCOUNT);
         when(storeService.findByOwner(OWNER_ID)).thenReturn(List.of(resultStore));
@@ -192,7 +193,36 @@ public class StoreMcpControllerTest {
         assertFalse(result.isEmpty());
         assertEquals(MAIN_PAY_ACCOUNT, result.get(0).getBank().getAccountId(),
                 "MCP path must mask bank accountId");
+        // Prove find() (which triggers save) is NEVER called on this path
+        verify(storeService, never()).find(any());
         verifyNoInteractions(agentIdentityAuditService);
+    }
+
+    /**
+     * ADR-026 Step B regression: the STORE-audience ownership check must use
+     * findByIdNoSideEffects(), NOT find(). find() calls profileRepo.save() as a side
+     * effect when the store has no business hours — that must never happen in a pure
+     * read gate. This test proves find() is never invoked.
+     */
+    @Test
+    public void findByOwner_storeAudience_ownershipProbeNeverCallsFindWithSideEffect() {
+        CallerIdentityContext.setMcpRequest(true);
+        CallerIdentityContext.setAudience(Audience.STORE.name());
+        StoreScopeContext.setAudience(Audience.STORE);
+        StoreScopeContext.setCallerPhone(CALLER_PHONE);
+        StoreScopeContext.setPermittedStoreId(STORE_ID);
+
+        StoreProfile permitted = storeWithBank(REAL_ACCOUNT);
+        permitted.setOwnerId(OWNER_ID);
+        when(storeService.findByIdNoSideEffects(STORE_ID)).thenReturn(permitted);
+        when(storeService.findByOwner(OWNER_ID)).thenReturn(List.of(storeWithBank(REAL_ACCOUNT)));
+
+        sut.findByOwner(OWNER_ID);
+
+        // The critical assertion: find() (which may call profileRepo.save()) is never invoked.
+        // findByIdNoSideEffects() must be called exactly once for the ownership probe.
+        verify(storeService, never()).find(any());
+        verify(storeService).findByIdNoSideEffects(STORE_ID);
     }
 
     @Test
@@ -205,7 +235,8 @@ public class StoreMcpControllerTest {
 
         StoreProfile permitted = storeWithBank(REAL_ACCOUNT);
         permitted.setOwnerId("different-owner");
-        when(storeService.find(STORE_ID)).thenReturn(permitted);
+        // ADR-026 Step B: controller must use findByIdNoSideEffects
+        when(storeService.findByIdNoSideEffects(STORE_ID)).thenReturn(permitted);
 
         assertThrows(CallerIdentityViolationException.class,
                 () -> sut.findByOwner(OWNER_ID));

@@ -47,6 +47,7 @@ import io.curiousoft.izinga.ordermanagement.mcp.DocumentUploadMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.McpCaller;
 import io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.OrderMcpController;
+import io.curiousoft.izinga.ordermanagement.mcp.PayoutMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.StoreMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.UserMcpController;
 import io.curiousoft.izinga.usermanagement.users.DocumentUploadMcpService;
@@ -273,15 +274,16 @@ class McpAccessMatrixTest {
                 storeAgreementAuditRepository, storeTierChangeAuditRepository,
                 firebaseAuth);
 
+        // ADR-026 Phase 5: agentIdentityAuditService removed from ReconServiceImpl constructor
         reconService = new ReconServiceImpl(
                 storeRepository, userProfileRepo, shopPayoutRepo,
                 messengerPayoutRepository, ambassadorPayoutRepository,
                 referralPartnerPayoutRepository, payoutBundleRepository,
                 foodCustomerCommissionRepo, furnitureCustomerCommissionRepo,
                 storeStage1CommissionRepo, storeStage2CommissionRepo,
-                eventPublisher, new AmbassadorProperties(), agentIdentityAuditService);
+                eventPublisher, new AmbassadorProperties());
 
-        // Build Phase 1–4 controller instances backed by the real (non-mocked) services
+        // Build Phase 1–5 controller instances backed by the real (non-mocked) services
         McpCaller mcpCaller = new McpCaller(userProfileRepo);
         OrderCreationMcpController orderCreationController =
                 new OrderCreationMcpController(mcpOrderService, mcpCaller, agentIdentityAuditService);
@@ -293,19 +295,22 @@ class McpAccessMatrixTest {
                 new OrderMcpController(orderService, mcpCaller, agentIdentityAuditService);
         StoreMcpController storeMcpController =
                 new StoreMcpController(storeService, agentIdentityAuditService, "main-pay-account", 0.05);
+        // ADR-026 Phase 5: PayoutMcpController added — owns get_payouts_for_user
+        PayoutMcpController payoutMcpController =
+                new PayoutMcpController(reconService, mcpCaller, agentIdentityAuditService);
         Map<String, Object> controllerBeans = new HashMap<>();
         controllerBeans.put("orderCreationMcpController", orderCreationController);
         controllerBeans.put("documentUploadMcpController", documentUploadController);
         controllerBeans.put("userMcpController", userMcpController);
         controllerBeans.put("orderMcpController", orderMcpController);
         controllerBeans.put("storeMcpController", storeMcpController);
+        controllerBeans.put("payoutMcpController", payoutMcpController);
         when(applicationContext.getBeansWithAnnotation(McpToolController.class))
                 .thenReturn(controllerBeans);
 
-        // Build provider via same McpConfig factory as production (Phase 4: 2-param signature)
+        // ADR-026 Phase 6: McpConfig.userProfileToolCallbackProvider takes 1 param (no reconService).
         McpConfig mcpConfig = new McpConfig();
-        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
-                reconService, applicationContext);
+        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(applicationContext);
 
         // Build lookup map by tool name
         toolCallbacks = new HashMap<>();
@@ -1103,8 +1108,8 @@ class McpAccessMatrixTest {
                 break;
 
             case "get_payouts_for_user":
-                // Gate: CallerIdentityValidator.validateCallerOwnsId (ReconServiceImpl).
-                // findByModifiedDateBetweenAndToId is called post-gate.
+                // Gate: StoreScopeValidator.validateCallerOwnsId (PayoutMcpController, Phase 5).
+                // findByModifiedDateBetweenAndToId is called post-gate on the ungated ReconServiceImpl.
                 verify(messengerPayoutRepository, atLeastOnce())
                         .findByModifiedDateBetweenAndToId(any(), any(), anyString());
                 break;

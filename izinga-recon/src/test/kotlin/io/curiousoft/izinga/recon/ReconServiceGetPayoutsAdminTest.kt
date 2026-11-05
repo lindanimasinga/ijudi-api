@@ -6,7 +6,6 @@ import io.curiousoft.izinga.commons.referral.StorePartnerStage1CommissionRepo
 import io.curiousoft.izinga.commons.referral.StorePartnerStage2CommissionRepo
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
-import io.curiousoft.izinga.commons.security.AgentIdentityAuditService
 import io.curiousoft.izinga.commons.security.CallerIdentityContext
 import io.curiousoft.izinga.recon.ambassador.AmbassadorProperties
 import io.curiousoft.izinga.recon.payout.PayoutType
@@ -65,7 +64,6 @@ class ReconServiceGetPayoutsAdminTest {
             storeStage2CommissionRepo = storeStage2CommissionRepo,
             applicationEventPublisher = applicationEventPublisher,
             ambassadorProperties = AmbassadorProperties(),
-            agentIdentityAuditService = mockk(relaxed = true)
         )
     }
 

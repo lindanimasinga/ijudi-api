@@ -407,7 +407,8 @@ import static java.lang.String.format;
             LOG.info("Found {} unpaid orders to check for missing payouts", unpaidOrders.size());
 
             // BUG-1 fix: call internal generate methods directly — never call the @Tool
-            // getAllPayouts (gated by CallerIdentityValidator) from a scheduler with no caller context.
+            // getAllPayouts is ungated at the service layer (ADR-026 Phase 5: the MCP gate lives in PayoutMcpController).
+            // The scheduler calls the service directly with no caller context, which is correct.
             // BUG-2 fix: guard messenger call on non-null shippingData + messengerId to avoid NPE.
             unpaidOrders.stream()
                     .filter(it -> !it.getPayoutCreated())

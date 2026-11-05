@@ -12,7 +12,6 @@ import io.curiousoft.izinga.commons.referral.StorePartnerStage1CommissionRepo
 import io.curiousoft.izinga.commons.referral.StorePartnerStage2CommissionRepo
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
-import io.curiousoft.izinga.commons.security.AgentIdentityAuditService
 import io.curiousoft.izinga.recon.ambassador.AmbassadorProperties
 import io.curiousoft.izinga.recon.payout.MessengerPayout
 import io.curiousoft.izinga.recon.payout.PayoutStage
@@ -56,8 +55,6 @@ class ReconServiceImplIdempotencyTest {
     private val storeStage1CommissionRepo = mockk<StorePartnerStage1CommissionRepo>()
     private val storeStage2CommissionRepo = mockk<StorePartnerStage2CommissionRepo>()
     private val applicationEventPublisher = mockk<ApplicationEventPublisher>()
-    private val agentIdentityAuditService = mockk<AgentIdentityAuditService>(relaxed = true)
-
     private lateinit var sut: ReconServiceImpl
 
     @Before
@@ -76,7 +73,6 @@ class ReconServiceImplIdempotencyTest {
             storeStage2CommissionRepo = storeStage2CommissionRepo,
             applicationEventPublisher = applicationEventPublisher,
             ambassadorProperties = AmbassadorProperties(),
-            agentIdentityAuditService = agentIdentityAuditService
         )
     }
 

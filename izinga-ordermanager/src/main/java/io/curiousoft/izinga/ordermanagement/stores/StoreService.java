@@ -417,6 +417,22 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         return store;
     }
 
+    /**
+     * ADR-026 Step B: side-effect-free ownership probe for use by {@link io.curiousoft.izinga.ordermanagement.mcp.StoreMcpController}.
+     *
+     * <p>Returns the raw persisted {@link StoreProfile} without triggering the lazy-seed
+     * of default business hours or categories (and therefore without calling
+     * {@code profileRepo.save()}). This method must ONLY be used for identity/ownership
+     * checks inside the MCP controller layer where triggering a save as a side effect of
+     * a read-only gate would be semantically incorrect.</p>
+     *
+     * <p>Callers that need the full seeded representation (including hours) should still
+     * call {@link #find(String)}.</p>
+     */
+    public StoreProfile findByIdNoSideEffects(String id) {
+        return profileRepo.findById(id).orElse(null);
+    }
+
     /** Builds the 5 default delivery categories seeded for every new store on first GET. */
     static List<Category> buildDefaultCategories() {
         return Arrays.asList(
