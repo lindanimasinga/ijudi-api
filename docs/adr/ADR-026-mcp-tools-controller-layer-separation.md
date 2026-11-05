@@ -373,6 +373,8 @@ Phases 2–5 touch disjoint service classes. They can run in parallel after Phas
 
 > **Decided (2026-11-04, Lindani Masinga):** Disable role assignment via MCP entirely for now. The `create_user` MCP tool must not be able to set or change a profile's role at all until this is properly designed. This closes the F4-2 MCP vector specifically. The REST-side gap (POST /user, PATCH /user/{id}, issue #138) is separate and stays open. See "OQ-7 Approved Behaviour Change" section below.
 
+> **Phase 2b resolved (2026-11-05, Lindani Masinga):** Role-allowlist approach not adopted. `create_user` removed from the MCP surface entirely (17 tools). No self-service registration on WhatsApp for any role; registration happens on the web apps (driver.izinga.co.za, shop.izinga.co.za, izinga-onboarding) via REST. `UserProfileService.create(...)` stays intact for REST/internal callers. REST role self-assignment (issue #138) remains open and out of scope for this ADR.
+
 ---
 
 ## OQ-7 Approved Behaviour Change: create_user Role Restriction (Phase 2b)
@@ -426,6 +428,6 @@ F4 items (F4-1: allowedTools never enforced; F4-2: self-assignable ADMIN role) s
 | Step B | `StoreService.findByIdNoSideEffects()` — side-effect-free ownership probe for `StoreMcpController.findByOwner` | Done (uncommitted — awaiting code review) |
 | 5 | Move `get_payouts_for_user` to `PayoutMcpController`; `ReconServiceImpl.getAllPayouts` becomes ungated | Done (uncommitted — awaiting code review) |
 | 6 | Lock-down: `LEGACY_EXCLUSIONS` deleted, R1/R4 hard-fail, `allowEmptyShould` removed, `McpConfig` takes only `ApplicationContext`, `@RequiresAudience` retired, all tests updated | Done (uncommitted — awaiting code review) |
-| 2b | `create_user` role restriction (OQ-7) | **Not implemented** — pre-implementation questions 1–4 remain unanswered. See "OQ-7 Approved Behaviour Change" section. |
+| 2b | `create_user` removed from MCP surface entirely (OQ-7) | **Done (uncommitted — awaiting code review)** — Lindani 2026-11-05: role-allowlist approach not adopted; `create_user` removed entirely; REST role self-assignment (#138) remains open. |
 
-**Non-vacuity state (Phase 6):** 18 tools, 6 `@McpToolController` classes, 0 legacy service classes with `@Tool` methods.
+**Non-vacuity state (Phase 6 + Phase 2b):** 17 tools, 6 `@McpToolController` classes, 0 legacy service classes with `@Tool` methods.

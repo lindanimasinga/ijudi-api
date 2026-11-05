@@ -68,8 +68,9 @@ public class McpConfig {
      * {@link io.curiousoft.izinga.ordermanagement.mcp.McpToolContractSnapshotTest} verifies that
      * the live tool set matches the snapshot on every build.</p>
      *
-     * <p>ADR-026 Phase 6 lock-down: the legacy tool-object list is gone. ALL 18 tools now live
-     * on {@link McpToolController} beans. This method collects those beans from the
+     * <p>ADR-026 Phase 6 lock-down: the legacy tool-object list is gone. ALL 17 tools now live
+     * on {@link McpToolController} beans (create_user removed from the MCP surface in Phase 2b,
+     * Lindani 2026-11-05). This method collects those beans from the
      * {@link ApplicationContext}, assembles a single {@link MethodToolCallbackProvider}, and wraps
      * every callback in a {@link GuardedToolCallback}.</p>
      *

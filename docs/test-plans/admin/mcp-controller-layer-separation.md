@@ -1,8 +1,8 @@
 ---
 userType: admin (platform integration)
-Feature: MCP tools controller-layer separation — ADR-026 / MCP-SEC-03 (Phases 0–6); 18 @Tool methods moved from domain services to 6 @McpToolController classes; services de-gated for REST; bank masking at controller layer; ArchUnit R1–R6; single-provider McpConfig; @RequiresAudience retired; contract snapshot + access matrix safety nets
+Feature: MCP tools controller-layer separation — ADR-026 / MCP-SEC-03 (Phases 0–6); 17 @Tool methods on 6 @McpToolController classes (create_user removed from MCP surface Phase 2b, Lindani 2026-11-05); services de-gated for REST; bank masking at controller layer; ArchUnit R1–R6; single-provider McpConfig; @RequiresAudience retired; contract snapshot + access matrix safety nets
 App: izinga-ordermanager (McpConfig, GuardedToolCallback, 6 McpToolControllers, McpToolContractSnapshotTest, McpAccessMatrixTest, McpArchitectureTest) + izinga-usermanagement + izinga-recon + izinga-messaging (StoreScopeJwtService)
-Last verified: 2026-11-05 | Gate 1 ADR-026 Phases 0–6 (full unscoped suite + live UAT profile verification) | PASS
+Last verified: 2026-11-05 | Gate 1 ADR-026 Phases 0–6 + Phase 2b (full unscoped suite + live UAT profile verification; create_user absence verified) | PASS
 ---
 
 ## Scope
@@ -11,17 +11,16 @@ Covers:
 
 - **ADR-026 Phase 0**: @McpToolController annotation, GuardedToolCallback, McpConfig single-provider wiring, ArchUnit rules R1–R6 with non-vacuity guards, McpToolContractSnapshotTest (golden file), McpAccessMatrixTest (188-row matrix)
 - **ADR-026 Phase 1**: OrderCreationMcpController (start_order), DocumentUploadMcpController (4 doc tools) created; services de-gated
-- **ADR-026 Phase 2**: UserMcpController (find_user_by_phone, find_users, create_user, get_missing_fields_by_phone)
+- **ADR-026 Phase 2**: UserMcpController (find_user_by_phone, find_users, get_missing_fields_by_phone); create_user removed from MCP surface in Phase 2b (Lindani 2026-11-05) — not present on UserMcpController
 - **ADR-026 Phases 3+4**: OrderMcpController (5 order-read tools), StoreMcpController (3 store tools; bank masking moved to controller)
 - **ADR-026 Phases 5+6**: PayoutMcpController (get_payouts_for_user); @RequiresAudience deleted; LEGACY_EXCLUSIONS removed; McpConfig takes single ApplicationContext parameter
 - **AC-04**: services (OrderServiceImpl, McpOrderService, StoreService, UserProfileService, DocumentUploadMcpService, ReconServiceImpl) are context-free for REST callers — no MCP gate in service layer
 - **AC-07 / REQ-08**: bank accountId masking at controller layer for MCP responses; REST responses return real accountId
 - **AC-09 / AC-14**: clean startup, one provider (userProfileToolCallbackProvider), no duplicate-tool IllegalStateException, no circular-dependency errors
 - **AC-11 / AC-12**: N/A (deferred — not in Phases 0–6)
-- **AC-13**: deferred (Phase 2b, OQ-7 — create_user role assignment over MCP intentionally NOT restricted; create_user still accepts any role)
-- **Known gap Phase 2b (create_user role)**: not implemented; 4 open questions (OQ-7 decision awaited from Lindani); create_user accepts any role including ADMIN over MCP in this release
+- **AC-13**: RESOLVED — create_user removed from MCP surface entirely (ADR-026 Phase 2b, Lindani 2026-11-05); tool absent from golden snapshot; UserProfileService.create(...) intact for REST/internal callers; REST gap #138 open separately.
 
-Out of scope: Phase 2b (create_user role restriction), REST tier testing beyond AC-04 smoke checks, full create_user role-persistence matrix over live REST (covered in existing tests).
+Out of scope: REST tier testing beyond AC-04 smoke checks; REST role self-assignment gap (issue #138, tracked separately under iZinga Security & Compliance).
 
 ## Repos affected
 
@@ -46,7 +45,7 @@ Out of scope: Phase 2b (create_user role restriction), REST tier testing beyond 
 
 **Startup:**
 - Run: `java -Dspring.profiles.active=uat -Dserver.port=8081 -DSTORE_SCOPE_JWT_SECRET=local-dev-secret-for-testing-only-min-32-chars -jar izinga-ordermanager/target/izinga-ordermanager-1.2.6-SNAPSHOT.jar`
-- Expected startup: 21–25 seconds; 1 WARN "No tool methods found" (benign — default Spring AI empty provider); `INFO Registered tools: 18` from McpServerAutoConfiguration
+- Expected startup: 21–25 seconds; 1 WARN "No tool methods found" (benign — default Spring AI empty provider); `INFO Registered tools: 17` from McpServerAutoConfiguration (create_user removed — ADR-026 Phase 2b)
 - MCP endpoint: `POST http://localhost:8081/mcp` with `Content-Type: application/json`, `Accept: application/json, text/event-stream`; SSE `data:` lines carry JSON-RPC responses
 
 ## Test cases
@@ -54,15 +53,15 @@ Out of scope: Phase 2b (create_user role restriction), REST tier testing beyond 
 | ID | Description | Type | Input | Expected output | Branch covered |
 |---|---|---|---|---|---|
 | TC-01 | Full unscoped reactor build | Automated | `./mvnw clean test` | BUILD SUCCESS, 0 failures, 0 errors | All |
-| TC-02 | McpAccessMatrixTest — 188 rows | Automated | Full matrix | 0 failures | Access matrix |
+| TC-02 | McpAccessMatrixTest — matrix rows (create_user rows removed — Phase 2b; createUserToolIsAbsentFromMcpSurface added) | Automated | Full matrix | 168 tests, 0 failures (surefire XML verified Phase 2b) | Access matrix |
 | TC-03 | McpArchitectureTest — R1–R6 + non-vacuity | Automated | ArchUnit | 6 @ArchTest rules + 6 non-vacuity guards | Architecture |
 | TC-04 | McpToolContractSnapshotTest — 5 assertions | Automated | Golden file | PASS (golden file unchanged since c71d029) | Contract |
 | TC-05 | McpConfigTest — 4 tests | Automated | Spring context | PASS | Config |
 | TC-06 | GuardedToolCallbackTest — 12 tests | Automated | GuardedToolCallback | PASS | Guard |
-| TC-07 | 11 controller unit tests (OrderCreationMcp, DocumentUploadMcp, UserMcp, OrderMcp, StoreMcp, PayoutMcp) | Automated | Mock services | 128 total PASS | Controller logic |
+| TC-07 | 11 controller unit tests (OrderCreationMcp, DocumentUploadMcp, UserMcp[21], OrderMcp, StoreMcp, PayoutMcp) | Automated | Mock services | UserMcpControllerTest=21 tests PASS (surefire XML verified Phase 2b) | Controller logic |
 | TC-08 | McpSseEndpointTest — 2 tests | Automated | SSE endpoint | PASS | Endpoint |
-| TC-09 | Live: startup on uat profile, port 8081 | Live | Local run | App started in <30s, Registered tools: 18, no IllegalStateException | AC-09/AC-14 |
-| TC-10 | Live: tools/list — exact 18 tools | Live | POST /mcp tools/list | 18 tool names match golden file names; schemas match after stripping $schema header | AC-01 |
+| TC-09 | Live: startup on uat profile, port 8081 | Live | Local run | App started in <30s, Registered tools: 17 (create_user removed — ADR-026 Phase 2b), no IllegalStateException | AC-09/AC-14 |
+| TC-10 | Live: tools/list — exact 17 tools | Live | POST /mcp tools/list | 17 tool names match golden file names (create_user absent); schemas match after stripping $schema header | AC-01 |
 | TC-11 | Live: tokenless find_user_by_phone | Live | No scope token | `IDENTITY_REFUSAL: This tool requires...` (isError: true) | Shape 1 |
 | TC-12 | Live: tokenless find_stores | Live | No scope token | `Audience required but no scope token is present on this request` (isError: true) | Shape 2 |
 | TC-13 | Live: tokenless start_order | Live | No scope token | `{"success":false,...,"message":"IDENTITY_REFUSAL..."}` (isError: false) | Shape 3 |
@@ -78,6 +77,12 @@ Out of scope: Phase 2b (create_user role restriction), REST tier testing beyond 
 | TC-23 | Live AC-04: REST /order?shopId= ungated | Live | GET /order?shopId=test, app-version: 2.1.1 | Returns 3108 orders (not gated) | AC-04, REST |
 | TC-24 | Golden file unchanged since Phase 0 | Git diff | `git diff c71d029 HEAD -- .../tool-contract-snapshot.json` | Empty (no output) | Contract stability |
 | TC-25 | McpAccessMatrixTest diff is wiring-only | Git diff | `git diff c71d029 HEAD -- .../McpAccessMatrixTest.java` | Only imports + constructor wiring + comment updates; zero row changes | Safety-net stability |
+| TC-26 | Phase 2b: tools/list returns exactly 17 tools, no create_user | Live | POST /mcp tools/list | 17 names match golden snapshot; create_user absent; diff script shows zero diffs | AC-13 |
+| TC-27 | Phase 2b: tokenless tools/call create_user → Tool not found | Live | No scope token | `{"error":{"code":-32602,"data":"Tool not found: create_user"}}` | AC-13 |
+| TC-28 | Phase 2b: CUSTOMER tools/call create_user → Tool not found | Live | CUSTOMER scope token | `{"error":{"code":-32602,"data":"Tool not found: create_user"}}` | AC-13 |
+| TC-29 | Phase 2b: ADMIN tools/call create_user → Tool not found | Live | ADMIN scope token | `{"error":{"code":-32602,"data":"Tool not found: create_user"}}` | AC-13 |
+| TC-30 | Phase 2b: REST POST /user (invalid body) → 400 not 404 | Live | POST /user `{"name":""}` | HTTP 400 BAD_REQUEST; endpoint still wired | AC-13 (REST unaffected) |
+| TC-31 | Phase 2b: REST GET /user/{phone} → 200 | Live | GET /user/+27812815707 | HTTP 200 with user profile; REST unaffected | AC-13 (REST unaffected) |
 
 ## Integration test scenarios
 
@@ -90,7 +95,7 @@ Out of scope: Phase 2b (create_user role restriction), REST tier testing beyond 
 - [x] Full reactor `./mvnw clean test` passes with 0 failures across all modules
 - [x] ArchUnit rules R1–R6 execute (confirmed in surefire XML for McpArchitectureTest)
 - [x] McpToolContractSnapshotTest golden file unchanged since Phase 0 (git diff empty)
-- [x] McpAccessMatrixTest: 188 rows pass; diff since Phase 0 is wiring/comments only
+- [x] McpAccessMatrixTest: 168 tests pass (Phase 2b: create_user rows removed, createUserToolIsAbsentFromMcpSurface added); diff since Phase 0 is wiring/comments only
 - [x] All pre-existing service tests (OrderServiceImpl, StoreService, UserProfileService, ReconServiceImpl) still pass
 - [x] No duplicate-tool IllegalStateException at startup
 - [x] REST endpoints remain ungated (store, user, order)
@@ -100,7 +105,7 @@ Out of scope: Phase 2b (create_user role restriction), REST tier testing beyond 
 
 | Defect | Severity | Location | Date found |
 |---|---|---|---|
-| create_user accepts any role over MCP (OQ-7 / Phase 2b not implemented) | Medium | OrderCreationMcpController (or UserMcpController) | 2026-11-05 (known, deliberate) |
+| ~~create_user accepts any role over MCP (OQ-7 / Phase 2b not implemented)~~ — RESOLVED: create_user removed from MCP surface entirely (ADR-026 Phase 2b, Lindani 2026-11-05); tool absent from golden snapshot and McpAccessMatrixTest; UserProfileService.create(...) intact for REST/internal | Closed | UserMcpController (tool absent), REST gap #138 open | 2026-11-05 (resolved) |
 | DRIVER own-id test requires sandbox profile to exist for the caller's phone | Low | McpCaller.resolveUserId | 2026-11-05 |
 | `No tool methods found in provided tool objects: []` WARN at startup | Info | Spring AI SyncMcpToolProvider (benign — empty default provider) | 2026-11-05 |
 

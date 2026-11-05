@@ -55,12 +55,10 @@ import io.curiousoft.izinga.usermanagement.users.DocumentUploadSessionRepo;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -84,8 +82,9 @@ import static org.mockito.Mockito.*;
 /**
  * ADR-026 D5 / REQ-05 / REQ-13: Full MCP access-control matrix characterization test — ROUND 2.
  *
- * <p><strong>Coverage</strong>: ALL 18 tools × {null/tokenless, DRIVER, CUSTOMER, STORE, ADMIN, OTP}
+ * <p><strong>Coverage</strong>: ALL 17 tools × {null/tokenless, DRIVER, CUSTOMER, STORE, ADMIN, OTP}
  * × {OWN, OTHER, N/A} through the tool-callback path ({@link ToolCallback#call(String)}).
+ * create_user removed from the MCP surface in ADR-026 Phase 2b (Lindani 2026-11-05).
  *
  * <p><strong>Three refusal shapes (ADR-026 F3, frozen by OQ-4 deferral)</strong>:
  * <ol>
@@ -108,8 +107,8 @@ import static org.mockito.Mockito.*;
  * collaborators — services are NOT mocked. Each row drives the guard path end-to-end
  * through {@link ToolCallback#call(String)}.
  *
- * <p><strong>REQ-13</strong>: Separate parametrized test pins that {@code create_user} today
- * accepts ANY role including ADMIN. Phase 2b (OQ-7) will update these rows.
+ * <p><strong>Absence test</strong>: a separate {@code @Test} asserts that no
+ * {@code ToolCallback} named {@code "create_user"} is registered (ADR-026 Phase 2b).
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -355,8 +354,8 @@ class McpAccessMatrixTest {
         lenient().when(userProfileRepo.existsById(CALLER_USER_ID)).thenReturn(true);
         lenient().when(userProfileRepo.existsById(OTHER_USER_ID)).thenReturn(true);
 
-        // REQ-05 round-2: create_user ALLOW rows now use imageUrl-valid JSON (not profilePicUrl).
-        // save() must succeed so create_user ALLOW rows reach at least findByMobileNumber.
+        // lenient save() stub — still needed for attach_uploaded_document_to_user_tag ALLOW rows
+        // that may call userProfileRepo.save() through the service.
         lenient().when(userProfileRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // Store queries for ALLOW cells
@@ -414,14 +413,6 @@ class McpAccessMatrixTest {
         String otherPhoneJson      = "{\"phone\":\"" + OTHER_PHONE + "\"}";
         String findUsersJson       = "{\"role\":\"MESSENGER\",\"latitude\":-26.0,\"longitude\":28.0," +
                                      "\"range\":0.1,\"storeType\":\"FOOD\"}";
-        // REQ-05 round-2: use imageUrl (not profilePicUrl) so ALLOW rows reach userProfileRepo.findByMobileNumber.
-        // DENY rows throw at the security gate before imageUrl validation, so the fix is safe for them.
-        String createOwnJson       = "{\"profile\":{\"name\":\"Test\",\"mobileNumber\":\"" + CALLER_PHONE +
-                                     "\",\"signUpReason\":\"BUY\",\"address\":\"1 Test St\"," +
-                                     "\"imageUrl\":\"https://t.c\",\"role\":\"CUSTOMER\"}}";
-        String createOtherJson     = "{\"profile\":{\"name\":\"Test\",\"mobileNumber\":\"" + OTHER_PHONE +
-                                     "\",\"signUpReason\":\"BUY\",\"address\":\"1 Test St\"," +
-                                     "\"imageUrl\":\"https://t.c\",\"role\":\"CUSTOMER\"}}";
         String ownMobileJson       = "{\"mobileNumber\":\"" + CALLER_PHONE + "\"}";
         String otherMobileJson     = "{\"mobileNumber\":\"" + OTHER_PHONE + "\"}";
         String callerOrderJson     = "{\"orderId\":\"" + CALLER_ORDER_ID + "\"}";
@@ -487,21 +478,6 @@ class McpAccessMatrixTest {
             row("find_users", "STORE",    CALLER_PHONE, PERMITTED_STORE_ID, findUsersJson, DENY,  true,  VIOLATION_MSG),
             row("find_users", "ADMIN",    CALLER_PHONE, null,               findUsersJson, ALLOW, false, null),
             row("find_users", "OTP",      CALLER_PHONE, null, findUsersJson, DENY,  true,  VIOLATION_MSG),
-
-            // ---- create_user (11 rows) ----
-            // null audience: rejectTokenlessMcp() throws immediately — no audit call.
-            // imageUrl used (not profilePicUrl) so ALLOW rows reach userProfileRepo.findByMobileNumber.
-            row("create_user", null,       null, null, createOtherJson, DENY,  false, UNAUTHENTICATED_MSG),
-            row("create_user", "DRIVER",   CALLER_PHONE, null, createOwnJson,   ALLOW, false, null),
-            row("create_user", "DRIVER",   CALLER_PHONE, null, createOtherJson, DENY,  true,  VIOLATION_MSG),
-            row("create_user", "CUSTOMER", CALLER_PHONE, null, createOwnJson,   ALLOW, false, null),
-            row("create_user", "CUSTOMER", CALLER_PHONE, null, createOtherJson, DENY,  true,  VIOLATION_MSG),
-            row("create_user", "STORE",    CALLER_PHONE, PERMITTED_STORE_ID, createOtherJson, ALLOW, false, null),
-            row("create_user", "STORE",    CALLER_PHONE, PERMITTED_STORE_ID, createOwnJson,   ALLOW, false, null),
-            row("create_user", "ADMIN",    CALLER_PHONE, null,               createOtherJson, ALLOW, false, null),
-            row("create_user", "ADMIN",    CALLER_PHONE, null,               createOwnJson,   ALLOW, false, null),
-            row("create_user", "OTP",      CALLER_PHONE, null,               createOtherJson, ALLOW, false, null),
-            row("create_user", "OTP",      CALLER_PHONE, null,               createOwnJson,   ALLOW, false, null),
 
             // ---- get_missing_fields_by_phone (11 rows) ----
             // null audience: delegates to findUserByPhone which calls rejectTokenlessMcp() first — no audit call.
@@ -869,107 +845,19 @@ class McpAccessMatrixTest {
     }
 
     // ==================================================================================
-    // REQ-13 (Phase 2b OQ-7): create_user role characterisation
-    // Phase 2b will deliberately change these rows.
+    // ADR-026 Phase 2b: create_user absence assertion
     // ==================================================================================
 
     /**
-     * REQ-13 characterisation: create_user currently persists ANY supplied role unchanged,
-     * including ADMIN. This test pins the current behaviour. Phase 2b (OQ-7) will introduce
-     * role whitelisting and these rows will need to be updated.
-     *
-     * <p>Uses ArgumentCaptor on userProfileRepo.save() to prove the role in the
-     * persisted UserProfile equals the role supplied in the JSON payload.
+     * ADR-026 Phase 2b (Lindani 2026-11-05): create_user must not appear in the tool callback
+     * map. The tool was removed from the MCP surface entirely; user creation is REST/internal only.
      */
-    @ParameterizedTest(name = "[{index}] create_user REQ-13: role={0} aud={1}")
-    @MethodSource("req13Rows")
-    @DisplayName("REQ-13 (Phase 2b OQ-7): create_user persists any role unchanged — to be revisited when OQ-7 ships")
-    void createUser_req13_anyRolePersistedUnchanged(String roleName, String audienceStr,
-                                                    String callerPhone, String jsonPhone) {
-        // Phase 2b (OQ-7) will deliberately change these rows.
-        // This test currently CHARACTERISES behaviour, not enforces a desired policy.
-
-        // callerPhone: set in CallerIdentityContext (what the JWT says).
-        // jsonPhone: the mobileNumber in the JSON payload.
-        // For CUSTOMER/DRIVER: callerPhone == jsonPhone (security gate requires a match).
-        // For STORE/OTP (F4-2 rows): callerPhone != jsonPhone — gate bypass proven by test passing.
-        String req13Json = "{\"profile\":{\"name\":\"Test User\",\"mobileNumber\":\"" + jsonPhone +
-            "\",\"signUpReason\":\"BUY\",\"address\":\"1 Test St\"," +
-            "\"imageUrl\":\"https://img.test/req13.png\",\"role\":\"" + roleName + "\"}}";
-
-        setMcpContext(audienceStr, callerPhone, null);
-
-        // Override findByMobileNumber to return null — no duplicate for jsonPhone.
-        // setUp's lenient stub for save(any()) is enough to handle the actual save() call;
-        // we capture via verify() after the call (NOT via when() stub — captor-in-stub is an anti-pattern
-        // that can silently fail to capture when the stub ordering or matchers interact).
-        when(userProfileRepo.findByMobileNumber(anyString())).thenReturn(null);
-
-        ToolCallback tc = toolCallbacks.get("create_user");
-        assertThat(tc).as("create_user ToolCallback must exist").isNotNull();
-
-        // ROUND-3 (item 5): UserProfile serialises correctly — no need for a RuntimeException swallow.
-        // Only catch ToolExecutionException for domain failures; re-throw if it is a security violation.
-        try {
-            tc.call(req13Json);
-        } catch (ToolExecutionException e) {
-            if (e.getCause() instanceof CallerIdentityViolationException) {
-                throw new AssertionError(
-                    "REQ-13: create_user must not throw CallerIdentityViolationException " +
-                    "for role=" + roleName + " aud=" + audienceStr + " — got: " + e.getMessage(), e);
-            }
-            // Other domain exceptions are acceptable (e.g. duplicate check, validation)
-        }
-
-        // Assert: verify save() was called and capture the saved UserProfile.
-        // Using verify()+captor (the correct Mockito pattern) rather than captor-in-stub.
-        ArgumentCaptor<UserProfile> saveCaptor = ArgumentCaptor.forClass(UserProfile.class);
-        verify(userProfileRepo, times(1)).save(saveCaptor.capture());
-        UserProfile saved = saveCaptor.getValue();
-        assertThat(saved.getRole())
-                .as("REQ-13: role=%s must be persisted unchanged (Phase 2b OQ-7 will change this)", roleName)
-                .isEqualTo(ProfileRoles.valueOf(roleName));
-    }
-
-    /** Rows for REQ-13 role characterisation test.
-     *
-     * <p>Parameters: roleName, audienceStr, callerPhone, jsonPhone (phone in the JSON payload).
-     * For CUSTOMER/DRIVER rows: callerPhone == jsonPhone (security gate requires a match).
-     * For STORE/OTP F4-2 rows: callerPhone != jsonPhone — proves the STORE/OTP bypass works
-     * (CallerIdentityValidator.kt:130 skips phone validation for non-CUSTOMER/non-DRIVER audience).
-     * Label F4-2 rows so Phase 2b (OQ-7) can find and update them when role whitelisting ships.
-     */
-    static Stream<Arguments> req13Rows() {
-        // Fresh phone with no setUp stub so findByMobileNumber returns null — reaches save()
-        String req13Phone    = "+27700000001";
-        // F4-2: an ALTERNATIVE phone used as jsonPhone when callerPhone differs — proves bypass.
-        String req13AltPhone = "+27700000002";
-        return Stream.of(
-            // CUSTOMER/DRIVER: callerPhone must match JSON phone for the security gate to pass.
-            // NOTE: ProfileRoles has no DRIVER value — DRIVER is an Audience, not a ProfileRoles.
-            // For the DRIVER-audience row we use MESSENGER as the role (a valid ProfileRoles value),
-            // which tests both that DRIVER audience can call create_user AND that the MESSENGER role
-            // is persisted unchanged (REQ-13).
-            Arguments.of("CUSTOMER",    "CUSTOMER", req13Phone, req13Phone),
-            Arguments.of("MESSENGER",   "DRIVER",   req13Phone, req13Phone),
-            // STORE/ADMIN/OTP: phone check bypassed — callerPhone in context may differ from JSON phone
-            Arguments.of("STORE",       "STORE",    req13Phone, req13Phone),
-            Arguments.of("STORE_ADMIN", "ADMIN",    req13Phone, req13Phone),
-            Arguments.of("ADMIN",       "ADMIN",    req13Phone, req13Phone),
-            Arguments.of("MESSENGER",   "ADMIN",    req13Phone, req13Phone),
-            // ---- F4-2 (ADR-026 OQ-7) NEW: non-privileged callers self-assigning ADMIN role ----
-            // Phase 2b will introduce role whitelisting and change these rows to DENY.
-            // CUSTOMER audience: own phone, role=ADMIN — currently persisted unchanged (characterisation).
-            Arguments.of("ADMIN", "CUSTOMER", req13Phone,    req13Phone),
-            // DRIVER audience: own phone, role=ADMIN — same.
-            Arguments.of("ADMIN", "DRIVER",   req13Phone,    req13Phone),
-            // STORE audience: callerPhone DIFFERENT from JSON mobileNumber — gate bypass proven.
-            // CallerIdentityValidator.kt:130: `if (audience != CUSTOMER && audience != DRIVER) return`
-            // so STORE audience skips phone validation entirely.
-            Arguments.of("ADMIN", "STORE",    req13Phone,    req13AltPhone),
-            // OTP audience: same bypass as STORE.
-            Arguments.of("ADMIN", "OTP",      req13Phone,    req13AltPhone)
-        );
+    @org.junit.jupiter.api.Test
+    void createUserToolIsAbsentFromMcpSurface() {
+        assertThat(toolCallbacks.get("create_user"))
+                .as("create_user must NOT be registered as an MCP tool callback " +
+                    "(ADR-026 Phase 2b, Lindani 2026-11-05)")
+                .isNull();
     }
 
     // ==================================================================================
@@ -1027,7 +915,6 @@ class McpAccessMatrixTest {
             case "attach_uploaded_document_to_user_tag":
             case "recheck_required_documents":
             case "find_orders_by_phone_number":
-            case "create_user":
                 verify(userProfileRepo, atLeastOnce()).findByMobileNumber(anyString());
                 break;
 

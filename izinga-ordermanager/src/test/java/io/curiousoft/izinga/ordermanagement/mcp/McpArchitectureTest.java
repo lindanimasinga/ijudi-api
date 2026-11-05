@@ -32,14 +32,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * ADR-026 D5: ArchUnit architectural rules R1–R6 for MCP controller-layer separation.
  *
- * <p>Phase 6 lock-down complete — all 18 tools now live on {@code @McpToolController} beans.
+ * <p>Phase 6 lock-down complete — all 17 tools now live on {@code @McpToolController} beans
+ * (create_user removed from the MCP surface in Phase 2b, Lindani 2026-11-05).
  * LEGACY_EXCLUSIONS removed. R1, R4 hard-fail with no exemptions. {@code allowEmptyShould}
  * removed everywhere. Rule R6 passes unconditionally.</p>
  *
  * <p>Non-vacuity guards ensure:
  * <ul>
  *   <li>(a) Zero R1 violators — no class outside {@code ..mcp..} has {@code @Tool} methods.</li>
- *   <li>(b) The importer finds exactly 18 {@code @Tool} methods across exactly 6 controller classes.</li>
+ *   <li>(b) The importer finds exactly 17 {@code @Tool} methods across exactly 6 controller classes.</li>
  * </ul>
  * </p>
  */
@@ -56,7 +57,8 @@ class McpArchitectureTest {
 
     // ---- LEGACY_EXCLUSIONS removed in Phase 6 -------------------------------------------
     //
-    // All 18 @Tool methods now reside on @McpToolController beans in ..ordermanagement.mcp..
+    // All 17 @Tool methods now reside on @McpToolController beans in ..ordermanagement.mcp..
+    // (create_user removed from the MCP surface in Phase 2b, Lindani 2026-11-05).
     // R1, R4, and the non-vacuity guards carry no exemptions as of ADR-026 Phase 6 lock-down.
 
     private static final DescribedPredicate<JavaClass> HAS_TOOL_METHODS =
@@ -299,19 +301,20 @@ class McpArchitectureTest {
     /**
      * Non-vacuity guard (b): ADR-026 Phase 6 lock-down.
      *
-     * <p>Sanity assertion that the importer finds exactly 18 {@code @Tool} methods across exactly
+     * <p>Sanity assertion that the importer finds exactly 17 {@code @Tool} methods across exactly
      * 6 {@code @McpToolController} classes (all in {@code ..ordermanagement.mcp..}). No legacy
      * service classes hold {@code @Tool} methods as of Phase 6.</p>
      *
      * <p>Expected controllers: {@code OrderCreationMcpController} (1), {@code DocumentUploadMcpController}
-     * (4), {@code UserMcpController} (4), {@code OrderMcpController} (5), {@code StoreMcpController} (3),
-     * {@code PayoutMcpController} (1) = 18 tools, 6 classes.</p>
+     * (4), {@code UserMcpController} (3), {@code OrderMcpController} (5), {@code StoreMcpController} (3),
+     * {@code PayoutMcpController} (1) = 17 tools, 6 classes
+     * (create_user removed from UserMcpController in Phase 2b, Lindani 2026-11-05).</p>
      *
      * <p>If a new tool is added, {@code McpToolContractSnapshotTest}'s golden file must be updated
      * and this count must be bumped.</p>
      */
     @Test
-    void nonVacuityGuard_b_exactly18ToolMethodsAcross6Classes() {
+    void nonVacuityGuard_b_exactly17ToolMethodsAcross6Classes() {
         JavaClasses allProductionClasses = new ClassFileImporter()
                 .withImportOption(new ImportOption.DoNotIncludeTests())
                 .importPackages(
@@ -339,9 +342,10 @@ class McpArchitectureTest {
                 .collect(Collectors.toSet());
 
         assertThat(distinctToolNames)
-                .as("Expected exactly 18 distinct @Tool names across all production classes. " +
+                .as("Expected exactly 17 distinct @Tool names across all production classes " +
+                        "(create_user removed Phase 2b). " +
                         "Update the golden snapshot and this count if the tool count changes.")
-                .hasSize(18);
+                .hasSize(17);
 
         assertThat(classesWithToolMethods)
                 .as("Expected exactly 6 @McpToolController classes to hold @Tool methods " +
@@ -385,11 +389,12 @@ class McpArchitectureTest {
     // ---- Sanity: tool names are the expected 18 names -----------------------------------
 
     /**
-     * Verifies that the 18 {@code @Tool} method names exactly match the documented set.
+     * Verifies that the 17 {@code @Tool} method names exactly match the documented set.
      * Any rename breaks this test, which also breaks the contract snapshot.
+     * create_user was removed from the MCP surface in ADR-026 Phase 2b (Lindani 2026-11-05).
      */
     @Test
-    void sanity_toolNamesAreTheExpected18() {
+    void sanity_toolNamesAreTheExpected17() {
         JavaClasses allProductionClasses = new ClassFileImporter()
                 .withImportOption(new ImportOption.DoNotIncludeTests())
                 .importPackages(
@@ -420,10 +425,9 @@ class McpArchitectureTest {
                 "find_store_or_shops_by_id",
                 "find_stores_by_owner",
                 "find_stores",
-                // UserMcpController (4) — migrated from UserProfileService in Phase 2
+                // UserMcpController (3) — migrated from UserProfileService in Phase 2; create_user removed Phase 2b
                 "find_user_by_phone",
                 "find_users",
-                "create_user",
                 "get_missing_fields_by_phone",
                 // DocumentUploadMcpController (4) — migrated from DocumentUploadMcpService in Phase 1
                 "get_required_documents_for_user",

@@ -80,7 +80,7 @@ import static org.assertj.core.api.Fail.fail;
 import static org.mockito.Mockito.when;
 
 /**
- * ADR-026 D5 REQ-04: Contract snapshot test for all 18 MCP tool definitions (Phase 4 complete).
+ * ADR-026 D5 REQ-04: Contract snapshot test for all 17 MCP tool definitions (Phase 4 complete; create_user removed Phase 2b).
  *
  * <p><strong>Golden file:</strong> {@code src/test/resources/mcp/tool-contract-snapshot.json}.
  * <br>To regenerate: {@code ./mvnw -pl izinga-ordermanager -am test -Dmcp.contract.update=true}</p>
@@ -108,13 +108,12 @@ class McpToolContractSnapshotTest {
     private static final String GOLDEN_FILE_RESOURCE = "/mcp/tool-contract-snapshot.json";
     private static final String UPDATE_FLAG = "mcp.contract.update";
 
-    private static final int EXPECTED_TOOL_COUNT = 18;
+    private static final int EXPECTED_TOOL_COUNT = 17;
 
-    // ---- All 18 expected tool names (alphabetical) ----
+    // ---- All 17 expected tool names (alphabetical) — create_user removed ADR-026 Phase 2b ----
     private static final List<String> EXPECTED_TOOL_NAMES = Arrays.asList(
             "attach_uploaded_document_to_user_tag",
             "create_document_upload_session",
-            "create_user",
             "find_order_by_id",
             "find_order_for_messenger",
             "find_orders_by_messenger_id",
@@ -219,7 +218,7 @@ class McpToolContractSnapshotTest {
                 storeStage1CommissionRepo, storeStage2CommissionRepo,
                 eventPublisher, new AmbassadorProperties());
 
-        // ADR-026 Phase 1-5: wire all real controllers so all 18 tool definitions appear in the snapshot.
+        // ADR-026 Phase 1-5: wire all real controllers so all 17 tool definitions appear in the snapshot (create_user removed Phase 2b).
         McpCaller mcpCaller = new McpCaller(userProfileRepo);
         OrderCreationMcpController orderCreationController =
                 new OrderCreationMcpController(mcpOrderService, mcpCaller, agentIdentityAuditService);
@@ -278,11 +277,21 @@ class McpToolContractSnapshotTest {
     // ---- Structural assertions (independent of golden file) -----------------------------
 
     @Test
-    void providerHasExactly18Tools() {
+    void providerHasExactly17Tools() {
         ToolCallback[] tools = provider.getToolCallbacks();
         assertThat(tools)
                 .as("Expected exactly %d MCP tools", EXPECTED_TOOL_COUNT)
                 .hasSize(EXPECTED_TOOL_COUNT);
+    }
+
+    @Test
+    void noToolNamedCreateUserIsExposed() {
+        List<String> toolNames = Arrays.stream(provider.getToolCallbacks())
+                .map(tc -> tc.getToolDefinition().name())
+                .collect(Collectors.toList());
+        assertThat(toolNames)
+                .as("create_user must not appear on the MCP surface (ADR-026 Phase 2b, Lindani 2026-11-05)")
+                .doesNotContain("create_user");
     }
 
     @Test

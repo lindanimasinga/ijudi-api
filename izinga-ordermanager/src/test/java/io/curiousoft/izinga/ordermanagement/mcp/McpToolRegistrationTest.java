@@ -153,7 +153,8 @@ class McpToolRegistrationTest {
                 .collect(Collectors.toList());
 
         assertTrue(toolNames.contains("find_user_by_phone"), "Tool 'find_user_by_phone' must be registered");
-        assertTrue(toolNames.contains("create_user"), "Tool 'create_user' must be registered");
+        // create_user intentionally absent — removed from MCP surface in ADR-026 Phase 2b (Lindani 2026-11-05)
+        assertFalse(toolNames.contains("create_user"), "Tool 'create_user' must NOT be on the MCP surface (ADR-026 Phase 2b)");
         assertTrue(toolNames.contains("get_required_documents_for_user"), "Tool 'get_required_documents_for_user' must be registered");
         assertTrue(toolNames.contains("create_document_upload_session"), "Tool 'create_document_upload_session' must be registered");
         assertTrue(toolNames.contains("attach_uploaded_document_to_user_tag"), "Tool 'attach_uploaded_document_to_user_tag' must be registered");
@@ -172,19 +173,6 @@ class McpToolRegistrationTest {
                 .orElseThrow(() -> new AssertionError("find_user_by_phone tool not found"));
 
         String description = findUserTool.getToolDefinition().description();
-        assertNotNull(description, "Tool description must not be null");
-        assertFalse(description.isEmpty(), "Tool description must not be empty");
-    }
-
-    @Test
-    void createUser_toolHasDescription() {
-        ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(applicationContext);
-        ToolCallback createUserTool = Arrays.stream(provider.getToolCallbacks())
-                .filter(t -> "create_user".equals(t.getToolDefinition().name()))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("create_user tool not found"));
-
-        String description = createUserTool.getToolDefinition().description();
         assertNotNull(description, "Tool description must not be null");
         assertFalse(description.isEmpty(), "Tool description must not be empty");
     }

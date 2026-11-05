@@ -14,8 +14,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+
+import org.springframework.ai.tool.annotation.Tool;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -24,15 +28,17 @@ import static org.mockito.Mockito.*;
 
 /**
  * ADR-026 Phase 2: Unit tests for {@link UserMcpController} — controller-layer identity gates
- * for the four user tools extracted from {@link UserProfileService}.
+ * for the three user tools on the MCP surface.
+ *
+ * <p>create_user removed from the MCP surface in ADR-026 Phase 2b (Lindani 2026-11-05).
+ * User creation is REST/internal only ({@link UserProfileService#create} stays intact).</p>
  *
  * <p><strong>Coverage</strong>:
  * <ul>
  *   <li>find_user_by_phone: tokenless reject (no audit), own phone allow, other phone deny+audit</li>
  *   <li>find_users: ADMIN-only gate — tokenless+DRIVER+CUSTOMER+STORE+OTP deny+audit; ADMIN allow</li>
- *   <li>create_user: tokenless reject (no audit), own phone allow, other phone deny+audit,
- *       null/blank phone allow (gate skipped)</li>
  *   <li>get_missing_fields_by_phone: same gate as find_user_by_phone</li>
+ *   <li>no create_user: reflection assertion that no {@code @Tool(name="create_user")} method exists</li>
  * </ul>
  *
  * <p><strong>Non-vacuity</strong>: every ALLOW row verifies that the downstream service method
@@ -269,143 +275,26 @@ class UserMcpControllerTest {
     }
 
     // ==================================================================================
-    // create_user
+    // create_user absence — ADR-026 Phase 2b
     // ==================================================================================
 
+    /**
+     * ADR-026 Phase 2b (Lindani 2026-11-05): create_user must NOT be declared as a {@code @Tool}
+     * on {@link UserMcpController}. User creation is REST/internal only.
+     * {@link UserProfileService#create} stays intact for REST/internal callers.
+     */
     @Test
-    void createUser_tokenless_throwsIdentityRefusalNoAudit() throws Exception {
-        CallerIdentityContext.setMcpRequest(true);
-        // No audience
-
-        UserProfile profile = new UserProfile(
-                "Name", UserProfile.SignUpReason.BUY, "Addr",
-                "https://t.c", OTHER_PHONE, ProfileRoles.CUSTOMER);
-
-        assertThatThrownBy(() -> controller().createUser(profile))
-                .isInstanceOf(CallerIdentityViolationException.class)
-                .hasMessageStartingWith("IDENTITY_REFUSAL:");
-
-        verify(agentIdentityAuditService, never()).recordViolation(any(), any(), any(), any(), any(), any(), any());
-        verify(userProfileService, never()).create(any());
-    }
-
-    @Test
-    void createUser_customerAudience_ownPhone_allow_delegatesToService() throws Exception {
-        CallerIdentityContext.setMcpRequest(true);
-        CallerIdentityContext.setAudience("CUSTOMER");
-        CallerIdentityContext.setCallerPhone(CALLER_PHONE);
-
-        UserProfile profile = new UserProfile(
-                "Name", UserProfile.SignUpReason.BUY, "Addr",
-                "https://t.c", CALLER_PHONE, ProfileRoles.CUSTOMER);
-
-        UserProfile saved = mock(UserProfile.class);
-        when(userProfileService.create(profile)).thenReturn(saved);
-
-        UserProfile result = controller().createUser(profile);
-
-        assertThat(result).isSameAs(saved);
-        verify(userProfileService).create(profile);
-        verify(agentIdentityAuditService, never()).recordViolation(any(), any(), any(), any(), any(), any(), any());
-    }
-
-    @Test
-    void createUser_customerAudience_otherPhone_denyPlusAudit() throws Exception {
-        CallerIdentityContext.setMcpRequest(true);
-        CallerIdentityContext.setAudience("CUSTOMER");
-        CallerIdentityContext.setCallerPhone(CALLER_PHONE);
-
-        UserProfile profile = new UserProfile(
-                "Other", UserProfile.SignUpReason.BUY, "Addr",
-                "https://t.c", OTHER_PHONE, ProfileRoles.CUSTOMER);
-
-        assertThatThrownBy(() -> controller().createUser(profile))
-                .isInstanceOf(CallerIdentityViolationException.class)
-                .hasMessageStartingWith("IDENTITY_REFUSAL:");
-
-        verify(agentIdentityAuditService).recordViolation(
-                eq(CALLER_PHONE), eq(OTHER_PHONE),
-                eq(AgentIdentityAuditLog.ViolationType.THIRD_PARTY_REGISTRATION),
-                eq("create_user"), eq("CUSTOMER"), isNull(), isNull());
-        verify(userProfileService, never()).create(any());
-    }
-
-    @Test
-    void createUser_adminAudience_otherPhone_allow_delegatesToService() throws Exception {
-        CallerIdentityContext.setMcpRequest(true);
-        CallerIdentityContext.setAudience("ADMIN");
-
-        UserProfile profile = new UserProfile(
-                "Driver", UserProfile.SignUpReason.DELIVERY_DRIVER, "Addr",
-                "https://t.c", OTHER_PHONE, ProfileRoles.MESSENGER);
-
-        UserProfile saved = mock(UserProfile.class);
-        when(userProfileService.create(profile)).thenReturn(saved);
-
-        UserProfile result = controller().createUser(profile);
-
-        assertThat(result).isSameAs(saved);
-        verify(userProfileService).create(profile);
-        verify(agentIdentityAuditService, never()).recordViolation(any(), any(), any(), any(), any(), any(), any());
-    }
-
-    @Test
-    void createUser_storeAudience_otherPhone_allow_delegatesToService() throws Exception {
-        // STORE audience: validateCallerPhone allows any phone (no phone-ownership restriction)
-        CallerIdentityContext.setMcpRequest(true);
-        CallerIdentityContext.setAudience("STORE");
-        CallerIdentityContext.setCallerPhone(CALLER_PHONE);
-
-        UserProfile profile = new UserProfile(
-                "Customer", UserProfile.SignUpReason.BUY, "Addr",
-                "https://t.c", OTHER_PHONE, ProfileRoles.CUSTOMER);
-
-        UserProfile saved = mock(UserProfile.class);
-        when(userProfileService.create(profile)).thenReturn(saved);
-
-        controller().createUser(profile);
-
-        verify(userProfileService).create(profile);
-        verify(agentIdentityAuditService, never()).recordViolation(any(), any(), any(), any(), any(), any(), any());
-    }
-
-    @Test
-    void createUser_nullPhone_skipGate_tokenless_throwsIdentityRefusalFirst() throws Exception {
-        // Gate 1 (rejectTokenlessMcp) fires even when phone is null — no audit
-        CallerIdentityContext.setMcpRequest(true);
-        // No audience
-
-        UserProfile profile = new UserProfile(
-                "Name", UserProfile.SignUpReason.BUY, "Addr",
-                "https://t.c", null, ProfileRoles.CUSTOMER);
-
-        assertThatThrownBy(() -> controller().createUser(profile))
-                .isInstanceOf(CallerIdentityViolationException.class)
-                .hasMessageStartingWith("IDENTITY_REFUSAL:");
-
-        verify(agentIdentityAuditService, never()).recordViolation(any(), any(), any(), any(), any(), any(), any());
-    }
-
-    @Test
-    void createUser_nullPhone_withToken_skipPhoneGate_delegatesToService() throws Exception {
-        // Phone is null → Gate 2 (validateCallerPhone) is skipped; delegates to service
-        CallerIdentityContext.setMcpRequest(true);
-        CallerIdentityContext.setAudience("CUSTOMER");
-        CallerIdentityContext.setCallerPhone(CALLER_PHONE);
-
-        UserProfile profile = new UserProfile(
-                "Name", UserProfile.SignUpReason.BUY, "Addr",
-                "https://t.c", null, ProfileRoles.CUSTOMER);
-
-        try {
-            controller().createUser(profile);
-        } catch (CallerIdentityViolationException e) {
-            throw new AssertionError("Null phone must skip Gate 2; no IDENTITY_REFUSAL expected", e);
-        } catch (Exception ignored) {
-            // Any service-level validation error is acceptable
-        }
-
-        verify(userProfileService).create(profile);
+    void controllerDeclaresNoCreateUserTool() {
+        UserMcpController ctrl = controller();
+        boolean hasCreateUser = Arrays.stream(ctrl.getClass().getDeclaredMethods())
+                .anyMatch(m -> {
+                    Tool tool = m.getAnnotation(Tool.class);
+                    return tool != null && "create_user".equals(tool.name());
+                });
+        assertThat(hasCreateUser)
+                .as("create_user must not be a @Tool method on UserMcpController " +
+                    "(ADR-026 Phase 2b, Lindani 2026-11-05)")
+                .isFalse();
     }
 
     // ==================================================================================

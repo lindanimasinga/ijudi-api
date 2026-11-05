@@ -44,8 +44,9 @@ import static org.mockito.Mockito.*;
 /**
  * ADR-026 Phase 6 (D5 / T-07): Unit tests for {@link McpConfig#userProfileToolCallbackProvider}.
  *
- * <p>Phase 6 lock-down: the legacy tool-object list is gone. ALL 18 tools live on
- * {@link McpToolController} beans. The bean method now takes only {@link ApplicationContext};
+ * <p>Phase 6 lock-down: the legacy tool-object list is gone. ALL 17 tools live on
+ * {@link McpToolController} beans (create_user removed from the MCP surface in Phase 2b,
+ * Lindani 2026-11-05). The bean method now takes only {@link ApplicationContext};
  * it collects {@code @McpToolController} beans, fails fast on duplicate names, and wraps
  * EVERY callback unconditionally in {@link GuardedToolCallback}.
  *
@@ -167,15 +168,16 @@ class McpConfigTest {
     // ---- Phase 6: all real controllers → 18 tools, ALL guarded -------------------------
 
     /**
-     * Phase 6: wiring all 6 real controllers produces exactly 18 tools, every one wrapped
+     * Phase 6: wiring all 6 real controllers produces exactly 17 tools, every one wrapped
      * in {@link GuardedToolCallback} — no legacy callbacks remain.
      *
      * <p>Controllers: {@code OrderCreationMcpController} (1), {@code DocumentUploadMcpController} (4),
-     * {@code UserMcpController} (4), {@code OrderMcpController} (5), {@code StoreMcpController} (3),
-     * {@code PayoutMcpController} (1) = 18 tools, all guarded.</p>
+     * {@code UserMcpController} (3), {@code OrderMcpController} (5), {@code StoreMcpController} (3),
+     * {@code PayoutMcpController} (1) = 17 tools, all guarded
+     * (create_user removed from UserMcpController in Phase 2b, Lindani 2026-11-05).</p>
      */
     @Test
-    void allRealControllers_returns18Tools_allGuarded() {
+    void allRealControllers_returns17Tools_allGuarded() {
         McpCaller mcpCaller = new McpCaller(userProfileRepo);
         OrderCreationMcpController orderCreationController =
                 new OrderCreationMcpController(mcpOrderService, mcpCaller, agentIdentityAuditService);
@@ -204,8 +206,8 @@ class McpConfigTest {
 
         ToolCallback[] callbacks = provider.getToolCallbacks();
         assertThat(callbacks)
-                .as("Phase 6: all 6 controllers together must produce exactly 18 tools")
-                .hasSize(18);
+                .as("Phase 6: all 6 controllers together must produce exactly 17 tools (create_user removed Phase 2b)")
+                .hasSize(17);
 
         // Every callback must be GuardedToolCallback — no legacy unguarded callbacks remain
         Set<String> unguardedNames = new java.util.HashSet<>();

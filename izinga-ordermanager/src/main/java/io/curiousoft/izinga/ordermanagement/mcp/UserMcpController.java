@@ -19,19 +19,19 @@ import java.util.List;
 /**
  * ADR-026 Phase 2 MCP controller for user-profile tools.
  *
- * <p>Owns the four user tools extracted from {@link UserProfileService}:
- * {@code find_user_by_phone}, {@code find_users}, {@code create_user},
- * and {@code get_missing_fields_by_phone}.
+ * <p>Owns the three user tools extracted from {@link UserProfileService}:
+ * {@code find_user_by_phone}, {@code find_users}, and {@code get_missing_fields_by_phone}.
  * Controller-layer concerns (identity gates, audience restrictions, and audit writes)
  * are handled here before delegating to the service layer.</p>
+ *
+ * <p>create_user removed from the MCP surface (ADR-026 Phase 2b, Lindani 2026-11-05);
+ * user creation is REST/internal only.</p>
  *
  * <h3>Gate ordering per tool (ADR-026 F1)</h3>
  * <ul>
  *   <li>find_user_by_phone: rejectTokenlessMcp (throws WITHOUT audit) →
  *       validateCallerPhone (audited on violation)</li>
  *   <li>find_users: validateMcpAudience("ADMIN") — catches violation, writes audit, rethrows</li>
- *   <li>create_user: rejectTokenlessMcp (no audit) → validateCallerPhone on non-blank
- *       mobileNumber only, validated on the RAW value before normalisation (audited)</li>
  *   <li>get_missing_fields_by_phone: same gate as find_user_by_phone (reproduces it
  *       exactly, as the service's getAllMissingFields delegates to findUserByPhone)</li>
  * </ul>
@@ -130,64 +130,6 @@ public class UserMcpController {
             throw e;
         }
         return userProfileService.findByLocation(role, latitude, longitude, range, storeType);
-    }
-
-    // ---- create_user -----------------------------------------------------------------------
-
-    /**
-     * Creates a new user profile.
-     *
-     * <p>Gate 1: {@link CallerIdentityValidator#rejectTokenlessMcp} — hard-reject tokenless
-     * requests FIRST, before the phone-blank guard, so a tokenless caller cannot distinguish
-     * a missing phone (validation error) from IDENTITY_REFUSAL.  No audit written here.
-     *
-     * <p>Gate 2: {@link CallerIdentityValidator#validateCallerPhone} — applied only when
-     * mobileNumber is non-blank, on the RAW mobileNumber before normalisation.
-     * CUSTOMER/DRIVER may only register their own phone; STORE and ADMIN are unrestricted.
-     * Writes an async audit record on violation.
-     *
-     * <p>TODO ADR-026 Phase 2b (OQ-7): role assignment over MCP to be disabled once the
-     * 4 pre-implementation questions are answered:
-     * <ul>
-     *   <li>whether WhatsApp self-registration depends on role=MESSENGER/STORE_ADMIN over MCP
-     *       (needs a check of production MongoDB AiAgentConfig)</li>
-     *   <li>how to handle the role-null placeholder collision with validateUserProfileForCreate</li>
-     *   <li>whether a supplied role is rejected or silently overridden</li>
-     *   <li>what happens to the tool description/schema</li>
-     * </ul>
-     * Until OQ-7 is answered, create_user accepts ANY role (REQ-13 rows must stay green).
-     */
-    @McpAudience({Audience.DRIVER, Audience.CUSTOMER, Audience.STORE, Audience.ADMIN, Audience.OTP})
-    @Tool(
-        name = "create_user",
-        description = "Creates a new user profile. It can be a normal customer or a driver or a store owner depending on the role specified in the profile object."
-    )
-    public UserProfile createUser(UserProfile profile) throws Exception {
-        // Gate 1: reject tokenless MCP requests FIRST — no audit written here
-        // (SEC-MCP-01 / SEC-MCP-BUG-01): must fire before the mobileNumber null/blank guard
-        // so a tokenless caller cannot distinguish a missing phone from IDENTITY_REFUSAL.
-        CallerIdentityValidator.rejectTokenlessMcp("create_user");
-        // Gate 2: CUSTOMER/DRIVER agents must only register profiles for their own phone.
-        // STORE audience is exempt — store agents may create customer profiles as part of checkout flows.
-        // Validation is on the RAW mobileNumber BEFORE normalisation (OQ-5: preserve today's behaviour).
-        // The ADR risk table (ADR-026) suggests validating on the normalised number; OQ-5 (preserve exactly)
-        // supersedes that — do not change until OQ-7 pre-implementation questions are answered.
-        String phoneForValidation = profile.getMobileNumber();
-        if (phoneForValidation != null && !phoneForValidation.isBlank()) {
-            try {
-                CallerIdentityValidator.validateCallerPhone(phoneForValidation);
-            } catch (CallerIdentityViolationException e) {
-                // FIX-04: capture audience on the request thread before the @Async audit dispatch
-                String auditAudience = CallerIdentityContext.getAudience() != null
-                        ? CallerIdentityContext.getAudience() : "UNKNOWN";
-                agentIdentityAuditService.recordViolation(
-                        CallerIdentityContext.getCallerPhone(), phoneForValidation,
-                        AgentIdentityAuditLog.ViolationType.THIRD_PARTY_REGISTRATION, "create_user",
-                        auditAudience, null, null);
-                throw e;
-            }
-        }
-        return userProfileService.create(profile);
     }
 
     // ---- get_missing_fields_by_phone -------------------------------------------------------
