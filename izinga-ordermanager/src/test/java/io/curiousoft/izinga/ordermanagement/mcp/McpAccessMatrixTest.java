@@ -46,6 +46,8 @@ import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService;
 import io.curiousoft.izinga.ordermanagement.mcp.DocumentUploadMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.McpCaller;
 import io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController;
+import io.curiousoft.izinga.ordermanagement.mcp.OrderMcpController;
+import io.curiousoft.izinga.ordermanagement.mcp.StoreMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.UserMcpController;
 import io.curiousoft.izinga.usermanagement.users.DocumentUploadMcpService;
 import io.curiousoft.izinga.usermanagement.users.DocumentUploadSessionRepo;
@@ -269,7 +271,7 @@ class McpAccessMatrixTest {
                 "main-pay-account", 0.05,
                 eventPublisher, referralCodeService,
                 storeAgreementAuditRepository, storeTierChangeAuditRepository,
-                firebaseAuth, agentIdentityAuditService);
+                firebaseAuth);
 
         reconService = new ReconServiceImpl(
                 storeRepository, userProfileRepo, shopPayoutRepo,
@@ -279,7 +281,7 @@ class McpAccessMatrixTest {
                 storeStage1CommissionRepo, storeStage2CommissionRepo,
                 eventPublisher, new AmbassadorProperties(), agentIdentityAuditService);
 
-        // Build Phase 1+2 controller instances backed by the real (non-mocked) services
+        // Build Phase 1–4 controller instances backed by the real (non-mocked) services
         McpCaller mcpCaller = new McpCaller(userProfileRepo);
         OrderCreationMcpController orderCreationController =
                 new OrderCreationMcpController(mcpOrderService, mcpCaller, agentIdentityAuditService);
@@ -287,18 +289,23 @@ class McpAccessMatrixTest {
                 new DocumentUploadMcpController(documentUploadMcpService, agentIdentityAuditService);
         UserMcpController userMcpController =
                 new UserMcpController(userProfileService, agentIdentityAuditService);
+        OrderMcpController orderMcpController =
+                new OrderMcpController(orderService, mcpCaller, agentIdentityAuditService);
+        StoreMcpController storeMcpController =
+                new StoreMcpController(storeService, agentIdentityAuditService, "main-pay-account", 0.05);
         Map<String, Object> controllerBeans = new HashMap<>();
         controllerBeans.put("orderCreationMcpController", orderCreationController);
         controllerBeans.put("documentUploadMcpController", documentUploadController);
         controllerBeans.put("userMcpController", userMcpController);
+        controllerBeans.put("orderMcpController", orderMcpController);
+        controllerBeans.put("storeMcpController", storeMcpController);
         when(applicationContext.getBeansWithAnnotation(McpToolController.class))
                 .thenReturn(controllerBeans);
 
-        // Build provider via same McpConfig factory as production (Phase 2: 4-param signature)
+        // Build provider via same McpConfig factory as production (Phase 4: 2-param signature)
         McpConfig mcpConfig = new McpConfig();
         ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
-                orderService, reconService,
-                storeService, applicationContext);
+                reconService, applicationContext);
 
         // Build lookup map by tool name
         toolCallbacks = new HashMap<>();
@@ -644,7 +651,7 @@ class McpAccessMatrixTest {
             row("start_order", "OTP",      CALLER_PHONE, null,               startOrderJson,         REJECTED, false, VIOLATION_MSG),
 
             // ---- find_store_or_shops_by_id (9 rows) — AudienceViolationException for null/OTP ----
-            // Source: StoreService.java:411 — StoreScopeValidator.validate(id); :415 — validateAudience
+            // Source: StoreMcpController.java — Gate 1: StoreScopeValidator.validate(id); Gate 2: validateAudience
             row("find_store_or_shops_by_id", null,       null, null,               storeIdJson,     DENY_AUDIENCE, false, AUDIENCE_NULL_MSG),
             row("find_store_or_shops_by_id", "DRIVER",   CALLER_PHONE, null,               storeIdJson,     ALLOW,         false, null),
             row("find_store_or_shops_by_id", "CUSTOMER", CALLER_PHONE, null,               storeIdJson,     ALLOW,         false, null),
@@ -1078,20 +1085,20 @@ class McpAccessMatrixTest {
                 break;
 
             case "find_store_or_shops_by_id":
-                // Gate: StoreScopeValidator.validate (StoreService.java) + validateAudience.
-                // storeRepository.findById is called post-gate.
+                // Gate: StoreScopeValidator.validate + validateAudience (StoreMcpController.java).
+                // storeRepository.findById is called post-gate via storeService.find(id).
                 verify(storeRepository, atLeastOnce()).findById(anyString());
                 break;
 
             case "find_stores_by_owner":
-                // Gate: CallerIdentityValidator.validateCallerOwnsId (StoreService.java).
-                // findByOwnerId is called post-gate.
+                // Gate: audience switch (StoreMcpController.java).
+                // findByOwnerId is called post-gate via storeService.findByOwner(ownerId).
                 verify(storeRepository, atLeastOnce()).findByOwnerId(anyString());
                 break;
 
             case "find_stores":
-                // Gate: validateAudience (StoreService.java).
-                // findAll is called post-gate.
+                // Gate: validateAudience (StoreMcpController.java).
+                // findAll is called post-gate via storeService.findStores(...).
                 verify(storeRepository, atLeastOnce()).findAll();
                 break;
 

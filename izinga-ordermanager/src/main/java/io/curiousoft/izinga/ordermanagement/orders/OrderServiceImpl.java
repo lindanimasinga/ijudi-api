@@ -6,12 +6,7 @@ import io.curiousoft.izinga.commons.order.DeliveryPriceEstimateDto;
 import io.curiousoft.izinga.commons.order.MessengerOrderDto;
 import io.curiousoft.izinga.commons.order.OrderService;
 import io.curiousoft.izinga.commons.order.events.*;
-import io.curiousoft.izinga.commons.security.AgentIdentityAuditLog;
 import io.curiousoft.izinga.commons.security.AgentIdentityAuditService;
-import io.curiousoft.izinga.commons.security.CallerIdentityContext;
-import io.curiousoft.izinga.commons.security.CallerIdentityViolationException;
-import io.curiousoft.izinga.ordermanagement.security.StoreScopeContext;
-import io.curiousoft.izinga.ordermanagement.security.StoreScopeValidator;
 import io.curiousoft.izinga.ordermanagement.cancellation.CustomerCancellationService;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.order.OrderRepository;
@@ -29,8 +24,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -522,59 +515,9 @@ public class OrderServiceImpl implements OrderService {
         return orderCompleted;
     }
 
-    /**
-     * ADR-024: Resolves the JWT caller's phone to their user profile ID.
-     * Uses the same last-9-digits prefix-loop pattern as findOrderByPhone().
-     * Returns null if the phone cannot be resolved (treated as mismatch by validator).
-     */
-    private String resolveCallerUserId() {
-        String callerPhone = StoreScopeContext.getCallerPhone();
-        if (callerPhone == null) return null;
-        String last9 = StoreScopeValidator.normalizeLast9(callerPhone);
-        if (last9 == null) return null;
-        for (String prefix : List.of("0", "+27", "27")) {
-            UserProfile u = userProfileRepo.findByMobileNumber(prefix + last9);
-            if (u != null) return u.getId();
-        }
-        return null;
-    }
-
-    @Tool(name = "find_order_by_id", description = "Find order by id and return the order details")
     @Override
     public Order findOrder(String orderId) {
-        // SEC-MCP-01 / SEC-MCP-BUG-01: tokenless MCP request — hard reject BEFORE any
-        // repository access so a tokenless caller cannot probe order-ID existence
-        // (i.e. cannot distinguish "order not found" from IDENTITY_REFUSAL).
-        if (CallerIdentityContext.isMcpRequest() && CallerIdentityContext.getAudience() == null) {
-            agentIdentityAuditService.recordViolation(
-                    StoreScopeContext.getCallerPhone(), orderId,
-                    AgentIdentityAuditLog.ViolationType.AUDIENCE_VIOLATION, "find_order_by_id",
-                    "UNKNOWN", null, null);
-            throw new CallerIdentityViolationException(
-                "IDENTITY_REFUSAL: This tool requires an authenticated scope token. " +
-                "Unauthenticated or tokenless requests are not permitted on the MCP surface. " +
-                "Please contact iZinga support if you need further help.");
-        }
-        Order order = orderRepo.findById(orderId).orElse(null);
-        if (order != null) {
-            // ADR-024: CUSTOMER must own the order; DRIVER must be assigned to it.
-            String audience = CallerIdentityContext.getAudience();
-            try {
-                if ("CUSTOMER".equals(audience)) {
-                    StoreScopeValidator.validateCallerOwnsId(order.getCustomerId(), this::resolveCallerUserId);
-                } else if ("DRIVER".equals(audience)) {
-                    String messengerId = order.getShippingData() != null ? order.getShippingData().getMessengerId() : null;
-                    StoreScopeValidator.validateCallerOwnsId(messengerId, this::resolveCallerUserId);
-                }
-            } catch (CallerIdentityViolationException e) {
-                agentIdentityAuditService.recordViolation(
-                        StoreScopeContext.getCallerPhone(), orderId,
-                        AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED, "find_order_by_id",
-                        audience != null ? audience : "UNKNOWN", null, null);
-                throw e;
-            }
-        }
-        return order;
+        return orderRepo.findById(orderId).orElse(null);
     }
 
     @Override
@@ -689,88 +632,20 @@ public class OrderServiceImpl implements OrderService {
                 }).orElseThrow();
     }
 
-    @Tool(name = "find_orders_by_user_id", description = "Find orders by user id and return the order details")
     @Override
     public List<Order> findOrderByUserId(String userId) {
-        // ADR-024: CUSTOMER/DRIVER agents may only fetch orders for their own user ID.
-        try {
-            StoreScopeValidator.validateCallerOwnsId(userId, this::resolveCallerUserId);
-        } catch (CallerIdentityViolationException e) {
-            // FIX-04: capture audience on the request thread before the @Async dispatch
-            String auditAudience = CallerIdentityContext.getAudience() != null ? CallerIdentityContext.getAudience() : "UNKNOWN";
-            agentIdentityAuditService.recordViolation(
-                    StoreScopeContext.getCallerPhone(), userId,
-                    AgentIdentityAuditLog.ViolationType.ID_NOT_OWNED, "find_orders_by_user_id",
-                    auditAudience, null, null);
-            throw e;
-        }
         return orderRepo.findByCustomerId(userId).orElse(new ArrayList<>());
     }
 
-    @Tool(name = "find_order_for_messenger", description = "Find order by id and return the order details as MessengerOrderDto")
     @Override
     public Order findOrderForMessenger(String orderId) {
-        // SEC-MCP-01 / SEC-MCP-BUG-01: tokenless MCP request — hard reject BEFORE any
-        // repository access so a tokenless caller cannot probe order-ID existence
-        // (i.e. cannot distinguish "Order not found" from IDENTITY_REFUSAL).
-        String audience = CallerIdentityContext.getAudience();
-        if (CallerIdentityContext.isMcpRequest() && audience == null) {
-            agentIdentityAuditService.recordViolation(
-                    StoreScopeContext.getCallerPhone(), orderId,
-                    AgentIdentityAuditLog.ViolationType.AUDIENCE_VIOLATION, "find_order_for_messenger",
-                    "UNKNOWN", null, null);
-            throw new CallerIdentityViolationException(
-                "IDENTITY_REFUSAL: This tool requires an authenticated scope token. " +
-                "Unauthenticated or tokenless requests are not permitted on the MCP surface. " +
-                "Please contact iZinga support if you need further help.");
-        }
-        // ADR-024: DRIVER must be assigned to this order; CUSTOMER must own it (FIX-03).
         Order order = orderRepo.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order with id " + orderId + " not found."));
-        if ("DRIVER".equals(audience)) {
-            try {
-                String messengerId = order.getShippingData() != null ? order.getShippingData().getMessengerId() : null;
-                StoreScopeValidator.validateCallerOwnsId(messengerId, this::resolveCallerUserId);
-            } catch (CallerIdentityViolationException e) {
-                // FIX-04: audience already captured as local var on request thread
-                agentIdentityAuditService.recordViolation(
-                        StoreScopeContext.getCallerPhone(), orderId,
-                        AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED, "find_order_for_messenger",
-                        audience != null ? audience : "UNKNOWN", null, null);
-                throw e;
-            }
-        } else if ("CUSTOMER".equals(audience)) {
-            // FIX-03 (Legal C-4): CUSTOMER audience must own the order — prevents cross-customer
-            // data leak of full MessengerOrderDto (shipping details, iZinga commission, etc.).
-            try {
-                StoreScopeValidator.validateCallerOwnsId(order.getCustomerId(), this::resolveCallerUserId);
-            } catch (CallerIdentityViolationException e) {
-                // FIX-04: audience already captured as local var on request thread
-                agentIdentityAuditService.recordViolation(
-                        StoreScopeContext.getCallerPhone(), orderId,
-                        AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED, "find_order_for_messenger",
-                        audience, null, null);
-                throw e;
-            }
-        }
         return new MessengerOrderDto(order, izingaCommissionPerc);
     }
 
-    @Tool(name = "find_orders_by_phone_number", description = "Find orders by phone number and return the order details")
     @Override
     public List<Order> findOrderByPhone(String phone) {
-        // ADR-024: CUSTOMER/DRIVER agents may only query orders for their own phone.
-        try {
-            StoreScopeValidator.validateCallerPhone(phone);
-        } catch (CallerIdentityViolationException e) {
-            // FIX-04: capture audience on the request thread before the @Async dispatch
-            String auditAudience = CallerIdentityContext.getAudience() != null ? CallerIdentityContext.getAudience() : "UNKNOWN";
-            agentIdentityAuditService.recordViolation(
-                    StoreScopeContext.getCallerPhone(), phone,
-                    AgentIdentityAuditLog.ViolationType.PHONE_MISMATCH, "find_orders_by_phone_number",
-                    auditAudience, null, null);
-            throw e;
-        }
         if (phone.length() < 9) {
             throw new IllegalArgumentException("phone must be at least 9 characters");
         }
@@ -791,50 +666,8 @@ public class OrderServiceImpl implements OrderService {
         return orderRepo.findByShopIdAndStageNot(store.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
     }
 
-    @Tool(name = "find_orders_by_messenger_id", description = "Find orders by messenger id and return the order details as MessengerOrderDto")
     @Override
-    public Set<Order> findOrderByMessengerId(String id, @ToolParam(required = false) boolean allStages) {
-        // SEC-MCP-02 (CORRECTION 2): on MCP requests enforce caller-scope gates.
-        if (CallerIdentityContext.isMcpRequest()) {
-            String audience = CallerIdentityContext.getAudience();
-            if (audience == null) {
-                agentIdentityAuditService.recordViolation(
-                        StoreScopeContext.getCallerPhone(), id,
-                        AgentIdentityAuditLog.ViolationType.AUDIENCE_VIOLATION, "find_orders_by_messenger_id",
-                        "UNKNOWN", null, null);
-                throw new CallerIdentityViolationException(
-                    "IDENTITY_REFUSAL: This tool requires an authenticated scope token. " +
-                    "Unauthenticated or tokenless requests are not permitted on the MCP surface. " +
-                    "Please contact iZinga support if you need further help.");
-            }
-            if ("DRIVER".equals(audience)) {
-                // DRIVER may only retrieve their own orders (caller userId == requested messenger id)
-                try {
-                    StoreScopeValidator.validateCallerOwnsId(id, this::resolveCallerUserId);
-                } catch (CallerIdentityViolationException e) {
-                    agentIdentityAuditService.recordViolation(
-                            StoreScopeContext.getCallerPhone(), id,
-                            AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED, "find_orders_by_messenger_id",
-                            audience, null, null);
-                    throw e;
-                }
-            } else if ("ADMIN".equals(audience)) {
-                // AMD-01 (REQ-A7): ADMIN has broad access — no ownership check, no store filter
-                LOG.debug("[MCP-ADMIN] find_orders_by_messenger_id pass-through for ADMIN audience");
-            } else {
-                // STORE, CUSTOMER and any other audience are not permitted to enumerate driver orders
-                // AMD-01 (REQ-A7): STORE path removed; STORE is now a hard reject with audit record
-                agentIdentityAuditService.recordViolation(
-                        StoreScopeContext.getCallerPhone(), id,
-                        AgentIdentityAuditLog.ViolationType.AUDIENCE_VIOLATION, "find_orders_by_messenger_id",
-                        audience, null, null);
-                throw new CallerIdentityViolationException(
-                    "IDENTITY_REFUSAL: I can only assist with queries for your own account. " +
-                    "For privacy and security reasons, I am not authorised to access another person's information. " +
-                    "Please contact iZinga support if you need further help.");
-            }
-        }
-
+    public Set<Order> findOrderByMessengerId(String id, boolean allStages) {
         var ordersAssigned = allStages ? orderRepo.findByShippingDataMessengerId(id) : orderRepo.findByShippingDataMessengerIdAndStageNot(id, OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
 
         var ordersQuoteRequested = quoteRepository.findBySentToMessengerIds(id)
@@ -855,9 +688,6 @@ public class OrderServiceImpl implements OrderService {
                 resultOrders = ordersFromQuotes;
             }
         }
-
-        // AMD-01 (REQ-A7): STORE post-query filter removed. STORE audience is now a hard reject above.
-        // No per-store filtering needed; DRIVER gets own orders only; ADMIN gets all unfiltered.
 
         return resultOrders.stream()
                 .map(it -> (Order) new MessengerOrderDto(it, izingaCommissionPerc))

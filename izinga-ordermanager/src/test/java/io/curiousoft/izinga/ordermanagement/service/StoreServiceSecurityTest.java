@@ -67,8 +67,7 @@ class StoreServiceSecurityTest {
         storeService = new StoreService(
                 storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, 0.0,
                 applicationEventPublisher, referralCodeService,
-                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth,
-                agentIdentityAuditService);
+                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth);
     }
 
     // ──────────────────────────────────────────────────────────────────────────

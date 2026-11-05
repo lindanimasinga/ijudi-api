@@ -23,6 +23,8 @@ import io.curiousoft.izinga.ordermanagement.leads.LeadService;
 import io.curiousoft.izinga.ordermanagement.mcp.DocumentUploadMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.McpCaller;
 import io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController;
+import io.curiousoft.izinga.ordermanagement.mcp.OrderMcpController;
+import io.curiousoft.izinga.ordermanagement.mcp.StoreMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.UserMcpController;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.orders.McpOrderService;
@@ -77,7 +79,7 @@ import static org.assertj.core.api.Fail.fail;
 import static org.mockito.Mockito.when;
 
 /**
- * ADR-026 D5 REQ-04: Contract snapshot test for all 18 MCP tool definitions.
+ * ADR-026 D5 REQ-04: Contract snapshot test for all 18 MCP tool definitions (Phase 4 complete).
  *
  * <p><strong>Golden file:</strong> {@code src/test/resources/mcp/tool-contract-snapshot.json}.
  * <br>To regenerate: {@code ./mvnw -pl izinga-ordermanager -am test -Dmcp.contract.update=true}</p>
@@ -205,7 +207,7 @@ class McpToolContractSnapshotTest {
                 "main-pay-account", 0.05,
                 eventPublisher, referralCodeService,
                 storeAgreementAuditRepository, storeTierChangeAuditRepository,
-                firebaseAuth, agentIdentityAuditService);
+                firebaseAuth);
 
         ReconServiceImpl reconService = new ReconServiceImpl(
                 storeRepository, userProfileRepo, shopPayoutRepo,
@@ -215,7 +217,7 @@ class McpToolContractSnapshotTest {
                 storeStage1CommissionRepo, storeStage2CommissionRepo,
                 eventPublisher, new AmbassadorProperties(), agentIdentityAuditService);
 
-        // ADR-026 Phase 1+2: wire real controllers so their tool definitions appear in the snapshot.
+        // ADR-026 Phase 1-4: wire all real controllers so all 18 tool definitions appear in the snapshot.
         McpCaller mcpCaller = new McpCaller(userProfileRepo);
         OrderCreationMcpController orderCreationController =
                 new OrderCreationMcpController(mcpOrderService, mcpCaller, agentIdentityAuditService);
@@ -223,20 +225,23 @@ class McpToolContractSnapshotTest {
                 new DocumentUploadMcpController(documentUploadMcpService, agentIdentityAuditService);
         UserMcpController userMcpController =
                 new UserMcpController(userProfileService, agentIdentityAuditService);
+        OrderMcpController orderMcpController =
+                new OrderMcpController(orderService, mcpCaller, agentIdentityAuditService);
+        StoreMcpController storeMcpController =
+                new StoreMcpController(storeService, agentIdentityAuditService, "main-pay-account", 0.05);
 
         java.util.Map<String, Object> controllerBeans = new java.util.HashMap<>();
         controllerBeans.put("orderCreationMcpController", orderCreationController);
         controllerBeans.put("documentUploadMcpController", documentUploadController);
         controllerBeans.put("userMcpController", userMcpController);
+        controllerBeans.put("orderMcpController", orderMcpController);
+        controllerBeans.put("storeMcpController", storeMcpController);
         when(applicationContext.getBeansWithAnnotation(McpToolController.class))
                 .thenReturn(controllerBeans);
 
         McpConfig mcpConfig = new McpConfig();
         provider = mcpConfig.userProfileToolCallbackProvider(
-                orderService,
-                reconService,
-                storeService,
-                applicationContext
+            reconService, applicationContext
         );
     }
 

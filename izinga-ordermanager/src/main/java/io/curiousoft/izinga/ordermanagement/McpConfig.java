@@ -2,10 +2,7 @@ package io.curiousoft.izinga.ordermanagement;
 
 import io.curiousoft.izinga.ordermanagement.mcp.GuardedToolCallback;
 import io.curiousoft.izinga.ordermanagement.mcp.McpToolController;
-import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
-import io.curiousoft.izinga.ordermanagement.stores.StoreService;
 import io.curiousoft.izinga.recon.ReconService;
-import io.curiousoft.izinga.recon.ReconServiceImpl;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
@@ -86,13 +83,12 @@ public class McpConfig {
      * {@link io.curiousoft.izinga.ordermanagement.mcp.GuardedToolCallback}.</p>
      */
     @Bean
-    public ToolCallbackProvider userProfileToolCallbackProvider(OrderServiceImpl orderService,
-                                                                ReconService reconService,
-                                                                StoreService storeService,
+    public ToolCallbackProvider userProfileToolCallbackProvider(ReconService reconService,
                                                                 ApplicationContext applicationContext) {
-        // Collect legacy service tool objects (Phase 2 baseline — 9 tools; 9 moved to controllers)
-        // ADR-026: UserProfileService removed in Phase 2 (all 4 user tools migrated to UserMcpController).
-        Object[] legacyObjects = {orderService, reconService, storeService};
+        // ADR-026 Phase 4 complete: only ReconServiceImpl retains @Tool methods as legacy.
+        // UserMcpController (4), OrderCreationMcpController (1), OrderMcpController (5),
+        // StoreMcpController (3) are all controller beans — collected below via @McpToolController.
+        Object[] legacyObjects = {reconService};
 
         // Collect @McpToolController beans and wrap their callbacks in GuardedToolCallback
         Map<String, Object> controllerBeans =

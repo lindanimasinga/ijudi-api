@@ -45,8 +45,7 @@ public class StoreServiceReferralAttributionTest {
     public void setUp() {
         storeService = new StoreService(storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, MARKUP,
                 eventPublisher, referralCodeService,
-                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth,
-                agentIdentityAuditService);
+                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth);
     }
 
     @Test

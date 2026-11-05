@@ -32,14 +32,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * ADR-026 D5: ArchUnit architectural rules R1–R6 for MCP controller-layer separation.
  *
- * <p>Phase 0 — foundation pass. All tools still live on the 6 legacy service classes.
- * Rules R1, R2, R4 carry {@code LEGACY_EXCLUSIONS} to allow that state.
- * Rules R3, R5 are vacuous today (no {@code @McpToolController} classes exist) and use
- * {@code allowEmptyShould(true)}. Rule R6 must already pass unconditionally.</p>
+ * <p>Phase 4 complete — OrderServiceImpl + StoreService migrated to OrderMcpController +
+ * StoreMcpController. Only ReconServiceImpl remains in LEGACY_EXCLUSIONS.
+ * Rules R1, R2, R4 carry {@code LEGACY_EXCLUSIONS} exempting the 1 remaining legacy class.
+ * Rule R6 must already pass unconditionally.</p>
  *
  * <p>Non-vacuity guards ensure:
  * <ul>
- *   <li>(a) Without LEGACY_EXCLUSIONS, R1 would flag exactly the 6 exclusion classes.</li>
+ *   <li>(a) Without LEGACY_EXCLUSIONS, R1 would flag exactly the 1 exclusion class.</li>
  *   <li>(b) The importer finds exactly 18 {@code @Tool} methods across exactly 6 classes.</li>
  * </ul>
  * </p>
@@ -58,14 +58,14 @@ class McpArchitectureTest {
     // ---- LEGACY_EXCLUSIONS ----------------------------------------------------------------
 
     /**
-     * The 3 service classes that still hold {@code @Tool} methods after Phase 2.
-     * McpOrderService and DocumentUploadMcpService were migrated in Phase 1.
-     * UserProfileService was migrated in Phase 2 (all 4 user tools → UserMcpController).
-     * Each phase of ADR-026 shrinks this list. Phase 6 deletes it.
+     * The 1 service class that still holds {@code @Tool} methods after Phase 4.
+     * McpOrderService + DocumentUploadMcpService migrated in Phase 1.
+     * UserProfileService migrated in Phase 2 → UserMcpController.
+     * OrderServiceImpl migrated in Phase 3 → OrderMcpController.
+     * StoreService migrated in Phase 4 → StoreMcpController.
+     * Phase 5+ will migrate ReconServiceImpl. Phase 6 deletes this list.
      */
     static final Set<String> LEGACY_EXCLUSIONS = new HashSet<>(Arrays.asList(
-            "io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl",
-            "io.curiousoft.izinga.ordermanagement.stores.StoreService",
             "io.curiousoft.izinga.recon.ReconServiceImpl"
     ));
 
@@ -307,7 +307,7 @@ class McpArchitectureTest {
                 .collect(Collectors.toSet());
 
         assertThat(violatingClassNames)
-                .as("Without LEGACY_EXCLUSIONS, R1 must flag exactly the 4 legacy classes (after Phase 1 migration). " +
+                .as("Without LEGACY_EXCLUSIONS, R1 must flag exactly the 1 legacy class (after Phase 4 migration). " +
                         "If a new class has @Tool methods, it must be a @McpToolController or added to LEGACY_EXCLUSIONS. " +
                         "If a legacy class was migrated, remove it from LEGACY_EXCLUSIONS.")
                 .containsExactlyInAnyOrderElementsOf(LEGACY_EXCLUSIONS);
@@ -359,7 +359,7 @@ class McpArchitectureTest {
 
         assertThat(classesWithToolMethods)
                 .as("Expected exactly 6 classes to hold @Tool methods " +
-                        "(3 legacy services + 3 controllers after Phase 2). " +
+                        "(1 legacy service + 5 controllers after Phase 4). " +
                         "Update LEGACY_EXCLUSIONS if a new class is introduced.")
                 .hasSize(6);
     }
@@ -421,7 +421,7 @@ class McpArchitectureTest {
                 .collect(Collectors.toSet());
 
         assertThat(toolNames).containsExactlyInAnyOrder(
-                // OrderServiceImpl (5)
+                // OrderMcpController (5) — migrated from OrderServiceImpl in Phase 3
                 "find_order_by_id",
                 "find_orders_by_user_id",
                 "find_order_for_messenger",
@@ -429,7 +429,7 @@ class McpArchitectureTest {
                 "find_orders_by_messenger_id",
                 // OrderCreationMcpController (1) — migrated from McpOrderService in Phase 1
                 "start_order",
-                // StoreService (3)
+                // StoreMcpController (3) — migrated from StoreService in Phase 4
                 "find_store_or_shops_by_id",
                 "find_stores_by_owner",
                 "find_stores",
@@ -443,7 +443,7 @@ class McpArchitectureTest {
                 "create_document_upload_session",
                 "attach_uploaded_document_to_user_tag",
                 "recheck_required_documents",
-                // ReconServiceImpl (1)
+                // ReconServiceImpl (1) — legacy, Phase 5 migration pending
                 "get_payouts_for_user"
         );
     }

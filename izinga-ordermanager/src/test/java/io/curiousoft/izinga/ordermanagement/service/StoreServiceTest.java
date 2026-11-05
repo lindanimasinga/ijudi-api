@@ -53,8 +53,7 @@ public class StoreServiceTest {
     public void setUp() {
         storeService = new StoreService(storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, 0.1,
                 applicationEventPublisher, referralCodeService,
-                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth,
-                agentIdentityAuditService);
+                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth);
     }
 
     @Test
@@ -1773,8 +1772,8 @@ public class StoreServiceTest {
         Assert.assertEquals(2, result.size());
         verify(storeRepository).findAll();
         verify(storeRepository, never()).findByStoreType(any());
-        // PII: real account ID must be replaced with main pay account
-        result.forEach(p -> Assert.assertEquals(MAIN_PAY_ACCOUNT, p.getBank().getAccountId()));
+        // ADR-026 Phase 4: bank masking moved to StoreMcpController — service returns real account
+        result.forEach(p -> Assert.assertEquals("real-account-123", p.getBank().getAccountId()));
     }
 
     @Test
@@ -1790,7 +1789,8 @@ public class StoreServiceTest {
         Assert.assertEquals(1, result.size());
         verify(storeRepository).findByStoreType(StoreType.FOOD);
         verify(storeRepository, never()).findAll();
-        Assert.assertEquals(MAIN_PAY_ACCOUNT, result.get(0).getBank().getAccountId());
+        // ADR-026 Phase 4: bank masking moved to StoreMcpController — service returns real account
+        Assert.assertEquals("real-account-123", result.get(0).getBank().getAccountId());
     }
 
     @Test
@@ -1853,7 +1853,8 @@ public class StoreServiceTest {
         Assert.assertEquals(1, result.size());
         Assert.assertEquals("match", result.get(0).getId());
         verify(storeRepository).findByStoreType(StoreType.SALON);
-        Assert.assertEquals(MAIN_PAY_ACCOUNT, result.get(0).getBank().getAccountId());
+        // ADR-026 Phase 4: bank masking moved to StoreMcpController — service returns real account
+        Assert.assertEquals("real-account-123", result.get(0).getBank().getAccountId());
     }
 
     @Test
@@ -1870,8 +1871,8 @@ public class StoreServiceTest {
     }
 
     @Test
-    public void findStores_noPiiLeaks_bankAccountIdIsAlwaysReplaced() {
-        // given
+    public void findStores_serviceDoesNotMaskBank_realAccountReturned() {
+        // given: ADR-026 Phase 4 — bank masking is StoreMcpController's responsibility, not service's
         StoreProfile store = buildStore("s1", StoreType.FOOD, "1 A St", StoreProfile.AVAILABILITY.ONLINE24_7);
         store.getBank().setAccountId("SENSITIVE-ACCOUNT-NUMBER-9999");
         when(storeRepository.findAll()).thenReturn(List.of(store));
@@ -1879,8 +1880,7 @@ public class StoreServiceTest {
         // when
         List<StoreProfile> result = storeService.findStores(null, null, null);
 
-        // then: real account never reaches caller
-        Assert.assertEquals(MAIN_PAY_ACCOUNT, result.get(0).getBank().getAccountId());
-        Assert.assertNotEquals("SENSITIVE-ACCOUNT-NUMBER-9999", result.get(0).getBank().getAccountId());
+        // then: service returns the real account ID (controller will mask it via StoreMcpController)
+        Assert.assertEquals("SENSITIVE-ACCOUNT-NUMBER-9999", result.get(0).getBank().getAccountId());
     }
 }
