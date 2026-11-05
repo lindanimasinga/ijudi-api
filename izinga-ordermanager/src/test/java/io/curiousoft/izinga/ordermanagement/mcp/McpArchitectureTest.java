@@ -58,15 +58,15 @@ class McpArchitectureTest {
     // ---- LEGACY_EXCLUSIONS ----------------------------------------------------------------
 
     /**
-     * The 4 service classes that still hold {@code @Tool} methods after Phase 1.
+     * The 3 service classes that still hold {@code @Tool} methods after Phase 2.
      * McpOrderService and DocumentUploadMcpService were migrated in Phase 1.
+     * UserProfileService was migrated in Phase 2 (all 4 user tools → UserMcpController).
      * Each phase of ADR-026 shrinks this list. Phase 6 deletes it.
      */
     static final Set<String> LEGACY_EXCLUSIONS = new HashSet<>(Arrays.asList(
             "io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl",
             "io.curiousoft.izinga.ordermanagement.stores.StoreService",
-            "io.curiousoft.izinga.recon.ReconServiceImpl",
-            "io.curiousoft.izinga.usermanagement.users.UserProfileService"
+            "io.curiousoft.izinga.recon.ReconServiceImpl"
     ));
 
     private static final DescribedPredicate<JavaClass> IS_LEGACY_EXCLUSION =
@@ -277,11 +277,12 @@ class McpArchitectureTest {
 
     /**
      * Non-vacuity guard (a): Verifies the LEGACY_EXCLUSIONS list is complete and minimal.
-     * Without the exclusion list, R1 must flag exactly the 4 classes named in LEGACY_EXCLUSIONS
-     * (after Phase 1 migration of McpOrderService and DocumentUploadMcpService to controllers).
+     * Without the exclusion list, R1 must flag exactly the 3 classes named in LEGACY_EXCLUSIONS
+     * (after Phase 2 migration: Phase 1 moved McpOrderService+DocumentUploadMcpService,
+     * Phase 2 moved UserProfileService → UserMcpController).
      * If this test fails with more violations, a new class has @Tool methods and must be added
      * to LEGACY_EXCLUSIONS or moved to a @McpToolController.
-     * If it fails with fewer violations, one of the 4 has been migrated and must be removed.
+     * If it fails with fewer violations, one of the 3 has been migrated and must be removed.
      */
     @Test
     void nonVacuityGuard_a_legacyExclusionsAreTheExactR1Violators() {
@@ -316,8 +317,9 @@ class McpArchitectureTest {
 
     /**
      * Non-vacuity guard (b): Sanity assertion that the importer finds exactly 18 {@code @Tool} methods
-     * across exactly 6 classes (4 legacy services + 2 Phase 1 controllers). This guards against
-     * silent tool additions or removals that could invalidate the contract snapshot and access matrix tests.
+     * across exactly 6 classes (3 legacy services + 3 controllers: Phase 1 × 2 + Phase 2 × 1).
+     * This guards against silent tool additions or removals that could invalidate the contract snapshot
+     * and access matrix tests.
      *
      * <p>If a new tool is added, {@code McpToolContractSnapshotTest}'s golden file must be updated
      * and this count must be bumped.</p>
@@ -356,7 +358,8 @@ class McpArchitectureTest {
                 .hasSize(18);
 
         assertThat(classesWithToolMethods)
-                .as("Expected exactly 6 classes to hold @Tool methods. " +
+                .as("Expected exactly 6 classes to hold @Tool methods " +
+                        "(3 legacy services + 3 controllers after Phase 2). " +
                         "Update LEGACY_EXCLUSIONS if a new class is introduced.")
                 .hasSize(6);
     }
@@ -430,7 +433,7 @@ class McpArchitectureTest {
                 "find_store_or_shops_by_id",
                 "find_stores_by_owner",
                 "find_stores",
-                // UserProfileService (4)
+                // UserMcpController (4) — migrated from UserProfileService in Phase 2
                 "find_user_by_phone",
                 "find_users",
                 "create_user",

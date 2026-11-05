@@ -46,6 +46,7 @@ import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService;
 import io.curiousoft.izinga.ordermanagement.mcp.DocumentUploadMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.McpCaller;
 import io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController;
+import io.curiousoft.izinga.ordermanagement.mcp.UserMcpController;
 import io.curiousoft.izinga.usermanagement.users.DocumentUploadMcpService;
 import io.curiousoft.izinga.usermanagement.users.DocumentUploadSessionRepo;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
@@ -243,7 +244,7 @@ class McpAccessMatrixTest {
         // Build real service instances (never mock the services themselves)
         userProfileService = new UserProfileService(
                 userProfileRepo, eventPublisher, userConfig,
-                icaAcceptanceLogRepo, referralCodeService, agentIdentityAuditService);
+                icaAcceptanceLogRepo, referralCodeService);
 
         documentUploadMcpService = new DocumentUploadMcpService(
                 userProfileService, userConfig, documentUploadSessionRepo);
@@ -278,22 +279,25 @@ class McpAccessMatrixTest {
                 storeStage1CommissionRepo, storeStage2CommissionRepo,
                 eventPublisher, new AmbassadorProperties(), agentIdentityAuditService);
 
-        // Build Phase 1 controller instances backed by the real (non-mocked) services
+        // Build Phase 1+2 controller instances backed by the real (non-mocked) services
         McpCaller mcpCaller = new McpCaller(userProfileRepo);
         OrderCreationMcpController orderCreationController =
                 new OrderCreationMcpController(mcpOrderService, mcpCaller, agentIdentityAuditService);
         DocumentUploadMcpController documentUploadController =
                 new DocumentUploadMcpController(documentUploadMcpService, agentIdentityAuditService);
+        UserMcpController userMcpController =
+                new UserMcpController(userProfileService, agentIdentityAuditService);
         Map<String, Object> controllerBeans = new HashMap<>();
         controllerBeans.put("orderCreationMcpController", orderCreationController);
         controllerBeans.put("documentUploadMcpController", documentUploadController);
+        controllerBeans.put("userMcpController", userMcpController);
         when(applicationContext.getBeansWithAnnotation(McpToolController.class))
                 .thenReturn(controllerBeans);
 
-        // Build provider via same McpConfig factory as production (Phase 1: 5-param signature)
+        // Build provider via same McpConfig factory as production (Phase 2: 4-param signature)
         McpConfig mcpConfig = new McpConfig();
         ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
-                userProfileService, orderService, reconService,
+                orderService, reconService,
                 storeService, applicationContext);
 
         // Build lookup map by tool name

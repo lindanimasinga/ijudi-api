@@ -23,6 +23,7 @@ import io.curiousoft.izinga.ordermanagement.leads.LeadService;
 import io.curiousoft.izinga.ordermanagement.mcp.DocumentUploadMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.McpCaller;
 import io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController;
+import io.curiousoft.izinga.ordermanagement.mcp.UserMcpController;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.orders.McpOrderService;
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
@@ -178,7 +179,7 @@ class McpToolContractSnapshotTest {
         // will cause this setup to break or produce different tool definitions.
         UserProfileService userProfileService = new UserProfileService(
                 userProfileRepo, eventPublisher, userConfig,
-                icaAcceptanceLogRepo, referralCodeService, agentIdentityAuditService);
+                icaAcceptanceLogRepo, referralCodeService);
 
         // ADR-026 Phase 1: 3-param constructor (agentIdentityAuditService removed from service)
         DocumentUploadMcpService documentUploadMcpService = new DocumentUploadMcpService(
@@ -214,22 +215,24 @@ class McpToolContractSnapshotTest {
                 storeStage1CommissionRepo, storeStage2CommissionRepo,
                 eventPublisher, new AmbassadorProperties(), agentIdentityAuditService);
 
-        // ADR-026 Phase 1: wire real controllers so their tool definitions appear in the snapshot.
+        // ADR-026 Phase 1+2: wire real controllers so their tool definitions appear in the snapshot.
         McpCaller mcpCaller = new McpCaller(userProfileRepo);
         OrderCreationMcpController orderCreationController =
                 new OrderCreationMcpController(mcpOrderService, mcpCaller, agentIdentityAuditService);
         DocumentUploadMcpController documentUploadController =
                 new DocumentUploadMcpController(documentUploadMcpService, agentIdentityAuditService);
+        UserMcpController userMcpController =
+                new UserMcpController(userProfileService, agentIdentityAuditService);
 
         java.util.Map<String, Object> controllerBeans = new java.util.HashMap<>();
         controllerBeans.put("orderCreationMcpController", orderCreationController);
         controllerBeans.put("documentUploadMcpController", documentUploadController);
+        controllerBeans.put("userMcpController", userMcpController);
         when(applicationContext.getBeansWithAnnotation(McpToolController.class))
                 .thenReturn(controllerBeans);
 
         McpConfig mcpConfig = new McpConfig();
         provider = mcpConfig.userProfileToolCallbackProvider(
-                userProfileService,
                 orderService,
                 reconService,
                 storeService,

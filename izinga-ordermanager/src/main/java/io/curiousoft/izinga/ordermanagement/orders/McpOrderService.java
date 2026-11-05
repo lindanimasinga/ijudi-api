@@ -131,6 +131,8 @@ public class McpOrderService {
         order.getTag().put("idempotencyKey", idempotencyKey);
 
         // Delegate to domain service — catch specific exceptions before the generic handler
+        // post-ADR-026 Phase 1: orderService.startOrder() must not throw CallerIdentityViolationException —
+        // any ownership gate belongs in the controller layer (OrderCreationMcpController), not here.
         Order created;
         try {
             created = orderService.startOrder(order);

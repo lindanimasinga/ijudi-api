@@ -9,6 +9,7 @@ import io.curiousoft.izinga.ordermanagement.McpConfig;
 import io.curiousoft.izinga.ordermanagement.mcp.DocumentUploadMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.McpCaller;
 import io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController;
+import io.curiousoft.izinga.ordermanagement.mcp.UserMcpController;
 import io.curiousoft.izinga.ordermanagement.orders.McpOrderService;
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
 import io.curiousoft.izinga.ordermanagement.stores.StoreService;
@@ -101,17 +102,20 @@ class McpToolRegistrationTest {
 
     @BeforeEach
     void setUp() {
-        userProfileService = new UserProfileService(userProfileRepo, eventPublisher, userConfig, icaAcceptanceLogRepo, referralCodeService, agentIdentityAuditService);
+        userProfileService = new UserProfileService(userProfileRepo, eventPublisher, userConfig, icaAcceptanceLogRepo, referralCodeService);
         mcpConfig = new McpConfig();
-        // ADR-026 Phase 1: wire real controllers so their tool definitions are registered.
+        // ADR-026 Phase 1+2: wire real controllers so their tool definitions are registered.
         McpCaller mcpCaller = new McpCaller(userProfileRepo);
         OrderCreationMcpController orderCreationController =
                 new OrderCreationMcpController(mcpOrderService, mcpCaller, agentIdentityAuditService);
         DocumentUploadMcpController documentUploadController =
                 new DocumentUploadMcpController(documentUploadMcpService, agentIdentityAuditService);
+        UserMcpController userMcpController =
+                new UserMcpController(userProfileService, agentIdentityAuditService);
         Map<String, Object> controllerBeans = new HashMap<>();
         controllerBeans.put("orderCreationMcpController", orderCreationController);
         controllerBeans.put("documentUploadMcpController", documentUploadController);
+        controllerBeans.put("userMcpController", userMcpController);
         lenient().when(applicationContext.getBeansWithAnnotation(McpToolController.class))
                 .thenReturn(controllerBeans);
     }
@@ -119,7 +123,6 @@ class McpToolRegistrationTest {
     @Test
     void userProfileToolCallbackProvider_isCreated() {
         ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
-                userProfileService,
                 orderService,
                 reconService,
                 storeService,
@@ -131,7 +134,6 @@ class McpToolRegistrationTest {
     @Test
     void userProfileTools_allExpectedToolsAreRegistered() {
         ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
-            userProfileService,
             orderService,
             reconService,
             storeService,
@@ -161,7 +163,6 @@ class McpToolRegistrationTest {
     @Test
     void findUserByPhone_toolHasDescription() {
         ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
-            userProfileService,
             orderService,
             reconService,
             storeService,
@@ -180,7 +181,6 @@ class McpToolRegistrationTest {
     @Test
     void createUser_toolHasDescription() {
         ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
-            userProfileService,
             orderService,
             reconService,
             storeService,

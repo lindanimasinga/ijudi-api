@@ -8,6 +8,7 @@ import io.curiousoft.izinga.ordermanagement.mcp.GuardedToolCallback;
 import io.curiousoft.izinga.ordermanagement.mcp.McpCaller;
 import io.curiousoft.izinga.ordermanagement.mcp.McpToolController;
 import io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController;
+import io.curiousoft.izinga.ordermanagement.mcp.UserMcpController;
 import io.curiousoft.izinga.ordermanagement.orders.McpOrderService;
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
 import io.curiousoft.izinga.ordermanagement.stores.StoreService;
@@ -77,24 +78,24 @@ class McpConfigTest {
     void setUp() {
         userProfileService = new UserProfileService(
                 userProfileRepo, eventPublisher, userConfig,
-                icaAcceptanceLogRepo, referralCodeService, agentIdentityAuditService);
+                icaAcceptanceLogRepo, referralCodeService);
         mcpConfig = new McpConfig();
     }
 
-    // ---- Phase 1: zero controllers → 13 legacy definitions, none wrapped --------------
+    // ---- Phase 2: zero controllers → 9 legacy definitions, none wrapped --------------
 
     @Test
-    void zeroControllers_returns13Tools_noneGuarded() {
+    void zeroControllers_returns9Tools_noneGuarded() {
         when(applicationContext.getBeansWithAnnotation(McpToolController.class))
                 .thenReturn(Collections.emptyMap());
 
         ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
-                userProfileService, orderService, reconService,
+                orderService, reconService,
                 storeService, applicationContext);
 
         ToolCallback[] callbacks = provider.getToolCallbacks();
-        // Phase 1: 5 tools migrated to controllers → 18 - 5 = 13 legacy tools remain
-        assertThat(callbacks).hasSize(13);
+        // Phase 2: 9 tools migrated to controllers → 18 - 9 = 9 legacy tools remain
+        assertThat(callbacks).hasSize(9);
 
         for (ToolCallback tc : callbacks) {
             assertThat(tc)
@@ -128,12 +129,12 @@ class McpConfigTest {
                 .thenReturn(controllerBeans);
 
         ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
-                userProfileService, orderService, reconService,
+                orderService, reconService,
                 storeService, applicationContext);
 
         ToolCallback[] callbacks = provider.getToolCallbacks();
-        // 13 legacy + 1 test controller = 14
-        assertThat(callbacks).hasSize(14);
+        // 9 legacy + 1 test controller = 10
+        assertThat(callbacks).hasSize(10);
 
         for (ToolCallback tc : callbacks) {
             String name = tc.getToolDefinition().name();
@@ -153,12 +154,14 @@ class McpConfigTest {
 
     /**
      * Controller that declares a tool whose name clashes with an existing legacy tool.
+     * ADR-026 Phase 2: find_user_by_phone moved to UserMcpController, so we now clash
+     * against find_order_by_id which remains in the legacy OrderServiceImpl.
      */
     @McpToolController
     static class DuplicateNameController {
-        @Tool(name = "find_user_by_phone", description = "duplicate of a legacy tool")
-        public String findUserByPhone(String phone) {
-            return phone;
+        @Tool(name = "find_order_by_id", description = "duplicate of a legacy tool")
+        public String findOrderById(String orderId) {
+            return orderId;
         }
     }
 
@@ -172,47 +175,56 @@ class McpConfigTest {
 
         assertThatThrownBy(() ->
                 mcpConfig.userProfileToolCallbackProvider(
-                        userProfileService, orderService, reconService,
+                        orderService, reconService,
                         storeService, applicationContext)
         ).isInstanceOf(IllegalStateException.class);
     }
 
-    // ---- AC-03 (Phase 1): real controllers → 18 tools total, 5 controller tools guarded ----
+    // ---- AC-03 (Phase 2): real controllers → 18 tools total, 9 controller tools guarded ----
 
     /**
-     * AC-03: Wiring the Phase 1 real controllers (OrderCreationMcpController +
-     * DocumentUploadMcpController) produces exactly 18 tools in total (13 legacy + 5 migrated),
-     * and each of the 5 controller tools is wrapped in {@link GuardedToolCallback} while legacy
-     * tools are not.
+     * AC-03: Wiring all Phase 1+2 real controllers (OrderCreationMcpController +
+     * DocumentUploadMcpController + UserMcpController) produces exactly 18 tools in total
+     * (9 legacy + 9 migrated), and each of the 9 controller tools is wrapped in
+     * {@link GuardedToolCallback} while legacy tools are not.
      */
     @Test
-    void phase1RealControllers_returns18Tools_5controllerToolsGuarded() {
+    void phase2RealControllers_returns18Tools_9controllerToolsGuarded() {
         McpCaller mcpCaller = new McpCaller(userProfileRepo);
         OrderCreationMcpController orderCreationController =
                 new OrderCreationMcpController(mcpOrderService, mcpCaller, agentIdentityAuditService);
         DocumentUploadMcpController documentUploadController =
                 new DocumentUploadMcpController(documentUploadMcpService, agentIdentityAuditService);
+        UserMcpController userMcpController =
+                new UserMcpController(userProfileService, agentIdentityAuditService);
 
         Map<String, Object> controllerBeans = new HashMap<>();
         controllerBeans.put("orderCreationMcpController", orderCreationController);
         controllerBeans.put("documentUploadMcpController", documentUploadController);
+        controllerBeans.put("userMcpController", userMcpController);
         when(applicationContext.getBeansWithAnnotation(McpToolController.class))
                 .thenReturn(controllerBeans);
 
         ToolCallbackProvider provider = mcpConfig.userProfileToolCallbackProvider(
-                userProfileService, orderService, reconService,
+                orderService, reconService,
                 storeService, applicationContext);
 
         ToolCallback[] callbacks = provider.getToolCallbacks();
-        // 13 legacy + 5 controllers = 18
+        // 9 legacy + 9 controllers = 18
         assertThat(callbacks).hasSize(18);
 
         Set<String> controllerToolNames = Set.of(
+                // Phase 1
                 "start_order",
                 "get_required_documents_for_user",
                 "create_document_upload_session",
                 "attach_uploaded_document_to_user_tag",
-                "recheck_required_documents");
+                "recheck_required_documents",
+                // Phase 2
+                "find_user_by_phone",
+                "find_users",
+                "create_user",
+                "get_missing_fields_by_phone");
 
         for (ToolCallback tc : callbacks) {
             String name = tc.getToolDefinition().name();

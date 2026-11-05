@@ -7,6 +7,8 @@ import io.curiousoft.izinga.commons.security.CallerIdentityViolationException;
 import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import io.curiousoft.izinga.ordermanagement.orders.McpOrderService;
 import io.curiousoft.izinga.ordermanagement.security.StoreScopeValidator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.util.StringUtils;
@@ -35,6 +37,8 @@ import org.springframework.util.StringUtils;
  */
 @McpToolController
 public class OrderCreationMcpController {
+
+    private static final Logger LOG = LoggerFactory.getLogger(OrderCreationMcpController.class);
 
     // ---- Exact refusal message literals (must match CallerIdentityValidator.kt) -----------
 
@@ -100,10 +104,12 @@ public class OrderCreationMcpController {
         if (CallerIdentityContext.isMcpRequest()) {
             String audience = CallerIdentityContext.getAudience();
             if (audience == null) {
+                LOG.warn("start_order: HARD-REJECT — MCP request has no scope token (null audience) for customerId={}", customerId);
                 return McpOrderService.StartOrderResponse.rejected(UNAUTHENTICATED_MESSAGE);
             }
             // AMD-01 (REQ-A9): ADMIN is also permitted to create orders
             if (!"CUSTOMER".equals(audience) && !"STORE".equals(audience) && !"ADMIN".equals(audience)) {
+                LOG.warn("start_order: HARD-REJECT — audience={} is not permitted to create orders for customerId={}", audience, customerId);
                 return McpOrderService.StartOrderResponse.rejected(VIOLATION_MESSAGE);
             }
         }
