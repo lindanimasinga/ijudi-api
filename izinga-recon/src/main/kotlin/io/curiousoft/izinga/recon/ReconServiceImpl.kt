@@ -11,10 +11,8 @@ import io.curiousoft.izinga.commons.payout.events.AmbassadorPayoutEvent
 import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
 import io.curiousoft.izinga.commons.payout.events.ReferralPartnerPayoutEvent
 import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent
-import io.curiousoft.izinga.commons.security.AgentIdentityAuditLog
-import io.curiousoft.izinga.commons.security.AgentIdentityAuditService
-import io.curiousoft.izinga.commons.security.CallerIdentityContext
-import io.curiousoft.izinga.commons.security.CallerIdentityValidator
+// ADR-026 Phase 5: AgentIdentityAuditService, CallerIdentityContext, CallerIdentityValidator,
+// and AgentIdentityAuditLog removed — the get_payouts_for_user gate now lives in PayoutMcpController.
 import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommissionRepo
 import io.curiousoft.izinga.commons.referral.FurnitureCustomerReferralCommissionRepo
 import io.curiousoft.izinga.commons.referral.ReferralCommissionStatus
@@ -31,8 +29,7 @@ import io.curiousoft.izinga.recon.payout.repo.PayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ReferralPartnerPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
 import org.slf4j.LoggerFactory
-import org.springframework.ai.tool.annotation.Tool
-import org.springframework.ai.tool.annotation.ToolParam
+// ADR-026 Phase 5: Tool and ToolParam imports removed (get_payouts_for_user @Tool moved to PayoutMcpController)
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.context.event.EventListener
 import org.springframework.dao.DuplicateKeyException
@@ -58,8 +55,6 @@ class ReconServiceImpl(
     private val storeStage2CommissionRepo: StorePartnerStage2CommissionRepo,
     private val applicationEventPublisher: ApplicationEventPublisher,
     private val ambassadorProperties: AmbassadorProperties,
-    /** ADR-024: injected for async audit writes on identity violations. */
-    private val agentIdentityAuditService: AgentIdentityAuditService,
 ) : ReconService {
 
     private val logger = LoggerFactory.getLogger(ReconServiceImpl::class.java)
@@ -373,44 +368,25 @@ class ReconServiceImpl(
         })
     }
 
-    @Tool(name="get_payouts_for_user",  description = "Get all payouts for a given payout type, date range and toId. The default date range is past 7 days. " +
-            "The Payout will have all orders for this payout and the total amount for the payout. " +
-            "For driver the payoutType is MESSENGER and the toId is the driver id. " +
-            "For shop the payoutType is SHOP and the toId is the shop id.")
-    override fun getAllPayouts(@ToolParam(description = "For driver the payoutType is MESSENGER") payoutType: PayoutType,
-                               @ToolParam(description = "Date time format is like 2026-04-09T00:00:00.000+00:00") from: Date,
-                               @ToolParam(description = "Date time format is like 2026-04-09T00:00:00.000+00:00") toDate: Date,
-                               @ToolParam(description = "This is the Driver/Messenger id to use for lookup") toId: String): List<Payout> {
-        // ADR-024: CUSTOMER/DRIVER agents may only query payouts for their own toId.
-        try {
-            CallerIdentityValidator.validateCallerOwnsId(toId) { resolveCallerUserId() }
-        } catch (e: io.curiousoft.izinga.commons.security.CallerIdentityViolationException) {
-            // FIX-04: capture audience on the request thread before the @Async dispatch
-            val auditAudience = CallerIdentityContext.getAudience() ?: "UNKNOWN"
-            agentIdentityAuditService.recordViolation(
-                CallerIdentityContext.getCallerPhone(), toId,
-                AgentIdentityAuditLog.ViolationType.PAYOUT_NOT_OWNED, "get_payouts_for_user",
-                auditAudience
-            )
-            throw e
-        }
+    /**
+     * ADR-026 Phase 5: @Tool and identity gate REMOVED from service.
+     * The gate (CallerIdentityValidator.validateCallerOwnsId + audit) now lives in
+     * PayoutMcpController, keeping service logic caller-agnostic (AC-04).
+     * resolveCallerUserId() was also removed — replaced by McpCaller.resolveUserId()
+     * in the controller, which performs the same prefix-loop lookup.
+     *
+     * <p>REST callers via ReconController remain unaffected — they call this method
+     * directly on the ungated service (AC-04 compliance).</p>
+     *
+     * <p>MUST NEVER be annotated @Tool — see ReconService interface contract.</p>
+     */
+    override fun getAllPayouts(payoutType: PayoutType, from: Date, toDate: Date, toId: String): List<Payout> {
         return when (payoutType) {
             PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetweenAndToId(from, toDate, toId)
             PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateBetweenAndToId(from, toDate, toId)
             PayoutType.AMBASSADOR -> ambassadorPayoutRepository.findByModifiedDateBetweenAndToId(from, toDate, toId)
             PayoutType.REFERRAL_PARTNER -> referralPartnerPayoutRepository.findByModifiedDateBetweenAndToId(from, toDate, toId)
         }
-    }
-
-    /**
-     * ADR-024: Resolves the JWT caller's phone to their user profile ID.
-     * Returns null if the phone is not set or cannot be resolved (treated as mismatch).
-     */
-    private fun resolveCallerUserId(): String? {
-        val callerPhone = CallerIdentityContext.getCallerPhone() ?: return null
-        val last9 = CallerIdentityValidator.normalizeLast9(callerPhone) ?: return null
-        return listOf("0", "+27", "27")
-            .firstNotNullOfOrNull { prefix -> userProfileRepo.findByMobileNumber("$prefix$last9")?.id }
     }
 
     override fun getAllPayoutsForMessengerAdmin(from: Date, toDate: Date, messengerAdminId: String, messengerId: String?): List<Payout> {

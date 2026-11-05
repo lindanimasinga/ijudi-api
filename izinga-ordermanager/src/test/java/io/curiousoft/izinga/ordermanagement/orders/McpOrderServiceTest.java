@@ -221,11 +221,16 @@ public class McpOrderServiceTest {
     }
 
     // -------------------------------------------------------------------------
-    // FIX-01/FIX-02: CallerIdentityViolationException must pass through verbatim
+    // ADR-026 Phase 1: CIVE from orderService propagates as generic error
+    // (ownership check moved to controller; service no longer catches CIVE specially)
     // -------------------------------------------------------------------------
 
     @Test
-    public void startOrder_customerAudienceThirdPartyId_returnsRejectedWithIdentityRefusal() {
+    public void startOrder_domainThrowsCallerIdentityViolation_returnsGenericError() {
+        // ADR-026 Phase 1: McpOrderService no longer has a CIVE catch block.
+        // A CIVE from orderService.startOrder() propagates through the generic Exception catch
+        // and returns a generic "Order could not be created at this time" message.
+        // (The ownership check moved to OrderCreationMcpController.)
         StoreScopeContext.setAudience(Audience.CUSTOMER);
         StoreScopeContext.setCallerPhone("+27801112222");
 
@@ -246,45 +251,44 @@ public class McpOrderServiceTest {
 
         assertFalse(response.isSuccess());
         assertNotNull(response.getMessage());
-        assertTrue(response.getMessage().contains("IDENTITY_REFUSAL"),
-                "IDENTITY_REFUSAL prefix must be present in rejection message");
-        assertFalse(response.getMessage().contains("could not be created"),
-                "Generic error must not appear when an identity violation occurs");
+        // CIVE is no longer intercepted by the service — falls through to generic Exception handler
+        assertTrue(response.getMessage().toLowerCase().contains("could not be created"),
+                "CIVE from domain falls through to generic handler after Phase 1");
     }
 
     // -------------------------------------------------------------------------
-    // SEC-MCP-01 / CORRECTION 3: audience gate on start_order
+    // ADR-026 Phase 1: audience gate REMOVED from service (moved to OrderCreationMcpController)
     // -------------------------------------------------------------------------
 
     @Test
-    public void startOrder_mcpNullAudience_returnsRejectedWithIdentityRefusal() {
+    public void startOrder_mcpNullAudience_serviceIsUngated_proceedsToConsentCheck() {
+        // ADR-026 Phase 1: McpOrderService no longer has an audience gate.
+        // Null audience reaches the consent check (Step 1) — gate enforcement is in the controller.
         CallerIdentityContext.setMcpRequest(true);
 
         McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
-                CUSTOMER_ID, true, IDEMPOTENCY_KEY, SHOP_ID,
+                CUSTOMER_ID, false, IDEMPOTENCY_KEY, SHOP_ID,
                 "desc", "ONLINE", basketJson(), null);
 
         assertFalse(response.isSuccess());
-        assertNotNull(response.getMessage());
-        assertTrue(response.getMessage().contains("IDENTITY_REFUSAL"),
-                "Response must contain IDENTITY_REFUSAL");
-        verifyNoInteractions(userProfileRepo, orderRepository, orderService);
+        assertTrue(response.getMessage().toLowerCase().contains("confirmation"),
+                "Without audience gate in service, reaches consent check");
     }
 
     @Test
-    public void startOrder_mcpDriverAudience_returnsRejectedWithIdentityRefusal() {
+    public void startOrder_mcpDriverAudience_serviceIsUngated_proceedsToConsentCheck() {
+        // ADR-026 Phase 1: McpOrderService no longer gates DRIVER audience.
+        // DRIVER audience reaches the consent check (Step 1) — gate enforcement is in the controller.
         CallerIdentityContext.setMcpRequest(true);
         StoreScopeContext.setAudience(Audience.DRIVER);
 
         McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
-                CUSTOMER_ID, true, IDEMPOTENCY_KEY, SHOP_ID,
+                CUSTOMER_ID, false, IDEMPOTENCY_KEY, SHOP_ID,
                 "desc", "ONLINE", basketJson(), null);
 
         assertFalse(response.isSuccess());
-        assertNotNull(response.getMessage());
-        assertTrue(response.getMessage().contains("IDENTITY_REFUSAL"),
-                "Response must contain IDENTITY_REFUSAL");
-        verifyNoInteractions(userProfileRepo, orderRepository, orderService);
+        assertTrue(response.getMessage().toLowerCase().contains("confirmation"),
+                "Without audience gate in service, DRIVER reaches consent check");
     }
 
     @Test
@@ -298,7 +302,7 @@ public class McpOrderServiceTest {
 
         assertFalse(response.isSuccess());
         assertTrue(response.getMessage().toLowerCase().contains("confirmation"),
-                "Should reach consent guard, not audience gate");
+                "Should reach consent guard");
     }
 
     @Test
@@ -309,7 +313,7 @@ public class McpOrderServiceTest {
 
         assertFalse(response.isSuccess());
         assertTrue(response.getMessage().toLowerCase().contains("confirmation"),
-                "Must reach consent guard, not audience gate");
+                "Must reach consent guard");
     }
 
     @Test
@@ -357,21 +361,25 @@ public class McpOrderServiceTest {
     }
 
     /**
-     * AMD-01 regression: DRIVER must still be rejected even after ADMIN was added.
+     * ADR-026 Phase 1: DRIVER is no longer rejected by the service layer — gate is now in the controller.
+     * This test verifies that DRIVER audience with customerConfirmed=true reaches the customer-existence check.
      */
     @Test
-    public void startOrder_driverAudience_rejected_unchanged() {
+    public void startOrder_driverAudience_serviceUngated_proceedsToCustomerExistenceCheck() {
         CallerIdentityContext.setMcpRequest(true);
         StoreScopeContext.setAudience(Audience.DRIVER);
+        // customerExists will return false → rejected with "No customer account found"
+        when(userProfileRepo.existsById(CUSTOMER_ID)).thenReturn(false);
 
         McpOrderService.StartOrderResponse response = mcpOrderService.startOrder(
                 CUSTOMER_ID, true, IDEMPOTENCY_KEY, SHOP_ID,
                 "desc", "ONLINE", basketJson(), null);
 
         assertFalse(response.isSuccess());
-        assertTrue(response.getMessage().contains("IDENTITY_REFUSAL"),
-                "DRIVER audience must still be rejected with IDENTITY_REFUSAL");
-        verifyNoInteractions(userProfileRepo, orderRepository, orderService);
+        assertTrue(response.getMessage().toLowerCase().contains("customer account"),
+                "Service reaches customer-existence check without audience gate");
+        verify(userProfileRepo).existsById(CUSTOMER_ID);
+        verifyNoInteractions(orderRepository, orderService);
     }
 
     // -------------------------------------------------------------------------

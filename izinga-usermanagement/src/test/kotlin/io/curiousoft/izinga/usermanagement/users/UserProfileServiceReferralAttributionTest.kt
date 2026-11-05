@@ -35,7 +35,7 @@ class UserProfileServiceReferralAttributionTest {
     fun setUp() {
         `when`(userConfigService.findAll()).thenReturn(emptyList())
         service = UserProfileService(
-            userProfileRepo, eventPublisher, userConfigService, icaAcceptanceLogRepo, referralCodeService, agentIdentityAuditService
+            userProfileRepo, eventPublisher, userConfigService, icaAcceptanceLogRepo, referralCodeService
         )
     }
 

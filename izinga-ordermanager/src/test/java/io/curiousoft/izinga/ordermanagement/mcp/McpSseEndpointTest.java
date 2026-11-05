@@ -51,8 +51,10 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>Once connected, AI assistants can invoke tools like:</p>
  * <ul>
  *   <li>{@code find_user_by_phone} – "Find the user with phone 0812345678"</li>
- *   <li>{@code create_user} – "Create a new customer named Alice with phone 0712345678"</li>
+ *   <li>{@code start_order} – "Start a new order for customer 0812345678"</li>
  * </ul>
+ * <p>Note: {@code create_user} was removed from the MCP surface in ADR-026 Phase 2b
+ * (Lindani 2026-11-05). User creation is REST/internal only.</p>
  */
 @Disabled("Requires a running MongoDB instance – run manually for local smoke testing")
 @SpringBootTest(classes = IjudiApplication.class,

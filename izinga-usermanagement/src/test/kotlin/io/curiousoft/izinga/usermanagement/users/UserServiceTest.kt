@@ -47,7 +47,7 @@ class UserServiceTest {
 
     @Before
     fun setUp() {
-        profileService = UserProfileService(profileRepo, profileUpdatedEventPublisher, userConfigService, icaAcceptanceLogRepo, referralCodeService, agentIdentityAuditService)
+        profileService = UserProfileService(profileRepo, profileUpdatedEventPublisher, userConfigService, icaAcceptanceLogRepo, referralCodeService)
     }
 
     @Test

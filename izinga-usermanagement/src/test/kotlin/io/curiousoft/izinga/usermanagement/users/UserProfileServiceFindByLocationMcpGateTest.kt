@@ -12,7 +12,6 @@ import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -21,11 +20,9 @@ import org.mockito.Mockito.`when`
 import org.mockito.junit.jupiter.MockitoExtension
 
 /**
- * SEC-MCP-02 / AMD-01 (find_users): verifies that the ADMIN-only audience gate on
- * [UserProfileService.findByLocation] is enforced on MCP requests and that
- * non-MCP (REST/scheduler) calls are unaffected.
- *
- * AMD-01 (REQ-A6): STORE audience removed from find_users; ADMIN is now the only permitted audience.
+ * AC-04 (ADR-026 Phase 2): verifies that [UserProfileService.findByLocation] is UNGATED after
+ * the Phase 2 migration — audience enforcement moved to [UserMcpController.findUsers].
+ * Non-MCP (REST/scheduler) calls remain unaffected.
  *
  * JUnit 5 + MockitoExtension (izinga-usermanagement module convention).
  */
@@ -52,7 +49,7 @@ class UserProfileServiceFindByLocationMcpGateTest {
         `when`(userConfigService.findAll()).thenReturn(emptyList())
         service = UserProfileService(
             userProfileRepo, eventPublisher, userConfigService,
-            icaAcceptanceLogRepo, referralCodeService, agentIdentityAuditService
+            icaAcceptanceLogRepo, referralCodeService
         )
     }
 
@@ -61,11 +58,10 @@ class UserProfileServiceFindByLocationMcpGateTest {
         CallerIdentityContext.clear()
     }
 
-    // ── AMD-01 (REQ-A6): ADMIN audience passes; STORE now throws ─────────────
+    // ── AC-04 (Phase 2): service is ungated — all audiences pass through to repo ─────
 
     @Test
     fun `findByLocation ADMIN audience MCP request passes`() {
-        // REQ-A6: ADMIN is now the only permitted audience for find_users
         CallerIdentityContext.setMcpRequest(true)
         CallerIdentityContext.setAudience("ADMIN")
         `when`(userProfileRepo.findByRoleAndServiceTypeAndLatitudeBetweenAndLongitudeBetween(
@@ -79,43 +75,79 @@ class UserProfileServiceFindByLocationMcpGateTest {
     }
 
     @Test
-    fun `findByLocation STORE audience MCP request now throws`() {
-        // REQ-A6: STORE was removed from the permitted set for find_users
+    fun `findByLocation STORE audience MCP request serviceIsUngated`() {
+        // AC-04: gate moved to UserMcpController — service must NOT throw for STORE audience
         CallerIdentityContext.setMcpRequest(true)
         CallerIdentityContext.setAudience("STORE")
+        `when`(userProfileRepo.findByRoleAndServiceTypeAndLatitudeBetweenAndLongitudeBetween(
+            role, storeType,
+            lat - range, lat + range,
+            lon - range, lon + range
+        )).thenReturn(emptyList())
 
-        assertThrows(CallerIdentityViolationException::class.java) {
+        try {
             service.findByLocation(role, lat, lon, range, storeType)
+        } catch (e: CallerIdentityViolationException) {
+            throw AssertionError(
+                "AC-04: UserProfileService.findByLocation must NOT enforce audience gate after Phase 2. " +
+                "Gate belongs in UserMcpController.", e)
         }
     }
 
     @Test
-    fun `findByLocation CUSTOMER audience MCP request throws`() {
+    fun `findByLocation CUSTOMER audience MCP request serviceIsUngated`() {
+        // AC-04: gate moved to UserMcpController
         CallerIdentityContext.setMcpRequest(true)
         CallerIdentityContext.setAudience("CUSTOMER")
+        `when`(userProfileRepo.findByRoleAndServiceTypeAndLatitudeBetweenAndLongitudeBetween(
+            role, storeType,
+            lat - range, lat + range,
+            lon - range, lon + range
+        )).thenReturn(emptyList())
 
-        assertThrows(CallerIdentityViolationException::class.java) {
+        try {
             service.findByLocation(role, lat, lon, range, storeType)
+        } catch (e: CallerIdentityViolationException) {
+            throw AssertionError(
+                "AC-04: UserProfileService.findByLocation must NOT enforce audience gate after Phase 2.", e)
         }
     }
 
     @Test
-    fun `findByLocation DRIVER audience MCP request throws`() {
+    fun `findByLocation DRIVER audience MCP request serviceIsUngated`() {
+        // AC-04: gate moved to UserMcpController
         CallerIdentityContext.setMcpRequest(true)
         CallerIdentityContext.setAudience("DRIVER")
+        `when`(userProfileRepo.findByRoleAndServiceTypeAndLatitudeBetweenAndLongitudeBetween(
+            role, storeType,
+            lat - range, lat + range,
+            lon - range, lon + range
+        )).thenReturn(emptyList())
 
-        assertThrows(CallerIdentityViolationException::class.java) {
+        try {
             service.findByLocation(role, lat, lon, range, storeType)
+        } catch (e: CallerIdentityViolationException) {
+            throw AssertionError(
+                "AC-04: UserProfileService.findByLocation must NOT enforce audience gate after Phase 2.", e)
         }
     }
 
     @Test
-    fun `findByLocation null audience MCP request throws`() {
+    fun `findByLocation null audience MCP request serviceIsUngated`() {
+        // AC-04: gate moved to UserMcpController — null audience must NOT throw from service
         CallerIdentityContext.setMcpRequest(true)
         // audience not set → null
+        `when`(userProfileRepo.findByRoleAndServiceTypeAndLatitudeBetweenAndLongitudeBetween(
+            role, storeType,
+            lat - range, lat + range,
+            lon - range, lon + range
+        )).thenReturn(emptyList())
 
-        assertThrows(CallerIdentityViolationException::class.java) {
+        try {
             service.findByLocation(role, lat, lon, range, storeType)
+        } catch (e: CallerIdentityViolationException) {
+            throw AssertionError(
+                "AC-04: UserProfileService.findByLocation must NOT enforce audience gate after Phase 2.", e)
         }
     }
 

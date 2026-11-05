@@ -49,8 +49,7 @@ class StoreServiceBankValidationTest {
         storeService = new StoreService(
                 storeRepository, userProfileRepo, MAIN_PAY_ACCOUNT, 0.1,
                 applicationEventPublisher, referralCodeService,
-                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth,
-                agentIdentityAuditService);
+                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth);
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────

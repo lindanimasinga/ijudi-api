@@ -54,8 +54,7 @@ public class StoreServiceSubscriptionEventListenerTest {
         storeService = new StoreService(
                 storeRepository, userProfileRepo, "main-pay", 0.1,
                 eventPublisher, referralCodeService,
-                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth,
-                agentIdentityAuditService);
+                storeAgreementAuditRepository, storeTierChangeAuditRepository, firebaseAuth);
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────

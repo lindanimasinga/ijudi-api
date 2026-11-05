@@ -48,7 +48,7 @@ class AmbassadorIdValidationTest {
     @BeforeEach
     fun setUp() {
         `when`(userConfigService.findAll()).thenReturn(emptyList())
-        profileService = UserProfileService(userProfileRepo, eventPublisher, userConfigService, icaAcceptanceLogRepo, referralCodeService, agentIdentityAuditService)
+        profileService = UserProfileService(userProfileRepo, eventPublisher, userConfigService, icaAcceptanceLogRepo, referralCodeService)
     }
 
     private fun buildNewUser(ambassadorId: String? = null): UserProfile {

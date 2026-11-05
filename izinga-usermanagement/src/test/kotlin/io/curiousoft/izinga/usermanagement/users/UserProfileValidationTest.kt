@@ -53,7 +53,7 @@ class UserProfileValidationTest {
     fun setUp() {
         `when`(userConfigService.findAll()).thenReturn(emptyList())
         profileService = UserProfileService(
-            userProfileRepo, eventPublisher, userConfigService, icaAcceptanceLogRepo, referralCodeService, agentIdentityAuditService
+            userProfileRepo, eventPublisher, userConfigService, icaAcceptanceLogRepo, referralCodeService
         )
     }
 

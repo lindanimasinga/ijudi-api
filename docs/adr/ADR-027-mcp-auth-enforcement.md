@@ -74,7 +74,7 @@ Non-MCP paths (REST, scheduler, internal callers) remain unaffected because `IS_
 
 **Alternative B — Unconditional audience gate (no IS_MCP_REQUEST flag):** Rejected because it would break REST endpoints that do not carry a scope token (e.g. admin console, SchedulerService). The IS_MCP_REQUEST sentinel ensures REST callers are never subject to MCP-specific enforcement.
 
-**Alternative C — Separate controller layer for MCP tools:** Noted in this ADR as a future improvement. The current approach intercepts at the service layer via ThreadLocal, which is testable and safe but mixes tool-surface concerns into domain services. This is tracked as reserved `ADR-026-mcp-tools-controller-layer-separation.md` (not yet written). A future author should evaluate moving all `@Tool` methods to a dedicated MCP controller layer, keeping domain services clean.
+**Alternative C — Separate controller layer for MCP tools:** ~~Noted in this ADR as a future improvement~~ **DONE via ADR-026 (feature/adr-026-phase-0-foundation, 2026-11-05).** All 18 `@Tool` methods have been migrated from service classes to dedicated `@McpToolController` beans in `io.curiousoft.izinga.ordermanagement.mcp`. Domain services are now clean of ThreadLocal gating. See `docs/adr/ADR-026-mcp-tools-controller-layer-separation.md` for the full implementation record.
 
 ---
 

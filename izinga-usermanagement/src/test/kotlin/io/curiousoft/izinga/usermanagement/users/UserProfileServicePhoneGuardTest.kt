@@ -47,7 +47,7 @@ class UserProfileServicePhoneGuardTest {
     @BeforeEach
     fun setUp() {
         Mockito.`when`(userConfigService.findAll()).thenReturn(emptyList())
-        service = UserProfileService(userProfileRepo, eventPublisher, userConfigService, icaAcceptanceLogRepo, referralCodeService, agentIdentityAuditService)
+        service = UserProfileService(userProfileRepo, eventPublisher, userConfigService, icaAcceptanceLogRepo, referralCodeService)
     }
 
     @AfterEach
@@ -90,14 +90,20 @@ class UserProfileServicePhoneGuardTest {
     }
 
     @Test
-    fun findUserByPhone_customerAudience_thirdPartyPhone_throws() {
+    fun findUserByPhone_customerAudience_thirdPartyPhone_serviceIsUngated() {
+        // AC-04 (ADR-026 Phase 2): gate moved to UserMcpController — service must NOT throw.
         CallerIdentityContext.setAudience("CUSTOMER")
         CallerIdentityContext.setCallerPhone("+27812815577")
+        Mockito.`when`(userProfileRepo.findByMobileNumber(Mockito.anyString())).thenReturn(null)
 
-        val ex = assertThrows(CallerIdentityViolationException::class.java) {
+        // Must NOT throw CallerIdentityViolationException from the service layer
+        try {
             service.findUserByPhone("+27811111111")
+        } catch (e: CallerIdentityViolationException) {
+            throw AssertionError(
+                "AC-04: UserProfileService.findUserByPhone must NOT enforce identity gate after Phase 2 migration. " +
+                "Gate belongs in UserMcpController.", e)
         }
-        assertTrue(ex.message!!.startsWith("IDENTITY_REFUSAL:"))
     }
 
     @Test
@@ -112,9 +118,11 @@ class UserProfileServicePhoneGuardTest {
     }
 
     @Test
-    fun create_customerAudience_thirdPartyPhone_throws() {
+    fun create_customerAudience_thirdPartyPhone_serviceIsUngated() {
+        // AC-04 (ADR-026 Phase 2): gate moved to UserMcpController — service must NOT throw.
         CallerIdentityContext.setAudience("CUSTOMER")
         CallerIdentityContext.setCallerPhone("+27812815577")
+        Mockito.`when`(userProfileRepo.findByMobileNumber(Mockito.anyString())).thenReturn(null)
 
         val profile = UserProfile(
             "Other Name",
@@ -125,10 +133,16 @@ class UserProfileServicePhoneGuardTest {
             ProfileRoles.CUSTOMER,
         )
 
-        val ex = assertThrows(CallerIdentityViolationException::class.java) {
+        // Must NOT throw CallerIdentityViolationException from the service layer
+        try {
             service.create(profile)
+        } catch (e: CallerIdentityViolationException) {
+            throw AssertionError(
+                "AC-04: UserProfileService.create must NOT enforce identity gate after Phase 2 migration. " +
+                "Gate belongs in UserMcpController.", e)
+        } catch (_: Exception) {
+            // Any other exception (validation, etc.) is fine — identity gate passed
         }
-        assertTrue(ex.message!!.startsWith("IDENTITY_REFUSAL:"))
     }
 
     @Test
@@ -234,46 +248,54 @@ class UserProfileServicePhoneGuardTest {
     // ---- SEC-MCP-BUG-01 / FIX-05: tokenless MCP guard is FIRST ----
 
     /**
-     * Tokenless MCP call to find_user_by_phone with a SHORT phone must throw IDENTITY_REFUSAL
-     * and must NOT access the repo. The short-phone guard (`phone.length < 9 → null`) would
-     * previously produce a distinguishable `null` response instead of IDENTITY_REFUSAL.
+     * AC-04 (ADR-026 Phase 2): Tokenless MCP call to the SERVICE layer for find_user_by_phone
+     * must NOT throw IDENTITY_REFUSAL — the tokenless gate is now in UserMcpController.
+     * With a short phone the service returns null via the short-phone guard.
      */
     @Test
-    fun findUserByPhone_mcpTokenless_shortPhone_throwsIdentityRefusalBeforeRepo() {
+    fun findUserByPhone_mcpTokenless_shortPhone_serviceReturnsNullNoGate() {
         CallerIdentityContext.setMcpRequest(true)
-        // No audience — tokenless call
-        // No repo stubs — if repo were reached the test would have unnecessary stubs
+        // No audience — tokenless, but service has no gate any more
 
-        val ex = assertThrows(CallerIdentityViolationException::class.java) {
-            service.findUserByPhone("123")
+        try {
+            val result = service.findUserByPhone("123")
+            // Short phone → null; no IDENTITY_REFUSAL thrown from service
+            assertNull(result, "Short phone must return null (not throw) from service after Phase 2")
+        } catch (e: CallerIdentityViolationException) {
+            throw AssertionError(
+                "AC-04: Service must NOT enforce tokenless gate after Phase 2. " +
+                "Gate belongs in UserMcpController.", e)
         }
-        assertTrue(ex.message!!.startsWith("IDENTITY_REFUSAL"),
-            "Tokenless MCP call must be rejected with IDENTITY_REFUSAL before the short-phone null-return branch")
         Mockito.verify(userProfileRepo, Mockito.never()).findByMobileNumber(Mockito.anyString())
     }
 
     /**
-     * Tokenless MCP call to create_user with a null phone must throw IDENTITY_REFUSAL and must
-     * NOT reach the validation check that produces a different error ("mobileNumber is required").
+     * AC-04 (ADR-026 Phase 2): Tokenless MCP call to the SERVICE layer for create_user must
+     * NOT throw IDENTITY_REFUSAL — the tokenless gate is now in UserMcpController.
+     * With a null phone the service throws its own validation error (not IDENTITY_REFUSAL).
      */
     @Test
-    fun create_mcpTokenless_nullPhone_throwsIdentityRefusalBeforeValidation() {
+    fun create_mcpTokenless_nullPhone_serviceThrowsValidationNotIdentityRefusal() {
         CallerIdentityContext.setMcpRequest(true)
-        // No audience — tokenless call
+        // No audience — tokenless, but service has no gate any more
         val profile = UserProfile(
             "Name",
             UserProfile.SignUpReason.BUY,
             "Address",
             "https://image.url",
-            null,  // null phone — would produce "mobileNumber is required" if guard were not first
+            null,  // null phone
             ProfileRoles.CUSTOMER,
         )
 
-        val ex = assertThrows(CallerIdentityViolationException::class.java) {
+        // Must NOT throw CallerIdentityViolationException (gate is in controller, not service)
+        try {
             service.create(profile)
+        } catch (e: CallerIdentityViolationException) {
+            throw AssertionError(
+                "AC-04: Service must NOT enforce tokenless gate after Phase 2. " +
+                "Gate belongs in UserMcpController.", e)
+        } catch (_: Exception) {
+            // Any other exception (validation, IllegalArgumentException, etc.) is expected
         }
-        assertTrue(ex.message!!.startsWith("IDENTITY_REFUSAL"),
-            "Tokenless MCP call must be rejected with IDENTITY_REFUSAL before the validation error branch")
-        Mockito.verify(userProfileRepo, Mockito.never()).findByMobileNumber(Mockito.anyString())
     }
 }

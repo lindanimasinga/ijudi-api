@@ -1,17 +1,11 @@
 package io.curiousoft.izinga.recon
 
-import io.curiousoft.izinga.commons.model.ProfileRoles
-import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommissionRepo
 import io.curiousoft.izinga.commons.referral.FurnitureCustomerReferralCommissionRepo
 import io.curiousoft.izinga.commons.referral.StorePartnerStage1CommissionRepo
 import io.curiousoft.izinga.commons.referral.StorePartnerStage2CommissionRepo
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
-import io.curiousoft.izinga.commons.security.AgentIdentityAuditLog
-import io.curiousoft.izinga.commons.security.AgentIdentityAuditService
-import io.curiousoft.izinga.commons.security.CallerIdentityContext
-import io.curiousoft.izinga.commons.security.CallerIdentityViolationException
 import io.curiousoft.izinga.recon.ambassador.AmbassadorProperties
 import io.curiousoft.izinga.recon.payout.PayoutType
 import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
@@ -23,17 +17,21 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.junit.After
-import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.springframework.context.ApplicationEventPublisher
 import java.util.Date
 
 /**
- * ADR-024: Caller identity enforcement tests for get_payouts_for_user in ReconServiceImpl.
+ * ADR-026 Phase 5 / AC-04 — ungated service-layer tests for {@link ReconServiceImpl#getAllPayouts}.
  *
- * Uses CallerIdentityContext from izinga-commons directly (izinga-recon does not depend on
- * izinga-ordermanager, so StoreScopeContext is not in scope here).
+ * <p>The identity gate (ADR-024) was migrated to {@code PayoutMcpController} in Phase 5.
+ * {@code ReconServiceImpl.getAllPayouts} is now a plain repository-delegation method with
+ * no caller-identity checks. These tests verify AC-04: the service delegates to the correct
+ * repository for each {@link PayoutType}, regardless of any audience or identity context.</p>
+ *
+ * <p>Gate enforcement tests (DRIVER-audience throws, audit-record on violation, etc.) live
+ * in {@code PayoutMcpControllerTest} in izinga-ordermanager.</p>
  */
 class ReconServiceImplCallerIdentityTest {
 
@@ -49,17 +47,14 @@ class ReconServiceImplCallerIdentityTest {
     private val storeStage1CommissionRepo = mockk<StorePartnerStage1CommissionRepo>()
     private val storeStage2CommissionRepo = mockk<StorePartnerStage2CommissionRepo>()
     private val applicationEventPublisher = mockk<ApplicationEventPublisher>()
-    private val agentIdentityAuditService = mockk<AgentIdentityAuditService>(relaxed = true)
 
     private lateinit var sut: ReconServiceImpl
 
-    private val callerPhone = "+27812345678"
-    private val callerLast9 = "812345678"
-    private val callerUserId = "caller-user-id"
-    private val otherUserId = "other-user-id"
+    private val userId = "user-id"
 
     @Before
     fun setUp() {
+        // ADR-026 Phase 5: agentIdentityAuditService removed from ReconServiceImpl constructor
         sut = ReconServiceImpl(
             storeRepo = storeRepo,
             userProfileRepo = userProfileRepo,
@@ -73,101 +68,81 @@ class ReconServiceImplCallerIdentityTest {
             storeStage1CommissionRepo = storeStage1CommissionRepo,
             storeStage2CommissionRepo = storeStage2CommissionRepo,
             applicationEventPublisher = applicationEventPublisher,
-            ambassadorProperties = AmbassadorProperties(),
-            agentIdentityAuditService = agentIdentityAuditService
+            ambassadorProperties = AmbassadorProperties()
         )
     }
 
-    @After
-    fun tearDown() {
-        CallerIdentityContext.clear()
-    }
-
-    private fun callerProfile(): UserProfile {
-        val p = UserProfile(
-            "Caller", UserProfile.SignUpReason.DELIVERY_DRIVER,
-            "1 Main St", "https://img.test/1.png", callerPhone, ProfileRoles.MESSENGER
-        )
-        p.id = callerUserId
-        return p
-    }
-
-    private fun stubCallerPhoneResolution() {
-        every { userProfileRepo.findByMobileNumber("0$callerLast9") } returns null
-        every { userProfileRepo.findByMobileNumber("+27$callerLast9") } returns callerProfile()
-    }
+    // ---- AC-04: service delegates to messengerPayoutRepository for MESSENGER payouts ---
 
     @Test
-    fun `getAllPayouts - DRIVER audience own id passes`() {
-        CallerIdentityContext.setAudience("DRIVER")
-        CallerIdentityContext.setCallerPhone(callerPhone)
-        stubCallerPhoneResolution()
+    fun `getAllPayouts MESSENGER delegates to messengerPayoutRepository`() {
         every {
-            messengerPayoutRepository.findByModifiedDateBetweenAndToId(any(), any(), callerUserId)
+            messengerPayoutRepository.findByModifiedDateBetweenAndToId(any(), any(), userId)
         } returns emptyList()
 
-        sut.getAllPayouts(PayoutType.MESSENGER, Date(), Date(), callerUserId)
-        // No exception → pass
+        sut.getAllPayouts(PayoutType.MESSENGER, Date(), Date(), userId)
+
+        verify(exactly = 1) {
+            messengerPayoutRepository.findByModifiedDateBetweenAndToId(any(), any(), userId)
+        }
     }
 
-    @Test(expected = CallerIdentityViolationException::class)
-    fun `getAllPayouts - DRIVER audience third-party id throws`() {
-        CallerIdentityContext.setAudience("DRIVER")
-        CallerIdentityContext.setCallerPhone(callerPhone)
-        stubCallerPhoneResolution()
-
-        sut.getAllPayouts(PayoutType.MESSENGER, Date(), Date(), otherUserId)
-    }
+    // ---- AC-04: service delegates to shopPayoutRepo for SHOP payouts --------------------
 
     @Test
-    fun `getAllPayouts - STORE audience any id passes - regression test`() {
-        // STORE audience must NOT be restricted by ADR-024
-        CallerIdentityContext.setAudience("STORE")
-        CallerIdentityContext.setCallerPhone(callerPhone)
+    fun `getAllPayouts SHOP delegates to shopPayoutRepo`() {
         every {
-            shopPayoutRepo.findByModifiedDateBetweenAndToId(any(), any(), any())
+            shopPayoutRepo.findByModifiedDateBetweenAndToId(any(), any(), userId)
         } returns emptyList()
 
-        sut.getAllPayouts(PayoutType.SHOP, Date(), Date(), "any-store-id")
-        // No exception → STORE is exempt
+        sut.getAllPayouts(PayoutType.SHOP, Date(), Date(), userId)
+
+        verify(exactly = 1) {
+            shopPayoutRepo.findByModifiedDateBetweenAndToId(any(), any(), userId)
+        }
     }
 
-    @Test(expected = CallerIdentityViolationException::class)
-    fun `getAllPayouts - DRIVER audience null resolved caller throws NOTE-03`() {
-        // NOTE-03: null resolved callerId is a hard reject — null == null must NOT pass.
-        // Caller phone is set but all prefix lookups fail → callerId resolves to null.
-        CallerIdentityContext.setAudience("DRIVER")
-        CallerIdentityContext.setCallerPhone(callerPhone)
-        // All prefix variants return null → resolver returns null
-        every { userProfileRepo.findByMobileNumber("0$callerLast9") } returns null
-        every { userProfileRepo.findByMobileNumber("+27$callerLast9") } returns null
-        every { userProfileRepo.findByMobileNumber("27$callerLast9") } returns null
-
-        sut.getAllPayouts(PayoutType.MESSENGER, Date(), Date(), callerUserId)
-    }
+    // ---- AC-04: service delegates to ambassadorPayoutRepository for AMBASSADOR payouts --
 
     @Test
-    fun `getAllPayouts - audit record written on violation`() {
-        CallerIdentityContext.setAudience("DRIVER")
-        CallerIdentityContext.setCallerPhone(callerPhone)
-        stubCallerPhoneResolution()
+    fun `getAllPayouts AMBASSADOR delegates to ambassadorPayoutRepository`() {
+        every {
+            ambassadorPayoutRepository.findByModifiedDateBetweenAndToId(any(), any(), userId)
+        } returns emptyList()
 
-        try {
-            sut.getAllPayouts(PayoutType.MESSENGER, Date(), Date(), otherUserId)
-            fail("Expected CallerIdentityViolationException")
-        } catch (_: CallerIdentityViolationException) {
-            // expected
-        }
+        sut.getAllPayouts(PayoutType.AMBASSADOR, Date(), Date(), userId)
 
-        // FIX-04: audience is now captured on request thread and passed explicitly
-        verify {
-            agentIdentityAuditService.recordViolation(
-                callerPhone,
-                otherUserId,
-                AgentIdentityAuditLog.ViolationType.PAYOUT_NOT_OWNED,
-                "get_payouts_for_user",
-                "DRIVER"  // CallerIdentityContext.setAudience("DRIVER") was set in this test
-            )
+        verify(exactly = 1) {
+            ambassadorPayoutRepository.findByModifiedDateBetweenAndToId(any(), any(), userId)
         }
+    }
+
+    // ---- AC-04: service delegates to referralPartnerPayoutRepository for REFERRAL_PARTNER
+
+    @Test
+    fun `getAllPayouts REFERRAL_PARTNER delegates to referralPartnerPayoutRepository`() {
+        every {
+            referralPartnerPayoutRepository.findByModifiedDateBetweenAndToId(any(), any(), userId)
+        } returns emptyList()
+
+        sut.getAllPayouts(PayoutType.REFERRAL_PARTNER, Date(), Date(), userId)
+
+        verify(exactly = 1) {
+            referralPartnerPayoutRepository.findByModifiedDateBetweenAndToId(any(), any(), userId)
+        }
+    }
+
+    // ---- AC-04: no caller-identity check in service — passes without any context --------
+
+    @Test
+    fun `getAllPayouts succeeds without any caller identity context set`() {
+        // No CallerIdentityContext setup — the service must NOT check caller identity.
+        // Gate belongs to PayoutMcpController (see PayoutMcpControllerTest).
+        every {
+            messengerPayoutRepository.findByModifiedDateBetweenAndToId(any(), any(), userId)
+        } returns emptyList()
+
+        // Must not throw, regardless of audience or identity context
+        sut.getAllPayouts(PayoutType.MESSENGER, Date(), Date(), userId)
     }
 }
