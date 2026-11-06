@@ -3,7 +3,7 @@
 **userType:** driver (messenger) / admin  
 **Feature:** Full payout pipeline: STAGE_7_ALL_PAID → payout generation (PENDING) → CSV export (PROCESSING flip) → bank reconciliation (COMPLETED or PENDING reversion) → missing-payout recovery  
 **App:** ijudi-api (backend) + izinga-onboarding (admin UI at /admin/recon and /admin/recon/detail)  
-**Last verified:** 2026-11-06 | feature/payout-disbursement-fixes-rebase Gate 1 ADR-028 — Live verification PASS (DEF-1 RESOLVED, DEF-2 RESOLVED; 3 scheduler runs + throttle-expiry test + cross-stage guard all PASS); `./mvnw clean test` FAIL — pre-existing non-deterministic flake `OrderServiceTest.startOrderShop_offline:308` (file identical to develop, tracked task_723cde3e, failed both clean runs); BLOCKED on build stability
+**Last verified:** 2026-11-06 | feature/payout-disbursement-fixes-rebase Gate 1 ADR-028 Retry 3 — PASS | 4 live scheduler runs (Run 1: Created+Deferred split; Run 2: cross-stage guard + cooldown suppress; Run 3: cross-stage guard on PROCESSING + cooldown expiry resend; Run 4: bank added → Created + payoutCreated=true) | `./mvnw clean test` 1,632/0/0/19 BUILD SUCCESS (summed across all 8 test modules: commons 35, yoco-pay 3, recon 162, usermanagement 248, payfast 62, document-management 13/1 skipped, messaging 221/14 skipped, ordermanager 888/4 skipped)
 
 ---
 
@@ -372,7 +372,119 @@ BUG-1 requires an order with `payoutCreated=false` to be observable. Creating on
 | AC-25 | izinga-recon module: 162 unit tests — PASS | UNIT | PASS (run 1 + 2: 162/0/0/0) |
 | AC-26 | Full reactor all modules except flake: 887/0/0/4 (excluding known pre-existing flake) | UNIT | PASS (all modules except izinga-ordermanager startOrderShop_offline) |
 
-**Build result:** `./mvnw clean test` — FAIL both runs (Run 1 and Rerun). Sole failure: `OrderServiceTest.startOrderShop_offline:308` (`java.lang.AssertionError` at `Assert.fail()` — `startOrder()` did not throw "Shop not available name" as expected). File confirmed IDENTICAL to develop branch (`git diff develop -- ...OrderServiceTest.java` = no diff). Pre-existing non-deterministic flake tracked by task_723cde3e. Not introduced by this branch. One rerun issued per protocol — same failure. Per QA constraints, cannot issue MERGE_READY.
+**Build result (Retry 2):** `./mvnw clean test` — FAIL both runs (Run 1 and Rerun). Sole failure: `OrderServiceTest.startOrderShop_offline:308` (`java.lang.AssertionError` at `Assert.fail()` — `startOrder()` did not throw "Shop not available name" as expected). File confirmed IDENTICAL to develop branch (`git diff develop -- ...OrderServiceTest.java` = no diff). Pre-existing non-deterministic flake tracked by task_723cde3e. Not introduced by this branch. One rerun issued per protocol — same failure. Per QA constraints, cannot issue MERGE_READY.
+
+---
+
+## Live verification notes (2026-11-06 Gate 1 ADR-028 Retry 3 — PASS)
+
+**Branch:** feature/payout-disbursement-fixes-rebase  
+**Worktree:** `/Users/lindanimasinga/Documents/GitHub/ijudi-api-payout-rebase`  
+**Build:** `./mvnw -pl izinga-ordermanager -am clean package -DskipTests` → SUCCESS  
+**Backend started (each run):** UAT profile, `java -jar izinga-ordermanager-1.2.6-SNAPSHOT.jar --spring.profiles.active=uat --server.port=8089`, JAVA_HOME=Corretto-17, `STORE_SCOPE_JWT_SECRET=local-dev-secret-for-testing-only-min-32-chars`  
+**Mongo URI confirmed from startup log:** `cluster0-7odiz.mongodb.net/izinga-sandbox` (NOT production)  
+**Pre-flight:** 0 non-fixture qualifying orders in izinga-sandbox — safe to proceed  
+
+**ADR-028 Retry 3 test fixtures:**
+
+| ID | Collection | Purpose |
+|---|---|---|
+| qa-payout-rebase-S1 | storeProfile | S1: bank=present (FNB EWALLET), hasPaymentAgreement=true, mobile=+27000000003 |
+| qa-payout-rebase-S2 | storeProfile | S2: bank=null, hasPaymentAgreement=true, mobile=+27000000004 |
+| qa-payout-rebase-D1 | userProfile | D1: bank=null initially, mobile=+27000000001, emailAddress=qa-d1@test.izinga.co.za |
+| qa-payout-rebase-D2 | userProfile | D2: bank=present, mobile=+27000000002, NO emailAddress field (DEF-1 test) |
+| qa-payout-rebase-O1 | order | O1: S1+D1, STAGE_7_ALL_PAID, payoutCreated=false |
+| qa-payout-rebase-O2 | order | O2: S1+D2, STAGE_7_ALL_PAID, payoutCreated=false |
+| qa-payout-rebase-O3 | order | O3: S2 only (no messenger), STAGE_7_ALL_PAID, payoutCreated=false |
+
+**Run 1 (14:07:37 SAST) — initial state:**
+- O1 shop (S1 bank present): outcome=`Created`; ShopPayout `CVARW` created PENDING, contains O1; `Shop payout created for order: qa-payout-rebase-O1`
+- O1 messenger (D1 null-bank): outcome=`Deferred`; WhatsApp driver template → +27000000001 → HTTP 200; cooldown `qa-payout-rebase-D1:DRIVER_MISSING_BANK` inserted
+- O1 payoutCreated=**false** ← DEF-2 fix: messenger Deferred → not set to true ✓
+- O2 shop (S1 bank present): outcome=`Created`; O2 added to existing `CVARW` (same S1); `adding order qa-payout-rebase-O2 to messenger payout TQG3Z`
+- O2 messenger (D2 bank present, no emailAddress): outcome=`Created`; MessengerPayout `TQG3Z` persisted; `emailAddress` field absent in MongoDB ← DEF-1 fix confirmed ✓
+- O2 payoutCreated=**true** ← both sides Created ✓
+- O3 shop (S2 null-bank): outcome=`Deferred`; WhatsApp store template → +27000000004 → HTTP 400 `code:132000` (template not approved, swallowed); cooldown `qa-payout-rebase-S2:STORE_MISSING_BANK` inserted
+- O3 payoutCreated=**false** ← shop Deferred ✓
+- Stats: `Shop Created: 2, Messenger Created: 1, Deferred: 2, Errors: 0`
+
+**Run 2 (14:20:50 SAST) — no DB changes; idempotency + cooldown suppress:**
+- Scheduler finds 2 orders (O2 excluded: payoutCreated=true)
+- O1 shop (S1): outcome=`NotApplicable`; `order qa-payout-rebase-O1 already included in an existing shop payout for store qa-payout-rebase-S1; skipping` ← cross-stage guard fires ✓
+- O1 messenger (D1 null-bank): outcome=`Deferred`; cooldown age 793096ms < 24h → `Notification suppressed for key qa-payout-rebase-D1:DRIVER_MISSING_BANK` ← throttle PASS ✓
+- O1 payoutCreated=**false** ✓
+- O3 shop (S2 null-bank): outcome=`Deferred`; cooldown age 788264ms < 24h → suppressed ✓
+- O3 payoutCreated=**false** ✓
+- Stats: `Shop Created: 0, Messenger Created: 0, Deferred: 2, Errors: 0`
+
+**Mutations between Run 2 and Run 3:**
+1. `db.shopPayout.updateOne({_id: "CVARW"}, {$set: {payoutStage: "PROCESSING"}})` → modifiedCount=1
+2. `db.payout_notification_cooldowns.updateOne({_id: "qa-payout-rebase-D1:DRIVER_MISSING_BANK"}, {$set: {createdAt: new Date(Date.now() - 25*60*60*1000)}})` → modifiedCount=1 (createdAt set to 2026-11-05T11:21:55Z)
+
+**Run 3 (14:30:45 SAST) — cross-stage guard on PROCESSING + expired cooldown resend:**
+- O1 shop (S1, payout CVARW now PROCESSING): outcome=`NotApplicable`; `already included in an existing shop payout` ← cross-stage guard fires even on PROCESSING stage ✓
+- O1 messenger (D1 null-bank, cooldown 25h old): outcome=`Deferred`; cooldown overwritten (25h ≥ 24h → resend); WhatsApp → +27000000001 → HTTP 200; new cooldown inserted ← throttle expiry path PASS ✓
+- O1 payoutCreated=**false** ✓
+- O3 shop (S2 null-bank): outcome=`Deferred`; S2 cooldown still 1385274ms (23 min) < 24h → suppressed ✓
+- Stats: `Shop Created: 0, Messenger Created: 0, Deferred: 2, Errors: 0`
+
+**Mutations between Run 3 and Run 4:**
+3. `db.userProfile.updateOne({_id: "qa-payout-rebase-D1"}, {$set: {bank: {branchCode: "250655", name: "fnb", ...}}})` → modifiedCount=1
+4. `db.storeProfile.updateOne({_id: "qa-payout-rebase-S2"}, {$set: {bank: {branchCode: "250655", name: "fnb", ...}}})` → modifiedCount=1
+
+**Run 4 (14:40:41 SAST) — bank added → Created; payoutCreated=true for all:**
+- O1 shop (S1, CVARW still PROCESSING): outcome=`NotApplicable`; `already included in an existing shop payout` ← cross-stage guard on PROCESSING confirmed again ✓
+- O1 messenger (D1 bank added): outcome=`Created`; `adding order qa-payout-rebase-O1 to messenger payout HE2VI`; MessengerPayout `HE2VI` persisted; payoutCreated=**true** ← NotApplicable+Created = neither Deferred → true ✓
+- O3 shop (S2 bank added): outcome=`Created`; `Shop payout created for order: qa-payout-rebase-O3`; ShopPayout `W365X` persisted; `Skipping messenger payout: no messenger assigned` ← BUG-2 guard ✓; payoutCreated=**true** ✓
+- Stats: `Shop Created: 1, Messenger Created: 1, Deferred: 0, Errors: 0`
+
+**Final MongoDB state after Run 4:**
+- O1, O2, O3: all payoutCreated=true ✓
+- shopPayouts: CVARW (S1, PROCESSING, [O1,O2]); W365X (S2, PENDING, [O3])
+- messengerPayouts: TQG3Z (D2, PENDING, emailAddress=null/absent, [O2]); HE2VI (D1, PENDING, emailAddress=qa-d1@test.izinga.co.za, [O1])
+
+**Indexes confirmed (getIndexes):**
+- `shopPayout`: `shop_payout_cross_stage_idx {toId:1, 'orders._id':1}` present ✓
+- `messengerPayout`: `messenger_payout_cross_stage_idx {toId:1, 'orders._id':1}` present ✓
+- `payout_notification_cooldowns`: TTL index on `createdAt expireAfterSeconds:86400` present ✓
+
+**Full suite: `./mvnw clean test` (from worktree root, no `-pl`, no exclusions):** BUILD SUCCESS — Tests run: 1,632, Failures: 0, Errors: 0, Skipped: 19 (summed across all 8 test modules: commons 35, yoco-pay 3, recon 162, usermanagement 248, payfast 62, document-management 13/1 skipped, messaging 221/14 skipped, ordermanager 888/4 skipped)
+
+**Fixtures cleaned:** All 7 fixtures + 2 shopPayouts + 2 messengerPayouts + 2 cooldown docs deleted; all verify counts = 0.  
+**Apps stopped:** PIDs 53914, 59624, 64204, 68765 all stopped.
+
+**ADR-028 Acceptance Criteria results (Gate 1 Retry 3):**
+
+| AC | Description | Type | Result |
+|---|---|---|---|
+| AC-01 | DEF-1 RESOLVED: null emailAddress on D2 does not throw NPE; payout created successfully | LIVE | PASS (TQG3Z persisted, emailAddress absent in doc) |
+| AC-02 | DEF-2 RESOLVED: payoutCreated=false when both sides Deferred (O1 Run 1 is N/A; shop=Created, messenger=Deferred → false) | LIVE | PASS (O1 payoutCreated=false after Run 1) |
+| AC-03 | DEF-2 RESOLVED: payoutCreated=false when messenger side Deferred (O3 shop=Deferred only) | LIVE | PASS (O3 payoutCreated=false after Run 1) |
+| AC-04 | Null-bank store → Deferred outcome + WA notification to store owner | LIVE | PASS (S2 → 400 from Meta, swallowed; cooldown inserted) |
+| AC-05 | Null-bank driver → Deferred outcome + WA notification to driver | LIVE | PASS (D1 → 200 from Meta; cooldown inserted) |
+| AC-06 | Valid-bank store → Created outcome; ShopPayout persisted PENDING | LIVE | PASS (S1 → CVARW PENDING with O1+O2) |
+| AC-07 | Valid-bank driver (no emailAddress) → Created outcome; MessengerPayout persisted PENDING, emailAddress absent | LIVE | PASS (D2 → TQG3Z, emailAddress absent in MongoDB) |
+| AC-08 | Bank added after Deferred: next Run creates payout (D1 bank added → MessengerPayout HE2VI created Run 4) | LIVE | PASS |
+| AC-09 | Already-created payout → NotApplicable outcome (O1 shop Run 2: PENDING payout; O1 shop Run 3: PROCESSING payout) | LIVE | PASS (both PENDING and PROCESSING → NotApplicable) |
+| AC-10 | Cross-stage guard: order in PROCESSING payout → NotApplicable (O1 shop Runs 3+4) | LIVE | PASS |
+| AC-11 | No duplicate ShopPayout created when cross-stage guard fires (S1 payouts unchanged through Runs 2-4) | LIVE | PASS |
+| AC-12 | No-messenger order: ShopPayout created + "no messenger assigned" skip; payoutCreated=true (O3 Run 4) | LIVE | PASS |
+| AC-13 | payoutCreated=true only when both sides resolved (not Deferred): O1 Run 4 (NotApplicable+Created) | LIVE | PASS |
+| AC-14 | payoutCreated=true when no-messenger order: shop=Created, messenger=skipped (O3 Run 4) | LIVE | PASS |
+| AC-15 | Cooldown suppresses duplicate WA notification within 24h (D1 Run 2 — cooldown active 793096ms) | LIVE | PASS |
+| AC-16 | Cooldown TTL expiry: aged cooldown allows resend (D1 25h aged → notification resent Run 3) | LIVE | PASS |
+| AC-17 | BUG-2 guard: null messenger ID check prevents NPE on no-messenger orders (O3 all runs) | LIVE | PASS |
+| AC-18 | Compound index `messenger_payout_cross_stage_idx` exists on messengerPayout collection | LIVE | PASS (confirmed via getIndexes) |
+| AC-19 | Compound index `shop_payout_cross_stage_idx` exists on shopPayout collection | LIVE | PASS (confirmed via getIndexes) |
+| AC-20 | NullBankGuardPayoutTest: 9 unit tests — all null/valid bank branches for store and messenger | UNIT | PASS (9/0/0/0 in full suite) |
+| AC-21 | CrossStageGuardPayoutTest: 5 unit tests — double-pay prevention logic | UNIT | PASS (5/0/0/0 in full suite) |
+| AC-22 | PayoutFailureStatusUpdateTest: 7 unit tests — paid=false reversion, attemptCount, COMPLETED | UNIT | PASS (7/0/0/0 in full suite) |
+| AC-23 | WhatsappNotificationServiceTest: 28 unit tests including 8 missing-bank notification tests | UNIT | PASS (28/0/0/0 in full suite) |
+| AC-24 | SchedulerServiceTest: 25 unit tests including DEF-2 scheduler marking rule | UNIT | PASS (25/0/0/0 in full suite) |
+| AC-25 | izinga-recon module: all recon unit tests PASS | UNIT | PASS (all recon classes 0/0 fail/error in full suite) |
+| AC-26 | Full reactor `./mvnw clean test`: BUILD SUCCESS — 1,632/0/0/19 (summed across all 8 test modules: commons 35, yoco-pay 3, recon 162, usermanagement 248, payfast 62, document-management 13/1 skipped, messaging 221/14 skipped, ordermanager 888/4 skipped) | UNIT | PASS |
+
+**Build result (Retry 3):** `./mvnw clean test` — BUILD SUCCESS. Tests run: 1,632, Failures: 0, Errors: 0, Skipped: 19 (summed across all 8 test modules: commons 35, yoco-pay 3, recon 162, usermanagement 248, payfast 62, document-management 13/1 skipped, messaging 221/14 skipped, ordermanager 888/4 skipped).
 
 ---
 
