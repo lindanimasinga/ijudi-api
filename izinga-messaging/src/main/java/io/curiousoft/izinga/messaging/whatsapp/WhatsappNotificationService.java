@@ -609,6 +609,58 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
          }
      }
 
+    /**
+     * ADR-029: MCP public tool — sends the iZinga shop options template to a customer.
+     *
+     * <p>Uses the {@code izinga_shop_options} Meta-approved template with a single BODY
+     * TEXT parameter (the recipient's display name). The message is routed via the main
+     * customer WhatsApp line ({@code Audience.CUSTOMER}, no store scope). This method is
+     * intentionally NOT on the {@link io.curiousoft.izinga.messaging.AdminOnlyNotificationService}
+     * interface — it is MCP-specific and should only be called from the MCP controller layer.</p>
+     *
+     * <p>Exception handling: {@code IOException} covers both
+     * {@code mapper.readValue()} (which throws {@code JsonProcessingException extends IOException})
+     * and {@code whatsAppService.sendMessage().execute()}. {@link WhatsappSenderResolver#resolve}
+     * never throws an unchecked exception.</p>
+     *
+     * @param mobileNumber the recipient's phone number (normalized to +27 prefix if starts with 0)
+     * @param name         the recipient's display name used as the BODY TEXT parameter
+     */
+    public void sendShopOptions(String mobileNumber, String name) {
+        try {
+            WhatsappTemplateRequest request = new WhatsappTemplateRequest();
+            String to = mobileNumber != null && mobileNumber.startsWith("0")
+                    ? mobileNumber.replaceFirst("0", "+27") : mobileNumber;
+            request.setTo(to);
+
+            String displayName = name != null && !name.isBlank() ? name : "Customer";
+
+            var requestStr = """
+                    {
+                      "name": "izinga_shop_options",
+                      "language": { "code": "en" },
+                      "components": [
+                        {
+                          "type": "BODY",
+                          "parameters": [
+                            { "type": "TEXT", "text": "#name" }
+                          ]
+                        }
+                      ]
+                    }
+                    """;
+
+            requestStr = requestStr.replace("#name", displayName);
+
+            var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
+            request.setTemplate(template);
+            whatsAppService.sendMessage(senderResolver.resolve(Audience.CUSTOMER, null), request).execute();
+            LOGGER.info("Sent shop options to {}", to);
+        } catch (IOException e) {
+            LOGGER.error("Failed to send shop options to {}", mobileNumber, e);
+        }
+    }
+
     @Override
     public void sendCrimnalCheckConsent(@Nullable String mobileNumber, @Nullable String name) {
         try {

@@ -5,6 +5,7 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
@@ -16,6 +17,7 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
 import fixtures.izinga.mcp.EmptyMcpAudienceFixture;
 import fixtures.izinga.violations.R4ViolatorFixture;
 import fixtures.izinga.violations.R6ViolatorFixture;
+import fixtures.izinga.violations.R7ViolatorFixture;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.tool.annotation.Tool;
 
@@ -30,17 +32,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * ADR-026 D5: ArchUnit architectural rules R1–R6 for MCP controller-layer separation.
+ * ADR-026 / ADR-029: ArchUnit architectural rules R1–R7 for MCP controller-layer separation.
  *
- * <p>Phase 6 lock-down complete — all 17 tools now live on {@code @McpToolController} beans
- * (create_user removed from the MCP surface in Phase 2b, Lindani 2026-11-05).
+ * <p>Phase 6 lock-down complete — all 19 tools now live on {@code @McpToolController} beans
+ * (create_user removed from the MCP surface in Phase 2b, Lindani 2026-11-05;
+ * two notification tools added in ADR-029).
  * LEGACY_EXCLUSIONS removed. R1, R4 hard-fail with no exemptions. {@code allowEmptyShould}
  * removed everywhere. Rule R6 passes unconditionally.</p>
  *
  * <p>Non-vacuity guards ensure:
  * <ul>
  *   <li>(a) Zero R1 violators — no class outside {@code ..mcp..} has {@code @Tool} methods.</li>
- *   <li>(b) The importer finds exactly 17 {@code @Tool} methods across exactly 6 controller classes.</li>
+ *   <li>(b) The importer finds exactly 19 {@code @Tool} methods across exactly 7 controller classes.</li>
+ *   <li>(c) R7 is live — {@link R7ViolatorFixture} is flagged as a violation.</li>
  * </ul>
  * </p>
  */
@@ -257,18 +261,99 @@ class McpArchitectureTest {
                     .should().callMethodWhere(IS_SCOPE_SETTER)
                     .as("R6: Only StoreScopeValidationFilter may call StoreScopeContext setters or setMcpRequest");
 
+    // ---- R7: @Tool methods without @McpPublicTool must call an identity gate method --------
+
+    /**
+     * ADR-029: Custom ArchCondition that passes only when a {@code @Tool} method (or a private
+     * helper it delegates to) calls at least one identity gate method:
+     * <ul>
+     *   <li>Any method on {@code CallerIdentityValidator}</li>
+     *   <li>Any method on {@code StoreScopeValidator}</li>
+     *   <li>{@code CallerIdentityContext.isMcpRequest()}</li>
+     * </ul>
+     *
+     * <p>Two-level traversal handles controllers that extract the gate into a private helper
+     * (e.g. {@code DocumentUploadMcpController.enforceCallerPhoneOrAudit()}).</p>
+     */
+    static final ArchCondition<JavaMethod> CALL_AN_IDENTITY_GATE =
+            new ArchCondition<JavaMethod>(
+                    "call an identity gate method (directly or via a one-level private helper)") {
+
+                private static final Set<String> GATE_OWNER_NAMES = Set.of(
+                        "io.curiousoft.izinga.commons.security.CallerIdentityValidator",
+                        "io.curiousoft.izinga.ordermanagement.security.StoreScopeValidator"
+                );
+                private static final String IDENTITY_CONTEXT_CLASS =
+                        "io.curiousoft.izinga.commons.security.CallerIdentityContext";
+                private static final String IS_MCP_REQUEST = "isMcpRequest";
+
+                @Override
+                public void check(JavaMethod method, ConditionEvents events) {
+                    if (callsGate(method) || delegatesToHelperThatCallsGate(method)) {
+                        events.add(SimpleConditionEvent.satisfied(method,
+                                method.getFullName() + " satisfies R7"));
+                    } else {
+                        events.add(SimpleConditionEvent.violated(method,
+                                method.getFullName() + " does not call any identity gate method (R7 violation). " +
+                                "Either add an identity gate call or annotate with @McpPublicTool (ADR-029)."));
+                    }
+                }
+
+                private boolean isGateCall(JavaMethodCall call) {
+                    String owner = call.getTarget().getOwner().getName();
+                    if (GATE_OWNER_NAMES.contains(owner)) return true;
+                    return IDENTITY_CONTEXT_CLASS.equals(owner) && IS_MCP_REQUEST.equals(call.getName());
+                }
+
+                private boolean callsGate(JavaMethod method) {
+                    return method.getMethodCallsFromSelf().stream().anyMatch(this::isGateCall);
+                }
+
+                private boolean delegatesToHelperThatCallsGate(JavaMethod method) {
+                    // For controllers that extract the gate into a private helper method in the same
+                    // class (e.g. DocumentUploadMcpController.enforceCallerPhoneOrAudit), traverse
+                    // one level deeper: check whether the helper itself calls a gate method.
+                    JavaClass owner = method.getOwner();
+                    return method.getMethodCallsFromSelf().stream()
+                            .filter(call -> owner.getName().equals(call.getTarget().getOwner().getName()))
+                            .flatMap(call -> owner.getMethods().stream()
+                                    .filter(m -> m.getName().equals(call.getTarget().getName())
+                                             && m.getModifiers().contains(JavaModifier.PRIVATE)))
+                            .anyMatch(this::callsGate);
+                }
+            };
+
+    /**
+     * R7 (ADR-029): Every {@code @Tool} method on an {@code @McpToolController} class that does NOT
+     * carry {@code @McpPublicTool} must call at least one identity gate method (directly or via a
+     * private helper). Methods annotated with {@code @McpPublicTool} are intentionally public and
+     * are exempt from this requirement.
+     *
+     * <p>Non-vacuity is proven by {@link #nonVacuityGuard_r7_detectsToolMethodWithoutGateOrPublicAnnotation()}.</p>
+     */
+    @ArchTest
+    static final ArchRule R7_toolMethodsMustHaveIdentityGateOrBePublicTool =
+            methods()
+                    .that().areAnnotatedWith(Tool.class)
+                    .and().areDeclaredInClassesThat().areAnnotatedWith(McpToolController.class)
+                    .and().areNotAnnotatedWith(McpPublicTool.class)
+                    .should(CALL_AN_IDENTITY_GATE)
+                    .as("R7 (ADR-029): @Tool methods on @McpToolController that lack @McpPublicTool " +
+                        "must call an identity gate method (directly or via a private helper). " +
+                        "To make a tool public, annotate it with @McpPublicTool (security review required).");
+
     // ---- Non-vacuity guard (a): zero R1 violators — all @Tool classes are controllers ----
 
     /**
-     * Non-vacuity guard (a): ADR-026 Phase 6 lock-down — LEGACY_EXCLUSIONS removed.
+     * Non-vacuity guard (a): ADR-026 Phase 6 / ADR-029 lock-down — LEGACY_EXCLUSIONS removed.
      *
      * <p>Verifies that there are ZERO classes with {@code @Tool} methods that are NOT also
      * annotated {@code @McpToolController}. Any class failing this check has leaked a {@code @Tool}
      * method outside the controller layer and must be migrated.</p>
      *
-     * <p>Expected controllers (6): {@code OrderCreationMcpController}, {@code DocumentUploadMcpController},
+     * <p>Expected controllers (7): {@code OrderCreationMcpController}, {@code DocumentUploadMcpController},
      * {@code UserMcpController}, {@code OrderMcpController}, {@code StoreMcpController},
-     * {@code PayoutMcpController}.</p>
+     * {@code PayoutMcpController}, {@code NotificationMcpController}.</p>
      */
     @Test
     void nonVacuityGuard_a_zeroR1ViolatorsAllToolClassesAreControllers() {
@@ -296,25 +381,26 @@ class McpArchitectureTest {
                 .isEmpty();
     }
 
-    // ---- Non-vacuity guard (b): exactly 18 @Tool methods across 6 controller classes ----
+    // ---- Non-vacuity guard (b): exactly 19 @Tool methods across 7 controller classes ----
 
     /**
-     * Non-vacuity guard (b): ADR-026 Phase 6 lock-down.
+     * Non-vacuity guard (b): ADR-026 Phase 6 / ADR-029.
      *
-     * <p>Sanity assertion that the importer finds exactly 17 {@code @Tool} methods across exactly
-     * 6 {@code @McpToolController} classes (all in {@code ..ordermanagement.mcp..}). No legacy
+     * <p>Sanity assertion that the importer finds exactly 19 {@code @Tool} methods across exactly
+     * 7 {@code @McpToolController} classes (all in {@code ..ordermanagement.mcp..}). No legacy
      * service classes hold {@code @Tool} methods as of Phase 6.</p>
      *
      * <p>Expected controllers: {@code OrderCreationMcpController} (1), {@code DocumentUploadMcpController}
      * (4), {@code UserMcpController} (3), {@code OrderMcpController} (5), {@code StoreMcpController} (3),
-     * {@code PayoutMcpController} (1) = 17 tools, 6 classes
-     * (create_user removed from UserMcpController in Phase 2b, Lindani 2026-11-05).</p>
+     * {@code PayoutMcpController} (1), {@code NotificationMcpController} (2) = 19 tools, 7 classes
+     * (create_user removed from UserMcpController in Phase 2b, Lindani 2026-11-05;
+     * notification tools added in ADR-029).</p>
      *
      * <p>If a new tool is added, {@code McpToolContractSnapshotTest}'s golden file must be updated
      * and this count must be bumped.</p>
      */
     @Test
-    void nonVacuityGuard_b_exactly17ToolMethodsAcross6Classes() {
+    void nonVacuityGuard_b_exactly19ToolMethodsAcross7Classes() {
         JavaClasses allProductionClasses = new ClassFileImporter()
                 .withImportOption(new ImportOption.DoNotIncludeTests())
                 .importPackages(
@@ -342,17 +428,17 @@ class McpArchitectureTest {
                 .collect(Collectors.toSet());
 
         assertThat(distinctToolNames)
-                .as("Expected exactly 17 distinct @Tool names across all production classes " +
-                        "(create_user removed Phase 2b). " +
+                .as("Expected exactly 19 distinct @Tool names across all production classes " +
+                        "(create_user removed Phase 2b; notification tools added ADR-029). " +
                         "Update the golden snapshot and this count if the tool count changes.")
-                .hasSize(17);
+                .hasSize(19);
 
         assertThat(classesWithToolMethods)
-                .as("Expected exactly 6 @McpToolController classes to hold @Tool methods " +
-                        "(Phase 6: OrderCreationMcpController, DocumentUploadMcpController, UserMcpController, " +
-                        "OrderMcpController, StoreMcpController, PayoutMcpController). " +
+                .as("Expected exactly 7 @McpToolController classes to hold @Tool methods " +
+                        "(Phase 6/ADR-029: OrderCreationMcpController, DocumentUploadMcpController, UserMcpController, " +
+                        "OrderMcpController, StoreMcpController, PayoutMcpController, NotificationMcpController). " +
                         "Update this guard if a new controller is introduced.")
-                .hasSize(6);
+                .hasSize(7);
     }
 
     // ---- FIX-04: R2 non-vacuity proof — rejects empty @McpAudience -----------------------
@@ -386,15 +472,16 @@ class McpArchitectureTest {
                 .hasMessageContaining("empty value() array");
     }
 
-    // ---- Sanity: tool names are the expected 18 names -----------------------------------
+    // ---- Sanity: tool names are the expected 19 names -----------------------------------
 
     /**
-     * Verifies that the 17 {@code @Tool} method names exactly match the documented set.
+     * Verifies that the 19 {@code @Tool} method names exactly match the documented set.
      * Any rename breaks this test, which also breaks the contract snapshot.
      * create_user was removed from the MCP surface in ADR-026 Phase 2b (Lindani 2026-11-05).
+     * Two notification tools added in ADR-029.
      */
     @Test
-    void sanity_toolNamesAreTheExpected17() {
+    void sanity_toolNamesAreTheExpected19() {
         JavaClasses allProductionClasses = new ClassFileImporter()
                 .withImportOption(new ImportOption.DoNotIncludeTests())
                 .importPackages(
@@ -435,7 +522,10 @@ class McpArchitectureTest {
                 "attach_uploaded_document_to_user_tag",
                 "recheck_required_documents",
                 // PayoutMcpController (1) — migrated from ReconServiceImpl in Phase 5
-                "get_payouts_for_user"
+                "get_payouts_for_user",
+                // NotificationMcpController (2) — ADR-029 WhatsApp outbound notification tools
+                "send_landing_options_notification",
+                "send_shop_options_notification"
         );
     }
 
@@ -468,6 +558,37 @@ class McpArchitectureTest {
         assertThatThrownBy(() -> r4ForFixture.check(fixtureClasses))
                 .as("R4 must flag R4ViolatorFixture — it depends on StoreScopeContext from outside the allowed packages")
                 .isInstanceOf(AssertionError.class);
+    }
+
+    // ---- Non-vacuity guard (c): R7 gate is live — detects @Tool method without gate --------
+
+    /**
+     * ADR-029 non-vacuity proof (c): Verifies that R7 is live and not vacuous.
+     *
+     * <p>{@link R7ViolatorFixture} is a {@code @McpToolController} class whose {@code @Tool}
+     * method has a non-empty {@code @McpAudience} but calls NO identity gate method and lacks
+     * {@code @McpPublicTool}. R7 must flag it as a violation.</p>
+     *
+     * <p>Without this proof, R7 might appear vacuously passing if {@link #CALL_AN_IDENTITY_GATE}
+     * had a bug in its gate-detection logic or the two-level traversal silently over-matched.</p>
+     */
+    @Test
+    void nonVacuityGuard_r7_detectsToolMethodWithoutGateOrPublicAnnotation() {
+        JavaClasses fixtureClasses = new ClassFileImporter()
+                .importClasses(R7ViolatorFixture.class);
+
+        ArchRule r7ForFixture = methods()
+                .that().areAnnotatedWith(Tool.class)
+                .and().areDeclaredInClassesThat().areAnnotatedWith(McpToolController.class)
+                .and().areNotAnnotatedWith(McpPublicTool.class)
+                .should(CALL_AN_IDENTITY_GATE)
+                .as("R7 (ADR-029): @Tool methods on @McpToolController that lack @McpPublicTool " +
+                    "must call an identity gate method");
+
+        assertThatThrownBy(() -> r7ForFixture.check(fixtureClasses))
+                .as("R7 must flag R7ViolatorFixture — it has @Tool + @McpAudience but no gate and no @McpPublicTool")
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("R7 violation");
     }
 
     // ---- Non-vacuity guard (d): R6 gate is live — detects scope-setter call ----------------
