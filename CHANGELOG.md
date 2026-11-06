@@ -133,8 +133,18 @@
 - Feature Brief: MCP-SEC-03 "Approved for Implementation" (PR #158/#159) for ADR-026; ADR-024, ADR-027 AMD-01 and ADR-028 approved by Lindani Masinga.
 - QA Gate 1: per-feature PASS with live UAT verification for ADR-026 (17 tools, `create_user` absent, 2026-11-05) and ADR-028 (4 live scheduler runs, 2026-11-06).
 - Release Manager full unscoped regression on `develop` tip `22a90484`: `./mvnw -B clean test`, Corretto 17.0.15, **1,632 tests, 0 failures, 0 errors, 19 skipped, BUILD SUCCESS** (2026-11-06). GitHub Actions `Java CI with Maven` on the same SHA (run 42231404309): 1,632 / 0 / 0 / 19, success.
-- QA Gate 2 (full regression on `release/1.17.0` by iZinga QA & Test Automation): **pending**.
-- Product Owner sign-off: **pending**.
+- QA Gate 2 (full regression on `release/1.17.0` by iZinga QA & Test Automation, 2026-11-06): **PASS**.
+  - Ran `./mvnw -B clean package` on Corretto 17.0.15, then live-booted the built release jar on the `uat` profile against the real `izinga-uat` secret, with no local `STORE_SCOPE_JWT_SECRET`.
+  - All 10 regression checks passed: tokenless rejection; 17-tool surface with `create_user` absent; CUSTOMER own vs cross-account; STORE bank masking; 400 on an unroutable address; `start_order` consent and idempotency gates; PATCH partial-body preservation; payout scheduler Created/Deferred/NotApplicable with no NPE or duplicates; RFC 4180 CSV quoting.
+  - **Reactor-wide result: 1,632 tests, 0 failures, 0 errors, 19 skipped.** The Release Manager counted `<testcase>` elements across every module's surefire XML: commons 35, yoco-pay 3, recon 162, usermanagement 248, payfast 62, document-management 13 (1 skipped), messaging 221 (14 skipped), ordermanager 888 (4 skipped).
+  - QA's report of "888 tests" was the ordermanager module total, not the reactor total.
+  - Adding up the surefire XML *header* counts gives 1,626 instead. That is a reporting artefact, not a regression: `McpArchitectureTest` runs under two engines (6 `@ArchTest` rules on the ArchUnit engine, 6 `@Test` methods on Jupiter), both write the same report file, and the second header overwrites the first. The file still lists all 12 testcases.
+- Product Owner sign-off (2026-11-06): **CONDITIONAL.**
+  - (a) `create_user` removal: accepted outright.
+  - (b) PATCH flag OR-merge: accepted, with a mandatory P1 bugfix brief for an admin-only endpoint that can set the 5 flags back to `false`.
+  - (c) Payouts abandoned before 1.17.0: accepted, with a mandatory post-deploy data-reconciliation task. This is real money owed to drivers and stores. Owners: Financial Manager and Data Intelligence, once a reconciliation list exists.
+  - (e) PR #162 Gate 1 gap: accepted, on condition that a retrospective comment documenting the verification actually done is posted on PR #162 within 48 h.
+  - **(d) External MCP clients: OPEN BLOCKER.** The "iZinga Driver Customer Service" Claude agent has 13 MCP tools wired to the production backend through the Claude connector, and there is no scope-token minting path for it. After deploy, **every** one of its tools returns `IDENTITY_REFUSAL`. Lindani must confirm one of two outcomes. If the agent is dev/internal only, the release proceeds and token minting becomes a follow-up. If production or ops workflows rely on it, the release holds pending its own ADR.
 - MCP breaking change: approved by Lindani Masinga as part of 1.17.0 (no major bump), 2026-11-06. No Hloniphani notification required (Lindani's decision).
 - Deployment authorisation: **pending.** Requires Lindani Masinga's explicit, direct go-ahead before `git flow release finish`.
 
