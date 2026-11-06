@@ -15,6 +15,7 @@ import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingListService;
 import io.curiousoft.izinga.commons.order.MessengerOrderDto;
 import io.curiousoft.izinga.commons.security.CallerIdentityContext;
 import io.curiousoft.izinga.recon.ReconService;
+import io.curiousoft.izinga.recon.payout.PayoutGenerationOutcome;
 import org.assertj.core.util.Lists;
 import org.junit.After;
 import org.junit.Assert;
@@ -1598,6 +1599,9 @@ public class SchedulerServiceTest {
         when(repo.findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(
                 eq(false), eq(OrderStage.STAGE_7_ALL_PAID), eq(false), any(Date.class)))
                 .thenReturn(Collections.singletonList(order));
+        // ADR-028: stub shop outcome so execution reaches the messenger payout call
+        when(reconService.generatePayoutForShopAndOrder(order))
+                .thenReturn(new PayoutGenerationOutcome.NotApplicable("already-covered"));
 
         // No exception expected — internal methods do not check caller identity
         sut.updateMissingPayouts();
@@ -1646,6 +1650,9 @@ public class SchedulerServiceTest {
         when(repo.findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(
                 eq(false), eq(OrderStage.STAGE_7_ALL_PAID), eq(false), any(Date.class)))
                 .thenReturn(Collections.singletonList(order));
+        // ADR-028: return NotApplicable so payoutCreated=true is set (NotApplicable is not Deferred)
+        when(reconService.generatePayoutForShopAndOrder(order))
+                .thenReturn(new PayoutGenerationOutcome.NotApplicable("already-covered"));
 
         sut.updateMissingPayouts();
 
@@ -1691,6 +1698,9 @@ public class SchedulerServiceTest {
         when(repo.findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(
                 eq(false), eq(OrderStage.STAGE_7_ALL_PAID), eq(false), any(Date.class)))
                 .thenReturn(Collections.singletonList(order));
+        // ADR-028: return NotApplicable so payoutCreated=true is set (NotApplicable is not Deferred)
+        when(reconService.generatePayoutForShopAndOrder(order))
+                .thenReturn(new PayoutGenerationOutcome.NotApplicable("already-covered"));
 
         // When
         sut.updateMissingPayouts();
@@ -1723,5 +1733,134 @@ public class SchedulerServiceTest {
         // intentionally omitting sd.setMessengerId(...) — messengerId remains null
         o.setShippingData(sd);
         return o;
+    }
+
+    // ===== ADR-028: payoutCreated marking — Deferred logic =====
+
+    /**
+     * ADR-028-SCHED-01: shop Created + messenger Deferred.
+     * Order must NOT be marked payoutCreated=true; repo.save must NOT be called.
+     * The messenger side still needs bank details — scheduler must retry next run.
+     */
+    @Test
+    public void updateMissingPayouts_shopCreated_messengerDeferred_orderNotMarked() {
+        Order order = makePayoutOrder("adr028-s01", "shop-s01", "messenger-s01");
+        when(repo.findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(
+                eq(false), eq(OrderStage.STAGE_7_ALL_PAID), eq(false), any(Date.class)))
+                .thenReturn(Collections.singletonList(order));
+        when(reconService.generatePayoutForShopAndOrder(order))
+                .thenReturn(new PayoutGenerationOutcome.Created<>(mock(io.curiousoft.izinga.recon.payout.ShopPayout.class)));
+        when(reconService.generatePayoutForMessengerAndOrder(any(MessengerOrderDto.class)))
+                .thenReturn(new PayoutGenerationOutcome.Deferred("messenger missing bank"));
+
+        sut.updateMissingPayouts();
+
+        Assert.assertFalse("payoutCreated must stay false when messenger side is Deferred", order.getPayoutCreated());
+        verify(repo, never()).save(order);
+    }
+
+    /**
+     * ADR-028-SCHED-02: shop Deferred + messenger Created.
+     * Order must NOT be marked payoutCreated=true; repo.save must NOT be called.
+     * The shop side still needs bank details — scheduler must retry next run.
+     */
+    @Test
+    public void updateMissingPayouts_shopDeferred_messengerCreated_orderNotMarked() {
+        Order order = makePayoutOrder("adr028-s02", "shop-s02", "messenger-s02");
+        when(repo.findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(
+                eq(false), eq(OrderStage.STAGE_7_ALL_PAID), eq(false), any(Date.class)))
+                .thenReturn(Collections.singletonList(order));
+        when(reconService.generatePayoutForShopAndOrder(order))
+                .thenReturn(new PayoutGenerationOutcome.Deferred("shop missing bank"));
+        when(reconService.generatePayoutForMessengerAndOrder(any(MessengerOrderDto.class)))
+                .thenReturn(new PayoutGenerationOutcome.Created<>(mock(io.curiousoft.izinga.recon.payout.MessengerPayout.class)));
+
+        sut.updateMissingPayouts();
+
+        Assert.assertFalse("payoutCreated must stay false when shop side is Deferred", order.getPayoutCreated());
+        verify(repo, never()).save(order);
+    }
+
+    /**
+     * ADR-028-SCHED-03: shop Created + messenger Created.
+     * Order MUST be marked payoutCreated=true and saved — both sides resolved.
+     */
+    @Test
+    public void updateMissingPayouts_shopCreated_messengerCreated_orderMarked() {
+        Order order = makePayoutOrder("adr028-s03", "shop-s03", "messenger-s03");
+        when(repo.findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(
+                eq(false), eq(OrderStage.STAGE_7_ALL_PAID), eq(false), any(Date.class)))
+                .thenReturn(Collections.singletonList(order));
+        when(reconService.generatePayoutForShopAndOrder(order))
+                .thenReturn(new PayoutGenerationOutcome.Created<>(mock(io.curiousoft.izinga.recon.payout.ShopPayout.class)));
+        when(reconService.generatePayoutForMessengerAndOrder(any(MessengerOrderDto.class)))
+                .thenReturn(new PayoutGenerationOutcome.Created<>(mock(io.curiousoft.izinga.recon.payout.MessengerPayout.class)));
+
+        sut.updateMissingPayouts();
+
+        Assert.assertTrue("payoutCreated must be true when both sides Created", order.getPayoutCreated());
+        verify(repo).save(order);
+    }
+
+    /**
+     * ADR-028-SCHED-04: shop NotApplicable + messenger Created.
+     * Order MUST be marked payoutCreated=true — NotApplicable is not Deferred.
+     */
+    @Test
+    public void updateMissingPayouts_shopNotApplicable_messengerCreated_orderMarked() {
+        Order order = makePayoutOrder("adr028-s04", "shop-s04", "messenger-s04");
+        when(repo.findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(
+                eq(false), eq(OrderStage.STAGE_7_ALL_PAID), eq(false), any(Date.class)))
+                .thenReturn(Collections.singletonList(order));
+        when(reconService.generatePayoutForShopAndOrder(order))
+                .thenReturn(new PayoutGenerationOutcome.NotApplicable("already processed"));
+        when(reconService.generatePayoutForMessengerAndOrder(any(MessengerOrderDto.class)))
+                .thenReturn(new PayoutGenerationOutcome.Created<>(mock(io.curiousoft.izinga.recon.payout.MessengerPayout.class)));
+
+        sut.updateMissingPayouts();
+
+        Assert.assertTrue("payoutCreated must be true when shop NotApplicable + messenger Created", order.getPayoutCreated());
+        verify(repo).save(order);
+    }
+
+    /**
+     * ADR-028-SCHED-05: shop Created + no messenger assigned.
+     * messengerOutcome is synthesised as NotApplicable("no messenger assigned") internally.
+     * Order MUST be marked payoutCreated=true — no-messenger is not a Deferred condition.
+     */
+    @Test
+    public void updateMissingPayouts_shopCreated_noMessenger_orderMarked() {
+        Order order = makePayoutOrder("adr028-s05", "shop-s05", null); // null = no messenger
+        when(repo.findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(
+                eq(false), eq(OrderStage.STAGE_7_ALL_PAID), eq(false), any(Date.class)))
+                .thenReturn(Collections.singletonList(order));
+        when(reconService.generatePayoutForShopAndOrder(order))
+                .thenReturn(new PayoutGenerationOutcome.Created<>(mock(io.curiousoft.izinga.recon.payout.ShopPayout.class)));
+
+        sut.updateMissingPayouts();
+
+        Assert.assertTrue("payoutCreated must be true when shop Created and no messenger assigned", order.getPayoutCreated());
+        verify(repo).save(order);
+        verify(reconService, never()).generatePayoutForMessengerAndOrder(any());
+    }
+
+    /**
+     * ADR-028-SCHED-06: shop Deferred + no messenger assigned.
+     * Order must NOT be marked payoutCreated=true — shop is deferred so retry is required.
+     */
+    @Test
+    public void updateMissingPayouts_shopDeferred_noMessenger_orderNotMarked() {
+        Order order = makePayoutOrder("adr028-s06", "shop-s06", null); // null = no messenger
+        when(repo.findByShopPaidAndStageAndPayoutCreatedAndCreatedDateAfter(
+                eq(false), eq(OrderStage.STAGE_7_ALL_PAID), eq(false), any(Date.class)))
+                .thenReturn(Collections.singletonList(order));
+        when(reconService.generatePayoutForShopAndOrder(order))
+                .thenReturn(new PayoutGenerationOutcome.Deferred("shop missing bank details"));
+
+        sut.updateMissingPayouts();
+
+        Assert.assertFalse("payoutCreated must stay false when shop is Deferred even with no messenger", order.getPayoutCreated());
+        verify(repo, never()).save(order);
+        verify(reconService, never()).generatePayoutForMessengerAndOrder(any());
     }
 }

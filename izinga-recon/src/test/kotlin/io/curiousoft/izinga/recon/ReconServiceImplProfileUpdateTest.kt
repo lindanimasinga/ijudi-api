@@ -14,6 +14,7 @@ import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent
 import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.payout.MessengerPayout
+import io.curiousoft.izinga.recon.payout.PayoutGenerationOutcome
 import io.curiousoft.izinga.recon.payout.PayoutStage
 import io.curiousoft.izinga.recon.payout.ShopPayout
 import io.curiousoft.izinga.recon.ambassador.AmbassadorProperties
@@ -243,13 +244,16 @@ class ReconServiceImplProfileUpdateTest {
         }
 
         every { storeRepo.findById("shop-1") } returns java.util.Optional.of(store)
+        // ADR-028: cross-stage guard must return false so the success path is reached
+        every { shopPayoutRepository.existsByToIdAndOrderId("shop-1", "order-1") } returns false
         every { shopPayoutRepository.findByToIdAndPayoutStage("shop-1", PayoutStage.PENDING) } returns null
         every { shopPayoutRepository.save(any()) } answers { firstArg() }
 
-        val payout = sut.generatePayoutForShopAndOrder(order)
+        val outcome = sut.generatePayoutForShopAndOrder(order)
+        val payout = (outcome as PayoutGenerationOutcome.Created).payout
 
-        assertEquals("+2782333444", payout?.toAccountNumber)
-        assertEquals(BankAccType.CHEQUE, payout?.toType)
+        assertEquals("+2782333444", payout.toAccountNumber)
+        assertEquals(BankAccType.CHEQUE, payout.toType)
     }
 
     @Test
@@ -279,12 +283,15 @@ class ReconServiceImplProfileUpdateTest {
         }
 
         every { userProfileRepo.findById("messenger-1") } returns java.util.Optional.of(messenger)
+        // ADR-028: cross-stage guard must return false so the success path is reached
+        every { messengerPayoutRepository.existsByToIdAndOrderId("messenger-1", "order-2") } returns false
         every { messengerPayoutRepository.findByToIdAndPayoutStage("messenger-1", PayoutStage.PENDING) } returns null
         every { messengerPayoutRepository.save(any()) } answers { firstArg() }
 
-        val payout = sut.generatePayoutForMessengerAndOrder(order)
+        val outcome = sut.generatePayoutForMessengerAndOrder(order)
+        val payout = (outcome as PayoutGenerationOutcome.Created).payout
 
-        assertEquals("+2782000111", payout?.toAccountNumber)
-        assertEquals(BankAccType.SAVINGS, payout?.toType)
+        assertEquals("+2782000111", payout.toAccountNumber)
+        assertEquals(BankAccType.SAVINGS, payout.toType)
     }
 }

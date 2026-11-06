@@ -266,55 +266,55 @@ public class OrderServiceTest {
     @Test
     public void startOrderShop_offline() throws Exception {
         //given
-        LocalDateTime open = LocalDateTime.now().minusHours(3);
-        LocalDateTime close = LocalDateTime.now().minusHours(1);
-        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD, open.getHour(), close.getHour());
-        storeProfile.setAvailability(StoreProfile.AVAILABILITY.SPECIFIC_HOURS);
+        // Use OFFLINE availability: StoreProfile.isStoreOffline() returns true immediately
+        // without calling LocalDateTime.now(). This eliminates the time-of-day flakiness
+        // (task_723cde3e) caused by @SpringBootTest ByteBuddy instrumentation corrupting
+        // Mockito's mockStatic(LocalDateTime.class) in the full test suite.
+        // Root cause: OrderControllerTest (@SpringBootTest) runs before this class in the full
+        // reactor, corrupting ByteBuddy's instrumentation registry so the static stub silently
+        // fails to intercept Kotlin-compiled invokestatic LocalDateTime.now() calls.
+        // The SPECIFIC_HOURS + outside-window path is covered by startOrderShop_scheduling_not_allowed_this_time.
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+        storeProfile.setAvailability(StoreProfile.AVAILABILITY.OFFLINE);
 
-        LocalDateTime dateNow = LocalDateTime.now();
-        // Use try-with-resources to ensure the static mock is always closed (prevents leak to next test)
-        try (MockedStatic<LocalDateTime> mocked = mockStatic(LocalDateTime.class)) {
-            mocked.when(LocalDateTime::now).thenReturn(dateNow.withHour(4).withMinute(59));
+        HashSet<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
+        stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+        ShippingData shipping = new ShippingData("shopAddress",
+                "46 Ududu Rd, Emlandweni, KwaMashu, 4051",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messagerID");
+        shipping.setBuildingType(BuildingType.HOUSE);
+        order.setShippingData(shipping);
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
 
-            HashSet<Stock> stockItems = new HashSet<>();
-            stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
-            stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
-            storeProfile.setStockList(stockItems);
-            Order order = new Order();
-            Basket basket = new Basket();
-            List<BasketItem> items = new ArrayList<>();
-            items.add(new BasketItem("chips", 2, 10, 0));
-            items.add(new BasketItem("hotdog", 1, 20, 0));
-            basket.setItems(items);
-            order.setBasket(basket);
-            ShippingData shipping = new ShippingData("shopAddress",
-                    "46 Ududu Rd, Emlandweni, KwaMashu, 4051",
-                    ShippingData.ShippingType.DELIVERY);
-            shipping.setMessengerId("messagerID");
-            shipping.setBuildingType(BuildingType.HOUSE);
-            order.setShippingData(shipping);
-            order.setCustomerId("customerId");
-            order.setShopId("shopid");
-            order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
-            order.setOrderType(OrderType.ONLINE);
-            order.setDescription("description");
+        //when
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
 
-            //when
-            when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
-            when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
-
-            try {
-                Order newOrder = sut.startOrder(order);
-                fail();
-            }catch (Exception e) {
-                Assert.assertEquals("Shop not available name", e.getMessage());
-            }
-
-            //verify
-            verify(repo, times(0)).save(order);
-            verify(customerRepo).existsById(order.getCustomerId());
-            verify(storeRepo).findById(order.getShopId());
+        try {
+            Order newOrder = sut.startOrder(order);
+            fail();
+        }catch (Exception e) {
+            Assert.assertEquals("Shop not available name", e.getMessage());
         }
+
+        //verify
+        verify(repo, times(0)).save(order);
+        verify(customerRepo).existsById(order.getCustomerId());
+        verify(storeRepo).findById(order.getShopId());
     }
 
     @Test

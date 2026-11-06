@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.recon
 
+import io.curiousoft.izinga.commons.model.Bank
 import io.curiousoft.izinga.commons.model.BankAccType
 import io.curiousoft.izinga.commons.model.Order
 import io.curiousoft.izinga.commons.model.OrderStage
@@ -130,18 +131,45 @@ class ReconServiceImplIdempotencyTest {
         )
 
     // findByIdOrNull is a Kotlin extension fn; mock via the underlying findById (CrudRepository).
-    private fun stubStore(shopId: String) {
+    private fun stubStore(shopId: String, vararg knownOrderIds: String) {
+        val bank = Bank().apply {
+            name = "FNB"; type = BankAccType.CHEQUE; accountId = "1234567890"; branchCode = "250655"
+        }
         val store = mockk<StoreProfile>()
         every { store.id } returns shopId
         every { store.hasPaymentAgreement } returns true
+        // GAP-7: bank must be non-null so the null-bank guard passes without notifying
+        every { store.bank } returns bank
+        every { store.name } returns "Test Shop"
+        every { store.mobileNumber } returns "0811234567"
+        every { store.emailAddress } returns "shop@test.com"
         every { storeRepo.findById(shopId) } returns Optional.of(store)
+        // ADR-028 cross-stage guard: return false for all known order ids so within-bundle guard is tested
+        knownOrderIds.forEach { orderId ->
+            every { shopPayoutRepo.existsByToIdAndOrderId(shopId, orderId) } returns false
+        }
+        // default: any unknown order id also returns false
+        every { shopPayoutRepo.existsByToIdAndOrderId(shopId, any()) } returns false
     }
 
-    private fun stubMessenger(messengerId: String) {
+    private fun stubMessenger(messengerId: String, vararg knownOrderIds: String) {
+        val bank = Bank().apply {
+            name = "FNB"; type = BankAccType.CHEQUE; accountId = "9876543210"; branchCode = "250655"
+        }
         val messenger = mockk<UserProfile>()
         every { messenger.id } returns messengerId
         every { messenger.isPermanentEmployed } returns false
+        // BUG-3: bank must be non-null so the null-bank guard passes without notifying
+        every { messenger.bank } returns bank
+        every { messenger.name } returns "Test Messenger"
+        every { messenger.mobileNumber } returns "0831111111"
+        every { messenger.emailAddress } returns "messenger@test.com"
         every { userProfileRepo.findById(messengerId) } returns Optional.of(messenger)
+        // ADR-028 cross-stage guard: return false for all known order ids
+        knownOrderIds.forEach { orderId ->
+            every { messengerPayoutRepository.existsByToIdAndOrderId(messengerId, orderId) } returns false
+        }
+        every { messengerPayoutRepository.existsByToIdAndOrderId(messengerId, any()) } returns false
     }
 
     // ── shop idempotency tests ────────────────────────────────────────────────────────────────────

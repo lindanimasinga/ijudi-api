@@ -10,6 +10,7 @@ import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
 import io.curiousoft.izinga.ordermanagement.service.DeviceService;
 import io.curiousoft.izinga.recon.ReconService;
 import io.curiousoft.izinga.recon.payout.MessengerPayout;
+import io.curiousoft.izinga.recon.payout.PayoutGenerationOutcome;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -100,7 +101,7 @@ class MessengerOrderEventHandlerTest {
 
         OrderUpdatedEvent event = new OrderUpdatedEvent(this, order, driverId, store);
         when(userProfileService.find(driverId)).thenReturn(driver);
-        when(reconService.generatePayoutForMessengerAndOrder(any())).thenReturn(messengerPayout);
+        when(reconService.generatePayoutForMessengerAndOrder(any())).thenReturn(new PayoutGenerationOutcome.Created<>(messengerPayout));
 
         handler.handleOrderUpdatedEvent(event);
 
@@ -120,7 +121,7 @@ class MessengerOrderEventHandlerTest {
 
         OrderUpdatedEvent event = new OrderUpdatedEvent(this, order, driverId, store);
         when(userProfileService.find(driverId)).thenReturn(driver);
-        when(reconService.generatePayoutForMessengerAndOrder(any())).thenReturn(messengerPayout);
+        when(reconService.generatePayoutForMessengerAndOrder(any())).thenReturn(new PayoutGenerationOutcome.Created<>(messengerPayout));
 
         handler.handleOrderUpdatedEvent(event);
 
@@ -128,7 +129,7 @@ class MessengerOrderEventHandlerTest {
     }
 
     @Test
-    void handleOrderUpdatedEvent_stage7_nullPayout_skipsDriverNotification() throws IOException {
+    void handleOrderUpdatedEvent_stage7_deferredPayout_skipsDriverNotification() throws IOException {
         String driverId = "driver-003";
         Order order = makeOrder("order-003", driverId);
         UserProfile driver = makeDriver(driverId);
@@ -136,7 +137,7 @@ class MessengerOrderEventHandlerTest {
 
         OrderUpdatedEvent event = new OrderUpdatedEvent(this, order, driverId, store);
         when(userProfileService.find(driverId)).thenReturn(driver);
-        when(reconService.generatePayoutForMessengerAndOrder(any())).thenReturn(null);
+        when(reconService.generatePayoutForMessengerAndOrder(any())).thenReturn(new PayoutGenerationOutcome.Deferred("missing bank"));
 
         handler.handleOrderUpdatedEvent(event);
 
@@ -153,7 +154,7 @@ class MessengerOrderEventHandlerTest {
 
         OrderUpdatedEvent event = new OrderUpdatedEvent(this, order, unknownDriverId, store);
         when(userProfileService.find(unknownDriverId)).thenReturn(null);
-        when(reconService.generatePayoutForMessengerAndOrder(any())).thenReturn(null);
+        when(reconService.generatePayoutForMessengerAndOrder(any())).thenReturn(new PayoutGenerationOutcome.NotApplicable("not applicable"));
 
         handler.handleOrderUpdatedEvent(event);
 
@@ -177,10 +178,93 @@ class MessengerOrderEventHandlerTest {
 
         OrderUpdatedEvent event = new OrderUpdatedEvent(this, order, driverId, store);
         when(userProfileService.find(driverId)).thenReturn(driver);
-        when(reconService.generatePayoutForMessengerAndOrder(any())).thenReturn(messengerPayout);
+        when(reconService.generatePayoutForMessengerAndOrder(any())).thenReturn(new PayoutGenerationOutcome.Created<>(messengerPayout));
 
         handler.handleOrderUpdatedEvent(event);
 
         verify(reconService, never()).generatePayoutForAmbassadorAndApproval(any(), any());
+    }
+
+    // ===== ADR-028: TIPS path — NotApplicable and Deferred outcomes =====
+
+    /**
+     * ADR-028-TIPS-01: TIPS path — when generatePayoutForMessengerAndOrder returns NotApplicable,
+     * no tip notification or payout balance event is published.
+     */
+    @Test
+    void handleNewOrderEventToWhatsapp_tipsStore_notApplicableOutcome_skipsNotification() throws Exception {
+        String driverId = "driver-tips-01";
+        Order order = makeOrder("order-tips-01", driverId);
+        order.setStage(OrderStage.STAGE_7_ALL_PAID);
+        order.setTip(10.0);
+        StoreProfile store = mock(StoreProfile.class);
+        when(store.getStoreType()).thenReturn(StoreType.TIPS);
+
+        io.curiousoft.izinga.commons.order.events.NewOrderEvent event =
+                new io.curiousoft.izinga.commons.order.events.NewOrderEvent(this, order, driverId, store);
+
+        when(userProfileService.find(driverId)).thenReturn(makeDriver(driverId));
+        when(promoCodeClient.getPromoCodes(any())).thenReturn(java.util.List.of());
+        when(reconService.generatePayoutForMessengerAndOrder(any()))
+                .thenReturn(new PayoutGenerationOutcome.NotApplicable("already processed"));
+
+        handler.handleNewOrderEventToWhatsapp(event);
+
+        verify(reconService).generatePayoutForMessengerAndOrder(any());
+        verify(smsNotificationService, never()).sendTipReceivedMessage(any(), any(), any());
+        verify(smsNotificationService, never()).sendTipReceivedMessageWithReward(any(), any(), any(), any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    /**
+     * ADR-028-TIPS-02: TIPS path — when generatePayoutForMessengerAndOrder returns Deferred,
+     * no tip notification or payout balance event is published.
+     */
+    @Test
+    void handleNewOrderEventToWhatsapp_tipsStore_deferredOutcome_skipsNotification() throws Exception {
+        String driverId = "driver-tips-02";
+        Order order = makeOrder("order-tips-02", driverId);
+        order.setStage(OrderStage.STAGE_7_ALL_PAID);
+        order.setTip(10.0);
+        StoreProfile store = mock(StoreProfile.class);
+        when(store.getStoreType()).thenReturn(StoreType.TIPS);
+
+        io.curiousoft.izinga.commons.order.events.NewOrderEvent event =
+                new io.curiousoft.izinga.commons.order.events.NewOrderEvent(this, order, driverId, store);
+
+        when(userProfileService.find(driverId)).thenReturn(makeDriver(driverId));
+        when(promoCodeClient.getPromoCodes(any())).thenReturn(java.util.List.of());
+        when(reconService.generatePayoutForMessengerAndOrder(any()))
+                .thenReturn(new PayoutGenerationOutcome.Deferred("missing bank details"));
+
+        handler.handleNewOrderEventToWhatsapp(event);
+
+        verify(reconService).generatePayoutForMessengerAndOrder(any());
+        verify(smsNotificationService, never()).sendTipReceivedMessage(any(), any(), any());
+        verify(smsNotificationService, never()).sendTipReceivedMessageWithReward(any(), any(), any(), any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    /**
+     * ADR-028-DELIVERY-01: delivery path (handleOrderUpdatedEvent) —
+     * NotApplicable outcome skips driver notification.
+     * This covers the guard-fired-first path: order already in payout → NotApplicable.
+     */
+    @Test
+    void handleOrderUpdatedEvent_stage7_notApplicableOutcome_skipsDriverNotification() throws IOException {
+        String driverId = "driver-delivery-na";
+        Order order = makeOrder("order-delivery-na", driverId);
+        UserProfile driver = makeDriver(driverId);
+        StoreProfile store = mock(StoreProfile.class);
+
+        OrderUpdatedEvent event = new OrderUpdatedEvent(this, order, driverId, store);
+        when(userProfileService.find(driverId)).thenReturn(driver);
+        when(reconService.generatePayoutForMessengerAndOrder(any()))
+                .thenReturn(new PayoutGenerationOutcome.NotApplicable("already processed"));
+
+        handler.handleOrderUpdatedEvent(event);
+
+        verify(reconService).generatePayoutForMessengerAndOrder(any());
+        verify(smsNotificationService, never()).sendDriverOrderCompletedMessage(any(), any(), any(), any());
     }
 }

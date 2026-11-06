@@ -274,13 +274,14 @@ class McpAccessMatrixTest {
                 firebaseAuth);
 
         // ADR-026 Phase 5: agentIdentityAuditService removed from ReconServiceImpl constructor
+        // payout-disbursement-fixes: payoutNotificationPort added as last param (nullable, pass null in tests)
         reconService = new ReconServiceImpl(
                 storeRepository, userProfileRepo, shopPayoutRepo,
                 messengerPayoutRepository, ambassadorPayoutRepository,
                 referralPartnerPayoutRepository, payoutBundleRepository,
                 foodCustomerCommissionRepo, furnitureCustomerCommissionRepo,
                 storeStage1CommissionRepo, storeStage2CommissionRepo,
-                eventPublisher, new AmbassadorProperties());
+                eventPublisher, new AmbassadorProperties(), null);
 
         // Build Phase 1–5 controller instances backed by the real (non-mocked) services
         McpCaller mcpCaller = new McpCaller(userProfileRepo);

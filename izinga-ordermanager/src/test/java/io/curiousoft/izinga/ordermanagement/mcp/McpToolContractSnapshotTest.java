@@ -210,13 +210,14 @@ class McpToolContractSnapshotTest {
                 firebaseAuth);
 
         // ADR-026 Phase 5: agentIdentityAuditService removed from ReconServiceImpl constructor
+        // payout-disbursement-fixes: payoutNotificationPort added as last param (nullable, pass null in tests)
         ReconServiceImpl reconService = new ReconServiceImpl(
                 storeRepository, userProfileRepo, shopPayoutRepo,
                 messengerPayoutRepository, ambassadorPayoutRepository,
                 referralPartnerPayoutRepository, payoutBundleRepository,
                 foodCustomerCommissionRepo, furnitureCustomerCommissionRepo,
                 storeStage1CommissionRepo, storeStage2CommissionRepo,
-                eventPublisher, new AmbassadorProperties());
+                eventPublisher, new AmbassadorProperties(), null);
 
         // ADR-026 Phase 1-5: wire all real controllers so all 17 tool definitions appear in the snapshot (create_user removed Phase 2b).
         McpCaller mcpCaller = new McpCaller(userProfileRepo);

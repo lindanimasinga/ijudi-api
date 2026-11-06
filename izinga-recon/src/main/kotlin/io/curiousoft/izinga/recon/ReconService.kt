@@ -5,6 +5,7 @@ import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent
 import io.curiousoft.izinga.commons.referral.ReferralCommissionType
 import io.curiousoft.izinga.recon.payout.*
+import io.curiousoft.izinga.recon.payout.PayoutGenerationOutcome
 import java.math.BigDecimal
 import java.util.*
 
@@ -14,15 +15,31 @@ interface ReconService {
      * INTERNAL — batch and event use only. MUST NEVER be annotated @Tool or registered
      * in McpConfig / reachable from caller-facing MCP/HTTP paths.
      * Caller-facing payout lookups must use the caller-identity-gated getAllPayouts().
+     *
+     * Returns one of three sealed outcomes (ADR-028):
+     * - [PayoutGenerationOutcome.Created]      — payout saved; order qualifies.
+     * - [PayoutGenerationOutcome.NotApplicable] — order does not qualify (wrong stage, no
+     *                                            payment agreement, already included).
+     * - [PayoutGenerationOutcome.Deferred]     — missing bank details; will retry next run.
+     *
+     * MUST NEVER be annotated @Tool — see [PayoutGenerationOutcome] KDoc.
      */
-    fun generatePayoutForShopAndOrder(order: Order): ShopPayout?
+    fun generatePayoutForShopAndOrder(order: Order): PayoutGenerationOutcome<ShopPayout>
 
     /**
      * INTERNAL — batch and event use only. MUST NEVER be annotated @Tool or registered
      * in McpConfig / reachable from caller-facing MCP/HTTP paths.
      * Caller-facing payout lookups must use the caller-identity-gated getAllPayouts().
+     *
+     * Returns one of three sealed outcomes (ADR-028):
+     * - [PayoutGenerationOutcome.Created]      — payout saved; order qualifies.
+     * - [PayoutGenerationOutcome.NotApplicable] — order does not qualify (perm-employed zero-tip,
+     *                                            messenger not found, already included).
+     * - [PayoutGenerationOutcome.Deferred]     — missing bank details; will retry next run.
+     *
+     * MUST NEVER be annotated @Tool — see [PayoutGenerationOutcome] KDoc.
      */
-    fun generatePayoutForMessengerAndOrder(order: Order): MessengerPayout?
+    fun generatePayoutForMessengerAndOrder(order: Order): PayoutGenerationOutcome<MessengerPayout>
 
     fun generatePayoutForAmbassadorAndApproval(driver: UserProfile, ambassador: UserProfile): AmbassadorPayout?
 
