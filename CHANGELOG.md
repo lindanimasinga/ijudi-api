@@ -1,5 +1,155 @@
 # Changelog
 
+## [1.17.0] — 2026-11-06
+
+**Status:** Release branch `release/1.17.0` cut from `develop` @ `22a90484` on 2026-11-06. NOT yet merged to `master`. Finish is waiting on the open gate items listed under "Gate citations".
+
+**Release type:** Feature + Security (P1/P2). Contains **breaking changes to the MCP tool surface only**. Lindani Masinga approved shipping them as 1.17.0, with no major-version bump, on 2026-11-06. The REST API contract is unchanged (see "Breaking changes").
+
+**Summary:** Hardens the AI-agent MCP surface end to end. Every MCP tool is now scoped to the WhatsApp caller's identity (ADR-024). Tokenless MCP calls are rejected (SEC-MCP-01/02, ADR-027). All 17 tools sit behind a dedicated controller layer, and `create_user` is removed from MCP (ADR-026). The store-scope JWT now signs with the real Secrets Manager secret instead of a public fallback (SEC-WA02-01-B, PR #162). About 300 JUnit 4 tests that had been silently skipped are running again (868 → 1,167 at PR #155 merge), and the real production bugs they exposed are fixed. Payout disbursement is fixed: no more duplicate messenger payouts, no more silently abandoned payouts, one notification per 24 h at most, and payouts no longer fail when a driver has no email address (ADR-028).
+
+### Changes
+
+**AI-agent identity scoping and MCP authentication**
+
+- [NEW] `feat(ADR-024)`: Caller-identity scoping on all MCP tools. The scope JWT now carries a `callerPhone` claim. `CallerIdentityValidator` (izinga-commons) makes CUSTOMER and DRIVER callers reach only their own profile, orders, payouts and documents, or orders assigned to them as a driver. Any attempt to reach a third party throws `IDENTITY_REFUSAL:` with product-reviewed wording. Each violation writes an async record to the new `agent_identity_audit_log` collection. (PR #151, commits `0263571d`, `de49462e`)
+- [FIX] `fix(security)` SEC-MCP-01 (#153): Closes the tokenless MCP auth bypass. Before this fix, a `/mcp` request with no scope token, or with an invalid or expired one, skipped every identity check. `StoreScopeValidationFilter` now flags every `/mcp/**` request as an MCP request before parsing the token, and all 17 tools hard-reject a null audience. (PR #156, `ddbc9f71`)
+- [FIX] `fix(security)` SEC-MCP-02 (#154): Adds per-tool audience gates to the four tools that had none: `find_orders_by_messenger_id`, `find_stores_by_owner`, `find_users`, `start_order`. (PR #156, `ddbc9f71`)
+- [NEW] SEC-MCP-07: Bank `accountId` is masked in every store payload returned to an MCP caller (`find_store_or_shops_by_id`, `find_stores_by_owner`, `find_stores`). The masked value is never written to MongoDB. (PR #156)
+- [NEW] `feat(security)` ADR-027 AMD-01: New `ADMIN` MCP audience (`Audience.ADMIN`). It is minted at runtime only when the WhatsApp caller resolves to a `ProfileRoles.ADMIN` profile **and** webhook HMAC signature verification is active (`whatsapp.cloud.appSecret` configured). It fails closed: while `appSecret` is unset, as it is in production today, ADMIN is never minted and no extra DB read happens. ADMIN can never come from `AiAgentConfig`; a config with audience ADMIN is demoted to CUSTOMER with a WARN. Gate changes: `find_users` → ADMIN only; `find_orders_by_messenger_id` → DRIVER (own) + ADMIN; `find_stores_by_owner` → STORE (owner match) + ADMIN; `start_order` → CUSTOMER, STORE, ADMIN. (PR #156, `9a5f1eb4`)
+- [IMPROVED] `refactor` ADR-026 / MCP-SEC-03: All MCP `@Tool` methods moved out of domain services into dedicated `@McpToolController` beans: `OrderCreationMcpController`, `DocumentUploadMcpController`, `UserMcpController`, `OrderMcpController`, `StoreMcpController`, `PayoutMcpController`. Domain services no longer read caller-identity ThreadLocals. `GuardedToolCallback` fails closed if a tool is ever invoked outside the MCP request path. Each tool declares its allowed audiences with `@McpAudience`. ArchUnit rules R1–R6, a tool-contract golden-file snapshot and an access-matrix test now break the build on any regression. `@RequiresAudience` is retired. (PRs #157, #158, #159, #160; `c71d0290` … `ff1d9fe9`)
+- [REMOVED] **BREAKING (MCP surface):** `create_user` removed from the MCP tool surface (ADR-026 Phase 2b / OQ-7, Lindani's decision 2026-11-05). MCP now exposes 17 tools instead of 18. User creation stays on REST (`UserController`) and internal callers. AI agents can no longer register users over WhatsApp; drivers and stores register through driver.izinga.co.za, shop.izinga.co.za or izinga-onboarding. (PR #160, `4e388c0f`)
+
+**Secrets / startup**
+
+- [FIX] `fix(security)` SEC-WA02-01-B: Removed the silent `:change-this-secret-to-minimum-32-chars!` fallback for the store-scope JWT secret. The fallback is publicly visible in git, and production has been signing and verifying scope JWTs with it, so anyone with repo access could forge a scope token. A missing secret now fails startup loudly. (PR #152, `9777c3c2`)
+- [FIX] `fix` (release-blocking): The store-scope JWT placeholder is now `${store.scope.jwt.secret}`, matching the key name actually stored in AWS Secrets Manager (`izinga-uat` and `izinga-prod`). Without this fix, PR #152 would have crashed `izinga-ordermanager` on startup in UAT and production (`Could not resolve placeholder 'STORE_SCOPE_JWT_SECRET'`). Live boot against the real `izinga-uat` secret was verified before and after the fix. The key's presence in `izinga-prod` (64 chars) was confirmed by the Release Manager on 2026-11-06. The local-dev env var `STORE_SCOPE_JWT_SECRET` still works through relaxed binding. (PR #162, `b612cf6a`)
+
+**Test engine and the production bugs it exposed (PR #155, `d4a43158`)**
+
+- [FIX] `test`: Added `junit-vintage-engine`. Since the Spring Boot 3.3.6 / Surefire 3.2.5 upgrade, every JUnit 4 test class had been silently reporting 0 tests. The full reactor now runs **1,632 tests** (0 failures, 0 errors, 19 skipped).
+- [FIX] Payout scheduler duplicate messenger payouts: `updateMissingPayouts` compared messenger payouts against `order.getShopId()`, so the "payout already exists" check never matched and a second messenger payout was generated. The same path also called a `@Tool` method from the scheduler thread, which crashed under caller-identity enforcement. It now calls the internal generate methods.
+- [FIX] Google Maps outage / unroutable address: `IjudiUtils.calculateDrivingDirectionKM` no longer crashes on an empty geocode response and no longer prices a no-route trip as 0 km. Delivery-distance logic is extracted into `DeliveryCalculationService`. `POST /order` and the delivery-price estimate now return **503** (`DeliveryDistanceUnavailableException`) or **400** with `{"error": "..."}`, and no order is persisted, instead of a 500.
+- [FIX] Service fee: no longer NPEs on INSTORE orders without `shippingData`. The delivery-fee part of the service fee is 0 when the order has free delivery or no shipping data.
+- [FIX] `PATCH /store/{id}` data loss: a partial payload no longer wipes `name`, `address`, `latitude`/`longitude` or `categories`. The admin-set flags `profileApproved`, `hasPaymentAgreement`, `deliversFromMultipleAddresses`, `generateMissingImages` and `quoteRequired` are OR-merged and are no longer reset to `false` by an omitted field. **Side effect:** these five flags can no longer be switched from `true` to `false` through this endpoint. See "Known behaviour changes".
+- [FIX] `OrderServiceImpl`: null `orderType` guard; terminal-stage progress guard (400 instead of an index error); vehicle-type normalisation for delivery fee lookup.
+- [FIX] `Device.token` `@NotBlank` now actually validates (`@field:` target). A blank device token is rejected with 400 at the model.
+- [FIX] FCM: `FCMMessage`/`FCMNotification` equality; WebPush block sent only when a link is present.
+- [FIX] `GooglePassGenerator`: credentials refresh lazily instead of at construction.
+
+**Payout disbursement (PR #161, `2bca9bb4`, `375f8929`, ADR-028)**
+
+- [NEW] ADR-028: Payout generation returns a sealed `PayoutGenerationOutcome`: `Created`, `NotApplicable` or `Deferred`. When a store or messenger with a payment agreement has no bank details, the outcome is `Deferred`. The order keeps `payoutCreated=false` and is retried on the next hourly scheduler run. Before this change the payout was silently dropped and the order marked done.
+- [NEW] ADR-028: A cross-stage double-pay guard checks `existsByToIdAndOrderId` (on `orders._id`) before generating any payout, covering PENDING, PROCESSING, COMPLETED and VOIDED. New compound indexes `messenger_payout_cross_stage_idx` and `shop_payout_cross_stage_idx` are auto-created on startup.
+- [NEW] BUG-3 / GAP-7: WhatsApp notification to drivers (`driver_missing_bank_details`) and store owners (`store_missing_bank_details`) when a payout is deferred for missing bank details. It is throttled to one per recipient per type per 24 h through the new `payout_notification_cooldowns` collection (TTL 86,400 s). The store template is still pending Meta approval, so sends fail with HTTP 400, which is logged and swallowed and never blocks payout generation.
+- [FIX] DEF-1: A messenger with no email address no longer NPEs during payout generation (`emailAddress` is no longer forced with `!!`).
+- [FIX] GAP-3: The bank reconciliation result now persists `failureReason` and increments `attemptCount` on each attempt. On `paid=false` the payout goes back to PENDING for retry. On `paid=true` it advances to COMPLETED and the reason is cleared.
+- [FIX] BUG-7: The payout bundle CSV (FNB BInSol) now quotes every field per RFC 4180, with internal quotes doubled, and the trailing `", "` separator becomes `","`. A comma in a store name or reference no longer shifts the columns. **This changes the bank upload file format.** See "Pre-deploy checks".
+
+**Docs / tests**
+
+- ADR-026, ADR-027, ADR-028, the MCP-SEC-03 feature brief, the start-order prompt-injection security review, and test plans: `admin/mcp-controller-layer-separation.md`, `admin/mcp-tools.md`, `driver/payout-disbursement.md`, `driver/ai-agent-boundary-discipline.md`, `driver/ai-agent-whatsapp-live-trace.md`, `admin/junit4-engine-and-production-null-guards.md`.
+- Added `.env.example` for local dev and put `.env` in `.gitignore`.
+- `MCP_VSCODE_GUIDE.md` updated for the `create_user` removal.
+
+### Breaking changes
+
+**REST API:** none. No REST endpoint path, method or success-response shape was removed or renamed. Behaviour changes on REST are limited to error paths: 400/503 with an `{"error"}` body where there used to be a 500, plus the PATCH flag semantics described under "Known behaviour changes". JWT/Firebase auth structure is unchanged. `Audience` (internal MCP/WhatsApp enum, not exposed on REST) gains the `ADMIN` value. `Payout` gains `failureReason` and `attemptCount`, which are additive.
+
+**MCP surface (breaking for MCP clients):**
+1. `create_user` is removed (18 → 17 tools).
+2. Every MCP tool call now needs a valid, unexpired store-scope JWT in the `?scope=` query parameter. Tokens have a 5-minute TTL and are signed with the real `store.scope.jwt.secret`. External MCP clients without a scope token get `IDENTITY_REFUSAL` on every tool. That covers the Claude connector used by the "iZinga Driver Customer Service" agent, VS Code / Copilot set up from `MCP_VSCODE_GUIDE.md`, and any token minted under the old public fallback secret. In-process WhatsApp agents mint their own tokens and are unaffected.
+3. Audience narrowing: CUSTOMER/DRIVER can no longer call `find_stores_by_owner`; STORE can no longer call `find_users`. Until `whatsapp.cloud.appSecret` is configured in production, `find_users` cannot be reached at all, and `find_orders_by_messenger_id` is DRIVER-own only.
+
+### Known behaviour changes (accepted or flagged, not regressions in the success path)
+
+- `PATCH /store/{id}` can no longer turn `profileApproved`, `hasPaymentAgreement`, `deliversFromMultipleAddresses`, `generateMissingImages` or `quoteRequired` from `true` to `false`. Visible impact: in izinga-onboarding, choosing "Generate missing images → NO" on business-update is silently ignored for a store where it is currently YES. Any store un-approval or suspension must go through a direct DB update until a targeted admin endpoint exists.
+- Orders whose payouts were silently abandoned under 1.16.0 (already `payoutCreated=true` with no payout) are **not** retried. The deferred retry applies only to orders processed from now on.
+- Existing duplicate PENDING messenger payouts created by the pre-fix scheduler bug are **not** cleaned up by this release. **Known risk, accepted by Lindani Masinga on 2026-11-06.** The cleanup is deferred and will be handled separately, outside this release's scope. Until then, check payout bundles for repeated recipient/order pairs before upload.
+- `agent_identity_audit_log` stores `callerPhone`, but the code creates only a plain (non-TTL) index on `timestamp`. The 90-day retention in the KDoc is not enforced until a TTL index is created in MongoDB (POPIA retention follow-up).
+
+### Known open items (NOT in this release, not blocking)
+
+- WhatsApp webhook signature verification (`whatsapp.cloud.appSecret`) is still not configured in production. This is a known risk Lindani has accepted. While it stays unset, ADMIN MCP minting stays dormant (fail-closed). Configuring it later turns on HMAC verification and ADMIN minting together and needs its own rollout plan.
+- ADR-028 PQ-1 (missing-profile retry semantics) and PQ-2 (720 h window escalation): open product questions.
+- F4-1 (store-line agent tool allowlist not enforced), REST role self-assignment (#138), formal ADR-025 retirement: tracked separately.
+- Two Claude agent `.md` files still reference the removed `create_user` MCP tool. The Agent Engineering Manager owns that fix; it is not part of this code release.
+- Build instability (task_723cde3e): `OrderControllerTest` / `OrderServiceTest` flake non-deterministically on CI. The master deploy build runs `mvn clean package` with tests, so a flake can fail the deploy job, which then needs a re-run.
+
+### Deployment sequence
+
+1. **ijudi-api only.** No frontend deploy is required. Every REST change is additive or error-path only. izinga-onboarding, cs-lifestyle, furniture-delivery-app and ijudi (Flutter) keep working unchanged.
+2. Deploy = `git flow release finish` push to `master`, which triggers `.github/workflows/aws-ecr-push.yml`: build with tests, ECR push, then an ECS rolling deploy (`ijudi-api` cluster, `ijudi-api-service`, Fargate, min 100 % / max 200 %, deployment circuit breaker **disabled**).
+3. **Do NOT open a pull request from `release/1.17.0` to `master`.** `aws-ecr-push.yml` also triggers on `pull_request` to `master`, its deploy job has no event guard, and the `production` environment has no protection rules. Opening the PR would deploy the PR head to production immediately.
+4. Preferred window: 05:00–07:00 SAST. During the rolling overlap, the old task (fallback secret) and the new task (real secret) both sit behind the load balancer. A scope JWT minted on one task can fail validation on the other, so a few WhatsApp agent replies may get `IDENTITY_REFUSAL` for up to ~5–10 minutes.
+
+### Pre-deploy checks
+
+- [x] `store.scope.jwt.secret` present in `izinga-prod` (64 chars) and `izinga-uat` (64 chars). Checked on key names and length only; the value was never read out.
+- [x] Every other property newly injected in this release (`google.maps.api.key`, `ukheshe.main.account`, `service.markup.perc`) resolves in prod. No new ECS env vars, no IAM change, no new secrets.
+- [ ] FNB BInSol dry-run: running in parallel, not a hard blocker on release prep (Lindani, 2026-11-06). Shop and messenger dry-run bundles were generated with the 1.17.0 `CsvWriter.kt` code path using synthetic QA data: a name containing a comma, a name containing double quotes, and plain names, with R1–R3 amounts and fake accounts. Lindani is to import them into FNB Online Banking himself, validate only and do NOT authorise, and confirm the quoted format is accepted before the first post-release payout bundle is uploaded.
+- [x] ~~Prod Mongo duplicate-payout count~~: deferred. Known risk accepted by Lindani on 2026-11-06 and out of scope for this release.
+- [ ] Confirm whether any external MCP client (the Claude connector behind "iZinga Driver Customer Service") is still needed against prod. It will lose all tools at cutover.
+
+### Rollback steps
+
+**Full rollback (preferred for any startup failure, auth regression or payout anomaly). Takes about 3–5 minutes and needs no CI:**
+1. `aws ecs update-service --cluster ijudi-api --service ijudi-api-service --task-definition first-run-task-definition:299 --force-new-deployment --region af-south-1`. Revision 299 is the live 1.16.0 task (image `ijudi-api:ae3df6a3…`, tag `1.16.0`).
+2. Do **not** revert on `master` while incident-handling: every push to `master` redeploys. Forward-fix through `hotfix/1.17.1` cut from `master`, which then back-merges to `develop`.
+3. Notify Lindani that rollback was triggered, with the reason.
+
+**Data and behaviour consequences of rolling back to 1.16.0:**
+- No schema migration needs reverting. `agent_identity_audit_log`, `payout_notification_cooldowns`, the two payout compound indexes and the new `failureReason`/`attemptCount` fields are additive and ignored by 1.16.0.
+- Rolling back **re-opens**: the tokenless MCP bypass, the public fallback JWT secret, `create_user` on MCP, duplicate messenger payouts, silent payout abandonment, the Maps-outage 500s and PATCH data loss. Orders left `payoutCreated=false` by a `Deferred` outcome will be marked done by 1.16.0's scheduler without a payout. Keep any rollback short and do not export a payout bundle while on 1.16.0.
+
+**Per-piece rollback (forward-fix in `hotfix/1.17.1`, used when only one area misbehaves):**
+- **App fails to start (secret/placeholder):** with the circuit breaker off, ECS keeps the 1.16.0 task serving and retries the new task, and the GitHub deploy job times out on service stability. Run step 1 above to stop the retries, then fix the key in Secrets Manager or the placeholder (`b612cf6a`).
+- **ADMIN-over-MCP (PR #156 AMD-01):** dormant while `appSecret` is unset, so nothing to roll back at deploy. If ADMIN misbehaves after `appSecret` is configured later, removing `appSecret` and restarting disables ADMIN minting with no code change (this also disables HMAC verification).
+- **SEC-MCP-01/02 or ADR-024 rejecting a legitimate agent:** first check the agent's `AiAgentConfig.audience` and its `?scope=` minting. The code is layered (ADR-024 → #156 → ADR-026), so there is no isolated revert. Use the full rollback if WhatsApp agents broadly fail.
+- **`create_user` removal:** revert `4e388c0f` in a hotfix to restore the tool (golden file and ArchUnit tests update with it).
+- **Payout CSV rejected by FNB:** revert the `csvAppend` hunk of `2bca9bb4` (`CsvWriter.kt`) in a hotfix. Until then, re-save the CSV without quotes manually for the upload.
+- **Deferred retry / notification throttle misbehaving (e.g. a notification storm or a scheduler loop):** hotfix-revert the ADR-028 scheduler hunk. The 24 h cooldown caps notifications even while a fix is pending.
+- **PATCH flag OR-merge blocking a required un-set:** set the flag directly in Mongo as a stop-gap; the targeted admin endpoint is a follow-up.
+
+### Smoke test plan (run immediately after the ECS deployment reaches steady state)
+
+1. **Startup**: CloudWatch `/ecs/first-run-task-definition` shows `Started IjudiApplication`, MCP `Registered tools: 17`, and no `Could not resolve placeholder` / `IllegalStateException`. Expected: one healthy task on the new image, old task drained.
+2. **Tokenless MCP rejected**: `POST https://api.izinga.co.za/mcp` `tools/call find_order_by_id` without `?scope=`. Expected: `IDENTITY_REFUSAL` or audience-violation refusal, no order data.
+3. **Customer WhatsApp line**: from a test number with a known order, ask "where is my order". Expected: the agent looks the order up and replies with the real status. This proves scope JWT mint and validate both work with the real secret. Asking about another number's order should return the refusal wording.
+4. **Store WhatsApp line**: message a store line. Expected: the store agent answers using `find_store_or_shops_by_id`, and no bank account number appears.
+5. **Order placement (REST)**: place a normal order through cs-lifestyle or furniture-delivery-app. Expected: 200 and the order is created with a correct delivery fee and service fee. A delivery-price estimate for an unroutable address should return 400 with an `error` message, not 500.
+6. **Store PATCH**: in izinga-onboarding business-update, save a store without touching categories. Expected: name, address, coordinates and categories are preserved.
+7. **First hourly payout scheduler run**: logs show created/deferred counters with no NPE, and no second messenger payout for an order that already has one.
+
+### Post-deployment monitoring
+
+- **15 min**: ECS service has 1 running task on the new image; no 5xx spike on the ALB target group; no `IDENTITY_REFUSAL` / `AUDIENCE_VIOLATION` burst beyond the rolling-overlap window; WhatsApp agents replying.
+- **1 h**: first payout scheduler run is clean (counts of created / deferred / errors); `payout_notification_cooldowns` entries appear only for recipients actually missing bank details; `store_missing_bank_details` HTTP 400s are expected (template pending Meta) and must not block payouts; `agent_identity_audit_log` growth rate is sane; no 503 spike from `DeliveryDistanceUnavailableException` (that would point to a Maps key or quota problem, see the Oct 2026 key-rotation gap).
+- **24 h**: order volume within normal range (Growth & Analytics); no duplicate payouts in the next payout bundle; deferred-payout list reviewed (drivers and stores needing bank details); no support complaints about the WhatsApp agents refusing legitimate own-account lookups; no store-owner reports of settings that "won't save".
+
+### Gate citations
+
+- Code Review PASS (Gate 1): PR #151 (2026-11-01), #152 (2026-11-01), #155 (on merged result), #156 (after one FAIL cycle), #160 (ADR-026 phases), #161. **PR #162: no Code Review PASS or QA sign-off recorded on the PR** (and its PR CI run failed on the known `OrderControllerTest` flake). Gate 1 evidence gap, flagged to the Product Owner and Lindani. Mitigated: a one-line config change, independently verified by the Release Manager (prod key present, full suite green).
+- Feature Brief: MCP-SEC-03 "Approved for Implementation" (PR #158/#159) for ADR-026; ADR-024, ADR-027 AMD-01 and ADR-028 approved by Lindani Masinga.
+- QA Gate 1: per-feature PASS with live UAT verification for ADR-026 (17 tools, `create_user` absent, 2026-11-05) and ADR-028 (4 live scheduler runs, 2026-11-06).
+- Release Manager full unscoped regression on `develop` tip `22a90484`: `./mvnw -B clean test`, Corretto 17.0.15, **1,632 tests, 0 failures, 0 errors, 19 skipped, BUILD SUCCESS** (2026-11-06). GitHub Actions `Java CI with Maven` on the same SHA (run 42231404309): 1,632 / 0 / 0 / 19, success.
+- QA Gate 2 (full regression on `release/1.17.0` by iZinga QA & Test Automation, 2026-11-06): **PASS**.
+  - Ran `./mvnw -B clean package` on Corretto 17.0.15, then live-booted the built release jar on the `uat` profile against the real `izinga-uat` secret, with no local `STORE_SCOPE_JWT_SECRET`.
+  - All 10 regression checks passed: tokenless rejection; 17-tool surface with `create_user` absent; CUSTOMER own vs cross-account; STORE bank masking; 400 on an unroutable address; `start_order` consent and idempotency gates; PATCH partial-body preservation; payout scheduler Created/Deferred/NotApplicable with no NPE or duplicates; RFC 4180 CSV quoting.
+  - **Reactor-wide result: 1,632 tests, 0 failures, 0 errors, 19 skipped.** The Release Manager counted `<testcase>` elements across every module's surefire XML: commons 35, yoco-pay 3, recon 162, usermanagement 248, payfast 62, document-management 13 (1 skipped), messaging 221 (14 skipped), ordermanager 888 (4 skipped).
+  - QA's report of "888 tests" was the ordermanager module total, not the reactor total.
+  - Adding up the surefire XML *header* counts gives 1,626 instead. That is a reporting artefact, not a regression: `McpArchitectureTest` runs under two engines (6 `@ArchTest` rules on the ArchUnit engine, 6 `@Test` methods on Jupiter), both write the same report file, and the second header overwrites the first. The file still lists all 12 testcases.
+- Product Owner sign-off (2026-11-06): **CONDITIONAL.**
+  - (a) `create_user` removal: accepted outright.
+  - (b) PATCH flag OR-merge: accepted, with a mandatory P1 bugfix brief for an admin-only endpoint that can set the 5 flags back to `false`.
+  - (c) Payouts abandoned before 1.17.0: accepted, with a mandatory post-deploy data-reconciliation task. This is real money owed to drivers and stores. Owners: Financial Manager and Data Intelligence, once a reconciliation list exists.
+  - (e) PR #162 Gate 1 gap: accepted, on condition that a retrospective comment documenting the verification actually done is posted on PR #162 within 48 h.
+  - **(d) External MCP clients: OPEN BLOCKER.** The "iZinga Driver Customer Service" Claude agent has 13 MCP tools wired to the production backend through the Claude connector, and there is no scope-token minting path for it. After deploy, **every** one of its tools returns `IDENTITY_REFUSAL`. Lindani must confirm one of two outcomes. If the agent is dev/internal only, the release proceeds and token minting becomes a follow-up. If production or ops workflows rely on it, the release holds pending its own ADR.
+- MCP breaking change: approved by Lindani Masinga as part of 1.17.0 (no major bump), 2026-11-06. No Hloniphani notification required (Lindani's decision).
+- Deployment authorisation: **pending.** Requires Lindani Masinga's explicit, direct go-ahead before `git flow release finish`.
+
+---
+
 ## [1.16.0] — 2026-10-20
 
 **Release type:** Feature (P2 — new functionality)

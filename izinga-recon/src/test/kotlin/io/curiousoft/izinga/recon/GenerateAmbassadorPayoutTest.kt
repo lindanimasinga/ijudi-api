@@ -62,7 +62,7 @@ class GenerateAmbassadorPayoutTest {
                 commissionAmountCar = BigDecimal("60.00"),
                 commissionAmountBakkie = BigDecimal("70.00"),
                 commissionAmountTruck = BigDecimal("70.00")
-            )
+            ),
         )
     }
 

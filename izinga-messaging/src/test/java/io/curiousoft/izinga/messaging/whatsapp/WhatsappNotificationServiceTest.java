@@ -16,9 +16,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 import retrofit2.Call;
 
 import java.io.IOException;
+import java.util.Date;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -36,16 +40,29 @@ class WhatsappNotificationServiceTest {
     @Mock
     private WhatsappSenderResolver senderResolver;
 
+    /** ADR-028: cooldown repository mock for throttle tests. */
+    @Mock
+    private PayoutNotificationCooldownRepository cooldownRepo;
+
     @SuppressWarnings("unchecked")
     private final Call<WhatsappTemplateResponse> callMock = mock(Call.class);
 
+    /** Service under test — cooldown repository is null (no-throttle mode). */
     private WhatsappNotificationService service;
+
+    /** Service under test — cooldown repository is wired (throttle mode for ADR-028 tests). */
+    private WhatsappNotificationService serviceWithCooldown;
 
     @BeforeEach
     void setUp() {
-        // REQ-08: service uses senderResolver, not whatsappConfig.phoneId() directly
-        when(senderResolver.resolve(any(Audience.class), any())).thenReturn("testPhoneId");
-        service = new WhatsappNotificationService(whatsAppService, whatsappConfig, new ObjectMapper(), "https://video.url", senderResolver);
+        // REQ-08: service uses senderResolver, not whatsappConfig.phoneId() directly.
+        // lenient() prevents UnnecessaryStubbingException in tests whose code paths exit
+        // before reaching senderResolver.resolve (e.g. blank-mobile early-return tests).
+        lenient().when(senderResolver.resolve(any(Audience.class), any())).thenReturn("testPhoneId");
+        // ADR-028: pass null for cooldown repo — existing tests run with no-throttle mode.
+        service = new WhatsappNotificationService(whatsAppService, whatsappConfig, new ObjectMapper(), "https://video.url", senderResolver, null);
+        // ADR-028: service with wired cooldown repo for throttle tests.
+        serviceWithCooldown = new WhatsappNotificationService(whatsAppService, whatsappConfig, new ObjectMapper(), "https://video.url", senderResolver, cooldownRepo);
     }
 
     private UserProfile customerProfile(String name, String mobile) {
@@ -282,5 +299,202 @@ class WhatsappNotificationServiceTest {
         assertEquals("rxnova24_landing_options", captor.getValue().getTemplate().getName());
         var bodyComp = captor.getValue().getTemplate().getComponents().get(0);
         assertEquals("Jane", bodyComp.getParameters().get(0).getText());
+    }
+
+    // ─── notifyDriverMissingBankDetails (BUG-3) ──────────────────────────────
+
+    @Test
+    void notifyDriverMissingBankDetails_blankMobile_returnsWithoutSending() {
+        // Branch 1a: blank string — guard fires, early return, no outbound call
+        assertDoesNotThrow(() -> service.notifyDriverMissingBankDetails("", "Sipho", "recipient-1"));
+        verify(whatsAppService, never()).sendMessage(anyString(), any());
+
+        // Branch 1b: null — isBlank() throws NPE inside try/catch, also no outbound call
+        assertDoesNotThrow(() -> service.notifyDriverMissingBankDetails(null, "Sipho", "recipient-1"));
+        verify(whatsAppService, never()).sendMessage(anyString(), any());
+    }
+
+    @Test
+    void notifyDriverMissingBankDetails_validMobile_postsTemplate() throws IOException {
+        when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+
+        service.notifyDriverMissingBankDetails("0821234567", "Sipho", "messenger-id-1");
+
+        ArgumentCaptor<WhatsappTemplateRequest> captor = ArgumentCaptor.forClass(WhatsappTemplateRequest.class);
+        verify(whatsAppService).sendMessage(eq("testPhoneId"), captor.capture());
+        verify(callMock).execute();
+
+        WhatsappTemplateRequest request = captor.getValue();
+        // 0-prefix normalised to +27
+        assertEquals("+27821234567", request.getTo());
+        assertEquals("driver_missing_bank_details", request.getTemplate().getName());
+        assertEquals("en", request.getTemplate().getLanguage().getCode());
+        var bodyComp = request.getTemplate().getComponents().get(0);
+        assertEquals(WhatsappTemplateRequest.ComponentType.BODY, bodyComp.getType());
+        assertEquals("Sipho", bodyComp.getParameters().get(0).getText());
+        verify(senderResolver).resolve(Audience.DRIVER, null);
+    }
+
+    @Test
+    void notifyDriverMissingBankDetails_driverNameWithJsonSpecialChars_sendsNotificationWithNamePreserved() throws IOException {
+        when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+
+        assertDoesNotThrow(() -> service.notifyDriverMissingBankDetails("0821234567", "John \"Danger\" O'Brien\\Jr", "messenger-id-2"));
+        verify(callMock).execute();
+
+        ArgumentCaptor<WhatsappTemplateRequest> captor = ArgumentCaptor.forClass(WhatsappTemplateRequest.class);
+        verify(whatsAppService).sendMessage(anyString(), captor.capture());
+        var bodyComp = captor.getValue().getTemplate().getComponents().get(0);
+        assertEquals("John \"Danger\" O'Brien\\Jr", bodyComp.getParameters().get(0).getText());
+    }
+
+    @Test
+    void notifyDriverMissingBankDetails_senderThrows_doesNotRethrow() {
+        when(whatsAppService.sendMessage(anyString(), any())).thenThrow(new RuntimeException("simulated network error"));
+        assertDoesNotThrow(() -> service.notifyDriverMissingBankDetails("0821234567", "Sipho", "messenger-id-3"));
+    }
+
+    // ─── notifyStoreMissingBankDetails (GAP-7) ───────────────────────────────
+
+    @Test
+    void notifyStoreMissingBankDetails_blankMobile_returnsWithoutSending() {
+        // Branch 1a: blank string
+        assertDoesNotThrow(() -> service.notifyStoreMissingBankDetails("", "Acme Store", "store-1"));
+        verify(whatsAppService, never()).sendMessage(anyString(), any());
+
+        // Branch 1b: null — NPE caught, still no outbound call
+        assertDoesNotThrow(() -> service.notifyStoreMissingBankDetails(null, "Acme Store", "store-1"));
+        verify(whatsAppService, never()).sendMessage(anyString(), any());
+    }
+
+    @Test
+    void notifyStoreMissingBankDetails_validMobile_postsTemplate() throws IOException {
+        when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+
+        service.notifyStoreMissingBankDetails("0829876543", "Acme Store", "store-id-1");
+
+        ArgumentCaptor<WhatsappTemplateRequest> captor = ArgumentCaptor.forClass(WhatsappTemplateRequest.class);
+        verify(whatsAppService).sendMessage(eq("testPhoneId"), captor.capture());
+        verify(callMock).execute();
+
+        WhatsappTemplateRequest request = captor.getValue();
+        // 0-prefix normalised to +27
+        assertEquals("+27829876543", request.getTo());
+        assertEquals("store_missing_bank_details", request.getTemplate().getName());
+        assertEquals("en", request.getTemplate().getLanguage().getCode());
+        var bodyComp = request.getTemplate().getComponents().get(0);
+        assertEquals(WhatsappTemplateRequest.ComponentType.BODY, bodyComp.getType());
+        assertEquals("Acme Store", bodyComp.getParameters().get(0).getText());
+
+        // Store notification uses CUSTOMER audience (not DRIVER)
+        verify(senderResolver).resolve(Audience.CUSTOMER, null);
+    }
+
+    @Test
+    void notifyStoreMissingBankDetails_storeNameWithJsonSpecialChars_sendsNotificationWithNamePreserved() throws IOException {
+        when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+
+        assertDoesNotThrow(() -> service.notifyStoreMissingBankDetails("0829876543", "Bob's \"BBQ\" Shop\\Ltd", "store-id-2"));
+        verify(callMock).execute();
+
+        ArgumentCaptor<WhatsappTemplateRequest> captor = ArgumentCaptor.forClass(WhatsappTemplateRequest.class);
+        verify(whatsAppService).sendMessage(anyString(), captor.capture());
+        var bodyComp = captor.getValue().getTemplate().getComponents().get(0);
+        assertEquals("Bob's \"BBQ\" Shop\\Ltd", bodyComp.getParameters().get(0).getText());
+    }
+
+    @Test
+    void notifyStoreMissingBankDetails_senderThrows_doesNotRethrow() {
+        when(whatsAppService.sendMessage(anyString(), any())).thenThrow(new RuntimeException("simulated network error"));
+        assertDoesNotThrow(() -> service.notifyStoreMissingBankDetails("0829876543", "Acme Store", "store-id-3"));
+    }
+
+    // ─── ADR-028: Throttle / acquireCooldown tests ───────────────────────────
+
+    @Test
+    void acquireCooldown_firstCall_insertsAndSendsNotification() throws IOException {
+        // insert succeeds → cooldown acquired → notification is sent
+        when(cooldownRepo.insert(any(PayoutNotificationCooldown.class)))
+                .thenReturn(new PayoutNotificationCooldown("messenger-t1:DRIVER_MISSING_BANK", new Date()));
+        when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+
+        serviceWithCooldown.notifyDriverMissingBankDetails("0821234567", "Sipho", "messenger-t1");
+
+        verify(cooldownRepo).insert(any(PayoutNotificationCooldown.class));
+        verify(whatsAppService).sendMessage(anyString(), any());
+    }
+
+    @Test
+    void acquireCooldown_secondCallWithinCooldown_suppressesNotification() {
+        // insert throws DuplicateKeyException, existing record is fresh (<24h) → suppressed
+        when(cooldownRepo.insert(any(PayoutNotificationCooldown.class)))
+                .thenThrow(new DuplicateKeyException("dup"));
+        var freshRecord = new PayoutNotificationCooldown(
+                "messenger-t2:DRIVER_MISSING_BANK",
+                new Date(System.currentTimeMillis() - TimeUnit.HOURS.toMillis(1)) // 1h ago — fresh
+        );
+        when(cooldownRepo.findById("messenger-t2:DRIVER_MISSING_BANK"))
+                .thenReturn(Optional.of(freshRecord));
+
+        serviceWithCooldown.notifyDriverMissingBankDetails("0821234567", "Sipho", "messenger-t2");
+
+        // Notification must NOT be sent
+        verify(whatsAppService, never()).sendMessage(anyString(), any());
+    }
+
+    @Test
+    void acquireCooldown_staleCooldownRecord_overwritesAndSendsNotification() throws IOException {
+        // insert throws DuplicateKeyException, existing record is stale (≥24h) → overwrite → send
+        when(cooldownRepo.insert(any(PayoutNotificationCooldown.class)))
+                .thenThrow(new DuplicateKeyException("dup"));
+        var staleRecord = new PayoutNotificationCooldown(
+                "messenger-t3:DRIVER_MISSING_BANK",
+                new Date(System.currentTimeMillis() - TimeUnit.HOURS.toMillis(25)) // 25h ago — stale
+        );
+        when(cooldownRepo.findById("messenger-t3:DRIVER_MISSING_BANK"))
+                .thenReturn(Optional.of(staleRecord));
+        when(cooldownRepo.save(any(PayoutNotificationCooldown.class)))
+                .thenReturn(new PayoutNotificationCooldown("messenger-t3:DRIVER_MISSING_BANK", new Date()));
+        when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+
+        serviceWithCooldown.notifyDriverMissingBankDetails("0821234567", "Sipho", "messenger-t3");
+
+        verify(cooldownRepo).save(any(PayoutNotificationCooldown.class));
+        verify(whatsAppService).sendMessage(anyString(), any());
+    }
+
+    @Test
+    void acquireCooldown_twoDistinctRecipients_bothNotificationsAreSent() throws IOException {
+        // Two different recipients → distinct cooldown keys → both inserts succeed → both send
+        when(cooldownRepo.insert(any(PayoutNotificationCooldown.class)))
+                .thenReturn(new PayoutNotificationCooldown("", new Date()));
+        when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+
+        serviceWithCooldown.notifyDriverMissingBankDetails("0821234567", "Sipho", "messenger-t4a");
+        serviceWithCooldown.notifyDriverMissingBankDetails("0829876543", "Thabo", "messenger-t4b");
+
+        verify(whatsAppService, times(2)).sendMessage(anyString(), any());
+    }
+
+    @Test
+    void acquireCooldown_sameRecipientTwice_secondCallIsSuppressedWhenCooldownActive() {
+        // Same recipient, second call within 24h → suppressed
+        // First call: insert succeeds
+        when(cooldownRepo.insert(any(PayoutNotificationCooldown.class)))
+                .thenReturn(new PayoutNotificationCooldown("messenger-t5:DRIVER_MISSING_BANK", new Date()))
+                .thenThrow(new DuplicateKeyException("dup"));
+        var freshRecord = new PayoutNotificationCooldown(
+                "messenger-t5:DRIVER_MISSING_BANK",
+                new Date() // just created
+        );
+        when(cooldownRepo.findById("messenger-t5:DRIVER_MISSING_BANK"))
+                .thenReturn(Optional.of(freshRecord));
+        lenient().when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+
+        serviceWithCooldown.notifyDriverMissingBankDetails("0821234567", "Sipho", "messenger-t5");
+        serviceWithCooldown.notifyDriverMissingBankDetails("0821234567", "Sipho", "messenger-t5");
+
+        // Only one notification should have been sent
+        verify(whatsAppService, times(1)).sendMessage(anyString(), any());
     }
 }

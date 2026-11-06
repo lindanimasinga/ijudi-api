@@ -7,10 +7,13 @@ import io.curiousoft.izinga.commons.model.Bank
 import io.curiousoft.izinga.commons.model.BankAccType
 import io.curiousoft.izinga.commons.model.StoreProfile
 import io.curiousoft.izinga.commons.model.UserProfile
+import io.curiousoft.izinga.commons.notification.PayoutNotificationPort
 import io.curiousoft.izinga.commons.payout.events.AmbassadorPayoutEvent
 import io.curiousoft.izinga.commons.payout.events.OrderPayoutEvent
 import io.curiousoft.izinga.commons.payout.events.ReferralPartnerPayoutEvent
 import io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent
+// ADR-026 Phase 5: AgentIdentityAuditService, CallerIdentityContext, CallerIdentityValidator,
+// and AgentIdentityAuditLog removed — the get_payouts_for_user gate now lives in PayoutMcpController.
 import io.curiousoft.izinga.commons.referral.FoodCustomerReferralCommissionRepo
 import io.curiousoft.izinga.commons.referral.FurnitureCustomerReferralCommissionRepo
 import io.curiousoft.izinga.commons.referral.ReferralCommissionStatus
@@ -21,14 +24,14 @@ import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.ambassador.AmbassadorProperties
 import io.curiousoft.izinga.recon.payout.*
+import io.curiousoft.izinga.recon.payout.PayoutGenerationOutcome
 import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.PayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ReferralPartnerPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.ShopPayoutRepository
 import org.slf4j.LoggerFactory
-import org.springframework.ai.tool.annotation.Tool
-import org.springframework.ai.tool.annotation.ToolParam
+// ADR-026 Phase 5: Tool and ToolParam imports removed (get_payouts_for_user @Tool moved to PayoutMcpController)
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.context.event.EventListener
 import org.springframework.dao.DuplicateKeyException
@@ -53,31 +56,76 @@ class ReconServiceImpl(
     private val storeStage1CommissionRepo: StorePartnerStage1CommissionRepo,
     private val storeStage2CommissionRepo: StorePartnerStage2CommissionRepo,
     private val applicationEventPublisher: ApplicationEventPublisher,
-    private val ambassadorProperties: AmbassadorProperties
+    private val ambassadorProperties: AmbassadorProperties,
+    /**
+     * BUG-3/GAP-7: Optional notification port for alerting users about missing bank details.
+     * Nullable to keep backward-compatibility with test setup that doesn't wire notifications.
+     * Live implementation: WhatsappNotificationService (izinga-messaging), wired at ordermanager runtime.
+     * Templates in use:
+     *   - `driver_missing_bank_details` (BUG-3, driver path) — LIVE (Meta returned HTTP 200 in UAT)
+     *   - `store_missing_bank_details` (GAP-7, store path) — pending Meta approval (returned HTTP 400)
+     * Notifications are throttled per recipient (24-hour cooldown) inside the port implementation.
+     */
+    private val payoutNotificationPort: PayoutNotificationPort? = null,
 ) : ReconService {
 
     private val logger = LoggerFactory.getLogger(ReconServiceImpl::class.java)
 
-    override fun generatePayoutForShopAndOrder(order: Order): ShopPayout? {
+    override fun generatePayoutForShopAndOrder(order: Order): PayoutGenerationOutcome<ShopPayout> {
+        // ── By-design NotApplicable checks ───────────────────────────────────
         if (order.stage != OrderStage.STAGE_7_ALL_PAID) {
-            logger.info("no payout generated for order {} at stage STAGE_7_ALL_PAID", order.id)
-            return null
+            logger.info("no payout generated for order {} — not at STAGE_7_ALL_PAID", order.id)
+            return PayoutGenerationOutcome.NotApplicable("order ${order.id} not at STAGE_7_ALL_PAID")
         }
 
-        val store = storeRepo.findByIdOrNull(order.shopId);
+        val store = storeRepo.findByIdOrNull(order.shopId)
         if (store?.hasPaymentAgreement == false) {
-            logger.info("no payout created because store {} has no payout agreement", store.id);
-            return null
+            logger.info("no payout created — store {} has no payout agreement", store.id)
+            return PayoutGenerationOutcome.NotApplicable("store ${store.id} has no payment agreement")
         }
 
+        val storeId = store?.id
+        if (storeId == null) {
+            logger.warn("no payout created — store not found for shopId {}", order.shopId)
+            return PayoutGenerationOutcome.NotApplicable("store not found for shopId ${order.shopId}")
+        }
+
+        // ── ADR-028 cross-stage idempotency guard ─────────────────────────────
+        // Prevents double-pay across all PayoutStages (PENDING, PROCESSING, COMPLETED, VOIDED).
+        // This is the primary guard; the in-bundle id check below is a second line of defence.
+        val orderId = order.id
+        if (orderId != null && shopPayoutRepo.existsByToIdAndOrderId(storeId, orderId)) {
+            logger.info("order {} already included in an existing shop payout for store {}; skipping", orderId, storeId)
+            return PayoutGenerationOutcome.NotApplicable("order already included in an existing shop payout")
+        }
+
+        // ── Deferred: missing bank details ────────────────────────────────────
+        // GAP-7: notify store owner once per 24h (throttled inside the port implementation).
+        // `store_missing_bank_details` template is pending Meta approval (returned HTTP 400 in UAT).
+        val bank = store.bank
+        if (bank == null) {
+            val storeName = store.name ?: "Store"
+            val mobile = store.mobileNumber
+            logger.warn(
+                "store {} has a payout agreement but no bank details on file; " +
+                "deferring payout for order {}. Store must add bank details to receive payouts.",
+                storeId, orderId
+            )
+            if (!mobile.isNullOrBlank()) {
+                payoutNotificationPort?.notifyStoreMissingBankDetails(mobile, storeName, storeId)
+            }
+            return PayoutGenerationOutcome.Deferred("store $storeId missing bank details")
+        }
+
+        // ── Success path ──────────────────────────────────────────────────────
         val payout = shopPayoutRepo.findByToIdAndPayoutStage(order.shopId, PayoutStage.PENDING) ?: ShopPayout(
-            toId = store?.id!!,
-            toName = store.name!!,
-            toBankName = store.bank?.name!!,
-            toType = store.bank?.type!!,
-            toAccountNumber = getPayoutAccountNumber(store.bank?.accountId, store.bank?.type)!!,
+            toId = store.id!!,
+            toName = store.name ?: "",
+            toBankName = bank.name!!,
+            toType = bank.type!!,
+            toAccountNumber = getPayoutAccountNumber(bank.accountId, bank.type)!!,
             orders = mutableSetOf(),
-            toBranchCode = store.bank?.branchCode!!,
+            toBranchCode = bank.branchCode!!,
             fromReference = "Payment to ${store.name}",
             toReference = "iZinga pay",
             emailNotify = "",
@@ -85,43 +133,87 @@ class ReconServiceImpl(
             emailSubject = "iZinga pay",
         )
 
-        payout.orders.add(order)
-        payout.emailSent = false
-        return shopPayoutRepo.save(payout)
+        // IDEMPOTENCY (second line of defence): Order.equals() is id-based but hashCode() is
+        // identity-based, so MutableSet dedup is identity-based. Guard explicitly by id to
+        // prevent duplicate order entries within the bundle (inflates total and causes overpayment).
+        if (payout.orders.none { it.id == order.id }) {
+            payout.orders.add(order)
+            payout.emailSent = false
+        }
+        return PayoutGenerationOutcome.Created(shopPayoutRepo.save(payout))
     }
 
-    override fun generatePayoutForMessengerAndOrder(order: Order): MessengerPayout? {
+    override fun generatePayoutForMessengerAndOrder(order: Order): PayoutGenerationOutcome<MessengerPayout> {
+        // ── By-design NotApplicable checks ───────────────────────────────────
         val messng = userProfileRepo.findByIdOrNull(order.shippingData?.messengerId!!)
-        if (messng?.isPermanentEmployed == true && order.tip?.let { it <= 0 } == true) {
-            return null
+        if (messng == null) {
+            logger.warn("messenger not found for order {}; skipping payout", order.id)
+            return PayoutGenerationOutcome.NotApplicable("messenger not found for order ${order.id}")
+        }
+        if (messng.isPermanentEmployed == true && order.tip?.let { it <= 0 } == true) {
+            logger.info("perm-employed messenger {} with zero tip — not applicable", messng.id)
+            return PayoutGenerationOutcome.NotApplicable("perm-employed messenger ${messng.id} with tip <= 0")
         }
 
-        //val tips = tipsService.getTodayTips()
-        val payout = messengerPayoutRepository.findByToIdAndPayoutStage(messng?.id!!, PayoutStage.PENDING) ?: MessengerPayout(
-            toId = messng.id!!,
-            toName = messng.name!!,
-            toBankName = messng.bank?.name!!,
-            toType = messng.bank?.type!!,
-            toAccountNumber = getPayoutAccountNumber(messng.bank?.accountId, messng.bank?.type)!!,
+        val messengerId = messng.id
+        if (messengerId == null) {
+            logger.warn("messenger has no id for order {}; skipping payout", order.id)
+            return PayoutGenerationOutcome.NotApplicable("messenger has no id for order ${order.id}")
+        }
+
+        // ── ADR-028 cross-stage idempotency guard ─────────────────────────────
+        val orderId = order.id
+        if (orderId != null && messengerPayoutRepository.existsByToIdAndOrderId(messengerId, orderId)) {
+            logger.info("order {} already included in an existing messenger payout for messenger {}; skipping", orderId, messengerId)
+            return PayoutGenerationOutcome.NotApplicable("order already included in an existing messenger payout")
+        }
+
+        // ── Deferred: missing bank details ────────────────────────────────────
+        // BUG-3: notify driver once per 24h (throttled inside the port implementation).
+        // Template `driver_missing_bank_details` is LIVE (Meta returned HTTP 200 in UAT).
+        val bank = messng.bank
+        if (bank == null) {
+            val messengerName = messng.name ?: "Driver"
+            val mobile = messng.mobileNumber
+            logger.warn(
+                "messenger {} has no bank details on file; deferring payout for order {}. " +
+                "Driver must add bank details at https://driver.izinga.co.za to receive payouts.",
+                messengerId, orderId
+            )
+            if (!mobile.isNullOrBlank()) {
+                payoutNotificationPort?.notifyDriverMissingBankDetails(mobile, messengerName, messengerId)
+            }
+            return PayoutGenerationOutcome.Deferred("messenger $messengerId missing bank details")
+        }
+
+        // ── Success path ──────────────────────────────────────────────────────
+        val payout = messengerPayoutRepository.findByToIdAndPayoutStage(messengerId, PayoutStage.PENDING) ?: MessengerPayout(
+            toId = messengerId,
+            toName = messng.name ?: "",
+            toBankName = bank.name!!,
+            toType = bank.type!!,
+            toAccountNumber = getPayoutAccountNumber(bank.accountId, bank.type)!!,
             orders = mutableSetOf(),
-            toBranchCode = messng.bank!!.branchCode!!,
+            toBranchCode = bank.branchCode!!,
             toReference = "iZinga pay",
             fromReference = "Payment to ${messng.name}",
             tips = mutableSetOf(),
-            emailAddress = messng.emailAddress!!,
+            emailAddress = messng.emailAddress,   // DEF-1: null is acceptable; email sender skips blank/null
             emailNotify = "",
             emailSubject = "iZinga pay"
         ).also {
             it.isPermEmployed = messng.isPermanentEmployed ?: false
         }
 
-        payout.orders.firstOrNull { it == order }
+        // IDEMPOTENCY (second line of defence): use explicit id comparison (not equals/hashCode)
+        // to guard against duplicate order entries within the bundle.
+        payout.orders.firstOrNull { it.id == order.id }
             ?.let { logger.info("payout already processed for the order {}", it.id) } ?: run {
                 logger.info("adding order {} to messenger payout {}", order.id, payout.id)
                 payout.orders.add(order)
                 payout.emailSent = false
             }
-        return messengerPayoutRepository.save(payout)
+        return PayoutGenerationOutcome.Created(messengerPayoutRepository.save(payout))
     }
 
     override fun generatePayoutForAmbassadorAndApproval(driver: UserProfile, ambassador: UserProfile): AmbassadorPayout? {
@@ -228,67 +320,90 @@ class ReconServiceImpl(
     }
 
     override fun updatePayoutStatus(bundleResponse: PayoutBundleResults) {
+        // GAP-3: on paid=false, revert PROCESSING→PENDING so the payout is re-exported in the
+        // next CSV cycle. Also persist the failure reason and increment the attempt counter.
+
         bundleResponse.payoutItemResults
             .filter { it.type == PayoutType.SHOP }
-            .mapNotNull {
-                shopPayoutRepo.findByToIdAndPayoutStage(it.toId, PayoutStage.PROCESSING)
+            .mapNotNull { result ->
+                shopPayoutRepo.findByToIdAndPayoutStage(result.toId, PayoutStage.PROCESSING)
                     ?.let { payout ->
-                        payout.paid = it.paid
+                        payout.paid = result.paid
                         payout.bundleId = bundleResponse.bundleId
+                        payout.attemptCount++
+                        if (result.paid) {
+                            payout.payoutStage = PayoutStage.COMPLETED
+                            payout.failureReason = null
+                        } else {
+                            payout.failureReason = result.message
+                            payout.payoutStage = PayoutStage.PENDING
+                            logger.warn(
+                                "shop payout {} for {} reverted to PENDING after failed attempt {}; reason={}",
+                                payout.id, result.toId, payout.attemptCount, result.message
+                            )
+                        }
                         shopPayoutRepo.save(payout)
                         payout
                     }
             }
             .filter { it.paid }
-            .onEach {
-                it.payoutStage = PayoutStage.COMPLETED
-                shopPayoutRepo.save(it)
-            }
             .flatMap { it.orders }
             .forEach {
-                val payoutEvent = OrderPayoutEvent(
-                    source = this,
-                    orderId = it.id!!,
-                    isStorePaid = true
+                applicationEventPublisher.publishEvent(
+                    OrderPayoutEvent(source = this, orderId = it.id!!, isStorePaid = true)
                 )
-                applicationEventPublisher.publishEvent(payoutEvent)
             }
 
         bundleResponse.payoutItemResults
             .filter { it.type == PayoutType.MESSENGER }
-            .mapNotNull {
-                messengerPayoutRepository.findByToIdAndPayoutStage(it.toId, PayoutStage.PROCESSING)
+            .mapNotNull { result ->
+                messengerPayoutRepository.findByToIdAndPayoutStage(result.toId, PayoutStage.PROCESSING)
                     ?.let { payout ->
-                        payout.paid = it.paid
+                        payout.paid = result.paid
+                        payout.attemptCount++
+                        if (result.paid) {
+                            payout.payoutStage = PayoutStage.COMPLETED
+                            payout.failureReason = null
+                        } else {
+                            payout.failureReason = result.message
+                            payout.payoutStage = PayoutStage.PENDING
+                            logger.warn(
+                                "messenger payout {} for {} reverted to PENDING after failed attempt {}; reason={}",
+                                payout.id, result.toId, payout.attemptCount, result.message
+                            )
+                        }
                         messengerPayoutRepository.save(payout)
                         payout
                     }
             }
             .filter { it.paid }
-            .onEach {
-                it.payoutStage = PayoutStage.COMPLETED
-                messengerPayoutRepository.save(it)
-            }
             .flatMap { it.orders }
             .forEach {
-                val event  = OrderPayoutEvent(
-                    source = this,
-                    orderId = it.id!!,
-                    isMessengerPaid = true)
-                applicationEventPublisher.publishEvent(event)
+                applicationEventPublisher.publishEvent(
+                    OrderPayoutEvent(source = this, orderId = it.id!!, isMessengerPaid = true)
+                )
             }
 
         bundleResponse.payoutItemResults
             .filter { it.type == PayoutType.AMBASSADOR }
             .flatMap { result ->
                 ambassadorPayoutRepository.findAllByToIdAndPayoutStage(result.toId, PayoutStage.PROCESSING)
-                    .onEach { payout -> payout.paid = result.paid }
+                    .onEach { payout ->
+                        payout.paid = result.paid
+                        payout.attemptCount++
+                        if (result.paid) {
+                            payout.payoutStage = PayoutStage.COMPLETED
+                            payout.failureReason = null
+                        } else {
+                            payout.failureReason = result.message
+                            payout.payoutStage = PayoutStage.PENDING
+                            logger.warn(
+                                "ambassador payout {} for {} reverted to PENDING after failed attempt {}; reason={}",
+                                payout.id, result.toId, payout.attemptCount, result.message
+                            )
+                        }
+                    }
                     .also { payouts -> ambassadorPayoutRepository.saveAll(payouts) }
-            }
-            .filter { it.paid }
-            .onEach {
-                it.payoutStage = PayoutStage.COMPLETED
-                ambassadorPayoutRepository.save(it)
             }
 
         // RP-009: handle referral partner payout completions and sync commission status
@@ -296,12 +411,25 @@ class ReconServiceImpl(
             .filter { it.type == PayoutType.REFERRAL_PARTNER }
             .flatMap { result ->
                 referralPartnerPayoutRepository.findAllByToIdAndPayoutStage(result.toId, PayoutStage.PROCESSING)
-                    .onEach { payout -> payout.paid = result.paid }
+                    .onEach { payout ->
+                        payout.paid = result.paid
+                        payout.attemptCount++
+                        if (result.paid) {
+                            payout.payoutStage = PayoutStage.COMPLETED
+                            payout.failureReason = null
+                        } else {
+                            payout.failureReason = result.message
+                            payout.payoutStage = PayoutStage.PENDING
+                            logger.warn(
+                                "referral partner payout {} for {} reverted to PENDING after failed attempt {}; reason={}",
+                                payout.id, result.toId, payout.attemptCount, result.message
+                            )
+                        }
+                    }
                     .also { payouts -> referralPartnerPayoutRepository.saveAll(payouts) }
             }
             .filter { it.paid }
             .onEach { payout ->
-                payout.payoutStage = PayoutStage.COMPLETED
                 referralPartnerPayoutRepository.save(payout)
                 syncCommissionStatusToPaid(payout)
             }
@@ -360,14 +488,19 @@ class ReconServiceImpl(
         })
     }
 
-    @Tool(name="get_payouts_for_user",  description = "Get all payouts for a given payout type, date range and toId. The default date range is past 7 days. " +
-            "The Payout will have all orders for this payout and the total amount for the payout. " +
-            "For driver the payoutType is MESSENGER and the toId is the driver id. " +
-            "For shop the payoutType is SHOP and the toId is the shop id.")
-    override fun getAllPayouts(@ToolParam(description = "For driver the payoutType is MESSENGER") payoutType: PayoutType,
-                               @ToolParam(description = "Date time format is like 2026-04-09T00:00:00.000+00:00") from: Date,
-                               @ToolParam(description = "Date time format is like 2026-04-09T00:00:00.000+00:00") toDate: Date,
-                               @ToolParam(description = "This is the Driver/Messenger id to use for lookup") toId: String): List<Payout> {
+    /**
+     * ADR-026 Phase 5: @Tool and identity gate REMOVED from service.
+     * The gate (CallerIdentityValidator.validateCallerOwnsId + audit) now lives in
+     * PayoutMcpController, keeping service logic caller-agnostic (AC-04).
+     * resolveCallerUserId() was also removed — replaced by McpCaller.resolveUserId()
+     * in the controller, which performs the same prefix-loop lookup.
+     *
+     * <p>REST callers via ReconController remain unaffected — they call this method
+     * directly on the ungated service (AC-04 compliance).</p>
+     *
+     * <p>MUST NEVER be annotated @Tool — see ReconService interface contract.</p>
+     */
+    override fun getAllPayouts(payoutType: PayoutType, from: Date, toDate: Date, toId: String): List<Payout> {
         return when (payoutType) {
             PayoutType.SHOP -> shopPayoutRepo.findByModifiedDateBetweenAndToId(from, toDate, toId)
             PayoutType.MESSENGER -> messengerPayoutRepository.findByModifiedDateBetweenAndToId(from, toDate, toId)

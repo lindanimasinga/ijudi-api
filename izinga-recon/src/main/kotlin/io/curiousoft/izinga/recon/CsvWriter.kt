@@ -45,8 +45,17 @@ class WriteCsvToResponse
             .build()
     }
 
+/**
+ * BUG-7: RFC 4180 CSV field encoding.
+ *
+ * FNB BInSol format has no documented quoting restrictions; RFC 4180 quoting is the
+ * safe default. Each field is wrapped in double-quotes; internal double-quotes are
+ * escaped by doubling them ("" inside a quoted field). This prevents comma-containing
+ * values (e.g. a store name "Food & Co, Durban") from corrupting the row.
+ */
 fun PrintWriter.csvAppend(vararg value: String) {
     value.forEach {
-        this.append("$it, ")
+        val escaped = it.replace("\"", "\"\"")
+        this.append("\"$escaped\",")
     }
 }

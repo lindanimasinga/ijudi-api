@@ -14,8 +14,6 @@ import io.curiousoft.izinga.usermanagement.userconfig.UserConfig
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService
 import lombok.extern.slf4j.Slf4j
 import org.slf4j.LoggerFactory
-import org.springframework.ai.tool.annotation.Tool
-import org.springframework.ai.tool.annotation.ToolParam
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -30,7 +28,7 @@ class UserProfileService(
     val eventPublisher: ApplicationEventPublisher,
     userConfigService: UserConfigService,
     private val icaAcceptanceLogRepo: IcaAcceptanceLogRepo,
-    private val referralCodeService: ReferralCodeService
+    private val referralCodeService: ReferralCodeService,
 ) : ProfileServiceImpl<UserProfileRepo, UserProfile>(userProfileRepo, eventPublisher) {
 
     private val log = LoggerFactory.getLogger(UserProfileService::class.java)
@@ -40,7 +38,11 @@ class UserProfileService(
         userConfig = userConfigService.findAll().toMutableList()
     }
 
-    @Tool(name = "find_user_by_phone", description = "Finds a user profile by phone number. It will try to find the userby adding different country code prefixes to the phone number provided.")
+    // ADR-026 Phase 2: MCP gate (rejectTokenlessMcp + validateCallerPhone) moved to
+    // UserMcpController. This method is now ungated — internal callers
+    // (FirebaseJwtAuthenticationConverter, WhatsAppOtpService, UserController,
+    // DocumentUploadMcpService, StoreDriverInviteService, StoreAdminStoreProfileEventHandler)
+    // are unaffected by this change.
     fun findUserByPhone(phone: String): UserProfile? {
         if (phone.length < 9) {
             return null
@@ -50,11 +52,13 @@ class UserProfileService(
             .firstNotNullOfOrNull { profileRepo.findByMobileNumber("$it$last9Digits") }
     }
 
-    @Tool(name = "find_users", description = "finds users by role and location. It will return a list of user profiles that match the specified role and are within the specified range of the given latitude and longitude.")
-    fun findByLocation(@ToolParam(description = "This will always have a value MESSENGER because this serach is only allow to search drivers available") role: ProfileRoles,
+    // ADR-026 Phase 2: MCP gate (validateMcpAudience("ADMIN") + audit) moved to
+    // UserMcpController. This method is now ungated — non-MCP callers (REST, scheduler,
+    // event listeners) are unaffected by this change.
+    fun findByLocation(role: ProfileRoles,
                        latitude: Double,
                        longitude: Double,
-                       @ToolParam(description = "range is in degrees. 1 degree is approximately 111 km. So a range of 0.01 would be approximately 1.11 km") range: Double,
+                       range: Double,
                        storeType: StoreType): List<UserProfile>? {
         val maxLong = longitude + range
         val minLong = longitude - range
@@ -88,7 +92,9 @@ class UserProfileService(
         return create(profile)
     }
 
-    @Tool(name = "create_user", description = "Creates a new user profile. It can be a normal customer or a driver or a store owner depending on the role specified in the profile object.")
+    // ADR-026 Phase 2: MCP gate (rejectTokenlessMcp + validateCallerPhone + audit) moved to
+    // UserMcpController. This method is now ungated — internal callers (UserController,
+    // WhatsAppOtpService, StoreAdminStoreProfileEventHandler) are unaffected.
     @Throws(Exception::class)
     override fun create(profile: UserProfile): UserProfile {
         validateUserProfileForCreate(profile)
@@ -313,7 +319,8 @@ class UserProfileService(
         return missingFields
     }
 
-    @Tool(name = "get_missing_fields_by_phone", description = "Returns a list of missing mandatory field names for the user profile associated with the given mobile number.")
+    // ADR-026 Phase 2: MCP gate moved to UserMcpController. This method is now ungated —
+    // it delegates to the ungated findUserByPhone (also ungated after Phase 2).
     fun getAllMissingFields(mobileNumber: String): List<String> {
         return findUserByPhone(mobileNumber)?.let {
             getAllMissingFields(it)

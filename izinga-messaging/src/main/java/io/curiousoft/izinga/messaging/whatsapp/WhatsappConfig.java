@@ -12,4 +12,17 @@ public record WhatsappConfig(String phoneId, String orderConfirmationCustomerTem
                              Boolean multiLineEnabled,
                              /** SEC-01: Meta app secret for HMAC-SHA256 webhook signature verification */
                              String appSecret) {
+
+    /**
+     * AMD-01 (REQ-A3): returns {@code true} when appSecret is configured (non-null, non-blank),
+     * meaning HMAC signature verification is genuinely active.
+     *
+     * ADMIN audience minting is gated on this predicate — when verification is inactive (production
+     * bypass state), no extra DB read is performed and the configured audience is used unchanged.
+     * The moment appSecret is configured and the app restarts, ADMIN minting activates with no
+     * further code change.
+     */
+    public boolean isSignatureVerificationEnabled() {
+        return appSecret != null && !appSecret.isBlank();
+    }
 }

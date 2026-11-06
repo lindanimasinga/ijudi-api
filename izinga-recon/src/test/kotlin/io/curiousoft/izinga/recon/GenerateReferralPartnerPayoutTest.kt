@@ -66,7 +66,7 @@ class GenerateReferralPartnerPayoutTest {
             storeStage1CommissionRepo = storeStage1CommissionRepo,
             storeStage2CommissionRepo = storeStage2CommissionRepo,
             applicationEventPublisher = applicationEventPublisher,
-            ambassadorProperties = AmbassadorProperties(commissionAmount = BigDecimal("70.00"))
+            ambassadorProperties = AmbassadorProperties(commissionAmount = BigDecimal("70.00")),
         )
     }
 

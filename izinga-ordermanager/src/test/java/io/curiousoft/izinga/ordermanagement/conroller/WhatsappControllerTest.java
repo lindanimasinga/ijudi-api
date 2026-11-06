@@ -24,7 +24,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @Disabled
-@RunWith(SpringRunner.class)
 @SpringBootTest(classes = IjudiApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class WhatsappControllerTest {

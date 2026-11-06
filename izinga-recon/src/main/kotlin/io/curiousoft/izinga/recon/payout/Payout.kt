@@ -32,9 +32,25 @@ abstract class Payout(
     var payoutStage: PayoutStage): BaseModel(id = generateId()) {
     abstract var paid: Boolean
     abstract val total: BigDecimal
-    var emailSent = false;
+    var emailSent = false
+    /** GAP-3: persisted failure reason from the bank reconciliation result, if available. */
+    var failureReason: String? = null
+    /** GAP-3: number of times this payout has been submitted and come back with paid=false. */
+    var attemptCount: Int = 0
 }
 
+/**
+ * ADR-028 / GAP-2: bare @Document pins the collection name to the Spring Data MongoDB
+ * default (uncapitalised simple class name = "messengerPayout"), which is the name that
+ * was already in use before this annotation was added.  The compound index enables the
+ * cross-stage double-pay guard query {toId, orders._id} to execute as an index scan
+ * rather than a collection scan on every scheduler retry.
+ *
+ * "orders._id" maps to Order.id because Spring Data MongoDB serialises the @Id-annotated
+ * field of an embedded subdocument as "_id" (see BaseModel.kt line 11-12).
+ */
+@Document
+@CompoundIndex(name = "messenger_payout_cross_stage_idx", def = "{'toId': 1, 'orders._id': 1}")
 class MessengerPayout(
     toId: String,
     toName: String,
@@ -64,6 +80,18 @@ class MessengerPayout(
                                         else orders.sumOf { it.shippingData?.fee!! + (it.tip ?: 0.00) }.toBigDecimal()
 }
 
+/**
+ * ADR-028 / GAP-2: bare @Document pins the collection name to the Spring Data MongoDB
+ * default (uncapitalised simple class name = "shopPayout"), which is the name that
+ * was already in use before this annotation was added.  The compound index enables the
+ * cross-stage double-pay guard query {toId, orders._id} to execute as an index scan
+ * rather than a collection scan on every scheduler retry.
+ *
+ * "orders._id" maps to Order.id because Spring Data MongoDB serialises the @Id-annotated
+ * field of an embedded subdocument as "_id" (see BaseModel.kt line 11-12).
+ */
+@Document
+@CompoundIndex(name = "shop_payout_cross_stage_idx", def = "{'toId': 1, 'orders._id': 1}")
 class ShopPayout(
     toId: String,
     toName: String,

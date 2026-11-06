@@ -185,4 +185,55 @@ public class FirebaseNotificationServiceTest {
         //then
         verify(wrapper).sendMessage(fcmMessage);
     }
+
+    /**
+     * When PushHeading.link is null, the built FCM message must have no WebPush section.
+     */
+    @Test
+    public void sendNotification_nullPushLink_fcmMessageHasNoWebPush() throws Exception {
+        // given
+        Device device = new Device("token-no-link");
+        PushHeading heading = new PushHeading("body text", "title text", null, null); // link = null
+        PushMessage message = new PushMessage(PushMessageType.NEW_ORDER, heading, "payload");
+
+        FCMNotification notification = new FCMNotification(heading.getBody(), heading.getTitle(), null);
+        // WebPush must be null when link is null
+        FCMMessage expected = new FCMMessage(device.getToken(), notification, null);
+
+        // when
+        firebaseNotificationService.sendNotification(device, message);
+
+        // then
+        verify(wrapper).sendMessage(expected);
+        // Verify via the captured argument that webpush is indeed null
+        org.mockito.ArgumentCaptor<FCMMessage> captor = org.mockito.ArgumentCaptor.forClass(FCMMessage.class);
+        verify(wrapper, atLeastOnce()).sendMessage(captor.capture());
+        Assert.assertNull("WebPush must be null when link is null",
+                captor.getValue().getMessage().webpush());
+    }
+
+    /**
+     * When PushHeading.link is non-null, the built FCM message must include a WebPush section
+     * carrying that link as the FcmOptions link.
+     */
+    @Test
+    public void sendNotification_withPushLink_fcmMessageHasWebPushWithLink() throws Exception {
+        // given
+        Device device = new Device("token-with-link");
+        String link = "https://onboard.izinga.co.za/business/info/shop1/order/order1";
+        PushHeading heading = new PushHeading("body text", "title text", null, link);
+        PushMessage message = new PushMessage(PushMessageType.NEW_ORDER, heading, "payload");
+
+        // when
+        firebaseNotificationService.sendNotification(device, message);
+
+        // then
+        org.mockito.ArgumentCaptor<FCMMessage> captor = org.mockito.ArgumentCaptor.forClass(FCMMessage.class);
+        verify(wrapper).sendMessage(captor.capture());
+        FCMMessage sent = captor.getValue();
+        Assert.assertNotNull("WebPush must not be null when link is provided",
+                sent.getMessage().webpush());
+        Assert.assertEquals("FcmOptions link must match the PushHeading link",
+                link, sent.getMessage().webpush().fcm_options().link());
+    }
 }

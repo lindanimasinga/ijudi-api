@@ -2,8 +2,6 @@ package io.curiousoft.izinga.usermanagement.users
 
 import io.curiousoft.izinga.usermanagement.userconfig.FieldDataType
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService
-import org.springframework.ai.tool.annotation.Tool
-import org.springframework.ai.tool.annotation.ToolParam
 import org.springframework.stereotype.Service
 import java.net.URI
 import java.time.Instant
@@ -30,12 +28,8 @@ class DocumentUploadMcpService(
         "graph.facebook.com",
     )
 
-    @Tool(
-        name = "get_required_documents_for_user",
-        description = "Returns required document fields and missing fields for the user linked to a phone number."
-    )
     fun getRequiredDocumentsForUser(
-        @ToolParam(description = "User phone number, for example +27812815577") phone: String,
+        phone: String,
     ): RequiredDocumentsForUserResponse {
         val normalizedPhone = validatePhoneInput(phone)
         val user = userProfileService.findUserByPhone(normalizedPhone)
@@ -43,15 +37,11 @@ class DocumentUploadMcpService(
         return buildRequiredDocumentsResponse(user.mobileNumber ?: normalizedPhone, user.id)
     }
 
-    @Tool(
-        name = "create_document_upload_session",
-        description = "Creates upload instructions for a required document field before linking it to a user profile."
-    )
     fun createDocumentUploadSession(
-        @ToolParam(description = "User phone number, for example +27812815577") phone: String,
-        @ToolParam(description = "Document field name from user config, for example identityDocument") fieldName: String,
-        @ToolParam(description = "Original file name, for example id-card.jpg") originalFileName: String,
-        @ToolParam(description = "MIME type, for example image/jpeg or application/pdf") mimeType: String,
+        phone: String,
+        fieldName: String,
+        originalFileName: String,
+        mimeType: String,
     ): UploadSessionInstructionsResponse {
         val normalizedPhone = validatePhoneInput(phone)
         val user = userProfileService.findUserByPhone(normalizedPhone)
@@ -86,14 +76,10 @@ class DocumentUploadMcpService(
         )
     }
 
-    @Tool(
-        name = "attach_uploaded_document_to_user_tag",
-        description = "Attaches an uploaded document URL to user.tag[fieldName], then returns remaining missing fields."
-    )
     fun attachUploadedDocumentToUserTag(
-        @ToolParam(description = "User phone number, for example +27812815577") phone: String,
-        @ToolParam(description = "Document field name from user config, for example identityDocument") fieldName: String,
-        @ToolParam(description = "Uploaded file public URL") fileUrl: String,
+        phone: String,
+        fieldName: String,
+        fileUrl: String,
     ): AttachUploadedDocumentResponse {
         val normalizedPhone = validatePhoneInput(phone)
         val user = userProfileService.findUserByPhone(normalizedPhone)
@@ -139,14 +125,13 @@ class DocumentUploadMcpService(
         )
     }
 
-    @Tool(
-        name = "recheck_required_documents",
-        description = "Rechecks required fields and required document fields after uploads."
-    )
     fun recheckRequiredDocuments(
-        @ToolParam(description = "User phone number, for example +27812815577") phone: String,
+        phone: String,
     ): RequiredDocumentsForUserResponse {
-        return getRequiredDocumentsForUser(phone)
+        val normalizedPhone = validatePhoneInput(phone)
+        val user = userProfileService.findUserByPhone(normalizedPhone)
+            ?: throw IllegalArgumentException("No user profile found for phone number: $phone")
+        return buildRequiredDocumentsResponse(user.mobileNumber ?: normalizedPhone, user.id)
     }
 
     private fun buildRequiredDocumentsResponse(phone: String, userId: String?): RequiredDocumentsForUserResponse {
@@ -217,4 +202,5 @@ class DocumentUploadMcpService(
             false
         }
     }
+
 }

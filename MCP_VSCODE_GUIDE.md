@@ -25,7 +25,10 @@ The `McpConfig` class wires those beans into a `ToolCallbackProvider`, which `Mc
 | Tool name | Description |
 |-----------|-------------|
 | `find_user_by_phone` | Look up a user profile by phone number (tries 0, +27, 27 prefixes automatically). |
-| `create_user` | Create a new user profile – customer, driver, or store owner – based on the `role` field. |
+
+> **Note (ADR-026 Phase 2b, 2026-11-05):** `create_user` has been removed from the MCP surface.
+> User creation is handled via the REST API on the web apps (driver.izinga.co.za, shop.izinga.co.za, izinga-onboarding).
+> `UserProfileService.create(...)` remains intact for REST/internal callers.
 
 ---
 
@@ -120,9 +123,10 @@ Once connected, talk to Copilot Chat naturally:
 Copilot will invoke `find_user_by_phone` and show the result.
 
 ```
-> Create a new customer named Alice with phone 0721234567 at address "10 Long St, Cape Town"
+> Register the driver with phone 0821234567 on the system
 ```
-Copilot will invoke `create_user` with the appropriate `UserProfile` payload.
+Copilot will advise that driver registration is done via the iZinga onboarding app (driver.izinga.co.za),
+not via the MCP surface (`create_user` was removed in ADR-026 Phase 2b, 2026-11-05).
 
 ---
 

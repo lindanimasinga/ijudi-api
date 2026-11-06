@@ -15,8 +15,7 @@ import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationServic
 import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingListRunEvent;
 import io.curiousoft.izinga.ordermanagement.shoppinglist.ShoppingListService;
 import io.curiousoft.izinga.recon.ReconService;
-import io.curiousoft.izinga.recon.payout.PayoutStage;
-import io.curiousoft.izinga.recon.payout.PayoutType;
+import io.curiousoft.izinga.recon.payout.PayoutGenerationOutcome;
 import io.curiousoft.izinga.usermanagement.userconfig.FieldSpec;
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfig;
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigRepo;
@@ -392,7 +391,8 @@ import static java.lang.String.format;
     public void updateMissingPayouts() {
         LOG.info("=============== [START] Scheduled Job: updateMissingPayouts ===============");
         long startTime = System.currentTimeMillis();
-        int[] counters = {0, 0, 0}; // [shopPayoutsGenerated, messengerPayoutsGenerated, errorCount]
+        // ADR-028: counters track sealed-outcome categories, not raw null checks.
+        int[] counters = {0, 0, 0, 0}; // [shopCreated, messengerCreated, deferred, errors]
 
         try {
             Date fromDate = Date.from(LocalDateTime.now()
@@ -408,61 +408,79 @@ import static java.lang.String.format;
                     OrderStage.STAGE_7_ALL_PAID, false, fromDate);
             LOG.info("Found {} unpaid orders to check for missing payouts", unpaidOrders.size());
 
+            // BUG-1 fix: call internal generate methods directly — never call the @Tool.
+            // getAllPayouts is ungated at the service layer (ADR-026 Phase 5: the MCP gate lives in PayoutMcpController).
+            // The scheduler calls the service directly with no caller context, which is correct.
+            // BUG-2 fix: guard messenger call on non-null shippingData + messengerId to avoid NPE.
+            // ADR-028: both outcomes are sealed. Mark payoutCreated=true only when neither side is Deferred.
             unpaidOrders.stream()
                     .filter(it -> !it.getPayoutCreated())
                     .forEach(order -> {
                         try {
                             LOG.debug("Processing payout for order: {}", order.getId());
 
-                            var payoutCreatedForShop = reconService.getAllPayouts(PayoutType.SHOP,
-                                            fromDate,
-                                            toDate,
-                                            order.getShopId())
-                                    .stream()
-                                    .anyMatch(it -> it.getToId().equals(order.getShopId()) && it.getPayoutStage() == PayoutStage.PENDING);
-
-                            var payoutCreatedForMessenger = order.getShippingData().getMessengerId() != null && reconService.getAllPayouts(PayoutType.MESSENGER,
-                                            fromDate,
-                                            toDate,
-                                            order.getShippingData().getMessengerId())
-                                    .stream()
-                                    .anyMatch(it -> it.getToId().equals(order.getShopId()) && it.getPayoutStage() == PayoutStage.PENDING);
-
-                            if (!payoutCreatedForShop) {
-                                LOG.info("Generating missing shop payout for order: {}", order.getId());
-                                reconService.generatePayoutForShopAndOrder(order);
-                                LOG.info("Shop payout generated for order: {}", order.getId());
+                            PayoutGenerationOutcome<?> shopOutcome = reconService.generatePayoutForShopAndOrder(order);
+                            if (shopOutcome instanceof PayoutGenerationOutcome.Created) {
+                                LOG.info("Shop payout created for order: {}", order.getId());
                                 counters[0]++;
+                            } else if (shopOutcome instanceof PayoutGenerationOutcome.Deferred deferred) {
+                                LOG.info("Shop payout deferred for order {}: {} — will retry next run",
+                                        order.getId(), deferred.getReason());
+                                counters[2]++;
                             } else {
-                                LOG.debug("Shop payout already exists for order: {}", order.getId());
+                                // NotApplicable — log at debug; not an error
+                                LOG.debug("Shop payout not applicable for order {}: {}",
+                                        order.getId(),
+                                        ((PayoutGenerationOutcome.NotApplicable) shopOutcome).getReason());
                             }
 
-                            if (!payoutCreatedForMessenger) {
-                                LOG.info("Generating missing messenger payout for order: {}", order.getId());
+                            PayoutGenerationOutcome<?> messengerOutcome;
+                            ShippingData sd = order.getShippingData();
+                            if (sd != null && sd.getMessengerId() != null) {
                                 var messengerOrderDto = new MessengerOrderDto(order, izingaCommissionPercentage);
-                                reconService.generatePayoutForMessengerAndOrder(messengerOrderDto);
-                                LOG.info("Messenger payout generated for order: {}", order.getId());
-                                counters[1]++;
+                                messengerOutcome = reconService.generatePayoutForMessengerAndOrder(messengerOrderDto);
+                                if (messengerOutcome instanceof PayoutGenerationOutcome.Created) {
+                                    LOG.info("Messenger payout created for order: {}", order.getId());
+                                    counters[1]++;
+                                } else if (messengerOutcome instanceof PayoutGenerationOutcome.Deferred deferred) {
+                                    LOG.info("Messenger payout deferred for order {}: {} — will retry next run",
+                                            order.getId(), deferred.getReason());
+                                    counters[2]++;
+                                } else {
+                                    LOG.debug("Messenger payout not applicable for order {}: {}",
+                                            order.getId(),
+                                            ((PayoutGenerationOutcome.NotApplicable) messengerOutcome).getReason());
+                                }
                             } else {
-                                LOG.debug("Messenger payout already exists for order: {}", order.getId());
+                                LOG.info("Skipping messenger payout for order {}: no messenger assigned", order.getId());
+                                messengerOutcome = new PayoutGenerationOutcome.NotApplicable("no messenger assigned");
                             }
 
-                            order.setPayoutCreated(true);
-                            orderRepo.save(order);
-                            LOG.debug("Order marked as payout created: {}", order.getId());
+                            // Mark payoutCreated=true only when neither side is Deferred.
+                            // A Deferred side means we must retry; leave the flag false so the scheduler picks it up again.
+                            boolean shopDeferred = shopOutcome instanceof PayoutGenerationOutcome.Deferred;
+                            boolean messengerDeferred = messengerOutcome instanceof PayoutGenerationOutcome.Deferred;
+                            if (!shopDeferred && !messengerDeferred) {
+                                order.setPayoutCreated(true);
+                                orderRepo.save(order);
+                                LOG.debug("Order marked as payout created: {}", order.getId());
+                            } else {
+                                LOG.info("Order {} left as payoutCreated=false; deferred; will retry next run",
+                                        order.getId());
+                            }
                         } catch (Exception e) {
-                            counters[2]++;
+                            counters[3]++;
                             LOG.error("Failed to process payout for order: {}", order.getId(), e);
                         }
                     });
         } catch (Exception e) {
-            counters[2]++;
+            counters[3]++;
             LOG.error("Fatal error in updateMissingPayouts job", e);
         } finally {
             long duration = System.currentTimeMillis() - startTime;
             LOG.info("=============== [FINISH] Scheduled Job: updateMissingPayouts ===============");
-            LOG.info("Job Statistics - Shop Payouts Generated: {}, Messenger Payouts Generated: {}, Errors: {}, Duration: {}ms",
-                    counters[0], counters[1], counters[2], duration);
+            LOG.info("Job Statistics - Shop Created: {}, Messenger Created: {}, Deferred: {}, Errors: {}, Duration: {}ms",
+                    counters[0], counters[1], counters[2], counters[3], duration);
         }
     }
 
@@ -553,7 +571,7 @@ import static java.lang.String.format;
             LOG.info("Found {} devices to send promotions to", devices.size());
 
             var deviceIterator = new LinkedList<>(devices);
-            devices.sort((s,b) -> random.nextBoolean() ? 1 : -1);
+            deviceIterator.sort((s,b) -> random.nextBoolean() ? 1 : -1);
 
             var promotions = promotionService.finAllPromotions(StoreType.FOOD)
                     .stream()
@@ -723,6 +741,10 @@ import static java.lang.String.format;
             LOG.info("Found {} WhatsApp sessions from yesterday to check", sessions.size());
 
             for (WhatsappSession session : sessions) {
+                if (session.getFrom() == null) {
+                    LOG.warn("Skipping WhatsApp session with null 'from' field");
+                    continue;
+                }
                 String from = "+" + session.getFrom();
                 try {
                     UserProfile user = userProfileRepo.findByMobileNumber(from);

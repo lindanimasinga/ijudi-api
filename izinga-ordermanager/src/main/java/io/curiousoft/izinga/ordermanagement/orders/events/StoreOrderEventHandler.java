@@ -20,6 +20,7 @@ import io.curiousoft.izinga.messaging.AdminOnlyNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.DeviceService;
 import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
 import io.curiousoft.izinga.recon.ReconService;
+import io.curiousoft.izinga.recon.payout.PayoutGenerationOutcome;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
@@ -97,7 +98,13 @@ public class StoreOrderEventHandler implements OrderEventHandler {
         var store = event.getReceivingStore();
         log.info("Received order udpated event {} for order {}", event.getOrder().getStage(), event.getOrder().getId());
         if (order.getStage() == OrderStage.STAGE_7_ALL_PAID) {
-            reconService.generatePayoutForShopAndOrder(order);
+            // ADR-028: capture sealed outcome; Deferred means bank details missing — scheduler retries.
+            var shopOutcome = reconService.generatePayoutForShopAndOrder(order);
+            if (shopOutcome instanceof PayoutGenerationOutcome.Deferred deferred) {
+                log.info("Shop payout deferred for order {}: {} — scheduler will retry", order.getId(), deferred.getReason());
+            } else if (shopOutcome instanceof PayoutGenerationOutcome.Created) {
+                log.info("Shop payout created for order: {}", order.getId());
+            }
             // RP-006: food customer referral commission (first order only, R15 flat)
             if (store.getStoreType() == StoreType.FOOD) {
                 triggerFoodCustomerCommissionIfEligible(order.getId(), order.getCustomerId());

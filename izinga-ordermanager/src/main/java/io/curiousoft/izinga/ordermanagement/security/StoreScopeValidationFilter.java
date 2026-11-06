@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.ordermanagement.security;
 
+import io.curiousoft.izinga.commons.security.CallerIdentityContext;
 import io.curiousoft.izinga.messaging.security.StoreScopeJwtService;
 import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import jakarta.servlet.FilterChain;
@@ -68,6 +69,11 @@ public class StoreScopeValidationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         String scopeParam = request.getParameter(StoreScopeJwtService.SCOPE_PARAM);
         try {
+            // SEC-MCP-01: mark this thread as an MCP request unconditionally — before token
+            // parsing so that even a missing or invalid token results in a null-audience
+            // hard reject in CallerIdentityValidator, not a silent pass-through.
+            // This flag is NEVER settable from a JWT claim or request parameter.
+            CallerIdentityContext.setMcpRequest(true);
             if (scopeParam != null && !scopeParam.isBlank()) {
                 try {
                     Map<String, String> claims = jwtService.validateAndExtract(scopeParam);
@@ -78,7 +84,10 @@ public class StoreScopeValidationFilter extends OncePerRequestFilter {
                     Audience audience = parseAudience(audienceStr);
                     StoreScopeContext.setPermittedStoreId(storeId);
                     StoreScopeContext.setAudience(audience);
-                    LOG.debug("Scope token accepted: storeId={} audience={}", storeId, audience);
+                    // ADR-024: extract callerPhone claim and propagate to context
+                    String callerPhone = claims.get("callerPhone");
+                    StoreScopeContext.setCallerPhone(callerPhone);
+                    LOG.debug("Scope token accepted: storeId={} audience={} callerPhone=<redacted>", storeId, audience);
                 } catch (Exception e) {
                     // Invalid token — log and allow filter chain to proceed without scope
                     // (soft enforcement; tool methods will still throw if they require scope)

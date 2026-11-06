@@ -4,6 +4,7 @@ import io.curiousoft.izinga.commons.model.ProfileRoles
 import io.curiousoft.izinga.commons.model.UserProfile
 import io.curiousoft.izinga.commons.repo.IcaAcceptanceLogRepo
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
+import io.curiousoft.izinga.commons.security.AgentIdentityAuditService
 import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -38,6 +39,7 @@ class UserProfileServicePendingApprovalsTest {
     @Mock lateinit var userConfigService: UserConfigService
     @Mock lateinit var icaAcceptanceLogRepo: IcaAcceptanceLogRepo
     @Mock lateinit var referralCodeService: ReferralCodeService
+    @Mock lateinit var agentIdentityAuditService: AgentIdentityAuditService
 
     @InjectMocks
     lateinit var profileService: UserProfileService
