@@ -47,6 +47,7 @@ public class StoreServiceSubscriptionEventListenerTest {
     @Mock private StoreAgreementAuditRepository storeAgreementAuditRepository;
     @Mock private StoreTierChangeAuditRepository storeTierChangeAuditRepository;
     @Mock private FirebaseAuth firebaseAuth;
+    @Mock private io.curiousoft.izinga.commons.security.AgentIdentityAuditService agentIdentityAuditService;
 
     @BeforeEach
     public void setUp() {

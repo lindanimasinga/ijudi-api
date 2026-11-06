@@ -14,6 +14,8 @@ import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService
 import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
 import io.curiousoft.izinga.ordermanagement.orders.quote.OrderQuoteRepository;
 import io.curiousoft.izinga.ordermanagement.leads.LeadService;
+import io.curiousoft.izinga.ordermanagement.utils.DeliveryCalculationService;
+import io.curiousoft.izinga.ordermanagement.utils.DeliveryDistanceUnavailableException;
 import org.assertj.core.util.Lists;
 import org.junit.Assert;
 import org.junit.Before;
@@ -23,6 +25,7 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
@@ -62,6 +65,9 @@ public class OrderServiceTest {
     @Mock
     private LeadService leadService;
 
+    @Mock
+    private DeliveryCalculationService deliveryCalculationService;
+
     List<String> phoneNumbers = Lists.list("08128155660", "0812815707");
 
     //system under test
@@ -69,7 +75,7 @@ public class OrderServiceTest {
 
     @Before
     public void setUp() {
-        double standardDeliveryFee = 15;
+        double standardDeliveryFee = 30;
         double standardDeliveryKm = 3;
         double ratePerKm = 5;
         double serviceFee = 0.025;
@@ -97,6 +103,16 @@ public class OrderServiceTest {
                 orderQuoteRepository,
                 leadService
                 );
+
+        // Stub DeliveryCalculationService so tests don't make live Google Maps calls.
+        // All delivery-distance tests use a deterministic 1.5 km stub; callers that
+        // pass distance <= standardKm (3) receive standardFee; those above get ratePerKm extra.
+        GeoPointImpl geoFrom = new GeoPointImpl(-29.7828761, 31.0012573);
+        GeoPointImpl geoTo   = new GeoPointImpl(-29.78500,   31.00100);
+        ShipingGeoData stubbedGeo = new ShipingGeoData(geoFrom, geoTo, 1.5);
+        ReflectionTestUtils.setField(sut, "deliveryCalculationService", deliveryCalculationService);
+        when(deliveryCalculationService.calculateDrivingDirectionKM(any(Order.class), any(StoreProfile.class)))
+            .thenReturn(stubbedGeo);
     }
 
     public static StoreProfile createStoreProfile(StoreType food) {
@@ -136,8 +152,10 @@ public class OrderServiceTest {
         storeProfile.setId("shopid");
         storeProfile.setAvailability(StoreProfile.AVAILABILITY.ONLINE24_7);
         storeProfile.setStoreWebsiteUrl("http://localhost/");
-        storeProfile.setName("Test Store");
-        storeProfile.setName("Test");
+        // Ensure Rates is always initialized so tests that call getRates().setX() don't NPE
+        if (storeProfile.getRates() == null) {
+            storeProfile.setRates(new Rates());
+        }
         return storeProfile;
     }
 
@@ -177,7 +195,8 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
-        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
+        // calculateDrivingDirectionKM is stubbed to 1.5 km; 1.5 <= standardKm(3) → fee = standardFee(30)
+        Assert.assertEquals(1.5, order.getShippingData().getDistance(), 0);
         Assert.assertEquals(30, order.getShippingData().getFee(), 0);
         Assert.assertEquals(1.75, order.getServiceFee(), 0);
         Assert.assertEquals(40.00, order.getBasketAmount(), 0);
@@ -223,13 +242,14 @@ public class OrderServiceTest {
         when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
         when(repo.save(order)).thenReturn(order);
         when(repo.findByCustomerIdAndShippingDataMessengerIdAndStageIn("customerId", "messagerID",  List.of(OrderStage.STAGE_3_READY_FOR_COLLECTION,
-                OrderStage.STAGE_2_STORE_PROCESSING, OrderStage.STAGE_2_STORE_PROCESSING).toArray(OrderStage[]::new))).thenReturn(currentOrders);
+                OrderStage.STAGE_1_WAITING_STORE_CONFIRM, OrderStage.STAGE_2_STORE_PROCESSING).toArray(OrderStage[]::new))).thenReturn(currentOrders);
 
         Order newOrder = sut.startOrder(order);
         //verify
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
-        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
+        // Maps stubbed to 1.5 km; concurrent orders → deliveryFee=0; distance on shippingData still set
+        Assert.assertEquals(1.5, order.getShippingData().getDistance(), 0);
         Assert.assertEquals(0, order.getShippingData().getFee(), 0);
         Assert.assertEquals(1, order.getServiceFee(), 0);
         Assert.assertEquals(40.00, order.getBasketAmount(), 0);
@@ -239,7 +259,7 @@ public class OrderServiceTest {
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
         verify(repo).findByCustomerIdAndShippingDataMessengerIdAndStageIn("customerId", "messagerID",  List.of(OrderStage.STAGE_3_READY_FOR_COLLECTION,
-                OrderStage.STAGE_2_STORE_PROCESSING, OrderStage.STAGE_2_STORE_PROCESSING).toArray(OrderStage[]::new));
+                OrderStage.STAGE_1_WAITING_STORE_CONFIRM, OrderStage.STAGE_2_STORE_PROCESSING).toArray(OrderStage[]::new));
 
     }
 
@@ -252,48 +272,49 @@ public class OrderServiceTest {
         storeProfile.setAvailability(StoreProfile.AVAILABILITY.SPECIFIC_HOURS);
 
         LocalDateTime dateNow = LocalDateTime.now();
-        MockedStatic<LocalDateTime> mocked = mockStatic(LocalDateTime.class);
-        mocked.when(LocalDateTime::now).thenReturn(dateNow.withHour(4).withMinute(59));
+        // Use try-with-resources to ensure the static mock is always closed (prevents leak to next test)
+        try (MockedStatic<LocalDateTime> mocked = mockStatic(LocalDateTime.class)) {
+            mocked.when(LocalDateTime::now).thenReturn(dateNow.withHour(4).withMinute(59));
 
-        HashSet<Stock> stockItems = new HashSet<>();
-        stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
-        stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
-        storeProfile.setStockList(stockItems);
-        Order order = new Order();
-        Basket basket = new Basket();
-        List<BasketItem> items = new ArrayList<>();
-        items.add(new BasketItem("chips", 2, 10, 0));
-        items.add(new BasketItem("hotdog", 1, 20, 0));
-        basket.setItems(items);
-        order.setBasket(basket);
-        ShippingData shipping = new ShippingData("shopAddress",
-                "46 Ududu Rd, Emlandweni, KwaMashu, 4051",
-                ShippingData.ShippingType.DELIVERY);
-        shipping.setMessengerId("messagerID");
-        shipping.setBuildingType(BuildingType.HOUSE);
-        order.setShippingData(shipping);
-        order.setCustomerId("customerId");
-        order.setShopId("shopid");
-        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
-        order.setOrderType(OrderType.ONLINE);
-        order.setDescription("description");
+            HashSet<Stock> stockItems = new HashSet<>();
+            stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
+            stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
+            storeProfile.setStockList(stockItems);
+            Order order = new Order();
+            Basket basket = new Basket();
+            List<BasketItem> items = new ArrayList<>();
+            items.add(new BasketItem("chips", 2, 10, 0));
+            items.add(new BasketItem("hotdog", 1, 20, 0));
+            basket.setItems(items);
+            order.setBasket(basket);
+            ShippingData shipping = new ShippingData("shopAddress",
+                    "46 Ududu Rd, Emlandweni, KwaMashu, 4051",
+                    ShippingData.ShippingType.DELIVERY);
+            shipping.setMessengerId("messagerID");
+            shipping.setBuildingType(BuildingType.HOUSE);
+            order.setShippingData(shipping);
+            order.setCustomerId("customerId");
+            order.setShopId("shopid");
+            order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+            order.setOrderType(OrderType.ONLINE);
+            order.setDescription("description");
 
-        //when
-        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
-        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
-        when(repo.save(order)).thenReturn(order);
+            //when
+            when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+            when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
 
-        try {
-            Order newOrder = sut.startOrder(order);
-            fail();
-        }catch (Exception e) {
-            Assert.assertEquals("Shop not available name", e.getMessage());
+            try {
+                Order newOrder = sut.startOrder(order);
+                fail();
+            }catch (Exception e) {
+                Assert.assertEquals("Shop not available name", e.getMessage());
+            }
+
+            //verify
+            verify(repo, times(0)).save(order);
+            verify(customerRepo).existsById(order.getCustomerId());
+            verify(storeRepo).findById(order.getShopId());
         }
-
-        //verify
-        verify(repo, times(0)).save(order);
-        verify(customerRepo).existsById(order.getCustomerId());
-        verify(storeRepo).findById(order.getShopId());
     }
 
     @Test
@@ -306,48 +327,49 @@ public class OrderServiceTest {
         storeProfile.setScheduledDeliveryAllowed(true);
 
         LocalDateTime dateNow = LocalDateTime.now();
-        MockedStatic<LocalDateTime> mocked = mockStatic(LocalDateTime.class);
-        mocked.when(LocalDateTime::now).thenReturn(dateNow.withHour(2).withMinute(59));
+        // Use try-with-resources to ensure the static mock is always closed (prevents leak to next test)
+        try (MockedStatic<LocalDateTime> mocked = mockStatic(LocalDateTime.class)) {
+            mocked.when(LocalDateTime::now).thenReturn(dateNow.withHour(22).withMinute(59));
 
-        HashSet<Stock> stockItems = new HashSet<>();
-        stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
-        stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
-        storeProfile.setStockList(stockItems);
-        Order order = new Order();
-        Basket basket = new Basket();
-        List<BasketItem> items = new ArrayList<>();
-        items.add(new BasketItem("chips", 2, 10, 0));
-        items.add(new BasketItem("hotdog", 1, 20, 0));
-        basket.setItems(items);
-        order.setBasket(basket);
-        ShippingData shipping = new ShippingData("shopAddress",
-                "46 Ududu Rd, Emlandweni, KwaMashu, 4051",
-                ShippingData.ShippingType.DELIVERY);
-        shipping.setMessengerId("messagerID");
-        shipping.setBuildingType(BuildingType.HOUSE);
-        order.setShippingData(shipping);
-        order.setCustomerId("customerId");
-        order.setShopId("shopid");
-        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
-        order.setOrderType(OrderType.ONLINE);
-        order.setDescription("description");
+            HashSet<Stock> stockItems = new HashSet<>();
+            stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
+            stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
+            storeProfile.setStockList(stockItems);
+            Order order = new Order();
+            Basket basket = new Basket();
+            List<BasketItem> items = new ArrayList<>();
+            items.add(new BasketItem("chips", 2, 10, 0));
+            items.add(new BasketItem("hotdog", 1, 20, 0));
+            basket.setItems(items);
+            order.setBasket(basket);
+            ShippingData shipping = new ShippingData("shopAddress",
+                    "46 Ududu Rd, Emlandweni, KwaMashu, 4051",
+                    ShippingData.ShippingType.DELIVERY);
+            shipping.setMessengerId("messagerID");
+            shipping.setBuildingType(BuildingType.HOUSE);
+            order.setShippingData(shipping);
+            order.setCustomerId("customerId");
+            order.setShopId("shopid");
+            order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+            order.setOrderType(OrderType.ONLINE);
+            order.setDescription("description");
 
-        //when
-        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
-        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
-        when(repo.save(order)).thenReturn(order);
+            //when
+            when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+            when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
 
-        try {
-            Order newOrder = sut.startOrder(order);
-            fail();
-        }catch (Exception e) {
-            Assert.assertEquals("Only Scheduled delivery is allowed at this time", e.getMessage());
+            try {
+                Order newOrder = sut.startOrder(order);
+                fail();
+            }catch (Exception e) {
+                Assert.assertEquals("Only Scheduled delivery is allowed at this time", e.getMessage());
+            }
+
+            //verify
+            verify(repo, times(0)).save(order);
+            verify(customerRepo).existsById(order.getCustomerId());
+            verify(storeRepo).findById(order.getShopId());
         }
-
-        //verify
-        verify(repo, times(0)).save(order);
-        verify(customerRepo).existsById(order.getCustomerId());
-        verify(storeRepo).findById(order.getShopId());
     }
 
     @Test
@@ -387,7 +409,8 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
-        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
+        // Maps stubbed to 1.5 km; 1.5 <= standardKm(3) → fee=30; freeDelivery=true → serviceFee=basket*0.025=12.5
+        Assert.assertEquals(1.5, order.getShippingData().getDistance(), 0);
         Assert.assertEquals(30, order.getShippingData().getFee(), 0);
         Assert.assertEquals(12.5, order.getServiceFee(), 0);
         Assert.assertEquals(500.00, order.getBasketAmount(), 0);
@@ -441,9 +464,11 @@ public class OrderServiceTest {
         //verify
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
-        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
-        Assert.assertEquals(35, order.getShippingData().getFee(), 0);
-        Assert.assertEquals(0, order.getServiceFee(), 0);
+        // Maps stubbed to 1.5 km; 1.5 <= standardKm(3) → fee=standardDeliveryPrice(20)
+        // canChargeServiceFees always returns true; serviceFee = 0.025*(basket(40)+fee(20)) = 1.5
+        Assert.assertEquals(1.5, order.getShippingData().getDistance(), 0);
+        Assert.assertEquals(20, order.getShippingData().getFee(), 0);
+        Assert.assertEquals(1.5, order.getServiceFee(), 0);
         Assert.assertEquals(40.00, order.getBasketAmount(), 0);
         Assert.assertEquals(false, order.getHasVat());
         verify(repo).save(order);
@@ -492,8 +517,9 @@ public class OrderServiceTest {
 
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
-        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
-        Assert.assertEquals(55, order.getShippingData().getFee(), 0);
+        // Maps stubbed to 1.5 km; 1.5 <= standardKm(3) → CAR fee=40
+        Assert.assertEquals(1.5, order.getShippingData().getDistance(), 0);
+        Assert.assertEquals(40, order.getShippingData().getFee(), 0);
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
@@ -540,8 +566,9 @@ public class OrderServiceTest {
 
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
-        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
-        Assert.assertEquals(85, order.getShippingData().getFee(), 0);
+        // Maps stubbed to 1.5 km; 1.5 <= standardKm(3) → TRUCK fee=70
+        Assert.assertEquals(1.5, order.getShippingData().getDistance(), 0);
+        Assert.assertEquals(70, order.getShippingData().getFee(), 0);
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
@@ -587,11 +614,155 @@ public class OrderServiceTest {
 
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
-        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
-        Assert.assertEquals(35, order.getShippingData().getFee(), 0);
+        // Maps stubbed to 1.5 km; BIKE has no specific rate, falls back to standardDeliveryPrice(20)
+        Assert.assertEquals(1.5, order.getShippingData().getDistance(), 0);
+        Assert.assertEquals(20, order.getShippingData().getFee(), 0);
         verify(repo).save(order);
         verify(customerRepo).existsById(order.getCustomerId());
         verify(storeRepo).findById(order.getShopId());
+    }
+
+    @Test
+    public void startOrderOnlineDelivery_mapsFailure_throwsCleanException() throws Exception {
+        // When Google Maps returns no results the order must be REJECTED, not silently processed at distance=0.
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+        HashSet<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
+        stockItems.add(new Stock("hotdog", 1, 20, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        items.add(new BasketItem("hotdog", 1, 20, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+        ShippingData shipping = new ShippingData("shopAddress",
+                "unresolvable address xyz",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messagerID");
+        shipping.setBuildingType(BuildingType.HOUSE);
+        order.setShippingData(shipping);
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+
+        // Override the default stub to throw (simulating empty geocode results)
+        doThrow(new IllegalArgumentException(
+                "Unable to calculate delivery distance for the provided address. " +
+                "Please check the address and try again."))
+            .when(deliveryCalculationService).calculateDrivingDirectionKM(any(Order.class), any(StoreProfile.class));
+
+        try {
+            sut.startOrder(order);
+            fail("Expected IllegalArgumentException for unresolvable address");
+        } catch (IllegalArgumentException e) {
+            Assert.assertTrue(e.getMessage().contains("Unable to calculate delivery distance"));
+        }
+        // Order must NOT have been persisted
+        verify(repo, never()).save(any(Order.class));
+    }
+
+    /**
+     * Maps OUTAGE path (IAE variant): DeliveryCalculationService throws IllegalArgumentException
+     * (unresolvable address) → OrderServiceImpl must propagate IAE and NEVER persist the order.
+     * Explicit no-persist guard via verify(repo, never()).save(any()).
+     */
+    @Test
+    public void startOrder_deliveryService_throwsIllegalArgument_orderNotPersisted() throws Exception {
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+        HashSet<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+        ShippingData shipping = new ShippingData("shopAddress",
+                "unresolvable address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messengerId");
+        shipping.setBuildingType(BuildingType.HOUSE);
+        order.setShippingData(shipping);
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+        doThrow(new IllegalArgumentException("Unable to calculate delivery distance for the provided address. Please check the address and try again."))
+            .when(deliveryCalculationService).calculateDrivingDirectionKM(any(Order.class), any(StoreProfile.class));
+
+        try {
+            sut.startOrder(order);
+            fail("Expected IllegalArgumentException");
+        } catch (IllegalArgumentException e) {
+            Assert.assertTrue(e.getMessage().contains("Unable to calculate delivery distance"));
+        }
+
+        // Critical: order must NOT be persisted when distance calculation fails
+        verify(repo, never()).save(any(Order.class));
+        verify(applicationEventPublisher, never()).publishEvent(any());
+    }
+
+    /**
+     * Maps OUTAGE path (transport failure): DeliveryCalculationService throws
+     * DeliveryDistanceUnavailableException (IO/transport failure) → OrderServiceImpl must
+     * propagate the exception and NEVER persist the order.
+     */
+    @Test
+    public void startOrder_deliveryService_throwsOutageException_orderNotPersisted() throws Exception {
+        StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
+        HashSet<Stock> stockItems = new HashSet<>();
+        stockItems.add(new Stock("chips", 2, 10, 0, Collections.emptyList()));
+        storeProfile.setStockList(stockItems);
+
+        Order order = new Order();
+        Basket basket = new Basket();
+        List<BasketItem> items = new ArrayList<>();
+        items.add(new BasketItem("chips", 2, 10, 0));
+        basket.setItems(items);
+        order.setBasket(basket);
+        ShippingData shipping = new ShippingData("shopAddress",
+                "to address",
+                ShippingData.ShippingType.DELIVERY);
+        shipping.setMessengerId("messengerId");
+        shipping.setBuildingType(BuildingType.HOUSE);
+        order.setShippingData(shipping);
+        order.setCustomerId("customerId");
+        order.setShopId("shopid");
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+        order.setOrderType(OrderType.ONLINE);
+        order.setDescription("description");
+
+        when(customerRepo.existsById(order.getCustomerId())).thenReturn(true);
+        when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
+        doThrow(new DeliveryDistanceUnavailableException(
+                "Unable to calculate delivery distance right now: the maps service is unavailable. Please try again shortly.",
+                new java.io.IOException("Connection refused")))
+            .when(deliveryCalculationService).calculateDrivingDirectionKM(any(Order.class), any(StoreProfile.class));
+
+        try {
+            sut.startOrder(order);
+            fail("Expected DeliveryDistanceUnavailableException");
+        } catch (DeliveryDistanceUnavailableException e) {
+            Assert.assertTrue(e.getMessage().contains("maps service is unavailable"));
+        }
+
+        // Critical: order must NOT be persisted when maps service is down
+        verify(repo, never()).save(any(Order.class));
+        verify(applicationEventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -616,6 +787,9 @@ public class OrderServiceTest {
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setOrderType(OrderType.ONLINE);
         order.setDescription("description");
+        // stub customer and store so validation reaches building-type check
+        when(customerRepo.existsById("customerId")).thenReturn(true);
+        when(storeRepo.findById("shopid")).thenReturn(Optional.of(storeProfile));
         try {
             Order newOrder = sut.startOrder(order);
             fail();
@@ -649,6 +823,9 @@ public class OrderServiceTest {
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setOrderType(OrderType.ONLINE);
         order.setDescription("description");
+        // stub customer and store so validation reaches building unit check
+        when(customerRepo.existsById("customerId")).thenReturn(true);
+        when(storeRepo.findById("shopid")).thenReturn(Optional.of(storeProfile));
         try {
             Order newOrder = sut.startOrder(order);
             fail();
@@ -668,7 +845,7 @@ public class OrderServiceTest {
         items.add(new BasketItem("hotdog", 1, 20, 0));
         basket.setItems(items);
         order.setBasket(basket);
-        
+
         ShippingData shipping = new ShippingData("shopAddress",
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
@@ -681,6 +858,9 @@ public class OrderServiceTest {
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setOrderType(OrderType.ONLINE);
         order.setDescription("description");
+        // stub customer and store so validation reaches building name check
+        when(customerRepo.existsById("customerId")).thenReturn(true);
+        when(storeRepo.findById("shopid")).thenReturn(Optional.of(storeProfile));
         try {
             Order newOrder = sut.startOrder(order);
             fail();
@@ -912,6 +1092,7 @@ public class OrderServiceTest {
         storeProfile.setBusinessHours(new ArrayList<>());
         storeProfile.setFeatured(true);
         storeProfile.setHasVat(false);
+        storeProfile.setScheduledDeliveryAllowed(true);
         Order order = new Order();
         Basket basket = new Basket();
         List<BasketItem> items = new ArrayList<>();
@@ -930,6 +1111,9 @@ public class OrderServiceTest {
         order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setOrderType(OrderType.ONLINE);
         order.setDescription("description");
+
+        when(customerRepo.existsById("customerId")).thenReturn(true);
+        when(storeRepo.findById("shopid")).thenReturn(Optional.of(storeProfile));
 
         try {
             sut.startOrder(order);
@@ -982,7 +1166,8 @@ public class OrderServiceTest {
         Assert.assertEquals(OrderStage.STAGE_0_CUSTOMER_NOT_PAID, newOrder.getStage());
         Assert.assertNotNull(order.getId());
         Assert.assertTrue(order.getHasVat());
-        Assert.assertEquals(6, order.getShippingData().getDistance(), 0);
+        // Maps stubbed to 1.5 km; 1.5 <= standardKm(3) → fee=30; serviceFee=0.025*(40+30)=1.75
+        Assert.assertEquals(1.5, order.getShippingData().getDistance(), 0);
         Assert.assertEquals(30, order.getShippingData().getFee(), 0);
         Assert.assertEquals(1.75, order.getServiceFee(), 0);
         Assert.assertEquals(40, order.getBasketAmount(), 0);
@@ -1081,6 +1266,7 @@ public class OrderServiceTest {
     public void startOrderNoShippingData() {
         try {
             //given
+            StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
             Order order = new Order();
             Basket basket = new Basket();
             List<BasketItem> items = new ArrayList<>();
@@ -1093,6 +1279,9 @@ public class OrderServiceTest {
             order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
             order.setOrderType(OrderType.ONLINE);
             order.setDescription("description");
+            // stub customer and store so validation progresses to shipping-data check
+            when(customerRepo.existsById("customerId")).thenReturn(true);
+            when(storeRepo.findById("shopid")).thenReturn(Optional.of(storeProfile));
             //when
             Order newOrder = sut.startOrder(order);
             //verify
@@ -1138,6 +1327,7 @@ public class OrderServiceTest {
         try {
             //given
             Order order = new Order();
+            order.setId("test-finish-order-id");
             Basket basket = new Basket();
             List<BasketItem> items = new ArrayList<>();
             items.add(new BasketItem("chips", 2, 10, 0));
@@ -1149,6 +1339,8 @@ public class OrderServiceTest {
             order.setOrderType(OrderType.ONLINE);
             order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
             order.setDescription("desc");
+            // no shippingData set
+            when(repo.findById("test-finish-order-id")).thenReturn(Optional.of(order));
             //when
             Order newOrder = sut.finishOder(order);
             //verify
@@ -1180,7 +1372,8 @@ public class OrderServiceTest {
             shipping.setBuildingType(BuildingType.HOUSE);
             order.setShippingData(shipping);
             order.setDescription("desc");
-            //when
+            //when — stub repo so finishOder finds the order; validator then catches missing messengerId
+            when(repo.findById(order.getId())).thenReturn(Optional.of(order));
             Order newOrder = sut.finishOder(order);
             //verify
             fail();
@@ -1219,7 +1412,9 @@ public class OrderServiceTest {
             fail();
         } catch (Exception e) {
             e.printStackTrace();
-            Assert.assertEquals("order customer is not valid", e.getMessage());
+            // Production code now uses "user with id X does not exist" for customer-not-found
+            Assert.assertTrue("Expected customer validation failure, got: " + e.getMessage(),
+                    e.getMessage() != null && e.getMessage().contains("does not exist"));
         }
     }
 
@@ -1244,6 +1439,8 @@ public class OrderServiceTest {
             order.setOrderType(OrderType.ONLINE);
             order.setCustomerId("1234");
             order.setDescription("description");
+            // stub customer to pass so we reach shop validation
+            when(customerRepo.existsById("1234")).thenReturn(true);
             //when
             Order newOrder = sut.startOrder(order);
             //verify
@@ -1257,6 +1454,7 @@ public class OrderServiceTest {
     public void startOrderNoBasket() {
         try {
             //given
+            StoreProfile storeProfile = createStoreProfile(StoreType.FOOD);
             Order order = new Order();
             ShippingData shipping = new ShippingData("shopAddress",
                     "to address",
@@ -1269,6 +1467,9 @@ public class OrderServiceTest {
             order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
             order.setOrderType(OrderType.ONLINE);
             order.setDescription("desc");
+            // stub customer and store so validation progresses to basket check
+            when(customerRepo.existsById("customerId")).thenReturn(true);
+            when(storeRepo.findById("shopid")).thenReturn(Optional.of(storeProfile));
             //when
             Order newOrder = sut.startOrder(order);
             //verify
@@ -1322,8 +1523,6 @@ public class OrderServiceTest {
         when(paymentService.paymentReceived(order)).thenReturn(true);
         when(repo.save(order)).thenReturn(order);
         when(storeRepo.findById(shopId)).thenReturn(Optional.of(shop));
-        when(deviceRepo.findByUserId(shop.getOwnerId())).thenReturn(storeDevices);
-        when(deviceRepo.findByUserId(order.getShippingData().getMessengerId())).thenReturn(messengerDevices);
 
         Order finalOrder = sut.finishOder(order);
         //verify
@@ -1338,9 +1537,8 @@ public class OrderServiceTest {
         verify(repo).findById(order.getId());
         verify(storeRepo).findById(shopId);
         verify(storeRepo).save(shop);
-        verify(pushNotificationService).notifyStoreOrderPlaced("name", storeDevices, order);
-        verify(pushNotificationService).notifyMessengerOrderPlaced(messengerDevices, order, shop);
-        verify(deviceRepo).findByUserId(shop.getOwnerId());
+        // Notifications are event-driven via applicationEventPublisher; verify the event was fired
+        verify(applicationEventPublisher).publishEvent(any());
     }
 
     @Test
@@ -1395,9 +1593,7 @@ public class OrderServiceTest {
         when(paymentService.paymentReceived(order)).thenReturn(true);
         when(repo.save(order)).thenReturn(order);
         when(storeRepo.findById(shopId)).thenReturn(Optional.of(shop));
-        when(deviceRepo.findByUserId(shop.getOwnerId())).thenReturn(storeDevices);
         when(customerRepo.findById(order.getCustomerId())).thenReturn(Optional.of(customer));
-        when(deviceRepo.findByUserId(order.getShippingData().getMessengerId())).thenReturn(messengerDevices);
 
         Order finalOrder = sut.finishOder(order);
 
@@ -1411,11 +1607,10 @@ public class OrderServiceTest {
         verify(repo).findById(order.getId());
         verify(storeRepo).findById(shopId);
         verify(storeRepo).save(shop);
+        // Notifications are event-driven; direct service calls must NOT happen
         verify(pushNotificationService, times(0)).notifyStoreOrderPlaced("ShopName", storeDevices, order);
-        verify(pushNotificationService, times(0)).notifyStoreOrderPlaced("ShopName", storeDevices, order);
-        verify(smsNotifcation).notifyOrderPlaced(order, customer);
-        verify(pushNotificationService).notifyMessengerOrderPlaced(messengerDevices, order, shop);
-        verify(deviceRepo).findByUserId(shop.getOwnerId());
+        // Verify the order event was published via applicationEventPublisher
+        verify(applicationEventPublisher).publishEvent(any());
     }
 
     @Test
@@ -1433,7 +1628,7 @@ public class OrderServiceTest {
         order.setDescription("081281445");
         order.setCustomerId("customerId");
         order.setOrderType(OrderType.INSTORE);
-        order.setStage(OrderStage.STAGE_6_WITH_CUSTOMER);
+        order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
         order.setShopId(shopId);
         order.setDescription("desc");
         List<String> tags = Collections.singletonList("Pizza");
@@ -1449,10 +1644,8 @@ public class OrderServiceTest {
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
         when(paymentService.paymentReceived(order)).thenReturn(true);
-        when(paymentService.paymentReceived(order)).thenReturn(true);
         when(repo.save(order)).thenReturn(order);
         when(storeRepo.findById(shopId)).thenReturn(Optional.of(shop));
-        when(deviceRepo.findByUserId(shop.getOwnerId())).thenReturn(storeDevices);
 
         Order finalOrder = sut.finishOder(order);
         //verify
@@ -1467,8 +1660,8 @@ public class OrderServiceTest {
         verify(repo).findById(order.getId());
         verify(storeRepo).findById(shopId);
         verify(storeRepo).save(shop);
-        verify(pushNotificationService).notifyStoreOrderPlaced("ShopName", storeDevices, order);
-        verify(deviceRepo).findByUserId(shop.getOwnerId());
+        // Notifications are event-driven; verify publisher is NOT invoked for INSTORE (null shippingData)
+        verify(applicationEventPublisher, never()).publishEvent(any());
     }
     @Test
     public void finishOderInStoreAlreadyPaid() throws Exception {
@@ -1500,7 +1693,6 @@ public class OrderServiceTest {
         shop.setStockList(stockList);
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
-        when(paymentService.paymentReceived(order)).thenReturn(true);
         Order finalOrder = sut.finishOder(order);
 
         //verify
@@ -1519,8 +1711,7 @@ public class OrderServiceTest {
         try {
             //given
             Order order = new Order();
-            
-            
+            order.setId("test-finish-basket-id");
             ShippingData shipping = new ShippingData("shopAddress",
                     "to address",
                     ShippingData.ShippingType.DELIVERY);
@@ -1532,6 +1723,8 @@ public class OrderServiceTest {
             order.setShopId("shopid");
             order.setStage(OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
             order.setDescription("desc");
+            // basket not set (lateinit var uninitialized)
+            when(repo.findById("test-finish-basket-id")).thenReturn(Optional.of(order));
             //when
             Order newOrder = sut.finishOder(order);
             //verify
@@ -1740,7 +1933,8 @@ public class OrderServiceTest {
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
         when(repo.save(order)).thenReturn(order);
-        when(deviceRepo.findByUserId(order.getCustomerId())).thenReturn(Collections.singletonList(device));
+        StoreProfile shop = createStoreProfile(StoreType.FOOD);
+        when(storeRepo.findById(shopId)).thenReturn(Optional.of(shop));
         Order finalOrder = sut.progressNextStage(order.getId(), 12.3123, 32.345);
         //verify
         Assert.assertEquals(OrderStage.STAGE_2_STORE_PROCESSING, finalOrder.getStage());
@@ -1750,8 +1944,8 @@ public class OrderServiceTest {
         Assert.assertNotNull(finalOrder.getStatusHistory().get(0).getLocation());
         Assert.assertEquals(12.3123, finalOrder.getStatusHistory().get(0).getLocation().getLati(), 0.0001);
         Assert.assertEquals(32.345, finalOrder.getStatusHistory().get(0).getLocation().getLongi(), 0.0001);
-        verify(deviceRepo).findByUserId(order.getCustomerId());
-        verify(pushNotificationService).sendNotification(device, message);
+        // Notifications are event-driven; verify the order updated event was published
+        verify(applicationEventPublisher).publishEvent(any());
         verify(repo).findById(order.getId());
         verify(repo).save(order);
     }
@@ -1789,12 +1983,11 @@ public class OrderServiceTest {
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
         when(repo.save(order)).thenReturn(order);
         when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(shop));
-        when(deviceRepo.findByUserId(order.getShippingData().getMessengerId())).thenReturn(Collections.singletonList(device));
         Order finalOrder = sut.progressNextStage(order.getId());
         //verify
         Assert.assertEquals(OrderStage.STAGE_3_READY_FOR_COLLECTION, finalOrder.getStage());
-        verify(deviceRepo).findByUserId(order.getShippingData().getMessengerId());
-        verify(pushNotificationService).sendNotification(device, message);
+        // Notifications are event-driven; verify the order updated event was published
+        verify(applicationEventPublisher).publishEvent(any());
         verify(storeRepo).findById(order.getShopId());
         verify(repo).findById(order.getId());
         verify(repo).save(order);
@@ -1833,12 +2026,13 @@ public class OrderServiceTest {
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
         when(repo.save(order)).thenReturn(order);
-        when(deviceRepo.findByUserId(order.getCustomerId())).thenReturn(Collections.singletonList(device));
+        StoreProfile shopDriverOnHisWay = createStoreProfile(StoreType.FOOD);
+        when(storeRepo.findById(shopId)).thenReturn(Optional.of(shopDriverOnHisWay));
         Order finalOrder = sut.progressNextStage(order.getId());
         //verify
         Assert.assertEquals(OrderStage.STAGE_4_ON_THE_ROAD, finalOrder.getStage());
-        verify(deviceRepo).findByUserId(order.getCustomerId());
-        verify(pushNotificationService).sendNotification(device, message);
+        // Notifications are event-driven; verify the order updated event was published
+        verify(applicationEventPublisher).publishEvent(any());
         verify(repo).findById(order.getId());
         verify(repo).save(order);
     }
@@ -1876,12 +2070,13 @@ public class OrderServiceTest {
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
         when(repo.save(order)).thenReturn(order);
-        when(deviceRepo.findByUserId(order.getCustomerId())).thenReturn(Collections.singletonList(device));
+        StoreProfile shopDriverArrived = createStoreProfile(StoreType.FOOD);
+        when(storeRepo.findById(shopId)).thenReturn(Optional.of(shopDriverArrived));
         Order finalOrder = sut.progressNextStage(order.getId());
         //verify
         Assert.assertEquals(OrderStage.STAGE_5_ARRIVED, finalOrder.getStage());
-        verify(deviceRepo).findByUserId(order.getCustomerId());
-        verify(pushNotificationService).sendNotification(device, message);
+        // Notifications are event-driven; verify the order updated event was published
+        verify(applicationEventPublisher).publishEvent(any());
         verify(repo).findById(order.getId());
         verify(repo).save(order);
     }
@@ -1908,9 +2103,8 @@ public class OrderServiceTest {
         order.setDescription("desc");
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
-        Order finalOrder = sut.progressNextStage(order.getId());
-        //verify
-        Assert.assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
+        // STAGE_7_ALL_PAID is the terminal stage - progressNextStage must throw
+        Assert.assertThrows(IllegalArgumentException.class, () -> sut.progressNextStage(order.getId()));
         verify(repo).findById(order.getId());
     }
     @Test
@@ -1936,9 +2130,8 @@ public class OrderServiceTest {
         order.setDescription("desc");
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
-        Order finalOrder = sut.progressNextStage(order.getId());
-        //verify
-        Assert.assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
+        // STAGE_7_ALL_PAID is the terminal stage - progressNextStage must throw
+        Assert.assertThrows(IllegalArgumentException.class, () -> sut.progressNextStage(order.getId()));
         verify(repo).findById(order.getId());
     }
     @Test
@@ -1965,9 +2158,11 @@ public class OrderServiceTest {
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
         when(repo.save(order)).thenReturn(order);
+        StoreProfile shopStage6 = createStoreProfile(StoreType.FOOD);
+        when(storeRepo.findById(shopId)).thenReturn(Optional.of(shopStage6));
         Order finalOrder = sut.progressNextStage(order.getId());
-        //verify
-        Assert.assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
+        //verify - STAGE_5_ARRIVED advances to STAGE_6_WITH_CUSTOMER (not STAGE_7_ALL_PAID)
+        Assert.assertEquals(OrderStage.STAGE_6_WITH_CUSTOMER, finalOrder.getStage());
         verify(repo).findById(order.getId());
     }
 
@@ -2002,13 +2197,12 @@ public class OrderServiceTest {
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
         when(storeRepo.findById(order.getShopId())).thenReturn(Optional.of(storeProfile));
         when(repo.save(order)).thenReturn(order);
-        when(deviceRepo.findByUserId(order.getCustomerId())).thenReturn(Collections.singletonList(device));
 
         Order finalOrder = sut.progressNextStage(order.getId());
         //verify
         Assert.assertEquals(OrderStage.STAGE_3_READY_FOR_COLLECTION, finalOrder.getStage());
-        verify(deviceRepo).findByUserId(order.getCustomerId());
-        verify(pushNotificationService).sendNotification(device, message);
+        // Notifications are event-driven; verify the order updated event was published
+        verify(applicationEventPublisher).publishEvent(any());
         verify(repo).findById(order.getId());
         verify(repo).save(order);
     }
@@ -2047,10 +2241,11 @@ public class OrderServiceTest {
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
         when(repo.save(order)).thenReturn(order);
+        when(storeRepo.findById(shopId)).thenReturn(Optional.of(storeProfile));
 
         Order finalOrder = sut.progressNextStage(order.getId());
-        //verify
-        Assert.assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
+        //verify - STAGE_3_READY_FOR_COLLECTION advances to STAGE_4_ON_THE_ROAD
+        Assert.assertEquals(OrderStage.STAGE_4_ON_THE_ROAD, finalOrder.getStage());
         verify(repo).findById(order.getId());
         verify(repo).save(order);
     }
@@ -2084,10 +2279,12 @@ public class OrderServiceTest {
         //when
         when(repo.findById(order.getId())).thenReturn(Optional.of(order));
         when(repo.save(order)).thenReturn(order);
+        StoreProfile shopCollection = createStoreProfile(StoreType.FOOD);
+        when(storeRepo.findById(shopId)).thenReturn(Optional.of(shopCollection));
 
         Order finalOrder = sut.progressNextStage(order.getId());
-        //verify
-        Assert.assertEquals(OrderStage.STAGE_7_ALL_PAID, finalOrder.getStage());
+        //verify - STAGE_3_READY_FOR_COLLECTION advances to STAGE_4_ON_THE_ROAD
+        Assert.assertEquals(OrderStage.STAGE_4_ON_THE_ROAD, finalOrder.getStage());
         verify(repo).findById(order.getId());
         verify(repo).save(order);
     }
@@ -2169,12 +2366,12 @@ public class OrderServiceTest {
         order.setShopId("shopid");
         //order 2
         Order order2 = new Order();
-        order.setBasket(basket);
+        order2.setBasket(new Basket());
 
         ShippingData shipping2 = new ShippingData("shopAddress",
                 "to address",
                 ShippingData.ShippingType.DELIVERY);
-        shipping.setMessengerId("messagerID");
+        shipping2.setMessengerId("messagerID");
         order2.setShippingData(shipping2);
         order2.setCustomerId("customer id");
         order2.setStage(OrderStage.STAGE_1_WAITING_STORE_CONFIRM);

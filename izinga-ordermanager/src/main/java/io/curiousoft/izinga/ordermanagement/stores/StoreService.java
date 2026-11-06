@@ -10,7 +10,6 @@ import io.curiousoft.izinga.payfast.model.MerchantSubscriptionActivatedEvent;
 import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -40,7 +39,6 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
     private final StoreAgreementAuditRepository storeAgreementAuditRepository;
     private final StoreTierChangeAuditRepository storeTierChangeAuditRepository;
     private final FirebaseAuth firebaseAuth;
-
     public StoreService(StoreRepository storeRepository,
                         UserProfileRepo userProfileRepo,
                         @Value("${ukheshe.main.account}") String mainPayAccount,
@@ -392,12 +390,8 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
                 .collect(Collectors.toList());
     }
 
-    @Tool(name = "find_store_or_shops_by_id", description = "Find a store profile by its ID. If the store has no business hours set, default hours will be added.")
     @Override
     public StoreProfile find(String id) {
-        // SA-021-8: enforce store scope — throws StoreScopeViolationException if this
-        // request's scope token is locked to a different store.
-        io.curiousoft.izinga.ordermanagement.security.StoreScopeValidator.validate(id);
         StoreProfile store = profileRepo.findById(id).orElse(null);
         if (store != null && store.getBusinessHours() == null) {
             ArrayList<BusinessHours> hours = new ArrayList<>();
@@ -407,21 +401,36 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
             instance1.set(2020, 1, 1, 17, 0);
             hours.add(new BusinessHours(DayOfWeek.MONDAY, instance1.getTime(), instance2.getTime()));
             store.setBusinessHours(hours);
+            // #60 — Lazy-seed default categories on the same first-time setup pass.
+            // Category seeding is bundled with the hours seed so that stores which already
+            // have hours set (i.e. post-initial-setup) are never saved redundantly during find().
+            // This is idempotent: if categories are already populated the branch is skipped.
+            // TODO #62: Confirm S3 bucket ACL allows public-read on category images before uploading.
+            if (store.getCategories() == null || store.getCategories().isEmpty()) {
+                store.setCategories(buildDefaultCategories());
+            }
             profileRepo.save(store);
         }
         if (store != null) {
-            // #60 — Lazy-seed default categories when the store has none.
-            // This is idempotent: if categories are already populated the branch is skipped entirely.
-            // Images are left as empty strings; the onboarding team uploads real images via the S3 endpoint.
-            // TODO #62: Confirm S3 bucket ACL allows public-read on category images before uploading (DevOps/Lindani item).
-            if (store.getCategories() == null || store.getCategories().isEmpty()) {
-                List<Category> defaults = buildDefaultCategories();
-                store.setCategories(defaults);
-                profileRepo.save(store);
-            }
             store.setMarkUp(markupPercentage);
         }
         return store;
+    }
+
+    /**
+     * ADR-026 Step B: side-effect-free ownership probe for use by {@link io.curiousoft.izinga.ordermanagement.mcp.StoreMcpController}.
+     *
+     * <p>Returns the raw persisted {@link StoreProfile} without triggering the lazy-seed
+     * of default business hours or categories (and therefore without calling
+     * {@code profileRepo.save()}). This method must ONLY be used for identity/ownership
+     * checks inside the MCP controller layer where triggering a save as a side effect of
+     * a read-only gate would be semantically incorrect.</p>
+     *
+     * <p>Callers that need the full seeded representation (including hours) should still
+     * call {@link #find(String)}.</p>
+     */
+    public StoreProfile findByIdNoSideEffects(String id) {
+        return profileRepo.findById(id).orElse(null);
     }
 
     /** Builds the 5 default delivery categories seeded for every new store on first GET. */
@@ -457,6 +466,105 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
     }
 
     /**
+     * #58 / #59 / #65 — Partial-patch update for StoreProfile.
+     *
+     * <p>Extends the base {@link io.curiousoft.izinga.ordermanagement.service.ProfileServiceImpl#update}
+     * with three additional behaviours:
+     * <ol>
+     *   <li><b>#59 Category validation</b>: when the incoming payload contains categories, every
+     *       category name must match at least one tag across the store's persisted stock items.
+     *       If the store has no stock, validation is skipped (supports initial onboarding seeding).
+     *       Throws {@link IllegalArgumentException} if a category name is unknown.</li>
+     *   <li><b>#58 Category merge</b>: if the incoming payload carries a null or empty categories
+     *       list, the persisted categories are preserved. A non-empty incoming list replaces the
+     *       persisted categories (after passing #59 validation).</li>
+     *   <li><b>#65 Partial-patch null/false guard</b>: admin-set boolean flags
+     *       ({@code profileApproved}, {@code hasPaymentAgreement}, {@code deliversFromMultipleAddresses},
+     *       {@code generateMissingImages}, {@code quoteRequired}) and core string/coordinate fields
+     *       ({@code name}, {@code address}, {@code latitude}, {@code longitude}) are never reset to
+     *       their Java defaults by an incoming payload that omits them. The merge follows OR semantics
+     *       for booleans (once true, stays true unless explicitly set false in a targeted admin call —
+     *       but since a partial PATCH sets them to false by default, OR is the safe default) and
+     *       null-guard semantics for strings/coordinates.</li>
+     * </ol>
+     *
+     * <p>Markup is applied to stock prices before the record is saved.
+     */
+    @Override
+    public StoreProfile update(String profileId, StoreProfile incoming) throws Exception {
+        StoreProfile persisted = profileRepo.findById(profileId)
+                .orElseThrow(() -> new Exception("Profile not found"));
+
+        // #59 — Category name validation against persisted stock tags (before any mutation)
+        List<Category> incomingCats = incoming.getCategories();
+        boolean hasIncomingCategories = incomingCats != null && !incomingCats.isEmpty();
+        if (hasIncomingCategories
+                && persisted.getStockList() != null
+                && !persisted.getStockList().isEmpty()) {
+            Set<String> knownTags = new HashSet<>();
+            for (Stock s : persisted.getStockList()) {
+                if (s.getTags() != null) {
+                    knownTags.addAll(s.getTags());
+                }
+            }
+            for (Category cat : incomingCats) {
+                if (!knownTags.contains(cat.getName())) {
+                    throw new IllegalArgumentException(
+                            "Category '" + cat.getName() + "' does not match any known StockItem tag");
+                }
+            }
+        }
+
+        // #65 — Capture protected fields before BeanUtils overwrites them
+        boolean savedProfileApproved       = persisted.getProfileApproved();
+        boolean savedHasPaymentAgreement   = persisted.getHasPaymentAgreement();
+        boolean savedDeliversFromMultiple  = persisted.getDeliversFromMultipleAddresses();
+        boolean savedGenerateMissingImages = persisted.getGenerateMissingImages();
+        boolean savedQuoteRequired         = persisted.isQuoteRequired();
+        String  savedName                  = persisted.getName();
+        String  savedAddress               = persisted.getAddress();
+        double  savedLatitude              = persisted.getLatitude();
+        double  savedLongitude             = persisted.getLongitude();
+        List<Category> savedCategories     = persisted.getCategories();
+
+        // Full field copy — replaces all fields including the protected ones
+        BeanUtils.copyProperties(incoming, persisted);
+
+        // #65 — Boolean OR-merge: never reset a true admin-set flag to false via a partial PATCH
+        if (savedProfileApproved)       persisted.setProfileApproved(true);
+        if (savedHasPaymentAgreement)   persisted.setHasPaymentAgreement(true);
+        if (savedDeliversFromMultiple)  persisted.setDeliversFromMultipleAddresses(true);
+        if (savedGenerateMissingImages) persisted.setGenerateMissingImages(true);
+        if (savedQuoteRequired)         persisted.setQuoteRequired(true);
+
+        // #65 — Null/zero-guard: don't wipe persisted string/coordinate fields with incoming null/0
+        if (persisted.getName()    == null && savedName    != null) persisted.setName(savedName);
+        if (persisted.getAddress() == null && savedAddress != null) persisted.setAddress(savedAddress);
+        if (persisted.getLatitude()  == 0.0 && savedLatitude  != 0.0) persisted.setLatitude(savedLatitude);
+        if (persisted.getLongitude() == 0.0 && savedLongitude != 0.0) persisted.setLongitude(savedLongitude);
+
+        // #58 — Category merge: keep persisted categories when incoming payload omits them
+        if (!hasIncomingCategories
+                && savedCategories != null
+                && !savedCategories.isEmpty()) {
+            persisted.setCategories(savedCategories);
+        }
+
+        // Apply stock markup
+        persisted.setMarkUp(markupPercentage);
+
+        StoreProfile saved = profileRepo.save(persisted);
+        try {
+            applicationEventPublisher.publishEvent(
+                    new io.curiousoft.izinga.commons.profile.events.ProfileUpdatedEvent(this, saved));
+        } catch (Exception e) {
+            String storeId = (saved != null) ? saved.getId() : "(save returned null)";
+            LOG.warn("ProfileUpdatedEvent publish failed for storeId={}: {}", storeId, e.getMessage());
+        }
+        return saved;
+    }
+
+    /**
      * SEC-01: authenticated stock update — enforces that the caller either owns the store or holds ROLE_ADMIN.
      * The ownership check is performed against the PERSISTED record's ownerId.
      */
@@ -472,43 +580,12 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
         addStockForShop(profileId, stock);
     }
 
-    @Tool(name = "find_stores_by_owner", description = "Find all store profiles owned by a specific user ID.")
     public List<StoreProfile> findByOwner(String ownerId) {
-        return profileRepo.findByOwnerId(ownerId);
+        List<StoreProfile> stores = profileRepo.findByOwnerId(ownerId);
+        return stores;
     }
 
-    /**
-     * ADR-020: MCP tool to find stores with optional filtering.
-     *
-     * <p>All parameters are optional. When none are provided all stores are returned.
-     * When one or more parameters are provided only stores matching ALL supplied filters
-     * are returned.
-     *
-     * <p>PII stripping: each returned StoreProfile has its bank {@code accountId} replaced
-     * with the platform's main pay account, matching the established pattern in
-     * {@link #findAll()} and {@link #findNearbyStores}. No raw bank account numbers
-     * reach the AI agent.
-     *
-     * @param city         Case-insensitive substring match against the store's {@code address}
-     *                     field. Pass {@code null} or blank to skip this filter.
-     * @param storeType    One of: FOOD, CLOTHING, SALON, CAR_WASH, MOVERS, TIPS, LICENSING, PARTS.
-     *                     Pass {@code null} to skip this filter.
-     * @param activeStatus When {@code true}, only stores whose {@code availability} is not
-     *                     {@code OFFLINE} are returned. When {@code false}, only OFFLINE stores
-     *                     are returned. Pass {@code null} to skip this filter.
-     */
-    @Tool(
-        name = "find_stores",
-        description = "Find stores with optional filters. " +
-            "All parameters are optional — pass null to skip a filter. " +
-            "city: case-insensitive substring of the store address. " +
-            "storeType: one of FOOD, CLOTHING, SALON, CAR_WASH, MOVERS, TIPS, LICENSING, PARTS. " +
-            "activeStatus: true = only available (non-OFFLINE) stores, false = only OFFLINE stores, null = all."
-    )
-    public List<StoreProfile> findStores(
-            @org.springframework.ai.tool.annotation.ToolParam(required = false, description = "Optional city name — case-insensitive substring match against store address. Pass null to skip.") String city,
-            @org.springframework.ai.tool.annotation.ToolParam(required = false, description = "Optional store type — one of FOOD, CLOTHING, SALON, CAR_WASH, MOVERS, TIPS, LICENSING, PARTS. Pass null to skip.") StoreType storeType,
-            @org.springframework.ai.tool.annotation.ToolParam(required = false, description = "Optional availability filter — true = non-OFFLINE stores only, false = OFFLINE stores only, null = no filter.") Boolean activeStatus) {
+    public List<StoreProfile> findStores(String city, StoreType storeType, Boolean activeStatus) {
 
         // Load base list: if storeType is supplied use the targeted repository query, else load all
         List<StoreProfile> base = storeType != null
@@ -532,11 +609,6 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
                 if (activeStatus && isOffline) continue;
                 if (!activeStatus && !isOffline) continue;
             }
-            // PII stripping — replace real bank account ID with platform account
-            if (profile.getBank() != null) {
-                profile.getBank().setAccountId(mainPayAccount);
-            }
-            profile.setMarkUp(markupPercentage);
             result.add(profile);
         }
         return result;
@@ -562,6 +634,12 @@ public class StoreService extends ProfileServiceImpl<StoreRepository, StoreProfi
     }
 
     public void addStockForShop(String profileId, Stock stock) throws Exception {
+        // Explicit guard: Kotlin @NotBlank on name doesn't reach the JVM backing field in all
+        // Jakarta Validation provider configurations, so we enforce it directly here before
+        // touching the repository — keeping verifyNoInteractions(storeRepository) in tests valid.
+        if (!StringUtils.hasText(stock.getName())) {
+            throw new Exception("stock name must not be blank");
+        }
         validate(stock);
         StoreProfile store = profileRepo.findById(profileId).orElseThrow(() -> new Exception("Profile not found"));
         Optional<Stock> stockOptional = store.getStockList().stream()

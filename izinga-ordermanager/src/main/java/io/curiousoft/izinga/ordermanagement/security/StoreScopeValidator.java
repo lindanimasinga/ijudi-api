@@ -71,8 +71,8 @@ public final class StoreScopeValidator {
      * callers cannot invoke audience-restricted {@code @Tool} methods.
      *
      * <p>SA-021-15 / NOTE-02: parameter type is {@code Audience...} (typed enum, not {@code String...})
-     * for compile-time safety, consistent with ADR-021 Decision 1 Extension and
-     * {@link RequiresAudience#value()}.
+     * for compile-time safety, consistent with ADR-021 Decision 1 Extension.
+     * (ADR-026 Phase 6: {@code @RequiresAudience} annotation retired; use this method directly.)
      *
      * @param permitted one or more audience values that are allowed to call this tool
      * @throws AudienceViolationException if the caller's audience is absent or not in {@code permitted}

@@ -62,7 +62,6 @@ class ResolveAmbassadorCommissionTest {
             storeStage2CommissionRepo = mockk<StorePartnerStage2CommissionRepo>(),
             applicationEventPublisher = mockk<ApplicationEventPublisher>(),
             ambassadorProperties = ambassadorProperties,
-            agentIdentityAuditService = mockk(relaxed = true)
         )
     }
 
@@ -231,7 +230,6 @@ class ResolveAmbassadorCommissionTest {
                 commissionAmountBakkie = BigDecimal("75.00"),
                 commissionAmountTruck = BigDecimal("80.00")
             ),
-            agentIdentityAuditService = mockk(relaxed = true)
         )
         val (bikeAmount, _) = customSut.resolveAmbassadorCommission(makeDriver("bike delivery"))
         assertEquals(BigDecimal("45.00"), bikeAmount)

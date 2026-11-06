@@ -1,0 +1,352 @@
+[ {
+  "name" : "attach_uploaded_document_to_user_tag",
+  "description" : "Attaches an uploaded document URL to user.tag[fieldName], then returns remaining missing fields.",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "phone" : {
+        "type" : "string",
+        "description" : "User phone number, for example +27812815577"
+      },
+      "fieldName" : {
+        "type" : "string",
+        "description" : "Document field name from user config, for example identityDocument"
+      },
+      "fileUrl" : {
+        "type" : "string",
+        "description" : "Uploaded file public URL"
+      }
+    },
+    "required" : [ "phone", "fieldName", "fileUrl" ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"phone\" : {\n      \"type\" : \"string\",\n      \"description\" : \"User phone number, for example +27812815577\"\n    },\n    \"fieldName\" : {\n      \"type\" : \"string\",\n      \"description\" : \"Document field name from user config, for example identityDocument\"\n    },\n    \"fileUrl\" : {\n      \"type\" : \"string\",\n      \"description\" : \"Uploaded file public URL\"\n    }\n  },\n  \"required\" : [ \"phone\", \"fieldName\", \"fileUrl\" ],\n  \"additionalProperties\" : false\n}"
+}, {
+  "name" : "create_document_upload_session",
+  "description" : "Creates upload instructions for a required document field before linking it to a user profile.",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "phone" : {
+        "type" : "string",
+        "description" : "User phone number, for example +27812815577"
+      },
+      "fieldName" : {
+        "type" : "string",
+        "description" : "Document field name from user config, for example identityDocument"
+      },
+      "originalFileName" : {
+        "type" : "string",
+        "description" : "Original file name, for example id-card.jpg"
+      },
+      "mimeType" : {
+        "type" : "string",
+        "description" : "MIME type, for example image/jpeg or application/pdf"
+      }
+    },
+    "required" : [ "phone", "fieldName", "originalFileName", "mimeType" ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"phone\" : {\n      \"type\" : \"string\",\n      \"description\" : \"User phone number, for example +27812815577\"\n    },\n    \"fieldName\" : {\n      \"type\" : \"string\",\n      \"description\" : \"Document field name from user config, for example identityDocument\"\n    },\n    \"originalFileName\" : {\n      \"type\" : \"string\",\n      \"description\" : \"Original file name, for example id-card.jpg\"\n    },\n    \"mimeType\" : {\n      \"type\" : \"string\",\n      \"description\" : \"MIME type, for example image/jpeg or application/pdf\"\n    }\n  },\n  \"required\" : [ \"phone\", \"fieldName\", \"originalFileName\", \"mimeType\" ],\n  \"additionalProperties\" : false\n}"
+}, {
+  "name" : "find_order_by_id",
+  "description" : "Find order by id and return the order details",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "orderId" : {
+        "type" : "string"
+      }
+    },
+    "required" : [ "orderId" ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"orderId\" : {\n      \"type\" : \"string\"\n    }\n  },\n  \"required\" : [ \"orderId\" ],\n  \"additionalProperties\" : false\n}"
+}, {
+  "name" : "find_order_for_messenger",
+  "description" : "Find order by id and return the order details as MessengerOrderDto",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "orderId" : {
+        "type" : "string"
+      }
+    },
+    "required" : [ "orderId" ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"orderId\" : {\n      \"type\" : \"string\"\n    }\n  },\n  \"required\" : [ \"orderId\" ],\n  \"additionalProperties\" : false\n}"
+}, {
+  "name" : "find_orders_by_messenger_id",
+  "description" : "Find orders by messenger id and return the order details as MessengerOrderDto",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "id" : {
+        "type" : "string"
+      },
+      "allStages" : {
+        "type" : "boolean"
+      }
+    },
+    "required" : [ "id" ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"id\" : {\n      \"type\" : \"string\"\n    },\n    \"allStages\" : {\n      \"type\" : \"boolean\"\n    }\n  },\n  \"required\" : [ \"id\" ],\n  \"additionalProperties\" : false\n}"
+}, {
+  "name" : "find_orders_by_phone_number",
+  "description" : "Find orders by phone number and return the order details",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "phone" : {
+        "type" : "string"
+      }
+    },
+    "required" : [ "phone" ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"phone\" : {\n      \"type\" : \"string\"\n    }\n  },\n  \"required\" : [ \"phone\" ],\n  \"additionalProperties\" : false\n}"
+}, {
+  "name" : "find_orders_by_user_id",
+  "description" : "Find orders by user id and return the order details",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "userId" : {
+        "type" : "string"
+      }
+    },
+    "required" : [ "userId" ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"userId\" : {\n      \"type\" : \"string\"\n    }\n  },\n  \"required\" : [ \"userId\" ],\n  \"additionalProperties\" : false\n}"
+}, {
+  "name" : "find_store_or_shops_by_id",
+  "description" : "Find a store profile by its ID. If the store has no business hours set, default hours will be added.",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "id" : {
+        "type" : "string"
+      }
+    },
+    "required" : [ "id" ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"id\" : {\n      \"type\" : \"string\"\n    }\n  },\n  \"required\" : [ \"id\" ],\n  \"additionalProperties\" : false\n}"
+}, {
+  "name" : "find_stores",
+  "description" : "Find stores with optional filters. All parameters are optional — pass null to skip a filter. city: case-insensitive substring of the store address. storeType: one of FOOD, CLOTHING, SALON, CAR_WASH, MOVERS, TIPS, LICENSING, PARTS. activeStatus: true = only available (non-OFFLINE) stores, false = only OFFLINE stores, null = all.",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "city" : {
+        "type" : "string",
+        "description" : "Optional city name — case-insensitive substring match against store address. Pass null to skip."
+      },
+      "storeType" : {
+        "type" : "string",
+        "enum" : [ "FOOD", "CLOTHING", "SALON", "CAR_WASH", "MOVERS", "TIPS", "LICENSING", "PARTS" ],
+        "description" : "Optional store type — one of FOOD, CLOTHING, SALON, CAR_WASH, MOVERS, TIPS, LICENSING, PARTS. Pass null to skip."
+      },
+      "activeStatus" : {
+        "type" : "boolean",
+        "description" : "Optional availability filter — true = non-OFFLINE stores only, false = OFFLINE stores only, null = no filter."
+      }
+    },
+    "required" : [ ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"city\" : {\n      \"type\" : \"string\",\n      \"description\" : \"Optional city name — case-insensitive substring match against store address. Pass null to skip.\"\n    },\n    \"storeType\" : {\n      \"type\" : \"string\",\n      \"enum\" : [ \"FOOD\", \"CLOTHING\", \"SALON\", \"CAR_WASH\", \"MOVERS\", \"TIPS\", \"LICENSING\", \"PARTS\" ],\n      \"description\" : \"Optional store type — one of FOOD, CLOTHING, SALON, CAR_WASH, MOVERS, TIPS, LICENSING, PARTS. Pass null to skip.\"\n    },\n    \"activeStatus\" : {\n      \"type\" : \"boolean\",\n      \"description\" : \"Optional availability filter — true = non-OFFLINE stores only, false = OFFLINE stores only, null = no filter.\"\n    }\n  },\n  \"required\" : [ ],\n  \"additionalProperties\" : false\n}"
+}, {
+  "name" : "find_stores_by_owner",
+  "description" : "Find all store profiles owned by a specific user ID.",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "ownerId" : {
+        "type" : "string"
+      }
+    },
+    "required" : [ "ownerId" ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"ownerId\" : {\n      \"type\" : \"string\"\n    }\n  },\n  \"required\" : [ \"ownerId\" ],\n  \"additionalProperties\" : false\n}"
+}, {
+  "name" : "find_user_by_phone",
+  "description" : "Finds a user profile by phone number. It will try to find the userby adding different country code prefixes to the phone number provided.",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "phone" : {
+        "type" : "string"
+      }
+    },
+    "required" : [ "phone" ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"phone\" : {\n      \"type\" : \"string\"\n    }\n  },\n  \"required\" : [ \"phone\" ],\n  \"additionalProperties\" : false\n}"
+}, {
+  "name" : "find_users",
+  "description" : "finds users by role and location. It will return a list of user profiles that match the specified role and are within the specified range of the given latitude and longitude.",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "role" : {
+        "type" : "string",
+        "enum" : [ "CUSTOMER", "STORE_ADMIN", "STORE", "MESSENGER", "MESSENGER_ADMIN", "ADMIN", "AMBASSADOR", "REFERRAL_PARTNER" ],
+        "description" : "This will always have a value MESSENGER because this serach is only allow to search drivers available"
+      },
+      "latitude" : {
+        "type" : "number"
+      },
+      "longitude" : {
+        "type" : "number"
+      },
+      "range" : {
+        "type" : "number",
+        "description" : "range is in degrees. 1 degree is approximately 111 km. So a range of 0.01 would be approximately 1.11 km"
+      },
+      "storeType" : {
+        "type" : "string",
+        "enum" : [ "FOOD", "CLOTHING", "SALON", "CAR_WASH", "MOVERS", "TIPS", "LICENSING", "PARTS" ]
+      }
+    },
+    "required" : [ "role", "latitude", "longitude", "range", "storeType" ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"role\" : {\n      \"type\" : \"string\",\n      \"enum\" : [ \"CUSTOMER\", \"STORE_ADMIN\", \"STORE\", \"MESSENGER\", \"MESSENGER_ADMIN\", \"ADMIN\", \"AMBASSADOR\", \"REFERRAL_PARTNER\" ],\n      \"description\" : \"This will always have a value MESSENGER because this serach is only allow to search drivers available\"\n    },\n    \"latitude\" : {\n      \"type\" : \"number\"\n    },\n    \"longitude\" : {\n      \"type\" : \"number\"\n    },\n    \"range\" : {\n      \"type\" : \"number\",\n      \"description\" : \"range is in degrees. 1 degree is approximately 111 km. So a range of 0.01 would be approximately 1.11 km\"\n    },\n    \"storeType\" : {\n      \"type\" : \"string\",\n      \"enum\" : [ \"FOOD\", \"CLOTHING\", \"SALON\", \"CAR_WASH\", \"MOVERS\", \"TIPS\", \"LICENSING\", \"PARTS\" ]\n    }\n  },\n  \"required\" : [ \"role\", \"latitude\", \"longitude\", \"range\", \"storeType\" ],\n  \"additionalProperties\" : false\n}"
+}, {
+  "name" : "get_missing_fields_by_phone",
+  "description" : "Returns a list of missing mandatory field names for the user profile associated with the given mobile number.",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "mobileNumber" : {
+        "type" : "string"
+      }
+    },
+    "required" : [ "mobileNumber" ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"mobileNumber\" : {\n      \"type\" : \"string\"\n    }\n  },\n  \"required\" : [ \"mobileNumber\" ],\n  \"additionalProperties\" : false\n}"
+}, {
+  "name" : "get_payouts_for_user",
+  "description" : "Get all payouts for a given payout type, date range and toId. The default date range is past 7 days. The Payout will have all orders for this payout and the total amount for the payout. For driver the payoutType is MESSENGER and the toId is the driver id. For shop the payoutType is SHOP and the toId is the shop id.",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "payoutType" : {
+        "type" : "string",
+        "enum" : [ "SHOP", "MESSENGER", "AMBASSADOR", "REFERRAL_PARTNER" ],
+        "description" : "For driver the payoutType is MESSENGER"
+      },
+      "from" : {
+        "type" : "string",
+        "description" : "Date time format is like 2026-04-09T00:00:00.000+00:00"
+      },
+      "toDate" : {
+        "type" : "string",
+        "description" : "Date time format is like 2026-04-09T00:00:00.000+00:00"
+      },
+      "toId" : {
+        "type" : "string",
+        "description" : "This is the Driver/Messenger id to use for lookup"
+      }
+    },
+    "required" : [ "payoutType", "from", "toDate", "toId" ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"payoutType\" : {\n      \"type\" : \"string\",\n      \"enum\" : [ \"SHOP\", \"MESSENGER\", \"AMBASSADOR\", \"REFERRAL_PARTNER\" ],\n      \"description\" : \"For driver the payoutType is MESSENGER\"\n    },\n    \"from\" : {\n      \"type\" : \"string\",\n      \"description\" : \"Date time format is like 2026-04-09T00:00:00.000+00:00\"\n    },\n    \"toDate\" : {\n      \"type\" : \"string\",\n      \"description\" : \"Date time format is like 2026-04-09T00:00:00.000+00:00\"\n    },\n    \"toId\" : {\n      \"type\" : \"string\",\n      \"description\" : \"This is the Driver/Messenger id to use for lookup\"\n    }\n  },\n  \"required\" : [ \"payoutType\", \"from\", \"toDate\", \"toId\" ],\n  \"additionalProperties\" : false\n}"
+}, {
+  "name" : "get_required_documents_for_user",
+  "description" : "Returns required document fields and missing fields for the user linked to a phone number.",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "phone" : {
+        "type" : "string",
+        "description" : "User phone number, for example +27812815577"
+      }
+    },
+    "required" : [ "phone" ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"phone\" : {\n      \"type\" : \"string\",\n      \"description\" : \"User phone number, for example +27812815577\"\n    }\n  },\n  \"required\" : [ \"phone\" ],\n  \"additionalProperties\" : false\n}"
+}, {
+  "name" : "recheck_required_documents",
+  "description" : "Rechecks required fields and required document fields after uploads.",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "phone" : {
+        "type" : "string",
+        "description" : "User phone number, for example +27812815577"
+      }
+    },
+    "required" : [ "phone" ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"phone\" : {\n      \"type\" : \"string\",\n      \"description\" : \"User phone number, for example +27812815577\"\n    }\n  },\n  \"required\" : [ \"phone\" ],\n  \"additionalProperties\" : false\n}"
+}, {
+  "name" : "start_order",
+  "description" : "Creates a new order for a customer. customerConfirmed MUST be true — only call this after the customer has explicitly confirmed they want to place the order. idempotencyKey MUST be unique per order attempt; duplicate calls within 24 hours return the existing order. orderType must be ONLINE or INSTORE. basketJson is a JSON-serialised Basket with an items array. shippingDataJson is a JSON-serialised ShippingData (required for ONLINE orders, null for INSTORE).",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "customerId" : {
+        "type" : "string",
+        "description" : "The customer's profile ID"
+      },
+      "customerConfirmed" : {
+        "type" : "boolean",
+        "description" : "Must be true — agent must have confirmed the customer's intent before placing the order"
+      },
+      "idempotencyKey" : {
+        "type" : "string",
+        "description" : "Unique key for this order attempt to prevent duplicate orders"
+      },
+      "shopId" : {
+        "type" : "string",
+        "description" : "The store/shop ID to place the order against"
+      },
+      "description" : {
+        "type" : "string",
+        "description" : "Brief description of the order"
+      },
+      "orderType" : {
+        "type" : "string",
+        "description" : "Order type: ONLINE or INSTORE"
+      },
+      "basketJson" : {
+        "type" : "string",
+        "description" : "JSON of the Basket with items array, e.g. {\"items\":[{\"name\":\"chips\",\"quantity\":2,\"price\":10,\"totalPrice\":20}]}"
+      },
+      "shippingDataJson" : {
+        "type" : "string",
+        "description" : "JSON of ShippingData (required for ONLINE orders). null for INSTORE orders."
+      }
+    },
+    "required" : [ "customerId", "customerConfirmed", "idempotencyKey", "shopId", "description", "orderType", "basketJson" ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"customerId\" : {\n      \"type\" : \"string\",\n      \"description\" : \"The customer's profile ID\"\n    },\n    \"customerConfirmed\" : {\n      \"type\" : \"boolean\",\n      \"description\" : \"Must be true — agent must have confirmed the customer's intent before placing the order\"\n    },\n    \"idempotencyKey\" : {\n      \"type\" : \"string\",\n      \"description\" : \"Unique key for this order attempt to prevent duplicate orders\"\n    },\n    \"shopId\" : {\n      \"type\" : \"string\",\n      \"description\" : \"The store/shop ID to place the order against\"\n    },\n    \"description\" : {\n      \"type\" : \"string\",\n      \"description\" : \"Brief description of the order\"\n    },\n    \"orderType\" : {\n      \"type\" : \"string\",\n      \"description\" : \"Order type: ONLINE or INSTORE\"\n    },\n    \"basketJson\" : {\n      \"type\" : \"string\",\n      \"description\" : \"JSON of the Basket with items array, e.g. {\\\"items\\\":[{\\\"name\\\":\\\"chips\\\",\\\"quantity\\\":2,\\\"price\\\":10,\\\"totalPrice\\\":20}]}\"\n    },\n    \"shippingDataJson\" : {\n      \"type\" : \"string\",\n      \"description\" : \"JSON of ShippingData (required for ONLINE orders). null for INSTORE orders.\"\n    }\n  },\n  \"required\" : [ \"customerId\", \"customerConfirmed\", \"idempotencyKey\", \"shopId\", \"description\", \"orderType\", \"basketJson\" ],\n  \"additionalProperties\" : false\n}"
+} ]

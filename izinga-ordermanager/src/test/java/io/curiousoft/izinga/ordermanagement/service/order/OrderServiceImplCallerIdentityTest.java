@@ -6,6 +6,7 @@ import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.repo.StoreRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.commons.security.AgentIdentityAuditService;
+import io.curiousoft.izinga.commons.security.CallerIdentityContext;
 import io.curiousoft.izinga.commons.security.CallerIdentityViolationException;
 import io.curiousoft.izinga.messaging.AdminOnlyNotificationService;
 import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
@@ -13,41 +14,46 @@ import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import io.curiousoft.izinga.ordermanagement.leads.LeadService;
 import io.curiousoft.izinga.ordermanagement.notification.EmailNotificationService;
 import io.curiousoft.izinga.ordermanagement.orders.OrderServiceImpl;
+import io.curiousoft.izinga.ordermanagement.utils.DeliveryCalculationService;
 import io.curiousoft.izinga.ordermanagement.orders.RestrictedRegionService;
 import io.curiousoft.izinga.ordermanagement.orders.quote.OrderQuoteRepository;
 import io.curiousoft.izinga.ordermanagement.promocodes.PromoCodeClient;
 import io.curiousoft.izinga.ordermanagement.security.StoreScopeContext;
 import io.curiousoft.izinga.ordermanagement.service.paymentverify.PaymentService;
 import org.assertj.core.util.Lists;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
- * ADR-024: Caller identity enforcement tests for MCP tool methods in OrderServiceImpl.
+ * ADR-026 Phase 3: AC-04 service-layer ungated tests for OrderServiceImpl.
  *
- * Uses JUnit 4 + Mockito (izinga-ordermanager module convention).
+ * <p>After Phase 3 migration, all five order-read @Tool gates (null-audience rejection,
+ * CUSTOMER/DRIVER ownership enforcement, AMD-01 scope gates for findOrderByMessengerId)
+ * have been moved from {@link OrderServiceImpl} into {@link
+ * io.curiousoft.izinga.ordermanagement.mcp.OrderMcpController}.
  *
- * Key invariants verified:
- * - CUSTOMER and DRIVER audiences receive identity enforcement.
- * - STORE audience is a no-op (regression test).
- * - SA-022-01: startOrder blocks third-party customerId for CUSTOMER audience.
- * - Audit writes are dispatched on every violation.
+ * <p>These tests verify AC-04: calling the service with any MCP context, including
+ * contexts that previously triggered identity gates, does NOT produce a
+ * {@link CallerIdentityViolationException}. The service simply delegates to the
+ * repository. Gate enforcement is covered in {@link
+ * io.curiousoft.izinga.ordermanagement.mcp.OrderMcpControllerTest}.
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class OrderServiceImplCallerIdentityTest {
 
     @Mock private OrderRepository orderRepo;
@@ -64,15 +70,15 @@ public class OrderServiceImplCallerIdentityTest {
     @Mock private OrderQuoteRepository orderQuoteRepository;
     @Mock private LeadService leadService;
     @Mock private AgentIdentityAuditService agentIdentityAuditService;
+    @Mock private DeliveryCalculationService deliveryCalculationService;
 
     private OrderServiceImpl sut;
 
-    private static final String CALLER_PHONE = "+27812345678";
-    private static final String CALLER_LAST9 = "812345678";
+    private static final String CALLER_PHONE  = "+27812345678";
     private static final String CALLER_USER_ID = "caller-user-id";
-    private static final String OTHER_USER_ID = "other-user-id";
+    private static final String OTHER_USER_ID  = "other-user-id";
 
-    @Before
+    @BeforeEach
     public void setUp() {
         List<String> adminPhones = Lists.list("0812815707");
         sut = new OrderServiceImpl(
@@ -84,261 +90,243 @@ public class OrderServiceImplCallerIdentityTest {
                 promoCodeClient, eventPublisher,
                 restrictedRegionService, orderQuoteRepository, leadService
         );
-        // Inject the @Autowired field that is not in the constructor
         ReflectionTestUtils.setField(sut, "agentIdentityAuditService", agentIdentityAuditService);
+        ReflectionTestUtils.setField(sut, "deliveryCalculationService", deliveryCalculationService);
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         StoreScopeContext.clear();
+        CallerIdentityContext.clear();
     }
 
-    // ---- helper ----
+    // ===== AC-04: findOrder is ungated =====================================================
 
-    private UserProfile callerProfile() {
-        UserProfile p = new UserProfile(
-                "Caller", UserProfile.SignUpReason.BUY,
-                "1 Main St", "https://img.test/1.png",
-                CALLER_PHONE, ProfileRoles.CUSTOMER
-        );
-        p.setId(CALLER_USER_ID);
-        return p;
-    }
-
-    private Order orderOwnedByCaller() {
-        Order o = new Order();
-        o.setId("order-1");
-        o.setCustomerId(CALLER_USER_ID);
-        ShippingData sd = new ShippingData("From", "To", ShippingData.ShippingType.DELIVERY);
-        sd.setMessengerId(CALLER_USER_ID);
-        o.setShippingData(sd);
-        return o;
-    }
-
-    private Order orderOwnedByOther() {
-        Order o = new Order();
-        o.setId("order-2");
-        o.setCustomerId(OTHER_USER_ID);
-        ShippingData sd = new ShippingData("From", "To", ShippingData.ShippingType.DELIVERY);
-        sd.setMessengerId(OTHER_USER_ID);
-        o.setShippingData(sd);
-        return o;
-    }
-
-    private void stubCallerPhoneResolution() {
-        // All three prefix variants return null except the canonical +27 form
-        when(userProfileRepo.findByMobileNumber("0" + CALLER_LAST9)).thenReturn(null);
-        when(userProfileRepo.findByMobileNumber("+27" + CALLER_LAST9)).thenReturn(callerProfile());
-        // NB: stub "27812345678" only if needed — lenient() would allow it but strict mock is fine here
-    }
-
-    // ===== findOrderByPhone =====
-
+    /**
+     * AC-04: findOrder() must not enforce null-audience gate after Phase 3.
+     * Gate was moved to OrderMcpController. Service delegates directly to the repo.
+     */
     @Test
-    public void findOrderByPhone_customerAudience_ownPhone_passes() {
-        StoreScopeContext.setAudience(Audience.CUSTOMER);
-        StoreScopeContext.setCallerPhone(CALLER_PHONE);
-        stubCallerPhoneResolution();
-        when(userProfileRepo.findByMobileNumber("0" + CALLER_LAST9)).thenReturn(callerProfile());
-        when(orderRepo.findByCustomerId(CALLER_USER_ID)).thenReturn(Optional.of(new ArrayList<>()));
+    public void findOrder_mcpNullAudience_serviceDoesNotThrowCive() {
+        CallerIdentityContext.setMcpRequest(true);
+        // No audience — this previously triggered null-audience gate in service
+        when(orderRepo.findById("order-1")).thenReturn(Optional.of(new Order()));
 
-        sut.findOrderByPhone(CALLER_PHONE);
-        // No exception → pass
-    }
-
-    @Test(expected = CallerIdentityViolationException.class)
-    public void findOrderByPhone_customerAudience_thirdPartyPhone_throws() {
-        StoreScopeContext.setAudience(Audience.CUSTOMER);
-        StoreScopeContext.setCallerPhone(CALLER_PHONE);
-
-        sut.findOrderByPhone("+27811111111");
-    }
-
-    @Test
-    public void findOrderByPhone_storeAudience_thirdPartyPhone_noOp() {
-        // STORE audience must NOT be restricted — regression test
-        StoreScopeContext.setAudience(Audience.STORE);
-        StoreScopeContext.setCallerPhone(CALLER_PHONE);
-        when(userProfileRepo.findByMobileNumber(anyString())).thenReturn(null);
-        // findOrderByPhone throws IllegalArgumentException("User not found") — that is the
-        // correct no-violation path for STORE; it must NOT throw CallerIdentityViolationException.
         try {
-            sut.findOrderByPhone("+27811111111");
-            fail("Expected IllegalArgumentException(User not found)");
-        } catch (IllegalArgumentException e) {
-            // expected — not a CallerIdentityViolationException
+            sut.findOrder("order-1");
         } catch (CallerIdentityViolationException e) {
-            fail("STORE audience must not trigger identity enforcement: " + e.getMessage());
+            fail("ADR-026 Phase 3: service must not enforce null-audience gate. CIVE: "
+                    + e.getMessage());
+        } catch (Exception e) {
+            // Other downstream failures (repo miss, missing data) are acceptable
         }
     }
 
-    // ===== findOrder (find_order_by_id) =====
-
+    /**
+     * AC-04: findOrder() must not enforce ownership gate after Phase 3.
+     * CUSTOMER requesting another user's order previously threw CIVE in service.
+     */
     @Test
-    public void findOrder_customerAudience_ownOrder_passes() {
-        StoreScopeContext.setAudience(Audience.CUSTOMER);
+    public void findOrder_mcpCustomerAudience_thirdPartyOrder_serviceDoesNotThrowCive() {
+        CallerIdentityContext.setMcpRequest(true);
+        CallerIdentityContext.setAudience(Audience.CUSTOMER.name());
         StoreScopeContext.setCallerPhone(CALLER_PHONE);
-        stubCallerPhoneResolution();
-        when(orderRepo.findById("order-1")).thenReturn(Optional.of(orderOwnedByCaller()));
-
-        sut.findOrder("order-1");
-        // No exception → pass
-    }
-
-    @Test(expected = CallerIdentityViolationException.class)
-    public void findOrder_customerAudience_thirdPartyOrder_throws() {
-        StoreScopeContext.setAudience(Audience.CUSTOMER);
-        StoreScopeContext.setCallerPhone(CALLER_PHONE);
-        stubCallerPhoneResolution();
-        when(orderRepo.findById("order-2")).thenReturn(Optional.of(orderOwnedByOther()));
-
-        sut.findOrder("order-2");
-    }
-
-    @Test
-    public void findOrder_driverAudience_assignedOrder_passes() {
-        StoreScopeContext.setAudience(Audience.DRIVER);
-        StoreScopeContext.setCallerPhone(CALLER_PHONE);
-        stubCallerPhoneResolution();
-        // Order where the caller IS the messenger
-        Order o = new Order();
-        o.setId("order-1");
-        o.setCustomerId(OTHER_USER_ID);
-        ShippingData sd = new ShippingData("From", "To", ShippingData.ShippingType.DELIVERY);
-        sd.setMessengerId(CALLER_USER_ID);
-        o.setShippingData(sd);
-        when(orderRepo.findById("order-1")).thenReturn(Optional.of(o));
-
-        sut.findOrder("order-1");
-        // No exception → pass
-    }
-
-    @Test(expected = CallerIdentityViolationException.class)
-    public void findOrder_driverAudience_notAssignedOrder_throws() {
-        StoreScopeContext.setAudience(Audience.DRIVER);
-        StoreScopeContext.setCallerPhone(CALLER_PHONE);
-        stubCallerPhoneResolution();
-        when(orderRepo.findById("order-2")).thenReturn(Optional.of(orderOwnedByOther()));
-
-        sut.findOrder("order-2");
-    }
-
-    // ===== findOrderByUserId (find_orders_by_user_id) =====
-
-    @Test
-    public void findOrderByUserId_customerAudience_ownId_passes() {
-        StoreScopeContext.setAudience(Audience.CUSTOMER);
-        StoreScopeContext.setCallerPhone(CALLER_PHONE);
-        stubCallerPhoneResolution();
-        when(orderRepo.findByCustomerId(CALLER_USER_ID)).thenReturn(Optional.of(new ArrayList<>()));
-
-        sut.findOrderByUserId(CALLER_USER_ID);
-        // No exception → pass
-    }
-
-    @Test(expected = CallerIdentityViolationException.class)
-    public void findOrderByUserId_customerAudience_thirdPartyId_throws() {
-        StoreScopeContext.setAudience(Audience.CUSTOMER);
-        StoreScopeContext.setCallerPhone(CALLER_PHONE);
-        stubCallerPhoneResolution();
-
-        sut.findOrderByUserId(OTHER_USER_ID);
-    }
-
-    // ===== findOrderForMessenger (find_order_for_messenger) =====
-
-    @Test
-    public void findOrderForMessenger_driverAudience_assignedOrder_passes() {
-        StoreScopeContext.setAudience(Audience.DRIVER);
-        StoreScopeContext.setCallerPhone(CALLER_PHONE);
-        stubCallerPhoneResolution();
-        Order o = new Order();
-        o.setId("order-1");
-        o.setCustomerId(OTHER_USER_ID);
-        ShippingData sd = new ShippingData("From", "To", ShippingData.ShippingType.DELIVERY);
-        sd.setMessengerId(CALLER_USER_ID);
-        o.setShippingData(sd);
-        o.setBasket(new Basket());
-        when(orderRepo.findById("order-1")).thenReturn(Optional.of(o));
-
-        sut.findOrderForMessenger("order-1");
-        // No exception → pass
-    }
-
-    @Test(expected = CallerIdentityViolationException.class)
-    public void findOrderForMessenger_driverAudience_notAssignedOrder_throws() {
-        StoreScopeContext.setAudience(Audience.DRIVER);
-        StoreScopeContext.setCallerPhone(CALLER_PHONE);
-        stubCallerPhoneResolution();
-        Order o = orderOwnedByOther(); // messengerId = OTHER_USER_ID
-        o.setBasket(new Basket());
-        when(orderRepo.findById("order-2")).thenReturn(Optional.of(o));
-
-        sut.findOrderForMessenger("order-2");
-    }
-
-    // ===== findOrderForMessenger — CUSTOMER audience (FIX-03) =====
-
-    @Test
-    public void findOrderForMessenger_customerAudience_ownOrder_passes() {
-        // FIX-03: CUSTOMER audience must be able to retrieve their own order's MessengerOrderDto
-        StoreScopeContext.setAudience(Audience.CUSTOMER);
-        StoreScopeContext.setCallerPhone(CALLER_PHONE);
-        stubCallerPhoneResolution();
-        Order o = orderOwnedByCaller(); // customerId = CALLER_USER_ID
-        o.setBasket(new Basket());
-        when(orderRepo.findById("order-1")).thenReturn(Optional.of(o));
-
-        sut.findOrderForMessenger("order-1");
-        // No exception → CUSTOMER can access their own order
-    }
-
-    @Test(expected = CallerIdentityViolationException.class)
-    public void findOrderForMessenger_customerAudience_thirdPartyOrder_throws() {
-        // FIX-03: CUSTOMER must NOT access another customer's MessengerOrderDto (data leak)
-        StoreScopeContext.setAudience(Audience.CUSTOMER);
-        StoreScopeContext.setCallerPhone(CALLER_PHONE);
-        stubCallerPhoneResolution();
-        Order o = orderOwnedByOther(); // customerId = OTHER_USER_ID
-        o.setBasket(new Basket());
-        when(orderRepo.findById("order-2")).thenReturn(Optional.of(o));
-
-        sut.findOrderForMessenger("order-2");
-    }
-
-    @Test
-    public void findOrderForMessenger_storeAudience_anyOrder_noOp() {
-        // FIX-03 regression: STORE audience must NOT be restricted by the new CUSTOMER branch
-        StoreScopeContext.setAudience(Audience.STORE);
-        StoreScopeContext.setCallerPhone(CALLER_PHONE);
-        Order o = orderOwnedByOther();
-        o.setBasket(new Basket());
-        when(orderRepo.findById("order-2")).thenReturn(Optional.of(o));
-
-        try {
-            sut.findOrderForMessenger("order-2");
-            // No exception → STORE audience is exempt from identity enforcement
-        } catch (CallerIdentityViolationException e) {
-            fail("STORE audience must not trigger identity enforcement: " + e.getMessage());
-        }
-    }
-
-    // ===== startOrder SA-022-01 =====
-
-    @Test(expected = CallerIdentityViolationException.class)
-    public void startOrder_customerAudience_thirdPartyCustomerId_throws() {
-        StoreScopeContext.setAudience(Audience.CUSTOMER);
-        StoreScopeContext.setCallerPhone(CALLER_PHONE);
-        stubCallerPhoneResolution();
-        // Caller is CALLER_USER_ID but order has OTHER_USER_ID
-        when(userProfileRepo.existsById(OTHER_USER_ID)).thenReturn(true);
 
         Order order = new Order();
+        order.setCustomerId(OTHER_USER_ID);
+        when(orderRepo.findById("order-1")).thenReturn(Optional.of(order));
+
+        try {
+            sut.findOrder("order-1");
+        } catch (CallerIdentityViolationException e) {
+            fail("ADR-026 Phase 3: ownership gate moved to controller. Service must not throw CIVE: "
+                    + e.getMessage());
+        } catch (Exception e) {
+            // OK
+        }
+    }
+
+    @Test
+    public void findOrder_nonMcp_delegatesToRepo() {
+        Order order = new Order();
+        order.setId("order-1");
+        when(orderRepo.findById("order-1")).thenReturn(Optional.of(order));
+
+        Order result = sut.findOrder("order-1");
+        assertNotNull(result);
+        verify(orderRepo).findById("order-1");
+    }
+
+    @Test
+    public void findOrder_nonMcp_missingOrder_returnsNull() {
+        when(orderRepo.findById("order-1")).thenReturn(Optional.empty());
+
+        Order result = sut.findOrder("order-1");
+        assertNull(result);
+    }
+
+    // ===== AC-04: findOrderByUserId is ungated ============================================
+
+    /**
+     * AC-04: findOrderByUserId() must not enforce ownership gate after Phase 3.
+     */
+    @Test
+    public void findOrderByUserId_mcpCustomerAudience_thirdPartyId_serviceDoesNotThrowCive() {
+        CallerIdentityContext.setMcpRequest(true);
+        CallerIdentityContext.setAudience(Audience.CUSTOMER.name());
+        StoreScopeContext.setCallerPhone(CALLER_PHONE);
+        when(orderRepo.findByCustomerId(OTHER_USER_ID)).thenReturn(Optional.of(new ArrayList<>()));
+
+        try {
+            sut.findOrderByUserId(OTHER_USER_ID);
+        } catch (CallerIdentityViolationException e) {
+            fail("ADR-026 Phase 3: ownership gate moved to controller. Service must not throw CIVE: "
+                    + e.getMessage());
+        } catch (Exception e) {
+            // OK
+        }
+    }
+
+    // ===== AC-04: findOrderForMessenger is ungated ========================================
+
+    /**
+     * AC-04: findOrderForMessenger() must not enforce null-audience gate after Phase 3.
+     */
+    @Test
+    public void findOrderForMessenger_mcpNullAudience_serviceDoesNotThrowCive() {
+        CallerIdentityContext.setMcpRequest(true);
+        when(orderRepo.findById("order-1")).thenReturn(Optional.of(new Order()));
+
+        try {
+            sut.findOrderForMessenger("order-1");
+        } catch (CallerIdentityViolationException e) {
+            fail("ADR-026 Phase 3: null-audience gate moved to controller. Service must not throw CIVE: "
+                    + e.getMessage());
+        } catch (Exception e) {
+            // OK
+        }
+    }
+
+    @Test
+    public void findOrderForMessenger_nonMcpNullAudience_passes() {
+        // Non-MCP: null audience is never enforced — always was the case
+        when(orderRepo.findById("order-1")).thenReturn(Optional.of(new Order()));
+
+        try {
+            sut.findOrderForMessenger("order-1");
+        } catch (CallerIdentityViolationException e) {
+            fail("Non-MCP path must never enforce gates: " + e.getMessage());
+        } catch (Exception e) {
+            // OK
+        }
+    }
+
+    // ===== AC-04: findOrderByPhone is ungated =============================================
+
+    /**
+     * AC-04: findOrderByPhone() must not enforce phone-ownership gate after Phase 3.
+     * CUSTOMER requesting another user's phone previously threw CIVE in service.
+     */
+    @Test
+    public void findOrderByPhone_mcpCustomerAudience_thirdPartyPhone_serviceDoesNotThrowCive() {
+        CallerIdentityContext.setMcpRequest(true);
+        CallerIdentityContext.setAudience(Audience.CUSTOMER.name());
+        StoreScopeContext.setCallerPhone(CALLER_PHONE);
+
+        // The service will try to resolve the phone to a user and may throw a non-CIVE
+        // exception if the user is not found — that is acceptable.
+        try {
+            sut.findOrderByPhone("+27800000000");
+        } catch (CallerIdentityViolationException e) {
+            fail("ADR-026 Phase 3: phone gate moved to controller. Service must not throw CIVE: "
+                    + e.getMessage());
+        } catch (Exception e) {
+            // OK — e.g. user not found
+        }
+    }
+
+    // ===== AC-04: findOrderByMessengerId is ungated =======================================
+
+    /**
+     * AC-04: findOrderByMessengerId() must not enforce null-audience gate after Phase 3.
+     */
+    @Test
+    public void findOrderByMessengerId_mcpNullAudience_serviceDoesNotThrowCive() {
+        CallerIdentityContext.setMcpRequest(true);
+        // No stub needed: service calls findByShippingDataMessengerIdAndStageNot when allStages=false
+
+        try {
+            sut.findOrderByMessengerId(CALLER_USER_ID, false);
+        } catch (CallerIdentityViolationException e) {
+            fail("ADR-026 Phase 3: null-audience gate moved to controller. Service must not throw CIVE: "
+                    + e.getMessage());
+        } catch (Exception e) {
+            // OK
+        }
+    }
+
+    /**
+     * AC-04: findOrderByMessengerId() DRIVER ownership gate must not fire in service.
+     */
+    @Test
+    public void findOrderByMessengerId_mcpDriverAudience_otherUserId_serviceDoesNotThrowCive() {
+        CallerIdentityContext.setMcpRequest(true);
+        CallerIdentityContext.setAudience(Audience.DRIVER.name());
+        StoreScopeContext.setCallerPhone(CALLER_PHONE);
+        // No stub needed: service calls findByShippingDataMessengerIdAndStageNot when allStages=false
+
+        try {
+            sut.findOrderByMessengerId(OTHER_USER_ID, false);
+        } catch (CallerIdentityViolationException e) {
+            fail("ADR-026 Phase 3: DRIVER ownership gate moved to controller. Service must not throw CIVE: "
+                    + e.getMessage());
+        } catch (Exception e) {
+            // OK
+        }
+    }
+
+    @Test
+    public void findOrderByMessengerId_nonMcpRequest_delegatesToRepo() {
+        // allStages=false → service calls findByShippingDataMessengerIdAndStageNot
+        when(orderRepo.findByShippingDataMessengerIdAndStageNot(OTHER_USER_ID, OrderStage.STAGE_0_CUSTOMER_NOT_PAID))
+                .thenReturn(List.of());
+
+        Set<Order> result = sut.findOrderByMessengerId(OTHER_USER_ID, false);
+        assertNotNull(result);
+        verify(orderRepo).findByShippingDataMessengerIdAndStageNot(OTHER_USER_ID, OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
+    }
+
+    // ===== startOrder SA-022-01 ===========================================================
+
+    /**
+     * ADR-026 Phase 1: ownership enforcement was moved from {@link OrderServiceImpl} to
+     * {@link io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController}.
+     * {@code OrderServiceImpl.startOrder()} must NOT throw {@link CallerIdentityViolationException}
+     * for a third-party customerId — that check now lives exclusively at the controller layer.
+     */
+    @Test
+    public void startOrder_customerAudienceThirdPartyId_ownershipNotEnforcedAtServiceLayer() {
+        StoreScopeContext.setAudience(Audience.CUSTOMER);
+        StoreScopeContext.setCallerPhone(CALLER_PHONE);
+        // No phone resolution or existsById stubs required: Phase 1 moved those checks
+        // to OrderCreationMcpController. The service no longer reads caller identity here.
+
+        Order order = new Order();
+        order.setOrderType(OrderType.ONLINE);
         order.setCustomerId(OTHER_USER_ID);
         order.setShopId("shop-1");
         ShippingData sd = new ShippingData("From", "To", ShippingData.ShippingType.DELIVERY);
         order.setShippingData(sd);
 
-        sut.startOrder(order);
+        // Phase 1: ownership enforcement lives at the controller layer, not the service layer.
+        // The service must NOT throw CIVE. Any other downstream failure is acceptable.
+        try {
+            sut.startOrder(order);
+        } catch (CallerIdentityViolationException e) {
+            fail("ADR-026 Phase 1: ownership enforcement moved to controller layer; "
+                    + "OrderServiceImpl must not throw CIVE: " + e.getMessage());
+        } catch (Exception e) {
+            // Other downstream failures (e.g. shop not found, missing data) are acceptable.
+        }
     }
 }

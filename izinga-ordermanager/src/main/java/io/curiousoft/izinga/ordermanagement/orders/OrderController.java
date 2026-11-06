@@ -4,6 +4,7 @@ import io.curiousoft.izinga.commons.model.Order;
 import io.curiousoft.izinga.commons.model.QouteApproval;
 import io.curiousoft.izinga.commons.order.DeliveryPriceEstimateDto;
 import io.curiousoft.izinga.commons.order.OrderService;
+import io.curiousoft.izinga.ordermanagement.utils.DeliveryDistanceUnavailableException;
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.servers.Server;
 import org.slf4j.Logger;
@@ -40,8 +41,16 @@ public class OrderController {
     }
 
     @PostMapping(consumes = "application/json", produces = "application/json")
-    public ResponseEntity<Order> startOrder(@RequestBody @Valid Order order) throws Exception {
-        return ResponseEntity.ok(orderService.startOrder(order));
+    public ResponseEntity<?> startOrder(@RequestBody @Valid Order order) throws Exception {
+        try {
+            return ResponseEntity.ok(orderService.startOrder(order));
+        } catch (DeliveryDistanceUnavailableException ex) {
+            LOGGER.warn("Maps service unavailable on start-order: {}", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("error", ex.getMessage()));
+        } catch (IllegalArgumentException ex) {
+            LOGGER.warn("Invalid start-order request: {}", ex.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
     }
 
     @PatchMapping(value = "/{id}", consumes = "application/json", produces = "application/json")
@@ -97,6 +106,9 @@ public class OrderController {
         try {
             DeliveryPriceEstimateDto estimate = orderService.getDeliveryPriceEstimate(category, fromAddress, toAddress, shopId);
             return ResponseEntity.ok(estimate);
+        } catch (DeliveryDistanceUnavailableException ex) {
+            LOGGER.warn("Maps service unavailable on delivery-price: {}", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("error", ex.getMessage()));
         } catch (IllegalArgumentException ex) {
             LOGGER.warn("Invalid delivery price request: {}", ex.getMessage());
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));

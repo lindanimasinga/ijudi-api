@@ -6,12 +6,7 @@ import io.curiousoft.izinga.commons.order.DeliveryPriceEstimateDto;
 import io.curiousoft.izinga.commons.order.MessengerOrderDto;
 import io.curiousoft.izinga.commons.order.OrderService;
 import io.curiousoft.izinga.commons.order.events.*;
-import io.curiousoft.izinga.commons.security.AgentIdentityAuditLog;
 import io.curiousoft.izinga.commons.security.AgentIdentityAuditService;
-import io.curiousoft.izinga.commons.security.CallerIdentityContext;
-import io.curiousoft.izinga.commons.security.CallerIdentityViolationException;
-import io.curiousoft.izinga.ordermanagement.security.StoreScopeContext;
-import io.curiousoft.izinga.ordermanagement.security.StoreScopeValidator;
 import io.curiousoft.izinga.ordermanagement.cancellation.CustomerCancellationService;
 import io.curiousoft.izinga.commons.repo.DeviceRepository;
 import io.curiousoft.izinga.commons.order.OrderRepository;
@@ -29,8 +24,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -46,8 +39,8 @@ import java.util.stream.Collectors;
 import static io.curiousoft.izinga.commons.model.OrderKt.generateId;
 import static io.curiousoft.izinga.commons.model.OrderType.INSTORE;
 import static io.curiousoft.izinga.commons.model.OrderType.ONLINE;
+import io.curiousoft.izinga.ordermanagement.utils.DeliveryCalculationService;
 import static io.curiousoft.izinga.ordermanagement.utils.IjudiUtils.calculateDeliveryDistanceFee;
-import static io.curiousoft.izinga.ordermanagement.utils.IjudiUtils.calculateDrivingDirectionKM;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -82,6 +75,11 @@ public class OrderServiceImpl implements OrderService {
     // ADR-024: injected via field to avoid disrupting the existing constructor
     @Autowired
     private AgentIdentityAuditService agentIdentityAuditService;
+
+    // Injected via field to avoid disrupting the existing constructor; wrapped so integration
+    // tests can replace it with @MockBean without fighting MockedStatic thread-locality.
+    @Autowired
+    private DeliveryCalculationService deliveryCalculationService;
 
     @Autowired
     public OrderServiceImpl(@Value("${service.delivery.standardFee}") double starndardDeliveryFee,
@@ -145,30 +143,33 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Order startOrder(Order order) {
 
+        if (order.getOrderType() == null) {
+            throw new IllegalArgumentException("order type is not valid");
+        }
+
         if (!userProfileRepo.existsById(order.getCustomerId())) {
             throw new IllegalArgumentException("user with id " + order.getCustomerId() + " does not exist");
         }
 
-        // SA-022-01 / ADR-024: CUSTOMER agents may only start orders for themselves.
-        // DRIVER and STORE audiences are exempt (STORE places orders on behalf of customers).
+        // Guard shopId: lateinit var in Kotlin throws UninitializedPropertyAccessException if not set
+        String resolvedShopId;
         try {
-            StoreScopeValidator.validateCallerOwnsId(order.getCustomerId(), this::resolveCallerUserId);
-        } catch (CallerIdentityViolationException e) {
-            // FIX-04: capture audience on the request thread before the @Async dispatch
-            String auditAudience = CallerIdentityContext.getAudience() != null ? CallerIdentityContext.getAudience() : "UNKNOWN";
-            agentIdentityAuditService.recordViolation(
-                    StoreScopeContext.getCallerPhone(), order.getCustomerId(),
-                    AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED, "start_order",
-                    auditAudience, null, null);
-            throw e;
+            resolvedShopId = order.getShopId();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("order shop is not valid");
         }
 
-        Optional<StoreProfile> storeOptional = storeRepository.findById(order.getShopId());
+        Optional<StoreProfile> storeOptional = storeRepository.findById(resolvedShopId);
         if (!storeOptional.isPresent()) {
-            throw new IllegalArgumentException("shop with id " + order.getShopId() + " does not exist");
+            throw new IllegalArgumentException("shop with id " + resolvedShopId + " does not exist");
         }
 
-        if (!storeOptional.get().getScheduledDeliveryAllowed() && order.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY) {
+        // Guard shippingData: ONLINE orders require shipping data
+        if (order.getOrderType() == ONLINE && order.getShippingData() == null) {
+            throw new IllegalArgumentException("Please supply shipping info for delivery or If you are paying in store, shipping should be null");
+        }
+
+        if (order.getShippingData() != null && !storeOptional.get().getScheduledDeliveryAllowed() && order.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY) {
             throw new IllegalArgumentException("Collection or scheduled orders not allowed for " + storeOptional.get().getName());
         }
 
@@ -177,15 +178,27 @@ public class OrderServiceImpl implements OrderService {
         }
 
         if(order.getOrderType() == ONLINE
+                && order.getShippingData() != null
                 && order.getShippingData().getType() == ShippingData.ShippingType.DELIVERY
                 && !storeOptional.get().isDeliverNowAllowed()) {
             throw new IllegalArgumentException("Only Scheduled delivery is allowed at this time");
         }
 
+        // Validate delivery address/building info before expensive stock check
+        var orderViolations = validator.validate(order);
+        if (!orderViolations.isEmpty()) {
+            throw new IllegalArgumentException(orderViolations.iterator().next().getMessage());
+        }
+
         List<String> stockItemNames = storeOptional.get()
                 .getStockList().stream().map(Stock::getName).toList();
-        List<String> basketItemNames = order
-                .getBasket().getItems().stream().map(BasketItem::getName).toList();
+        // Guard basket: lateinit var in Kotlin throws UninitializedPropertyAccessException if not set
+        List<String> basketItemNames;
+        try {
+            basketItemNames = order.getBasket().getItems().stream().map(BasketItem::getName).toList();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("order basket is not valid");
+        }
 
         boolean isValidBasketItems = stockItemNames.containsAll(basketItemNames);
         if (!INSTORE.equals(order.getOrderType()) && !isValidBasketItems) {
@@ -216,7 +229,7 @@ public class OrderServiceImpl implements OrderService {
                             OrderStage.STAGE_2_STORE_PROCESSING) : List.of();
 
             // if there are current orders for this user and its same messenger than don't charge a delivery fee.
-            var shipingGeoData = calculateDrivingDirectionKM(googleMapsApiKey, order, storeOptional.get());
+            var shipingGeoData = deliveryCalculationService.calculateDrivingDirectionKM(order, storeOptional.get());
             if(allOrdersCurrentForCustomer.isEmpty()) {
                 double standardFee = resolveStandardDeliveryFee(order, storeOptional.get());
 
@@ -237,8 +250,14 @@ public class OrderServiceImpl implements OrderService {
 
             //if store has weight and volume fee, add to the total fee
             if(storeOptional.get().getRates() != null) {
-                order.setWeightFee(storeOptional.get().getRates().getRatePerWeightKg() * order.getTotalWeight());
-                order.setVolumeFee(storeOptional.get().getRates().getRatePerVolumeCM2() * order.getTotalArea());
+                Double ratePerWeightKg = storeOptional.get().getRates().getRatePerWeightKg();
+                if (ratePerWeightKg != null) {
+                    order.setWeightFee(ratePerWeightKg * order.getTotalWeight());
+                }
+                Double ratePerVolumeCM2 = storeOptional.get().getRates().getRatePerVolumeCM2();
+                if (ratePerVolumeCM2 != null) {
+                    order.setVolumeFee(ratePerVolumeCM2 * order.getTotalArea());
+                }
             }
 
             //if store has labour fee per floor, add to the total fee
@@ -270,7 +289,8 @@ public class OrderServiceImpl implements OrderService {
         order.setFreeDelivery(isEligibleForFreeDelivery);
 
         if (canChargeServiceFees(storeOptional.get())) {
-            order.setServiceFee(serviceFeePerc * (order.getBasketAmount() + (order.getFreeDelivery() ? 0 : order.getShippingData().getFee())));
+            double deliveryFeeForServiceCalc = (order.getFreeDelivery() || order.getShippingData() == null) ? 0 : order.getShippingData().getFee();
+            order.setServiceFee(serviceFeePerc * (order.getBasketAmount() + deliveryFeeForServiceCalc));
         }
 
         var isQuoteRequired = storeOptional.get().isQuoteRequired();
@@ -352,7 +372,7 @@ public class OrderServiceImpl implements OrderService {
         if (tag != null) {
             String vehicleType = tag.get("vehicleType");
             if (StringUtils.hasText(vehicleType)) {
-                return vehicleType.trim().toUpperCase(Locale.ROOT);
+                return normalizeVehicleType(vehicleType.trim());
             }
         }
 
@@ -360,6 +380,7 @@ public class OrderServiceImpl implements OrderService {
         if (shippingData != null && shippingData.getCategory() != null) {
             Optional<String> matchedVehicleType = shippingData.getCategory().stream()
                     .map(String::trim)
+                    .map(this::normalizeVehicleType)
                     .filter(it -> it.equalsIgnoreCase("Bakkie Delivery Driver") ||
                             it.equalsIgnoreCase("Truck Delivery Driver") ||
                             it.equalsIgnoreCase("Small/Medium Vehicle Driver") ||
@@ -373,6 +394,23 @@ public class OrderServiceImpl implements OrderService {
         return "";
     }
 
+    /**
+     * Normalizes short vehicle type labels (e.g. "CAR", "truck") to the canonical
+     * full names expected by the switch expressions in resolveStandardDeliveryFee
+     * and resolveRatePerKm. Unrecognised values are returned upper-cased so switch
+     * default branches handle them consistently.
+     */
+    private String normalizeVehicleType(String raw) {
+        if (raw == null) return "";
+        return switch (raw.trim().toUpperCase(Locale.ROOT)) {
+            case "CAR", "SMALL/MEDIUM VEHICLE DRIVER" -> "Small/Medium Vehicle Driver";
+            case "BIKE", "BIKE DELIVERY DRIVER" -> "Bike Delivery Driver";
+            case "BAKKIE", "BAKKIE DELIVERY DRIVER" -> "Bakkie Delivery Driver";
+            case "TRUCK", "TRUCK DELIVERY DRIVER" -> "Truck Delivery Driver";
+            default -> raw.trim().toUpperCase(Locale.ROOT);
+        };
+    }
+
     private boolean canChargeServiceFees(StoreProfile storeProfile) {
         return true;
     }
@@ -384,6 +422,25 @@ public class OrderServiceImpl implements OrderService {
 
         if(order.getStage() != OrderStage.STAGE_0_CUSTOMER_NOT_PAID) {
             return persistedOrder;
+        }
+
+        // Defensive validation on persisted state before processing payment
+        if (persistedOrder.getOrderType() == ONLINE && persistedOrder.getShippingData() == null) {
+            throw new IllegalArgumentException("Please supply shipping info for delivery or If you are paying in store, shipping should be null");
+        }
+        boolean hasBasket;
+        try {
+            hasBasket = persistedOrder.getBasket() != null;
+        } catch (Exception e) {
+            hasBasket = false;
+        }
+        if (!hasBasket) {
+            throw new IllegalArgumentException("order basket is not valid");
+        }
+
+        var finishViolations = validator.validate(persistedOrder);
+        if (!finishViolations.isEmpty()) {
+            throw new IllegalArgumentException(finishViolations.iterator().next().getMessage());
         }
 
         persistedOrder.setDescription(order.getDescription());
@@ -410,6 +467,7 @@ public class OrderServiceImpl implements OrderService {
         } else {
             persistedOrder.setStage(OrderStage.STAGE_7_ALL_PAID);
             persistedOrder.addStatusHistory(OrderStage.STAGE_7_ALL_PAID);
+            persistedOrder.setShopPaid(true);
         }
 
         var promoCode = order.getTag().get("promoCode");
@@ -444,58 +502,22 @@ public class OrderServiceImpl implements OrderService {
         store.setServicesCompleted(store.getServicesCompleted() + 1);
         storeRepository.save(store);
         LOG.info("New order placed. Order No. {}, Basket Amount. R{}", order.getId(), order.getBasketAmount());
-        LOG.info("New order placed. Order No. {}, Delivery Fee. R{}", order.getId(), order.getShippingData().getFee());
+        LOG.info("New order placed. Order No. {}, Delivery Fee. R{}", order.getId(), order.getShippingData() != null ? order.getShippingData().getFee() : 0);
         var orderCompleted = orderRepo.save(persistedOrder);
 
-        //send order event
-        OrderEvent newOrderEvent = orderCompleted.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY ?
-                new ScheduledOrderEvent(this, orderCompleted, persistedOrder.getShippingData().getMessengerId(), store)
-        : new NewOrderEvent(this, orderCompleted, persistedOrder.getShippingData().getMessengerId(), store);
-        applicationEventPublisher.publishEvent(newOrderEvent);
+        //send order event — guard against null shippingData (INSTORE orders have none)
+        if (orderCompleted.getShippingData() != null) {
+            OrderEvent newOrderEvent = orderCompleted.getShippingData().getType() == ShippingData.ShippingType.SCHEDULED_DELIVERY ?
+                    new ScheduledOrderEvent(this, orderCompleted, persistedOrder.getShippingData().getMessengerId(), store)
+            : new NewOrderEvent(this, orderCompleted, persistedOrder.getShippingData().getMessengerId(), store);
+            applicationEventPublisher.publishEvent(newOrderEvent);
+        }
         return orderCompleted;
     }
 
-    /**
-     * ADR-024: Resolves the JWT caller's phone to their user profile ID.
-     * Uses the same last-9-digits prefix-loop pattern as findOrderByPhone().
-     * Returns null if the phone cannot be resolved (treated as mismatch by validator).
-     */
-    private String resolveCallerUserId() {
-        String callerPhone = StoreScopeContext.getCallerPhone();
-        if (callerPhone == null) return null;
-        String last9 = StoreScopeValidator.normalizeLast9(callerPhone);
-        if (last9 == null) return null;
-        for (String prefix : List.of("0", "+27", "27")) {
-            UserProfile u = userProfileRepo.findByMobileNumber(prefix + last9);
-            if (u != null) return u.getId();
-        }
-        return null;
-    }
-
-    @Tool(name = "find_order_by_id", description = "Find order by id and return the order details")
     @Override
     public Order findOrder(String orderId) {
-        Order order = orderRepo.findById(orderId).orElse(null);
-        if (order != null) {
-            // ADR-024: CUSTOMER must own the order; DRIVER must be assigned to it.
-            String audience = CallerIdentityContext.getAudience();
-            try {
-                if ("CUSTOMER".equals(audience)) {
-                    StoreScopeValidator.validateCallerOwnsId(order.getCustomerId(), this::resolveCallerUserId);
-                } else if ("DRIVER".equals(audience)) {
-                    String messengerId = order.getShippingData() != null ? order.getShippingData().getMessengerId() : null;
-                    StoreScopeValidator.validateCallerOwnsId(messengerId, this::resolveCallerUserId);
-                }
-            } catch (CallerIdentityViolationException e) {
-                // FIX-04: audience already captured as local var on request thread
-                agentIdentityAuditService.recordViolation(
-                        StoreScopeContext.getCallerPhone(), orderId,
-                        AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED, "find_order_by_id",
-                        audience != null ? audience : "UNKNOWN", null, null);
-                throw e;
-            }
-        }
-        return order;
+        return orderRepo.findById(orderId).orElse(null);
     }
 
     @Override
@@ -520,7 +542,7 @@ public class OrderServiceImpl implements OrderService {
         Order pricingOrder = new Order();
         pricingOrder.setShippingData(shippingData);
 
-        ShipingGeoData shipingGeoData = calculateDrivingDirectionKM(googleMapsApiKey, pricingOrder, pricingContextStore);
+        ShipingGeoData shipingGeoData = deliveryCalculationService.calculateDrivingDirectionKM(pricingOrder, pricingContextStore);
 
         double standardFee = resolveStandardDeliveryFee(pricingOrder, pricingContextStore);
         double standardDistance = Optional.ofNullable(pricingContextStore.getRates())
@@ -579,10 +601,14 @@ public class OrderServiceImpl implements OrderService {
 
         if(order.getStage() == OrderStage.CANCELLED) throw new IllegalArgumentException("Order with id " + orderId + " has been cancelled");
 
+        if (index < 0 || index >= onlineDeliveryStages.size() - 1) {
+            throw new IllegalArgumentException("Order with id " + orderId + " is already at the terminal stage and cannot progress further.");
+        }
         OrderStage stage = onlineDeliveryStages.get(index + 1);
         order.setStage(stage);
         order.addStatusHistory(stage, latitude, longitude);
-        var store = storeRepository.findById(order.getShopId()).get();
+        var store = storeRepository.findById(order.getShopId())
+                .orElseThrow(() -> new IllegalArgumentException("Store with id " + order.getShopId() + " not found."));
         OrderUpdatedEvent orderUpdatedEvent = new OrderUpdatedEvent(this, order, order.getShippingData().getMessengerId(), store);
         applicationEventPublisher.publishEvent(orderUpdatedEvent);
         return orderRepo.save(order);
@@ -606,75 +632,20 @@ public class OrderServiceImpl implements OrderService {
                 }).orElseThrow();
     }
 
-    @Tool(name = "find_orders_by_user_id", description = "Find orders by user id and return the order details")
     @Override
     public List<Order> findOrderByUserId(String userId) {
-        // ADR-024: CUSTOMER/DRIVER agents may only fetch orders for their own user ID.
-        try {
-            StoreScopeValidator.validateCallerOwnsId(userId, this::resolveCallerUserId);
-        } catch (CallerIdentityViolationException e) {
-            // FIX-04: capture audience on the request thread before the @Async dispatch
-            String auditAudience = CallerIdentityContext.getAudience() != null ? CallerIdentityContext.getAudience() : "UNKNOWN";
-            agentIdentityAuditService.recordViolation(
-                    StoreScopeContext.getCallerPhone(), userId,
-                    AgentIdentityAuditLog.ViolationType.ID_NOT_OWNED, "find_orders_by_user_id",
-                    auditAudience, null, null);
-            throw e;
-        }
         return orderRepo.findByCustomerId(userId).orElse(new ArrayList<>());
     }
 
-    @Tool(name = "find_order_for_messenger", description = "Find order by id and return the order details as MessengerOrderDto")
     @Override
     public Order findOrderForMessenger(String orderId) {
         Order order = orderRepo.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order with id " + orderId + " not found."));
-        // ADR-024: DRIVER must be assigned to this order; CUSTOMER must own it (FIX-03).
-        String audience = CallerIdentityContext.getAudience();
-        if ("DRIVER".equals(audience)) {
-            try {
-                String messengerId = order.getShippingData() != null ? order.getShippingData().getMessengerId() : null;
-                StoreScopeValidator.validateCallerOwnsId(messengerId, this::resolveCallerUserId);
-            } catch (CallerIdentityViolationException e) {
-                // FIX-04: audience already captured as local var on request thread
-                agentIdentityAuditService.recordViolation(
-                        StoreScopeContext.getCallerPhone(), orderId,
-                        AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED, "find_order_for_messenger",
-                        audience != null ? audience : "UNKNOWN", null, null);
-                throw e;
-            }
-        } else if ("CUSTOMER".equals(audience)) {
-            // FIX-03 (Legal C-4): CUSTOMER audience must own the order — prevents cross-customer
-            // data leak of full MessengerOrderDto (shipping details, iZinga commission, etc.).
-            try {
-                StoreScopeValidator.validateCallerOwnsId(order.getCustomerId(), this::resolveCallerUserId);
-            } catch (CallerIdentityViolationException e) {
-                // FIX-04: audience already captured as local var on request thread
-                agentIdentityAuditService.recordViolation(
-                        StoreScopeContext.getCallerPhone(), orderId,
-                        AgentIdentityAuditLog.ViolationType.ORDER_NOT_OWNED, "find_order_for_messenger",
-                        audience, null, null);
-                throw e;
-            }
-        }
         return new MessengerOrderDto(order, izingaCommissionPerc);
     }
 
-    @Tool(name = "find_orders_by_phone_number", description = "Find orders by phone number and return the order details")
     @Override
     public List<Order> findOrderByPhone(String phone) {
-        // ADR-024: CUSTOMER/DRIVER agents may only query orders for their own phone.
-        try {
-            StoreScopeValidator.validateCallerPhone(phone);
-        } catch (CallerIdentityViolationException e) {
-            // FIX-04: capture audience on the request thread before the @Async dispatch
-            String auditAudience = CallerIdentityContext.getAudience() != null ? CallerIdentityContext.getAudience() : "UNKNOWN";
-            agentIdentityAuditService.recordViolation(
-                    StoreScopeContext.getCallerPhone(), phone,
-                    AgentIdentityAuditLog.ViolationType.PHONE_MISMATCH, "find_orders_by_phone_number",
-                    auditAudience, null, null);
-            throw e;
-        }
         if (phone.length() < 9) {
             throw new IllegalArgumentException("phone must be at least 9 characters");
         }
@@ -695,9 +666,8 @@ public class OrderServiceImpl implements OrderService {
         return orderRepo.findByShopIdAndStageNot(store.getId(), OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
     }
 
-    @Tool(name = "find_orders_by_messenger_id", description = "Find orders by messenger id and return the order details as MessengerOrderDto")
     @Override
-    public Set<Order> findOrderByMessengerId(String id, @ToolParam(required = false) boolean allStages) {
+    public Set<Order> findOrderByMessengerId(String id, boolean allStages) {
         var ordersAssigned = allStages ? orderRepo.findByShippingDataMessengerId(id) : orderRepo.findByShippingDataMessengerIdAndStageNot(id, OrderStage.STAGE_0_CUSTOMER_NOT_PAID);
 
         var ordersQuoteRequested = quoteRepository.findBySentToMessengerIds(id)
@@ -718,6 +688,7 @@ public class OrderServiceImpl implements OrderService {
                 resultOrders = ordersFromQuotes;
             }
         }
+
         return resultOrders.stream()
                 .map(it -> (Order) new MessengerOrderDto(it, izingaCommissionPerc))
                 .collect(Collectors.toSet());

@@ -54,6 +54,8 @@ class StoreServiceBankSelectionTest {
     private StoreTierChangeAuditRepository storeTierChangeAuditRepository;
     @Mock
     private FirebaseAuth firebaseAuth;
+    @Mock
+    private io.curiousoft.izinga.commons.security.AgentIdentityAuditService agentIdentityAuditService;
 
     @BeforeEach
     void setUp() {

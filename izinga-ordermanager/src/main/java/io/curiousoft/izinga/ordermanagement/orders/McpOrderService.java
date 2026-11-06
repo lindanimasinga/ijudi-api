@@ -4,11 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.izinga.commons.model.*;
 import io.curiousoft.izinga.commons.order.OrderRepository;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
-import io.curiousoft.izinga.commons.security.CallerIdentityViolationException;
+import io.curiousoft.izinga.ordermanagement.utils.DeliveryDistanceUnavailableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -82,24 +80,15 @@ public class McpOrderService {
      *                          may be null or blank for INSTORE orders.
      * @return a {@link StartOrderResponse} indicating success or the reason for rejection.
      */
-    @Tool(
-        name = "start_order",
-        description = "Creates a new order for a customer. " +
-            "customerConfirmed MUST be true — only call this after the customer has explicitly confirmed they want to place the order. " +
-            "idempotencyKey MUST be unique per order attempt; duplicate calls within 24 hours return the existing order. " +
-            "orderType must be ONLINE or INSTORE. " +
-            "basketJson is a JSON-serialised Basket with an items array. " +
-            "shippingDataJson is a JSON-serialised ShippingData (required for ONLINE orders, null for INSTORE)."
-    )
     public StartOrderResponse startOrder(
-            @ToolParam(description = "The customer's profile ID") String customerId,
-            @ToolParam(description = "Must be true — agent must have confirmed the customer's intent before placing the order") boolean customerConfirmed,
-            @ToolParam(description = "Unique key for this order attempt to prevent duplicate orders") String idempotencyKey,
-            @ToolParam(description = "The store/shop ID to place the order against") String shopId,
-            @ToolParam(description = "Brief description of the order") String description,
-            @ToolParam(description = "Order type: ONLINE or INSTORE") String orderType,
-            @ToolParam(description = "JSON of the Basket with items array, e.g. {\"items\":[{\"name\":\"chips\",\"quantity\":2,\"price\":10,\"totalPrice\":20}]}") String basketJson,
-            @ToolParam(required = false, description = "JSON of ShippingData (required for ONLINE orders). null for INSTORE orders.") String shippingDataJson) {
+            String customerId,
+            boolean customerConfirmed,
+            String idempotencyKey,
+            String shopId,
+            String description,
+            String orderType,
+            String basketJson,
+            String shippingDataJson) {
 
         // Step 1 — consent (SA-022-01 Guard 2): evaluated first, before any data access
         if (!customerConfirmed) {
@@ -142,14 +131,14 @@ public class McpOrderService {
         order.getTag().put("idempotencyKey", idempotencyKey);
 
         // Delegate to domain service — catch specific exceptions before the generic handler
+        // post-ADR-026 Phase 1: orderService.startOrder() must not throw CallerIdentityViolationException —
+        // any ownership gate belongs in the controller layer (OrderCreationMcpController), not here.
         Order created;
         try {
             created = orderService.startOrder(order);
-        } catch (CallerIdentityViolationException e) {
-            // FIX-01 (Legal C-3): IDENTITY_REFUSAL prefix is machine-parseable — must NOT
-            // be sanitized. Pass the message through verbatim so the AI agent sees the refusal.
-            LOG.warn("start_order: identity violation for customerId={} — {}", customerId, e.getMessage());
-            return StartOrderResponse.rejected(e.getMessage());
+        } catch (DeliveryDistanceUnavailableException e) {
+            LOG.warn("start_order: maps service unavailable for customerId={} — {}", customerId, e.getMessage());
+            return StartOrderResponse.rejected("Delivery distance could not be calculated at this time: the maps service is unavailable. Please try again shortly.");
         } catch (IllegalArgumentException e) {
             LOG.warn("start_order: domain layer rejected order for customerId={} — {}", customerId, e.getMessage());
             return StartOrderResponse.rejected(sanitizeMessage(e.getMessage()));
@@ -160,6 +149,19 @@ public class McpOrderService {
 
         LOG.info("start_order: created orderId={} for customerId={}", created.getId(), customerId);
         return StartOrderResponse.success(created);
+    }
+
+    /**
+     * ADR-026 Phase 1: cheap existence check for the given customer ID.
+     * Called by {@link io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController}
+     * before the ownership check to satisfy the gate-ordering invariant
+     * (existence check BEFORE ownership check).
+     *
+     * @param customerId the customer profile ID to look up
+     * @return {@code true} if a UserProfile with the given ID exists, {@code false} otherwise
+     */
+    public boolean customerExists(String customerId) {
+        return userProfileRepo.existsById(customerId);
     }
 
     // -------------------------------------------------------------------------
@@ -240,11 +242,11 @@ public class McpOrderService {
             this.message = message;
         }
 
-        static StartOrderResponse rejected(String reason) {
+        public static StartOrderResponse rejected(String reason) {
             return new StartOrderResponse(false, null, null, 0.0, false, reason);
         }
 
-        static StartOrderResponse success(Order order) {
+        public static StartOrderResponse success(Order order) {
             return new StartOrderResponse(
                     true,
                     order.getId(),
@@ -254,7 +256,7 @@ public class McpOrderService {
                     null);
         }
 
-        static StartOrderResponse idempotent(Order existingOrder) {
+        public static StartOrderResponse idempotent(Order existingOrder) {
             return new StartOrderResponse(
                     true,
                     existingOrder.getId(),

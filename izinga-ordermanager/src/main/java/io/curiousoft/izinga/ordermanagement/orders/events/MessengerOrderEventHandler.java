@@ -13,6 +13,8 @@ import io.curiousoft.izinga.messaging.AdminOnlyNotificationService;
 import io.curiousoft.izinga.ordermanagement.service.DeviceService;
 import io.curiousoft.izinga.commons.order.events.NewOrderEvent;
 import io.curiousoft.izinga.recon.ReconService;
+import io.curiousoft.izinga.recon.payout.MessengerPayout;
+import io.curiousoft.izinga.recon.payout.PayoutGenerationOutcome;
 import io.curiousoft.izinga.usermanagement.users.UserProfileService;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
@@ -138,9 +140,10 @@ public class MessengerOrderEventHandler implements OrderEventHandler {
                 log.info("Redeemed code {} for user {}", promoCode.get(), order.getShippingData().getMessengerId());
             }
 
-            //get payout balance send event to update payout
-            io.curiousoft.izinga.recon.payout.MessengerPayout payout = reconService.generatePayoutForMessengerAndOrder(order);
-            if (payout != null) {
+            //get payout balance send event to update payout — ADR-028: unwrap sealed outcome
+            var tipOutcome = reconService.generatePayoutForMessengerAndOrder(order);
+            if (tipOutcome instanceof PayoutGenerationOutcome.Created<MessengerPayout> created) {
+                var payout = created.getPayout();
                 var payoutTotal = payout.getTotal().setScale(2, RoundingMode.HALF_UP);
                 var mobileNumber = userProfileService.find(order.getShippingData().getMessengerId()).getMobileNumber();
                 var tip = BigDecimal.valueOf(order.getTip()).setScale(2, RoundingMode.HALF_UP);
@@ -209,10 +212,16 @@ public class MessengerOrderEventHandler implements OrderEventHandler {
 
         if (order.getStage() == OrderStage.STAGE_7_ALL_PAID) {
             var messengerOrder = new MessengerOrderDto(order, izingaCommissionPerc);
-            var payout  = reconService.generatePayoutForMessengerAndOrder(messengerOrder);
-            if(payout != null && !payout.isPermEmployed()) {
-                var payoutTotal = payout.getTotal().setScale(2, RoundingMode.HALF_UP);
-                smsNotificationService.sendDriverOrderCompletedMessage(messenger.get(), messengerOrder.getId(), BigDecimal.valueOf(messengerOrder.getShippingData().getFee()), payoutTotal);
+            // ADR-028: unwrap sealed outcome
+            var deliveryOutcome = reconService.generatePayoutForMessengerAndOrder(messengerOrder);
+            if (deliveryOutcome instanceof PayoutGenerationOutcome.Created<MessengerPayout> created) {
+                var payout = created.getPayout();
+                if (!payout.isPermEmployed()) {
+                    var payoutTotal = payout.getTotal().setScale(2, RoundingMode.HALF_UP);
+                    smsNotificationService.sendDriverOrderCompletedMessage(messenger.get(), messengerOrder.getId(), BigDecimal.valueOf(messengerOrder.getShippingData().getFee()), payoutTotal);
+                }
+            } else if (deliveryOutcome instanceof PayoutGenerationOutcome.Deferred deferred) {
+                log.info("Messenger payout deferred for order {}: {} — scheduler will retry", order.getId(), deferred.getReason());
             }
         }
     }

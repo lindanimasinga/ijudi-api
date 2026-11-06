@@ -68,36 +68,53 @@ public final class IjudiUtils {
 
     /**
      * Uses Google Maps APIs (via GoogleServices.GoogleMaps) to compute driving distance in km and return ShipingGeoData.
-     * Note: this method may throw runtime exceptions from network/retrofit calls; callers should handle them.
+     * Throws {@link IllegalArgumentException} with an informative message when geocoding or routing fails.
+     * Never falls back to a guessed distance or location.
      */
     @SneakyThrows
     public static ShipingGeoData calculateDrivingDirectionKM(String apiKey, Order order, StoreProfile store) {
-        GoogleServices.GoogleMaps googleMapsInstance = GoogleServices.GoogleMaps.instance;
+        return calculateDrivingDirectionKM(apiKey, order, store, GoogleServices.GoogleMaps.instance);
+    }
 
+    /**
+     * Package-private overload that accepts an injectable Maps client — used by unit tests to avoid
+     * live network calls without fighting Java 17 static-final reflection restrictions.
+     */
+    @SneakyThrows
+    static ShipingGeoData calculateDrivingDirectionKM(String apiKey, Order order, StoreProfile store,
+                                                       GoogleServices.GoogleMaps mapsClient) {
         // from lat long
         String fromLatLong;
         Boolean deliversMultiple = null;
         try {
-            // try to use getter name convention; fall back gracefully
             deliversMultiple = (Boolean) safeGet(store, "getDeliversFromMultipleAddresses", "isDeliversFromMultipleAddresses");
         } catch (Exception ignored) {
         }
 
         if (Boolean.TRUE.equals(deliversMultiple) && order.getShippingData() != null) {
-            var geocodeResp = googleMapsInstance.geocodeAddress(apiKey, order.getShippingData().getFromAddress(), 100.0).execute().body();
+            var geocodeResp = mapsClient.geocodeAddress(apiKey, order.getShippingData().getFromAddress(), 100.0).execute().body();
+            if (geocodeResp == null || geocodeResp.getResults() == null || geocodeResp.getResults().isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Unable to calculate delivery distance: could not find the pickup (from) address. " +
+                        "Please check the address and try again.");
+            }
             var loc = geocodeResp.getResults().get(0).getGeometry().getLocation();
             fromLatLong = String.format(Locale.US, "%s,%s", loc.getLat(), loc.getLng());
         } else {
-            // fallback to store coords
             fromLatLong = String.format(Locale.US, "%s,%s", store.getLatitude(), store.getLongitude());
         }
 
         // to lat long
-        var geoCode = googleMapsInstance.geocodeAddress(apiKey, order.getShippingData().getToAddress(), 100.0).execute().body();
+        var geoCode = mapsClient.geocodeAddress(apiKey, order.getShippingData().getToAddress(), 100.0).execute().body();
+        if (geoCode == null || geoCode.getResults() == null || geoCode.getResults().isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Unable to calculate delivery distance for the provided address. " +
+                    "Please check the address and try again.");
+        }
         var location = geoCode.getResults().get(0).getGeometry().getLocation();
         String toLatLong = String.format(Locale.US, "%s,%s", location.getLat(), location.getLng());
 
-        var directions = googleMapsInstance.findDirections(apiKey, fromLatLong, toLatLong).execute().body();
+        var directions = mapsClient.findDirections(apiKey, fromLatLong, toLatLong).execute().body();
 
         // find minimum leg distance across all routes
         int minMeters = Integer.MAX_VALUE;
@@ -111,7 +128,12 @@ public final class IjudiUtils {
                 }
             }
         }
-        double distanceKm = (minMeters == Integer.MAX_VALUE) ? 0.0 : ((double) minMeters) / 1000.0;
+        if (minMeters == Integer.MAX_VALUE) {
+            throw new IllegalArgumentException(
+                    "Unable to calculate delivery distance: no route found between the given addresses. " +
+                    "Please check the addresses and try again.");
+        }
+        double distanceKm = ((double) minMeters) / 1000.0;
 
         GeoPointImpl fromGeo = new GeoPointImpl(Double.parseDouble(fromLatLong.split(",")[0]), Double.parseDouble(fromLatLong.split(",")[1]));
         GeoPointImpl toGeo = new GeoPointImpl(location.getLat(), location.getLng());

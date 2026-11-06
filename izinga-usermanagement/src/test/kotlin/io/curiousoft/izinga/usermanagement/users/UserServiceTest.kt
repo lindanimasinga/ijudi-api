@@ -47,7 +47,7 @@ class UserServiceTest {
 
     @Before
     fun setUp() {
-        profileService = UserProfileService(profileRepo, profileUpdatedEventPublisher, userConfigService, icaAcceptanceLogRepo, referralCodeService, agentIdentityAuditService)
+        profileService = UserProfileService(profileRepo, profileUpdatedEventPublisher, userConfigService, icaAcceptanceLogRepo, referralCodeService)
     }
 
     @Test
@@ -65,14 +65,15 @@ class UserServiceTest {
         )
 
         //when
-        // Production normalizes "081mobilenumb" → "+27obilenumb" before the duplicate check;
-        // stub and verify must use the post-normalization number.
+        // Production normalizes "081mobilenumb" → "+27obilenumb" (last 9 digits + "+27" prefix),
+        // then calls findByMobileNumber (not existsByMobileNumber) as part of the ONB-FIX placeholder
+        // detection logic. Stub it to return null to simulate no pre-existing profile.
+        Mockito.`when`(profileRepo.findByMobileNumber("+27obilenumb")).thenReturn(null)
         Mockito.`when`(profileRepo.save(initialProfile)).thenReturn(initialProfile)
-        Mockito.`when`(profileRepo.existsByMobileNumber("+27obilenumb")).thenReturn(false)
         val profile: Profile = profileService.create(initialProfile)
 
         //verify
-        Mockito.verify(profileRepo).existsByMobileNumber("+27obilenumb")
+        Mockito.verify(profileRepo).findByMobileNumber("+27obilenumb")
         Mockito.verify(profileRepo).save(initialProfile)
         Assert.assertNotNull(profile.id)
     }
@@ -92,9 +93,11 @@ class UserServiceTest {
         )
 
         //when
-        // Production normalizes "081mobilenumb" → "+27obilenumb" before calling existsByMobileNumber,
-        // so the stub must use the post-normalization value (last 9 chars + "+27" prefix).
-        Mockito.`when`(profileRepo.existsByMobileNumber("+27obilenumb")).thenReturn(true)
+        // Production normalizes "081mobilenumb" → "+27obilenumb" (last 9 digits + "+27" prefix),
+        // then calls findByMobileNumber. Stub it to return a completed profile (role != null) to
+        // trigger the genuine-duplicate branch (ONB-FIX: role=null placeholder is not a duplicate).
+        val existingProfile = UserProfile("existing", UserProfile.SignUpReason.BUY, "addr", "https://img.url", "+27obilenumb", ProfileRoles.CUSTOMER)
+        Mockito.`when`(profileRepo.findByMobileNumber("+27obilenumb")).thenReturn(existingProfile)
         try {
             val profile: Profile = profileService.create(initialProfile)
             Assert.fail()

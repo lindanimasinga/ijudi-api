@@ -10,6 +10,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import io.curiousoft.izinga.commons.notification.DriverInviteNotificationPort;
@@ -21,7 +22,9 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static java.util.Optional.ofNullable;
 import static java.util.TimeZone.getTimeZone;
@@ -30,22 +33,32 @@ import static java.util.TimeZone.getTimeZone;
 public class WhatsappNotificationService implements AdminOnlyNotificationService, DriverInviteNotificationPort, PayoutNotificationPort {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(WhatsappNotificationService.class);
+    private static final long COOLDOWN_MILLIS = TimeUnit.HOURS.toMillis(24);
+
     private final WhatsAppService whatsAppService;
     private final WhatsappConfig whatsappConfig;
     private final ObjectMapper mapper;
     private final String driverWelcomeVideoUrl;
     /** REQ-08/SA-7: outbound phone line resolver — replaces all direct whatsappConfig.phoneId() call sites. */
     private final WhatsappSenderResolver senderResolver;
+    /**
+     * ADR-028: throttle repository for missing-bank payout notifications. Nullable so that
+     * existing test setups that do not wire a repository continue to work (no-throttle mode).
+     */
+    @Nullable
+    private final PayoutNotificationCooldownRepository cooldownRepository;
 
     public WhatsappNotificationService(WhatsAppService whatsAppService,
                                        io.curiousoft.izinga.messaging.whatsapp.WhatsappConfig whatsappConfig, ObjectMapper mapper,
                                        @Value("${whatsapp.driver.welcome.videoUrl:https://izinga-aut.s3.af-south-1.amazonaws.com/output.mp4}") String driverWelcomeVideoUrl,
-                                       WhatsappSenderResolver senderResolver) {
+                                       WhatsappSenderResolver senderResolver,
+                                       @Nullable PayoutNotificationCooldownRepository cooldownRepository) {
         this.whatsAppService = whatsAppService;
         this.whatsappConfig = whatsappConfig;
         this.mapper = mapper;
         this.driverWelcomeVideoUrl = driverWelcomeVideoUrl;
         this.senderResolver = senderResolver;
+        this.cooldownRepository = cooldownRepository;
     }
 
     @Override
@@ -656,7 +669,13 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
      *   Button: "Update Profile" → https://driver.izinga.co.za
      */
     @Override
-    public void notifyDriverMissingBankDetails(@org.jetbrains.annotations.NotNull String mobileNumber, @org.jetbrains.annotations.NotNull String driverName) {
+    public void notifyDriverMissingBankDetails(@org.jetbrains.annotations.NotNull String mobileNumber,
+                                               @org.jetbrains.annotations.NotNull String driverName,
+                                               @org.jetbrains.annotations.NotNull String recipientId) {
+        // ADR-028: throttle — at most one notification per recipientId per 24 hours
+        if (!acquireCooldown(recipientId + ":DRIVER_MISSING_BANK")) {
+            return; // suppressed — cooldown active
+        }
         try {
             if (mobileNumber.isBlank()) {
                 LOGGER.warn("notifyDriverMissingBankDetails: mobileNumber is blank — skipping");
@@ -666,32 +685,31 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
             String to = mobileNumber.startsWith("0") ? mobileNumber.replaceFirst("0", "+27") : mobileNumber;
             String safeDriverName = (driverName != null && !driverName.isBlank()) ? driverName : "Driver";
 
-            var requestStr = """
-                    {
-                      "name": "driver_missing_bank_details",
-                      "language": { "code": "en" },
-                      "components": [
-                        {
-                          "type": "BODY",
-                          "parameters": [
-                            { "type": "TEXT", "text": "#name" }
-                          ]
-                        }
-                      ]
-                    }
-                    """;
+            var nameParam = new WhatsappTemplateRequest.Parameter();
+            nameParam.setType(WhatsappTemplateRequest.ParameterType.TEXT);
+            nameParam.setText(safeDriverName);
 
-            requestStr = requestStr.replace("#name", safeDriverName);
+            var bodyComponent = new WhatsappTemplateRequest.Component();
+            bodyComponent.setType(WhatsappTemplateRequest.ComponentType.BODY);
+            bodyComponent.setParameters(List.of(nameParam));
+
+            var language = new WhatsappTemplateRequest.Language();
+            language.setCode("en");
+
+            var template = new WhatsappTemplateRequest.Template();
+            // Template `driver_missing_bank_details` is LIVE (Meta returned HTTP 200 in UAT).
+            template.setName("driver_missing_bank_details");
+            template.setLanguage(language);
+            template.setComponents(List.of(bodyComponent));
 
             WhatsappTemplateRequest request = new WhatsappTemplateRequest();
             request.setTo(to);
-            var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
             request.setTemplate(template);
             whatsAppService.sendMessage(senderResolver.resolve(Audience.DRIVER, null), request).execute();
-            LOGGER.info("Sent missing bank details notification to {}", to);
+            LOGGER.info("Sent driver missing bank details notification to recipient {}", recipientId);
         } catch (Exception e) {
-            LOGGER.error("Failed to send missing bank details notification to {} — template may not yet be approved: {}",
-                    mobileNumber, e.getMessage(), e);
+            LOGGER.error("Failed to send driver missing bank details notification for recipient {}: {}",
+                    recipientId, e.getMessage(), e);
         }
     }
 
@@ -700,9 +718,9 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
      * generation was skipped.
      *
      * Template: {@code store_missing_bank_details}
-     * IMPORTANT: This template is pending Meta Business approval — submitted by PO in parallel
-     * with this wiring commit. Until approved, the Meta API call will fail with "template not
-     * found" — the catch block below absorbs that failure so payout generation is never blocked.
+     * IMPORTANT: This template is pending Meta Business approval (the Meta API returned HTTP 400
+     * in UAT). Until approved, the Meta API call will fail with "template not found" — the catch
+     * block below absorbs that failure so payout generation is never blocked.
      *
      * Suggested template body (UTILITY, en, single BODY TEXT param + URL button):
      *   "Hi {{1}}, your iZinga store payout is ready but we could not send it because your bank
@@ -710,7 +728,13 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
      *   Button: "Update Profile" -> https://izinga.co.za
      */
     @Override
-    public void notifyStoreMissingBankDetails(@org.jetbrains.annotations.NotNull String mobileNumber, @org.jetbrains.annotations.NotNull String storeName) {
+    public void notifyStoreMissingBankDetails(@org.jetbrains.annotations.NotNull String mobileNumber,
+                                              @org.jetbrains.annotations.NotNull String storeName,
+                                              @org.jetbrains.annotations.NotNull String recipientId) {
+        // ADR-028: throttle — at most one notification per recipientId per 24 hours
+        if (!acquireCooldown(recipientId + ":STORE_MISSING_BANK")) {
+            return; // suppressed — cooldown active
+        }
         try {
             if (mobileNumber.isBlank()) {
                 LOGGER.warn("notifyStoreMissingBankDetails: mobileNumber is blank — skipping");
@@ -720,32 +744,86 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
             String to = mobileNumber.startsWith("0") ? mobileNumber.replaceFirst("0", "+27") : mobileNumber;
             String safeStoreName = (storeName != null && !storeName.isBlank()) ? storeName : "Store";
 
-            var requestStr = """
-                    {
-                      "name": "store_missing_bank_details",
-                      "language": { "code": "en" },
-                      "components": [
-                        {
-                          "type": "BODY",
-                          "parameters": [
-                            { "type": "TEXT", "text": "#name" }
-                          ]
-                        }
-                      ]
-                    }
-                    """;
+            var nameParam = new WhatsappTemplateRequest.Parameter();
+            nameParam.setType(WhatsappTemplateRequest.ParameterType.TEXT);
+            nameParam.setText(safeStoreName);
 
-            requestStr = requestStr.replace("#name", safeStoreName);
+            var bodyComponent = new WhatsappTemplateRequest.Component();
+            bodyComponent.setType(WhatsappTemplateRequest.ComponentType.BODY);
+            bodyComponent.setParameters(List.of(nameParam));
+
+            var language = new WhatsappTemplateRequest.Language();
+            language.setCode("en");
+
+            var template = new WhatsappTemplateRequest.Template();
+            template.setName("store_missing_bank_details");
+            template.setLanguage(language);
+            template.setComponents(List.of(bodyComponent));
 
             WhatsappTemplateRequest request = new WhatsappTemplateRequest();
             request.setTo(to);
-            var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
             request.setTemplate(template);
             whatsAppService.sendMessage(senderResolver.resolve(Audience.CUSTOMER, null), request).execute();
-            LOGGER.info("Sent missing bank details notification to store owner at {}", to);
+            LOGGER.info("Sent store missing bank details notification for recipient {}", recipientId);
         } catch (Exception e) {
-            LOGGER.error("Failed to send store missing bank details notification to {} — template may not yet be approved: {}",
-                    mobileNumber, e.getMessage(), e);
+            LOGGER.error("Failed to send store missing bank details notification for recipient {} — template pending Meta approval: {}",
+                    recipientId, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * ADR-028: Acquires a notification cooldown slot for the given key.
+     *
+     * <p>Returns {@code true} if the notification should be sent (cooldown acquired or stale).
+     * Returns {@code false} if the cooldown is active and the notification should be suppressed.</p>
+     *
+     * <p>Algorithm:
+     * <ol>
+     *   <li>If {@code cooldownRepository} is null (test mode), always return {@code true}.</li>
+     *   <li>Insert a new cooldown document. If the insert succeeds, return {@code true}.</li>
+     *   <li>On {@link DuplicateKeyException}: read the existing record. If its {@code createdAt}
+     *       is older than 24 hours (TTL monitor has not yet deleted it), overwrite and return
+     *       {@code true}. Otherwise return {@code false} (suppress).</li>
+     * </ol>
+     * </p>
+     */
+    private boolean acquireCooldown(String cooldownKey) {
+        if (cooldownRepository == null) {
+            // No repository wired (e.g. test environments) — always send
+            return true;
+        }
+        var cooldown = new PayoutNotificationCooldown(cooldownKey, new Date());
+        try {
+            cooldownRepository.insert(cooldown);
+            return true; // cooldown slot acquired — proceed to send
+        } catch (DuplicateKeyException e) {
+            // A cooldown record already exists. Check if it is stale (TTL lagging).
+            return cooldownRepository.findById(cooldownKey)
+                .map(existing -> {
+                    long ageMillis = System.currentTimeMillis() - existing.getCreatedAt().getTime();
+                    if (ageMillis >= COOLDOWN_MILLIS) {
+                        // Stale record (TTL monitor has not yet removed it) — overwrite and send
+                        LOGGER.info("[ADR-028] Stale cooldown for key {} (age {}ms) — overwriting and sending", cooldownKey, ageMillis);
+                        cooldown.setCreatedAt(new Date());
+                        cooldownRepository.save(cooldown);
+                        return true;
+                    } else {
+                        // Active cooldown — suppress notification
+                        LOGGER.info("[ADR-028] Notification suppressed for key {} — cooldown active (age {}ms)", cooldownKey, ageMillis);
+                        return false;
+                    }
+                })
+                .orElseGet(() -> {
+                    // Record disappeared between the DuplicateKeyException and the read (TTL deleted it)
+                    // Try a fresh insert; if that fails too we fall back to sending
+                    try {
+                        cooldownRepository.insert(new PayoutNotificationCooldown(cooldownKey, new Date()));
+                    } catch (DuplicateKeyException ignored) {
+                        // Another thread beat us — cooldown is fresh, suppress
+                        return false;
+                    }
+                    return true;
+                });
         }
     }
 

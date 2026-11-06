@@ -10,6 +10,7 @@ import io.curiousoft.izinga.commons.repo.StoreRepository
 import io.curiousoft.izinga.commons.repo.UserProfileRepo
 import io.curiousoft.izinga.recon.ambassador.AmbassadorProperties
 import io.curiousoft.izinga.recon.payout.MessengerPayout
+import io.curiousoft.izinga.recon.payout.PayoutGenerationOutcome
 import io.curiousoft.izinga.recon.payout.PayoutStage
 import io.curiousoft.izinga.recon.payout.repo.AmbassadorPayoutRepository
 import io.curiousoft.izinga.recon.payout.repo.MessengerPayoutRepository
@@ -28,8 +29,9 @@ import java.time.ZoneOffset
 import java.util.*
 
 /**
- * BUG-3 + GAP-7: Verifies that null bank details on messenger/store payout paths
- * return null and log a warning instead of throwing NullPointerException.
+ * ADR-028 (was BUG-3 + GAP-7): Verifies that null bank details on messenger/store payout paths
+ * return Deferred (not null, not throw) and trigger the notification port exactly once per run.
+ * When bank details are present the outcome is Created.
  */
 class NullBankGuardPayoutTest {
 
@@ -65,41 +67,43 @@ class NullBankGuardPayoutTest {
             storeStage2CommissionRepo = storeStage2CommissionRepo,
             applicationEventPublisher = applicationEventPublisher,
             ambassadorProperties = AmbassadorProperties(),
-            agentIdentityAuditService = mockk(relaxed = true),
             payoutNotificationPort = payoutNotificationPort
         )
     }
 
-    // ── Messenger / driver path (BUG-3) ─────────────────────────────────────
+    // ── Messenger / driver path (BUG-3 → ADR-028) ───────────────────────────
 
     @Test
-    fun `BUG-3 - messenger with null bank returns null and does not throw NPE`() {
+    fun `BUG-3 - messenger with null bank returns Deferred and does not throw NPE`() {
         val messengerId = "messenger-no-bank"
         val messenger = makeMessengerWithoutBank(messengerId)
         val order = makeOrderForMessenger(messengerId)
 
         every { userProfileRepo.findById(messengerId) } returns Optional.of(messenger)
+        every { messengerPayoutRepository.existsByToIdAndOrderId(messengerId, order.id!!) } returns false
 
         val result = sut.generatePayoutForMessengerAndOrder(order)
 
-        assertNull(result)
+        assertTrue(result is PayoutGenerationOutcome.Deferred, "Expected Deferred but got $result")
         verify(exactly = 0) { messengerPayoutRepository.save(any()) }
     }
 
     @Test
-    fun `BUG-3 - messenger with null bank triggers PayoutNotificationPort`() {
+    fun `BUG-3 - messenger with null bank triggers PayoutNotificationPort with recipientId`() {
         val messengerId = "messenger-no-bank-2"
         val messenger = makeMessengerWithoutBank(messengerId)
         val order = makeOrderForMessenger(messengerId)
 
         every { userProfileRepo.findById(messengerId) } returns Optional.of(messenger)
+        every { messengerPayoutRepository.existsByToIdAndOrderId(messengerId, order.id!!) } returns false
 
         sut.generatePayoutForMessengerAndOrder(order)
 
         verify(exactly = 1) {
             payoutNotificationPort.notifyDriverMissingBankDetails(
                 eq("0831111111"),
-                eq("Test Messenger")
+                eq("Test Messenger"),
+                eq(messengerId)
             )
         }
     }
@@ -111,15 +115,16 @@ class NullBankGuardPayoutTest {
         val order = makeOrderForMessenger(messengerId)
 
         every { userProfileRepo.findById(messengerId) } returns Optional.of(messenger)
+        every { messengerPayoutRepository.existsByToIdAndOrderId(messengerId, order.id!!) } returns false
 
         val result = sut.generatePayoutForMessengerAndOrder(order)
 
-        assertNull(result)
-        verify(exactly = 0) { payoutNotificationPort.notifyDriverMissingBankDetails(any(), any()) }
+        assertTrue(result is PayoutGenerationOutcome.Deferred, "Expected Deferred but got $result")
+        verify(exactly = 0) { payoutNotificationPort.notifyDriverMissingBankDetails(any(), any(), any()) }
     }
 
     @Test
-    fun `BUG-3 - messenger with bank present proceeds to payout creation`() {
+    fun `BUG-3 - messenger with bank present returns Created`() {
         val messengerId = "messenger-with-bank"
         val messenger = makeMessengerWithBank(messengerId)
         val order = makeOrderForMessenger(messengerId)
@@ -132,46 +137,50 @@ class NullBankGuardPayoutTest {
         )
 
         every { userProfileRepo.findById(messengerId) } returns Optional.of(messenger)
+        every { messengerPayoutRepository.existsByToIdAndOrderId(messengerId, order.id!!) } returns false
         every { messengerPayoutRepository.findByToIdAndPayoutStage(messengerId, PayoutStage.PENDING) } returns null
         every { messengerPayoutRepository.save(any()) } returns savedPayout
 
         val result = sut.generatePayoutForMessengerAndOrder(order)
 
-        assertNotNull(result)
-        verify(exactly = 0) { payoutNotificationPort.notifyDriverMissingBankDetails(any(), any()) }
+        assertTrue(result is PayoutGenerationOutcome.Created, "Expected Created but got $result")
+        verify(exactly = 0) { payoutNotificationPort.notifyDriverMissingBankDetails(any(), any(), any()) }
         verify(exactly = 1) { messengerPayoutRepository.save(any()) }
     }
 
-    // ── Store / shop path (GAP-7) ────────────────────────────────────────────
+    // ── Store / shop path (GAP-7 → ADR-028) ─────────────────────────────────
 
     @Test
-    fun `GAP-7 - store with payment agreement but null bank returns null`() {
+    fun `GAP-7 - store with payment agreement but null bank returns Deferred`() {
         val shopId = "shop-no-bank"
         val store = makeStoreWithPaymentAgreementWithoutBank(shopId)
         val order = makeOrderForShop(shopId)
 
         every { storeRepo.findById(shopId) } returns Optional.of(store)
+        every { shopPayoutRepository.existsByToIdAndOrderId(shopId, order.id!!) } returns false
 
         val result = sut.generatePayoutForShopAndOrder(order)
 
-        assertNull(result)
+        assertTrue(result is PayoutGenerationOutcome.Deferred, "Expected Deferred but got $result")
         verify(exactly = 0) { shopPayoutRepository.save(any()) }
     }
 
     @Test
-    fun `GAP-7 - store with null bank triggers PayoutNotificationPort`() {
+    fun `GAP-7 - store with null bank triggers PayoutNotificationPort with recipientId`() {
         val shopId = "shop-no-bank-notify"
         val store = makeStoreWithPaymentAgreementWithoutBank(shopId)
         val order = makeOrderForShop(shopId)
 
         every { storeRepo.findById(shopId) } returns Optional.of(store)
+        every { shopPayoutRepository.existsByToIdAndOrderId(shopId, order.id!!) } returns false
 
         sut.generatePayoutForShopAndOrder(order)
 
         verify(exactly = 1) {
             payoutNotificationPort.notifyStoreMissingBankDetails(
                 eq("0811234567"),
-                eq("Test Store")
+                eq("Test Store"),
+                eq(shopId)
             )
         }
     }
@@ -183,15 +192,16 @@ class NullBankGuardPayoutTest {
         val order = makeOrderForShop(shopId)
 
         every { storeRepo.findById(shopId) } returns Optional.of(store)
+        every { shopPayoutRepository.existsByToIdAndOrderId(shopId, order.id!!) } returns false
 
         val result = sut.generatePayoutForShopAndOrder(order)
 
-        assertNull(result)
-        verify(exactly = 0) { payoutNotificationPort.notifyStoreMissingBankDetails(any(), any()) }
+        assertTrue(result is PayoutGenerationOutcome.Deferred, "Expected Deferred but got $result")
+        verify(exactly = 0) { payoutNotificationPort.notifyStoreMissingBankDetails(any(), any(), any()) }
     }
 
     @Test
-    fun `GAP-7 - store with payment agreement and bank present proceeds to payout creation`() {
+    fun `GAP-7 - store with payment agreement and bank present returns Created`() {
         val shopId = "shop-with-bank"
         val store = makeStoreWithPaymentAgreementAndBank(shopId)
         val order = makeOrderForShop(shopId)
@@ -204,16 +214,17 @@ class NullBankGuardPayoutTest {
         )
 
         every { storeRepo.findById(shopId) } returns Optional.of(store)
+        every { shopPayoutRepository.existsByToIdAndOrderId(shopId, order.id!!) } returns false
         every { shopPayoutRepository.findByToIdAndPayoutStage(shopId, PayoutStage.PENDING) } returns null
         every { shopPayoutRepository.save(any()) } returns savedPayout
 
         val result = sut.generatePayoutForShopAndOrder(order)
 
-        assertNotNull(result)
+        assertTrue(result is PayoutGenerationOutcome.Created, "Expected Created but got $result")
     }
 
     @Test
-    fun `GAP-7 - store without payment agreement returns null regardless of bank`() {
+    fun `GAP-7 - store without payment agreement returns NotApplicable regardless of bank`() {
         val shopId = "shop-no-agreement"
         val store = makeStoreWithPaymentAgreementAndBank(shopId).also { it.hasPaymentAgreement = false }
         val order = makeOrderForShop(shopId)
@@ -222,7 +233,7 @@ class NullBankGuardPayoutTest {
 
         val result = sut.generatePayoutForShopAndOrder(order)
 
-        assertNull(result)
+        assertTrue(result is PayoutGenerationOutcome.NotApplicable, "Expected NotApplicable but got $result")
         verify(exactly = 0) { shopPayoutRepository.save(any()) }
     }
 

@@ -551,4 +551,27 @@ class StoreOrderEventHandlerReferralCommissionTest {
         order.addStatusHistory(OrderStage.STAGE_7_ALL_PAID);
         return order;
     }
+
+    // -------------------------------------------------------------------------
+    // ADR-028: StoreOrderEventHandler Deferred — logs, does not throw
+    // -------------------------------------------------------------------------
+
+    /**
+     * ADR-028-STORE-01: when generatePayoutForShopAndOrder returns Deferred,
+     * the handler must log and not throw. No commission methods are affected.
+     */
+    @Test
+    void handleOrderUpdatedEvent_deferredShopPayout_doesNotThrow() {
+        var store = foodStore("store-deferred-01", null);
+        var order = completedOrder("order-deferred-01", "store-deferred-01", "customer-deferred-01");
+        var customer = customer("customer-deferred-01", null);
+
+        when(userProfileRepo.findById("customer-deferred-01")).thenReturn(Optional.of(customer));
+        when(reconService.generatePayoutForShopAndOrder(order))
+                .thenReturn(new io.curiousoft.izinga.recon.payout.PayoutGenerationOutcome.Deferred("store missing bank"));
+
+        // Must not throw even when the payout is deferred
+        assertDoesNotThrow(() -> handler.handleOrderUpdatedEvent(new OrderUpdatedEvent(this, order, "", store)));
+        verify(reconService).generatePayoutForShopAndOrder(order);
+    }
 }

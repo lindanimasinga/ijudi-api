@@ -1,5 +1,7 @@
 package io.curiousoft.izinga.messaging.firebase;
 
+import java.util.Objects;
+
 public class FCMNotification {
 
     String body;
@@ -37,5 +39,20 @@ public class FCMNotification {
 
     public void setIcon(String icon) {
         this.icon = icon;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        FCMNotification that = (FCMNotification) o;
+        return Objects.equals(body, that.body)
+                && Objects.equals(title, that.title)
+                && Objects.equals(icon, that.icon);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(body, title, icon);
     }
 }

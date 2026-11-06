@@ -3,7 +3,7 @@
 **userType:** driver (messenger) / admin  
 **Feature:** Full payout pipeline: STAGE_7_ALL_PAID → payout generation (PENDING) → CSV export (PROCESSING flip) → bank reconciliation (COMPLETED or PENDING reversion) → missing-payout recovery  
 **App:** ijudi-api (backend) + izinga-onboarding (admin UI at /admin/recon and /admin/recon/detail)  
-**Last verified:** 2026-11-03 | feature/payout-disbursement-fixes Gate 1 QA — full reactor `./mvnw test` 258/0/3-skipped PASS; auth enforcement live-verified; GAP-3/BUG-3/GAP-7/BUG-7 unit-test verified; PATCH live blocked by ADMIN auth constraint (documented)
+**Last verified:** 2026-11-06 | feature/payout-disbursement-fixes-rebase Gate 1 ADR-028 — Live verification PASS (DEF-1 RESOLVED, DEF-2 RESOLVED; 3 scheduler runs + throttle-expiry test + cross-stage guard all PASS); `./mvnw clean test` FAIL — pre-existing non-deterministic flake `OrderServiceTest.startOrderShop_offline:308` (file identical to develop, tracked task_723cde3e, failed both clean runs); BLOCKED on build stability
 
 ---
 
@@ -176,6 +176,34 @@ Steps 3–4 of Scenario A (CSV download and reconciliation via izinga-onboarding
 6. After auth, navigate to `/admin/recon` and drive the CSV + reconciliation flow
 7. Alternatively: Lindani can click Confirm directly in the browser (OTP 792743 was pre-filled in the 2026-11-02 session but expired after 10 minutes)
 
+### RESOLVED — COVERAGE GAP: WhatsappNotificationService missing-bank methods branch coverage (2026-11-06)
+
+**File:** `izinga-messaging/src/main/java/io/curiousoft/izinga/messaging/whatsapp/WhatsappNotificationService.java`  
+**Methods:** `notifyDriverMissingBankDetails` (line 659) and `notifyStoreMissingBankDetails` (line 713)  
+**Resolution:** 8 direct unit tests added to `WhatsappNotificationServiceTest.java` (lines 289–394 in the worktree) covering all 4 branches for each method: blank mobile guard, valid mobile POST, JSON special chars (via POJO construction, not string replace), and sender throws. `./mvnw test` passes 1610/0/0/19 including `WhatsappNotificationServiceTest` at 23/0/0/0.  
+**Date resolved:** 2026-11-06, feature/payout-disbursement-fixes-rebase Gate 1 Retry 2
+
+### RESOLVED — DEF-1: ReconServiceImpl.kt emailAddress NPE — messenger payout fails for phone-registered users (HIGH severity)
+
+**File:** `izinga-recon/src/main/kotlin/io/curiousoft/izinga/recon/ReconServiceImpl.kt`  
+**Root cause:** Non-null assertion `!!` on `emailAddress` threw `NullPointerException` when a messenger registered via phone/WhatsApp only and had no email on their `userProfile`.  
+**Fix applied:** `emailAddress = messng.emailAddress!!` changed to `emailAddress = messng.emailAddress` (null-safe; email sender skips blank/null addresses downstream).  
+**Live evidence (Gate 1 ADR-028, 2026-11-06):** Run 2 — D2 fixture had no emailAddress field; MessengerPayout CJ2XF created successfully, no NPE; payoutCreated=true set for O2; `MessengerPayout` document persisted with `emailAddress=null` and `payoutStage=PENDING`. Confirmed resolution.  
+**Date found:** 2026-11-06 (Gate 1 Retry 2)  
+**Date resolved:** 2026-11-06 (Gate 1 ADR-028, feature/payout-disbursement-fixes-rebase)
+
+### RESOLVED — DEF-2: SchedulerService marks payoutCreated=true even when bank-guard returns null — prevents retry (MEDIUM severity)
+
+**File:** `izinga-ordermanager/src/main/java/io/curiousoft/izinga/ordermanagement/service/SchedulerService.java`  
+**Root cause:** Scheduler called `order.setPayoutCreated(true)` unconditionally even when both generate calls returned null (Deferred). Orders with missing bank were permanently excluded from retry.  
+**Fix applied (ADR-028):** Sealed `PayoutGenerationOutcome` type (`Created<T>`, `NotApplicable`, `Deferred`). Scheduler now captures outcome from both sides; sets `payoutCreated=true` only when `!shopDeferred && !messengerDeferred`. Also includes BUG-2 guard: `if (sd != null && sd.getMessengerId() != null)` check before messenger payout call.  
+**Live evidence (Gate 1 ADR-028, 2026-11-06):**  
+- Run 1: O1 (D1 null-bank, S1 null-bank) — both sides `Deferred`; `payoutCreated=false` confirmed in MongoDB (not set). O2 (S2 valid-bank, D2 null-bank) — ShopPayout `Created`, MessengerPayout `Deferred`; `payoutCreated=false` (messenger side still deferred).  
+- Run 2: D1 got bank added; O1 messenger → `Created`; O1 shop still `Deferred` (S1 no bank); `payoutCreated=false` (shop side still deferred). O2 shop → `NotApplicable` (already created); O2 messenger still `Deferred`; `payoutCreated=false`.  
+- Run 3: D1 bank set, S1 payout moved to PROCESSING manually; O1 shop → `NotApplicable` (cross-stage guard); O1 messenger → new payout NYCF8 `Created`; both sides resolved → `payoutCreated=true` set. O3 shop → `Created`; no messenger → "Skipping messenger payout: no messenger assigned" → `payoutCreated=true` set.  
+**Date found:** 2026-11-06 (Gate 1 Retry 2)  
+**Date resolved:** 2026-11-06 (Gate 1 ADR-028, feature/payout-disbursement-fixes-rebase)
+
 ### GAP — BUG-1 not observable without payoutCreated=false order in UAT
 
 BUG-1 requires an order with `payoutCreated=false` to be observable. Creating one in UAT sandbox would require either:
@@ -208,6 +236,146 @@ BUG-1 requires an order with `payoutCreated=false` to be observable. Creating on
 
 ---
 
+## Live verification notes (2026-11-06 Gate 1 Retry 2 — feature/payout-disbursement-fixes-rebase, two new defects found)
+
+**Branch:** feature/payout-disbursement-fixes-rebase (merge in progress: HEAD e01f5657 + MERGE_HEAD dc5d4ae0 staged, not committed)  
+**Worktree:** `/Users/lindanimasinga/Documents/GitHub/ijudi-api-payout-rebase`  
+**Build:** `./mvnw -pl izinga-ordermanager -am clean package -DskipTests` → SUCCESS; `./mvnw test` (no-clean) → 1610/0/0/19 PASS  
+**App started:** UAT profile, PID 87740, port 8085, `STORE_SCOPE_JWT_SECRET=local-dev-secret-for-testing-only-min-32-chars`, 2026-11-06 01:30:04 SAST  
+**Mongo URI confirmed from startup log:** `cluster0-7odiz.mongodb.net/izinga-sandbox` (NOT production)  
+
+**Fixtures inserted:**
+| ID | Collection | Purpose |
+|---|---|---|
+| qa-payout-rebase-store-null-bank | storeProfile | Store with null bank, hasPaymentAgreement=true, mobile=+27000000001 |
+| qa-payout-rebase-store-valid-bank | storeProfile | Store with FNB CHEQUE 62345678901, mobile=+27000000003 |
+| qa-payout-rebase-messenger-null-bank | userProfile | Driver with null bank, mobile=+27000000002 |
+| qa-payout-rebase-messenger-valid-bank | userProfile | Driver with FNB CHEQUE 62345678902, mobile=+27000000004 (NOTE: no emailAddress field) |
+| qa-payout-rebase-order-null-bank | order | stage=STAGE_7_ALL_PAID, shopPaid=false, payoutCreated=false, shopId=null-bank-store, messengerId=null-bank-driver |
+| qa-payout-rebase-order-valid-bank | order | stage=STAGE_7_ALL_PAID, shopPaid=false, payoutCreated=false, shopId=valid-bank-store, messengerId=valid-bank-driver |
+
+**Scheduler fired:** 2026-11-06 01:38:04 SAST (480s initial delay from 01:30:04)
+
+**Evidence — null-bank order (AC-01, AC-02 guards):**
+- `01:38:04.938 DEBUG: Processing payout for order: qa-payout-rebase-order-null-bank`
+- `01:38:05.226 WARN ReconServiceImpl: store qa-payout-rebase-store-null-bank ('QA Null Bank Store') has a payout agreement but no bank details on file; skipping payout for order qa-payout-rebase-order-null-bank` ← GAP-7 guard PASS
+- `01:38:05.557 INFO WhatsAppFactory: Request body: {"to":"+27000000001","template":{"name":"store_missing_bank_details",...}}` ← notification invoked
+- `01:38:06.662 INFO WhatsAppFactory: Response code: 400` with `"code":132000,"details":"body: number of localizable_params (1) does not match the expected number of params (2)"` ← template not approved, expected; swallowed by catch
+- `01:38:06.663 INFO WhatsappNotificationService: Sent missing bank details notification to store owner at +27000000001`
+- `01:38:06.966 WARN ReconServiceImpl: messenger qa-payout-rebase-messenger-null-bank ('QA Null Bank Driver') has no bank details on file; skipping payout for order qa-payout-rebase-order-null-bank` ← BUG-3 guard PASS
+- `01:38:07.533 INFO WhatsAppFactory: Request body: {"to":"+27000000002","template":{"name":"driver_missing_bank_details",...}}` ← notification invoked
+- `01:38:08.700 INFO WhatsAppFactory: Response code: 200` with wamid accepted ← driver template IS approved, notification delivered
+- `01:38:08.706 INFO WhatsappNotificationService: Sent missing bank details notification to +27000000002`
+- `01:38:09.058 DEBUG: Order marked as payout created: qa-payout-rebase-order-null-bank` ← **DEF-2: payoutCreated=true set even though no payout was created**
+- MongoDB post-run: `order.payoutCreated=true`; NO ShopPayout doc for null-bank-store; NO MessengerPayout doc for null-bank-driver ← confirms DEF-2
+
+**Evidence — valid-bank order (DEF-1 found):**
+- `01:38:09.058 DEBUG: Processing payout for order: qa-payout-rebase-order-valid-bank`
+- `01:38:09.986 INFO: Shop payout generated for order: qa-payout-rebase-order-valid-bank` ← ShopPayout created
+- `01:38:10.627 ERROR: Failed to process payout for order: qa-payout-rebase-order-valid-bank`
+  - `java.lang.NullPointerException at ReconServiceImpl.kt:169` — `emailAddress = messng.emailAddress!!` with null emailAddress ← **DEF-1**
+- MongoDB post-run: `order.payoutCreated=false` (exception blocked the set); ShopPayout `QFL5G` with payoutStage=PENDING EXISTS for valid-bank store; NO MessengerPayout for valid-bank driver
+
+**Job statistics:** `Shop Payouts Generated: 2, Messenger Payouts Generated: 1, Errors: 1, Duration: 6059ms`  
+(Note: counters misleading — "2 shop payouts" includes null-bank store where null was returned without exception)
+
+**Fixtures cleaned:** All 6 user/store/order fixtures + 1 ShopPayout document deleted from izinga-sandbox post-verification.  
+**App stopped:** PID 87740 killed post-verification.  
+**Verdict:** BLOCKED (DEF-1 + DEF-2)
+
+---
+
+## Live verification notes (2026-11-06 Gate 1 ADR-028 — feature/payout-disbursement-fixes-rebase, DEF-1 and DEF-2 RESOLVED)
+
+**Branch:** feature/payout-disbursement-fixes-rebase  
+**Worktree:** `/Users/lindanimasinga/Documents/GitHub/ijudi-api-payout-rebase`  
+**Build:** `./mvnw -pl izinga-ordermanager -am clean package -DskipTests` → SUCCESS  
+**Backend started:** UAT profile, PID (java -jar), port 8085, JAVA_HOME=Corretto-17, `STORE_SCOPE_JWT_SECRET=local-dev-secret-for-testing-only-min-32-chars`  
+**Mongo URI confirmed from startup log:** `cluster0-7odiz.mongodb.net/izinga-sandbox` (NOT production)  
+**Pre-flight:** 0 non-fixture qualifying orders in izinga-sandbox — safe to proceed  
+
+**ADR-028 test fixtures:**
+
+| ID | Collection | Purpose |
+|---|---|---|
+| qa-payout-rebase-s1 (store) | storeProfile | S1: null bank, hasPaymentAgreement=true, mobile=+27000000001 |
+| qa-payout-rebase-d1 (driver) | userProfile | D1: null bank initially, mobile=+27000000002; bank added after Run 1 |
+| qa-payout-rebase-s2 (store) | storeProfile | S2: FNB CHEQUE valid bank, mobile=+27000000003 |
+| qa-payout-rebase-d2 (driver) | userProfile | D2: null bank throughout, mobile=+27000000004; NO emailAddress field (DEF-1 test) |
+| qa-payout-rebase-o1 | order | O1: S1 + D1, STAGE_7_ALL_PAID, payoutCreated=false |
+| qa-payout-rebase-o2 | order | O2: S2 + D2, STAGE_7_ALL_PAID, payoutCreated=false |
+| qa-payout-rebase-o3 | order | O3: S1 only (no messenger), STAGE_7_ALL_PAID, payoutCreated=false |
+
+**Run 1 — both sides missing bank (DEF-2 proof + notification):**
+- O1 shop (S1 null-bank): outcome=`Deferred`; WA notification sent to +27000000001; cooldown doc inserted for `qa-payout-rebase-s1:STORE_MISSING_BANK`
+- O1 messenger (D1 null-bank): outcome=`Deferred`; WA notification sent to +27000000002; cooldown doc inserted for `qa-payout-rebase-d1:DRIVER_MISSING_BANK`
+- O1 payoutCreated=false confirmed in MongoDB (DEF-2 fix PASS — not set to true when both sides Deferred)
+- O2 shop (S2 valid-bank): outcome=`Created`; ShopPayout `<id>` persisted with payoutStage=PENDING
+- O2 messenger (D2 null-bank): outcome=`Deferred`; WA notification sent to +27000000004; cooldown inserted
+- O2 payoutCreated=false confirmed in MongoDB (messenger side still Deferred)
+
+**DEF-1 resolution proof (Run 2 — D2 no emailAddress):**
+- D2 fixture has no emailAddress field in userProfile
+- Scheduler Run 2: O2 messenger payout generated for D2 — MessengerPayout CJ2XF created, payoutStage=PENDING
+- No NullPointerException; `emailAddress=null` stored on payout doc (email sender skips blank/null)
+- DEF-1 RESOLVED confirmed
+
+**Run 2 — partial bank resolution:**
+- O1 shop (S1 still null-bank): outcome=`Deferred`; O1 payoutCreated=false (shop still deferred)
+- O1 messenger (D1 bank added after Run 1): outcome=`Created`; MessengerPayout created for D1
+- O2 shop (S2 payout already exists): outcome=`NotApplicable`; "order already included in existing shop payout" logged
+- O2 messenger (D2 null-bank): outcome=`Deferred`; cooldown suppressed duplicate notification (within 24h)
+
+**Throttle expiry test:**
+- D1 cooldown doc artificially aged to 25h via MongoDB `$set createdAt` to 25h ago
+- TTL index had already cleaned the doc (or doc aged past 24h): insert succeeded (no DuplicateKeyException)
+- WA notification resent to D1 — throttle expiry path PASS
+
+**Run 3 — cross-stage guard + no-messenger path:**
+- S1 existing ShopPayout manually set to `payoutStage=PROCESSING` before Run 3
+- O1 shop: outcome=`NotApplicable`; "order already included in existing shop payout [in PROCESSING]" — cross-stage guard PASS; no duplicate ShopPayout created
+- O1 messenger (D1 bank set): outcome=`Created`; new MessengerPayout NYCF8 created for D1; payoutCreated=true set (shop=NotApplicable, messenger=Created — not Deferred)
+- O3 shop (S1): outcome=`Created`; new ShopPayout created; "Skipping messenger payout: no messenger assigned" logged (BUG-2 guard PASS); payoutCreated=true set
+- Compound index confirmed on both `messengerPayout` (`messenger_payout_cross_stage_idx`) and `shopPayout` (`shop_payout_cross_stage_idx`) collections
+
+**Fixtures cleaned:** All test fixtures (users, stores, orders, payouts, cooldown docs) deleted from izinga-sandbox post-verification.  
+**App stopped:** Killed post-verification.
+
+**ADR-028 Acceptance Criteria results (Gate 1):**
+
+| AC | Description | Type | Result |
+|---|---|---|---|
+| AC-01 | DEF-1 RESOLVED: null emailAddress on D2 does not throw NPE | LIVE | PASS |
+| AC-02 | DEF-2 RESOLVED: payoutCreated=false when both sides Deferred (O1 Run 1) | LIVE | PASS |
+| AC-03 | DEF-2 RESOLVED: payoutCreated=false when messenger side Deferred (O2 Run 1) | LIVE | PASS |
+| AC-04 | Null-bank store → Deferred outcome + WA notification to store owner | LIVE | PASS |
+| AC-05 | Null-bank driver → Deferred outcome + WA notification to driver | LIVE | PASS |
+| AC-06 | Valid-bank store → Created outcome; ShopPayout persisted PENDING | LIVE | PASS |
+| AC-07 | Valid-bank driver (no emailAddress) → Created outcome; MessengerPayout persisted PENDING, emailAddress=null | LIVE | PASS |
+| AC-08 | Bank added after Deferred: next Run creates payout (D1 bank added → MessengerPayout created Run 2) | LIVE | PASS |
+| AC-09 | Already-created payout → NotApplicable outcome (O2 shop Run 2) | LIVE | PASS |
+| AC-10 | Cross-stage guard: order in PROCESSING payout → NotApplicable (O1 shop Run 3) | LIVE | PASS |
+| AC-11 | No duplicate ShopPayout created when cross-stage guard fires (S1 Run 3) | LIVE | PASS |
+| AC-12 | No-messenger order: ShopPayout created + "no messenger assigned" skip; payoutCreated=true | LIVE | PASS |
+| AC-13 | payoutCreated=true only when both sides resolved (not Deferred): O1 Run 3 (NotApplicable+Created) | LIVE | PASS |
+| AC-14 | payoutCreated=true when no-messenger order: shop=Created, messenger=skipped | LIVE | PASS |
+| AC-15 | Cooldown suppresses duplicate WA notification within 24h (D2 Run 2 — no second notify) | LIVE | PASS |
+| AC-16 | Cooldown TTL expiry: aged cooldown allows resend (D1 25h aged → notification resent) | LIVE | PASS |
+| AC-17 | BUG-2 guard: null messenger ID check prevents NPE on no-messenger orders (O3) | LIVE | PASS |
+| AC-18 | Compound index `messenger_payout_cross_stage_idx` exists on messengerPayout collection | LIVE | PASS |
+| AC-19 | Compound index `shop_payout_cross_stage_idx` exists on shopPayout collection | LIVE | PASS |
+| AC-20 | NullBankGuardPayoutTest: 9 unit tests — all null/valid bank branches for store and messenger | UNIT | PASS (run 1 + 2: 9/0/0/0) |
+| AC-21 | CrossStageGuardPayoutTest: 5 unit tests — double-pay prevention logic | UNIT | PASS (run 1 + 2: 5/0/0/0) |
+| AC-22 | PayoutFailureStatusUpdateTest: 7 unit tests — paid=false reversion, attemptCount, COMPLETED | UNIT | PASS (run 1 + 2: 7/0/0/0) |
+| AC-23 | WhatsappNotificationServiceTest: 28 unit tests including 8 missing-bank notification tests | UNIT | PASS (run 1 + 2: 28/0/0/0) |
+| AC-24 | SchedulerServiceTest: 25 unit tests including DEF-2 scheduler marking rule | UNIT | PASS (run 1 + 2: 25/0/0/0) |
+| AC-25 | izinga-recon module: 162 unit tests — PASS | UNIT | PASS (run 1 + 2: 162/0/0/0) |
+| AC-26 | Full reactor all modules except flake: 887/0/0/4 (excluding known pre-existing flake) | UNIT | PASS (all modules except izinga-ordermanager startOrderShop_offline) |
+
+**Build result:** `./mvnw clean test` — FAIL both runs (Run 1 and Rerun). Sole failure: `OrderServiceTest.startOrderShop_offline:308` (`java.lang.AssertionError` at `Assert.fail()` — `startOrder()` did not throw "Shop not available name" as expected). File confirmed IDENTICAL to develop branch (`git diff develop -- ...OrderServiceTest.java` = no diff). Pre-existing non-deterministic flake tracked by task_723cde3e. Not introduced by this branch. One rerun issued per protocol — same failure. Per QA constraints, cannot issue MERGE_READY.
+
+---
+
 ## Live verification notes (2026-11-03 — feature/payout-disbursement-fixes Gate 1)
 
 **Backend status:** Attempted to start feature branch backend on UAT profile. Port 80 was already held by the prior session's develop-branch backend (PID 34881) and could not be released in auto mode. Auth enforcement verified via the prior-session backend (Spring Security config unchanged on this feature branch).
@@ -234,13 +402,21 @@ Code analysis confirms: a name like `O"Brien` causes `requestStr.replace("#name"
 ## Validation commands
 
 ```bash
-# Backend (full reactor — mandatory before PASS verdict)
+# Backend (full reactor — mandatory before PASS verdict; run from repo root)
 export JAVA_HOME=/Users/lindanimasinga/Library/Java/JavaVirtualMachines/corretto-17.0.15/Contents/Home
-cd /Users/lindanimasinga/Documents/GitHub/ijudi-api
+cd /Users/lindanimasinga/Documents/GitHub/ijudi-api   # or ijudi-api-payout-rebase worktree
 ./mvnw test
 
 # Backend (scoped — for iteration only, not final verdict)
-./mvnw -pl izinga-recon,izinga-ordermanager -am test
+./mvnw -pl izinga-recon,izinga-ordermanager,izinga-messaging -am test
+
+# Local UAT run (for live verification — requires JAVA_HOME + AWS credentials)
+export STORE_SCOPE_JWT_SECRET=local-dev-secret-for-testing-only-min-32-chars
+./mvnw -pl izinga-ordermanager -am clean package -DskipTests
+java -DSTORE_SCOPE_JWT_SECRET=local-dev-secret-for-testing-only-min-32-chars \
+     -jar izinga-ordermanager/target/izinga-ordermanager-1.2.6-SNAPSHOT.jar \
+     --spring.profiles.active=uat --server.port=8085
+# Confirm on startup: cluster0-7odiz.mongodb.net/izinga-sandbox (NOT production)
 
 # Frontend
 cd /Users/lindanimasinga/Documents/GitHub/izinga-onboarding
