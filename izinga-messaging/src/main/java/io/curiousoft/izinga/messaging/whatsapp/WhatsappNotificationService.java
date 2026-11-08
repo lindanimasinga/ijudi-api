@@ -618,18 +618,27 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
      * intentionally NOT on the {@link io.curiousoft.izinga.messaging.AdminOnlyNotificationService}
      * interface — it is MCP-specific and should only be called from the MCP controller layer.</p>
      *
-     * <p>Exception handling: {@code IOException} covers both
-     * {@code mapper.readValue()} (which throws {@code JsonProcessingException extends IOException})
-     * and {@code whatsAppService.sendMessage().execute()}. {@link WhatsappSenderResolver#resolve}
-     * never throws an unchecked exception.</p>
+     * <p>Exception handling: {@code IOException} covers {@code mapper.readValue()} (which throws
+     * {@code JsonProcessingException extends IOException}) and
+     * {@code whatsAppService.sendMessage().execute()}. {@link WhatsappSenderResolver#resolve}
+     * queries MongoDB via Spring Data and CAN throw unchecked {@code DataAccessException} on
+     * connectivity or timeout failure. The outer {@code catch (Exception e)} absorbs both checked
+     * and unchecked failures so no exception ever escapes this method (AC-09 graceful degradation).</p>
      *
      * @param mobileNumber the recipient's phone number (normalized to +27 prefix if starts with 0)
      * @param name         the recipient's display name used as the BODY TEXT parameter
+     * @return {@code true} if the Meta API call completed without exception; {@code false} if any
+     *         exception was absorbed (including unchecked {@code DataAccessException} from the sender
+     *         resolver or unapproved-template failures from the WhatsApp API)
      */
-    public void sendShopOptions(String mobileNumber, String name) {
+    public boolean sendShopOptions(String mobileNumber, String name) {
+        if (mobileNumber == null || mobileNumber.isBlank()) {
+            LOGGER.warn("Cannot send shop options: mobile number is null or blank");
+            return false;
+        }
         try {
             WhatsappTemplateRequest request = new WhatsappTemplateRequest();
-            String to = mobileNumber != null && mobileNumber.startsWith("0")
+            String to = mobileNumber.startsWith("0")
                     ? mobileNumber.replaceFirst("0", "+27") : mobileNumber;
             request.setTo(to);
 
@@ -655,9 +664,14 @@ public class WhatsappNotificationService implements AdminOnlyNotificationService
             var template = mapper.readValue(requestStr, WhatsappTemplateRequest.Template.class);
             request.setTemplate(template);
             whatsAppService.sendMessage(senderResolver.resolve(Audience.CUSTOMER, null), request).execute();
-            LOGGER.info("Sent shop options to {}", to);
-        } catch (IOException e) {
-            LOGGER.error("Failed to send shop options to {}", mobileNumber, e);
+            // SEC-05: log at DEBUG and mask all but the last 4 digits (POPIA — personal information)
+            LOGGER.debug("Sent shop options to ...{}", to.length() > 4 ? to.substring(to.length() - 4) : "****");
+            return true;
+        } catch (Exception e) {
+            // AC-09: absorb ALL failures (checked IOException + unchecked DataAccessException from
+            // senderResolver.resolve(), unapproved-template errors, etc.) so no exception escapes.
+            LOGGER.error("Failed to send shop options notification", e);
+            return false;
         }
     }
 

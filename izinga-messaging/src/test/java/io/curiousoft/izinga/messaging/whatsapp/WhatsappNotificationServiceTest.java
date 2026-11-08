@@ -414,14 +414,15 @@ class WhatsappNotificationServiceTest {
 
     /**
      * AC-09 (happy path): sendShopOptions sends the izinga_shop_options template using the
-     * CUSTOMER audience line, and absorbs the IOException from execute() without rethrowing.
+     * CUSTOMER audience line, and returns true on success.
      */
     @Test
     void sendShopOptions_happyPath_sendsIzingaShopOptionsTemplateAndReturnsNormally() throws IOException {
         when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
 
-        assertDoesNotThrow(() -> service.sendShopOptions("+27821234567", "Test User"));
+        boolean result = service.sendShopOptions("+27821234567", "Test User");
 
+        assertTrue(result, "sendShopOptions must return true when the Meta API call succeeds");
         verify(senderResolver).resolve(Audience.CUSTOMER, null);
         ArgumentCaptor<WhatsappTemplateRequest> captor = ArgumentCaptor.forClass(WhatsappTemplateRequest.class);
         verify(whatsAppService).sendMessage(eq("testPhoneId"), captor.capture());
@@ -431,7 +432,8 @@ class WhatsappNotificationServiceTest {
 
     /**
      * AC-09 (IOException path): When the WhatsApp send call throws IOException (e.g. network
-     * error, unapproved Meta template), sendShopOptions absorbs the exception and does NOT rethrow.
+     * error, unapproved Meta template), sendShopOptions absorbs the exception, does NOT rethrow,
+     * and returns false to signal the absorbed failure to the caller.
      * This is the designed degradation path.
      */
     @Test
@@ -439,7 +441,9 @@ class WhatsappNotificationServiceTest {
         when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
         when(callMock.execute()).thenThrow(new IOException("Meta API: template not approved"));
 
-        assertDoesNotThrow(() -> service.sendShopOptions("+27821234567", "Test User"));
+        boolean result = service.sendShopOptions("+27821234567", "Test User");
+
+        assertFalse(result, "sendShopOptions must return false when IOException is absorbed (AC-09 degraded-outcome signal)");
     }
 
     /**
@@ -463,24 +467,25 @@ class WhatsappNotificationServiceTest {
 
         // AC-09 requires graceful degradation — the agent must NOT see this exception.
         // Currently FAILS: DataAccessException is not caught by catch (IOException e).
-        assertDoesNotThrow(() -> service.sendShopOptions("+27821234567", "Test User"),
-                "AC-09 FAIL: DataAccessException from senderResolver.resolve() propagates out of " +
-                "sendShopOptions uncaught. Only IOException is caught. Fix: broaden catch to " +
-                "catch (Exception e) or add a separate catch (RuntimeException e) block.");
+        // Fix: broaden catch to catch (Exception e) or add a separate catch (RuntimeException e) block.
+        boolean result = service.sendShopOptions("+27821234567", "Test User");
+
+        assertFalse(result,
+                "AC-09: sendShopOptions must absorb DataAccessException from senderResolver.resolve() " +
+                "and return false. The agent must never see this exception.");
     }
 
     /**
-     * AC-09 (null mobileNumber): When mobileNumber is null, sendShopOptions should handle
-     * it gracefully (sibling sendCrimnalCheckConsent has an explicit null guard; this method
-     * does not). With null mobileNumber, 'to' becomes null and the send proceeds.
-     * The method should not throw even if the downstream call fails with IOException.
+     * AC-09 (null mobileNumber): When mobileNumber is null, the null guard returns false
+     * immediately (mirrors sibling sendCrimnalCheckConsent). No downstream call is made.
      */
     @Test
-    void sendShopOptions_nullMobileNumber_doesNotThrowNullPointerException() throws IOException {
-        when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+    void sendShopOptions_nullMobileNumber_doesNotThrowNullPointerException() {
+        // null/blank guard: returns false immediately, no downstream call
+        boolean result = service.sendShopOptions(null, null);
 
-        // Should not propagate any exception regardless of null mobile
-        assertDoesNotThrow(() -> service.sendShopOptions(null, null));
+        assertFalse(result, "sendShopOptions must return false for null mobileNumber (null guard)");
+        verify(senderResolver, never()).resolve(any(), any());
     }
 
     // ─── ADR-028: Throttle / acquireCooldown tests ───────────────────────────
