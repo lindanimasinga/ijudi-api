@@ -591,6 +591,57 @@ class McpArchitectureTest {
                 .hasMessageContaining("R7 violation");
     }
 
+    // ---- SEC-03: frozen allow-list for @McpPublicTool (ADR-029) ----------------------------
+
+    /**
+     * SEC-03 (ADR-029): Asserts the EXACT set of {@code @Tool} methods on {@code @McpToolController}
+     * beans that are annotated {@code @McpPublicTool} is frozen at exactly one method:
+     * {@code "send_shop_options_notification"}.
+     *
+     * <p>{@code @McpPublicTool} is an escape hatch — a future developer could remove an inline
+     * identity gate from any tool and add this annotation to keep ArchUnit R7 green, with no gate
+     * forcing a security review. This test makes the allow-list structural and enforced at build
+     * time: adding any second public tool causes an immediate test failure with a message that
+     * explains why a security review and ADR are required.</p>
+     *
+     * <p>Test scope: production classes only ({@code DoNotIncludeTests}). The
+     * {@link R7ViolatorFixture} and {@link fixtures.izinga.mcp.EmptyMcpAudienceFixture} test
+     * fixtures do not carry {@code @McpPublicTool} and would not pollute this set even if scanned,
+     * but they are excluded by {@code DoNotIncludeTests} to maintain test/production boundary
+     * discipline.</p>
+     *
+     * <p>When a second public tool legitimately needs to be added, follow the security review
+     * and ADR process mandated by ADR-029, then update this frozen set.</p>
+     */
+    @Test
+    void sec03_frozenPublicToolAllowList_onlySendShopOptionsNotificationIsPublic() {
+        JavaClasses allProductionClasses = new ClassFileImporter()
+                .withImportOption(new ImportOption.DoNotIncludeTests())
+                .importPackages(
+                        "io.curiousoft.izinga.ordermanagement",
+                        "io.curiousoft.izinga.recon",
+                        "io.curiousoft.izinga.usermanagement",
+                        "io.curiousoft.izinga.commons"
+                );
+
+        // Collect the @Tool name attribute from every method annotated with BOTH @Tool AND @McpPublicTool
+        // on a @McpToolController class. De-duplicate by tool name (Kotlin bridge methods copy annotations).
+        Set<String> publicToolNames = allProductionClasses.stream()
+                .filter(c -> c.isAnnotatedWith(McpToolController.class))
+                .flatMap(c -> c.getMethods().stream())
+                .filter(m -> m.isAnnotatedWith(Tool.class) && m.isAnnotatedWith(McpPublicTool.class))
+                .map(m -> (String) m.getAnnotationOfType(Tool.class).name())
+                .collect(Collectors.toSet());
+
+        assertThat(publicToolNames)
+                .as("SEC-03 (ADR-029): The set of @McpPublicTool @Tool methods is FROZEN at exactly " +
+                    "{\"send_shop_options_notification\"}. Adding a second public tool bypasses the " +
+                    "null-audience identity gate for that tool and requires a security review and an " +
+                    "ADR amendment before being allowed. Update this assertion only after that process " +
+                    "has been completed and signed off.")
+                .containsExactly("send_shop_options_notification");
+    }
+
     // ---- Non-vacuity guard (d): R6 gate is live — detects scope-setter call ----------------
 
     /**

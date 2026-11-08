@@ -29,8 +29,10 @@ import org.springframework.ai.tool.annotation.ToolParam;
  * <ul>
  *   <li>send_landing_options_notification: SEC-MCP-01 null-audience hard reject (with audit + throw)
  *       before any downstream call. Tokenless callers cannot trigger outbound messages.</li>
- *   <li>send_shop_options_notification: {@link McpPublicTool} — no identity gate applied;
- *       the GuardedToolCallback explicitly permits tokenless access for this method.</li>
+ *   <li>send_shop_options_notification: {@link McpPublicTool} — no identity gate applied.
+ *       {@code GuardedToolCallback} does NOT read this annotation at runtime; the public behaviour
+ *       comes from the deliberate absence of an inline identity gate in this method body. The
+ *       annotation is a documentation marker and ArchUnit R7 exemption only.</li>
  * </ul>
  *
  * <h3>Security note</h3>
@@ -123,9 +125,15 @@ public class NotificationMcpController {
      * ({@link McpPublicTool}) and accepts tokenless requests because it carries no caller-specific
      * or account-sensitive information — only a generic shop-listing template.</p>
      *
-     * <p><strong>Security note:</strong> No identity gate is applied here. The
-     * {@code GuardedToolCallback} in {@link io.curiousoft.izinga.ordermanagement.McpConfig}
-     * passes through requests to methods carrying {@link McpPublicTool}.</p>
+     * <p><strong>Security note:</strong> No identity gate is applied here.
+     * {@code GuardedToolCallback} does NOT read the {@link McpPublicTool} annotation at runtime —
+     * the public behaviour comes from the deliberate absence of an inline identity gate in this
+     * method body. {@link McpPublicTool} is a documentation marker and ArchUnit R7 exemption only.</p>
+     *
+     * <p><strong>Truthful outcome reporting:</strong> {@link WhatsappNotificationService#sendShopOptions}
+     * returns {@code true} if the Meta API call succeeded and {@code false} if any failure was
+     * absorbed (unapproved template, MongoDB timeout, network error). The controller returns a
+     * distinct message for each outcome so the agent can report accurately to the user.</p>
      *
      * @param mobileNumber recipient's mobile number in international format, e.g. +27821234567
      * @param name         display name of the recipient
@@ -143,8 +151,11 @@ public class NotificationMcpController {
             String name) {
         // @McpPublicTool: intentionally accepts unauthenticated requests.
         // No identity gate. Routes via the main customer line (Audience.CUSTOMER, no store scope).
-        whatsappNotificationService.sendShopOptions(mobileNumber, name);
-        LOG.debug("[NotificationMcpController] send_shop_options_notification dispatched to {}", mobileNumber);
-        return "Shop options notification sent to " + mobileNumber + ".";
+        boolean sent = whatsappNotificationService.sendShopOptions(mobileNumber, name);
+        LOG.debug("[NotificationMcpController] send_shop_options_notification sent={} to {}", sent, mobileNumber);
+        if (sent) {
+            return "Shop options notification sent to " + mobileNumber + ".";
+        }
+        return "Shop options notification could not be delivered to " + mobileNumber + " at this time.";
     }
 }

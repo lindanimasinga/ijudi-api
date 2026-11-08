@@ -182,13 +182,15 @@ class NotificationMcpControllerTest {
     // ==================================================================================
 
     /**
-     * Public tool, null audience: no gate fires. The shop options notification is sent
-     * regardless of token presence. The audit service must NOT be called.
+     * Public tool, null audience, service reports success: no gate fires. The shop options
+     * notification is sent regardless of token presence. Controller returns the success string.
+     * The audit service must NOT be called.
      */
     @Test
     void sendShopOptionsNotification_nullAudience_sendsNotificationWithoutGate() {
         CallerIdentityContext.setMcpRequest(true);
         StoreScopeContext.setAudience(null); // tokenless — no scope token
+        when(whatsappNotificationService.sendShopOptions("+27821234567", "Test User")).thenReturn(true);
 
         String result = controller.sendShopOptionsNotification("+27821234567", "Test User");
 
@@ -199,12 +201,13 @@ class NotificationMcpControllerTest {
     }
 
     /**
-     * Public tool, authenticated DRIVER: tool passes through, service called, success returned.
+     * Public tool, authenticated DRIVER, service reports success: tool passes through, success returned.
      */
     @Test
     void sendShopOptionsNotification_driverAudience_sendsNotificationAndReturnsSuccessString() {
         CallerIdentityContext.setMcpRequest(true);
         StoreScopeContext.setAudience(Audience.DRIVER);
+        when(whatsappNotificationService.sendShopOptions("+27821234567", "Test User")).thenReturn(true);
 
         String result = controller.sendShopOptionsNotification("+27821234567", "Test User");
 
@@ -213,16 +216,40 @@ class NotificationMcpControllerTest {
     }
 
     /**
-     * Public tool, authenticated CUSTOMER: tool passes through, service called.
+     * Public tool, authenticated CUSTOMER, service reports success: tool passes through, success returned.
      */
     @Test
     void sendShopOptionsNotification_customerAudience_sendsNotificationAndReturnsSuccessString() {
         CallerIdentityContext.setMcpRequest(true);
         StoreScopeContext.setAudience(Audience.CUSTOMER);
+        when(whatsappNotificationService.sendShopOptions("+27821234567", "Test User")).thenReturn(true);
 
         String result = controller.sendShopOptionsNotification("+27821234567", "Test User");
 
         assertThat(result).isEqualTo("Shop options notification sent to +27821234567.");
         verify(whatsappNotificationService).sendShopOptions("+27821234567", "Test User");
+    }
+
+    /**
+     * FIX-2 (AC-09 truthfulness): When sendShopOptions returns false (absorbed failure —
+     * e.g. unapproved Meta template, MongoDB timeout during sender resolution), the controller
+     * must NOT return the success string. It must return a clearly distinct degraded-outcome
+     * message so the agent accurately reports to the user that the notification was not delivered.
+     */
+    @Test
+    void sendShopOptionsNotification_serviceReturnsFalse_returnsDegradedOutcomeString() {
+        CallerIdentityContext.setMcpRequest(true);
+        StoreScopeContext.setAudience(null); // tokenless — public tool still executes
+        when(whatsappNotificationService.sendShopOptions("+27821234567", "Test User")).thenReturn(false);
+
+        String result = controller.sendShopOptionsNotification("+27821234567", "Test User");
+
+        assertThat(result)
+                .as("Controller must return a degraded-outcome message, not the success string, " +
+                    "when sendShopOptions reports a failed delivery (AC-09 truthfulness fix)")
+                .isEqualTo("Shop options notification could not be delivered to +27821234567 at this time.");
+        verify(whatsappNotificationService).sendShopOptions("+27821234567", "Test User");
+        verify(agentIdentityAuditService, never())
+                .recordViolation(any(), any(), any(), anyString(), anyString(), any(), any());
     }
 }

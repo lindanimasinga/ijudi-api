@@ -19,9 +19,12 @@ import java.lang.annotation.Target;
  * <p><strong>R2 still applies:</strong> Tools annotated with {@code @McpPublicTool} must still
  * carry a non-empty {@link McpAudience @McpAudience} annotation.</p>
  *
- * <p>The {@link io.curiousoft.izinga.ordermanagement.McpConfig} {@code GuardedToolCallback}
- * inspects this annotation at dispatch time and skips the identity-gate check for methods
- * that carry it, allowing tokenless requests through to the tool body.</p>
+ * <p><strong>Runtime behaviour:</strong> {@code GuardedToolCallback} does NOT read this annotation
+ * at dispatch time. Its entire logic is {@code assertMcpRequest()}, which checks only
+ * {@link io.curiousoft.izinga.commons.security.CallerIdentityContext#isMcpRequest()} and fails
+ * closed. The public behaviour of a method carrying {@code @McpPublicTool} comes exclusively from
+ * the deliberate absence of an inline identity gate in that method body. This annotation is a
+ * documentation marker and ArchUnit R7 exemption only — it confers no runtime privilege by itself.</p>
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
