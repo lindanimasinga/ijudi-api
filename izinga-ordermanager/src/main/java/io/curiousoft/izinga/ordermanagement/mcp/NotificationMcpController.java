@@ -111,7 +111,7 @@ public class NotificationMcpController {
         whatsappNotificationService.sendLandingOptions(
                 mobileNumber, name, null,
                 mcpCaller.getAudience(), mcpCaller.getPermittedStoreId());
-        LOG.debug("[NotificationMcpController] send_landing_options_notification dispatched to {}", mobileNumber);
+        LOG.debug("[NotificationMcpController] send_landing_options_notification dispatched to {}", maskPhone(mobileNumber));
         return "Landing options notification sent to " + mobileNumber + ".";
     }
 
@@ -152,10 +152,27 @@ public class NotificationMcpController {
         // @McpPublicTool: intentionally accepts unauthenticated requests.
         // No identity gate. Routes via the main customer line (Audience.CUSTOMER, no store scope).
         boolean sent = whatsappNotificationService.sendShopOptions(mobileNumber, name);
-        LOG.debug("[NotificationMcpController] send_shop_options_notification sent={} to {}", sent, mobileNumber);
+        LOG.debug("[NotificationMcpController] send_shop_options_notification sent={} to {}", sent, maskPhone(mobileNumber));
         if (sent) {
             return "Shop options notification sent to " + mobileNumber + ".";
         }
         return "Shop options notification could not be delivered to " + mobileNumber + " at this time.";
+    }
+
+    // ---- POPIA log-masking helper --------------------------------------------------------
+
+    /**
+     * Masks a phone number to its last 4 digits for logging, in compliance with iZinga POPIA rules.
+     * Returns {@code "****"} for null, blank, or strings of 4 characters or fewer.
+     *
+     * <p>Consistent with the pattern already used in
+     * {@code WhatsappNotificationService.sendShopOptions} (SEC-06 / FIX-01 / FIX-02).</p>
+     *
+     * @param phone the phone number to mask; may be null
+     * @return the masked representation, e.g. {@code "...4567"}, or {@code "****"}
+     */
+    static String maskPhone(String phone) {
+        if (phone == null || phone.isBlank()) return "****";
+        return phone.length() > 4 ? "..." + phone.substring(phone.length() - 4) : "****";
     }
 }

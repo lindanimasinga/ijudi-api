@@ -447,17 +447,16 @@ class WhatsappNotificationServiceTest {
     }
 
     /**
-     * AC-09 (DataAccessException path): When senderResolver.resolve() throws an unchecked
-     * DataAccessException (e.g. MongoDB connectivity failure, timeout), sendShopOptions must
-     * absorb the exception gracefully and NOT propagate it to the agent.
+     * Regression test (AC-09 DataAccessException path): proves that
+     * {@code sendShopOptions} absorbs an unchecked {@code DataAccessException} thrown by
+     * {@code senderResolver.resolve()} (e.g. MongoDB connectivity failure, timeout) and
+     * returns {@code false} without propagating the exception to the agent.
      *
-     * <p><strong>DEFECT: AC-09 NOT MET.</strong> The current implementation catches only
-     * {@code IOException}. A {@code DataAccessException} (which extends {@code RuntimeException},
-     * not {@code IOException}) is NOT caught and propagates to the agent. This test is expected to
-     * FAIL until the production code is fixed to catch (or suppress) unchecked exceptions from
-     * {@code senderResolver.resolve()} and {@code whatsAppService.sendMessage()}.</p>
-     *
-     * <p>See ADR-029 Defect 1 raised by QA.</p>
+     * <p>This test was written as a failing sentinel while the defect was open (ADR-029 Defect 1).
+     * The fix broadened the catch block from {@code IOException} to {@code Exception}, so
+     * {@code DataAccessException} — which extends {@code RuntimeException}, not {@code IOException}
+     * — is now absorbed. <strong>Narrowing the catch back to {@code IOException} will cause this
+     * test to fail</strong>, confirming that the fix is still in place.</p>
      */
     @Test
     void sendShopOptions_senderResolverThrowsDataAccessException_absorbsExceptionAndDoesNotRethrow() {

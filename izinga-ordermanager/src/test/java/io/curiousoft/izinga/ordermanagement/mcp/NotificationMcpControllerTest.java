@@ -252,4 +252,38 @@ class NotificationMcpControllerTest {
         verify(agentIdentityAuditService, never())
                 .recordViolation(any(), any(), any(), anyString(), anyString(), any(), any());
     }
+
+    // ==================================================================================
+    // maskPhone — POPIA log-masking helper (SEC-06 / FIX-01 / FIX-02)
+    // ==================================================================================
+
+    /** Null input returns four stars — no NullPointerException from length() call. */
+    @Test
+    void maskPhone_null_returnsFourStars() {
+        assertThat(NotificationMcpController.maskPhone(null)).isEqualTo("****");
+    }
+
+    /** Blank (whitespace-only) input returns four stars. */
+    @Test
+    void maskPhone_blank_returnsFourStars() {
+        assertThat(NotificationMcpController.maskPhone("   ")).isEqualTo("****");
+    }
+
+    /** Exactly 4-character string returns four stars (boundary: length NOT > 4). */
+    @Test
+    void maskPhone_exactlyFourChars_returnsFourStars() {
+        assertThat(NotificationMcpController.maskPhone("1234")).isEqualTo("****");
+    }
+
+    /** 5-character string returns ellipsis + last 4 (boundary: length > 4). */
+    @Test
+    void maskPhone_fiveChars_returnsEllipsisPlusLastFour() {
+        assertThat(NotificationMcpController.maskPhone("12345")).isEqualTo("...2345");
+    }
+
+    /** Normal E.164 phone number is masked to last 4 digits. */
+    @Test
+    void maskPhone_normalPhoneNumber_masksToLastFourDigits() {
+        assertThat(NotificationMcpController.maskPhone("+27821234567")).isEqualTo("...4567");
+    }
 }
