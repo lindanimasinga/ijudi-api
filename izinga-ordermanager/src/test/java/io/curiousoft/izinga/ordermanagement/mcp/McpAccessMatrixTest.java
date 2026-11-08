@@ -17,6 +17,7 @@ import io.curiousoft.izinga.commons.security.CallerIdentityContext;
 import io.curiousoft.izinga.commons.security.CallerIdentityViolationException;
 import io.curiousoft.izinga.messaging.AdminOnlyNotificationService;
 import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
+import io.curiousoft.izinga.messaging.whatsapp.WhatsappNotificationService;
 import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import io.curiousoft.izinga.ordermanagement.McpConfig;
 import io.curiousoft.izinga.ordermanagement.leads.LeadService;
@@ -45,6 +46,7 @@ import io.curiousoft.izinga.usermanagement.referral.ReferralCodeService;
 import io.curiousoft.izinga.usermanagement.userconfig.UserConfigService;
 import io.curiousoft.izinga.ordermanagement.mcp.DocumentUploadMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.McpCaller;
+import io.curiousoft.izinga.ordermanagement.mcp.NotificationMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.OrderMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.PayoutMcpController;
@@ -82,9 +84,10 @@ import static org.mockito.Mockito.*;
 /**
  * ADR-026 D5 / REQ-05 / REQ-13: Full MCP access-control matrix characterization test — ROUND 2.
  *
- * <p><strong>Coverage</strong>: ALL 17 tools × {null/tokenless, DRIVER, CUSTOMER, STORE, ADMIN, OTP}
+ * <p><strong>Coverage</strong>: ALL 19 tools × {null/tokenless, DRIVER, CUSTOMER, STORE, ADMIN, OTP}
  * × {OWN, OTHER, N/A} through the tool-callback path ({@link ToolCallback#call(String)}).
  * create_user removed from the MCP surface in ADR-026 Phase 2b (Lindani 2026-11-05).
+ * send_landing_options_notification and send_shop_options_notification added in ADR-029.
  *
  * <p><strong>Three refusal shapes (ADR-026 F3, frozen by OQ-4 deferral)</strong>:
  * <ol>
@@ -194,6 +197,7 @@ class McpAccessMatrixTest {
     @Mock private ReferralCodeService        referralCodeService;
     @Mock private AgentIdentityAuditService  agentIdentityAuditService;
     @Mock private DocumentUploadSessionRepo  documentUploadSessionRepo;
+    @Mock private WhatsappNotificationService whatsappNotificationService;
 
     // OrderServiceImpl collaborators
     @Mock private OrderRepository          orderRepo;
@@ -298,6 +302,9 @@ class McpAccessMatrixTest {
         // ADR-026 Phase 5: PayoutMcpController added — owns get_payouts_for_user
         PayoutMcpController payoutMcpController =
                 new PayoutMcpController(reconService, mcpCaller, agentIdentityAuditService);
+        // ADR-029: NotificationMcpController added — owns send_landing/shop_options_notification
+        NotificationMcpController notificationMcpController =
+                new NotificationMcpController(whatsappNotificationService, mcpCaller, agentIdentityAuditService);
         Map<String, Object> controllerBeans = new HashMap<>();
         controllerBeans.put("orderCreationMcpController", orderCreationController);
         controllerBeans.put("documentUploadMcpController", documentUploadController);
@@ -305,6 +312,7 @@ class McpAccessMatrixTest {
         controllerBeans.put("orderMcpController", orderMcpController);
         controllerBeans.put("storeMcpController", storeMcpController);
         controllerBeans.put("payoutMcpController", payoutMcpController);
+        controllerBeans.put("notificationMcpController", notificationMcpController);
         when(applicationContext.getBeansWithAnnotation(McpToolController.class))
                 .thenReturn(controllerBeans);
 
@@ -385,7 +393,7 @@ class McpAccessMatrixTest {
     // ==================================================================================
 
     /**
-     * Explicit literal outcome table for all 18 MCP tools × audience combinations.
+     * Explicit literal outcome table for all 19 MCP tools × audience combinations (ADR-029 adds 2).
      *
      * <p>Row format: (toolName, audienceStr, callerPhone, permittedStoreId, json,
      * expectedOutcome, expectAuditCall, expectedMsg)
@@ -453,6 +461,8 @@ class McpAccessMatrixTest {
                                      "\"toDate\":1762212800000,\"toId\":\"" + CALLER_USER_ID + "\"}";
         String payoutsOtherJson    = "{\"payoutType\":\"MESSENGER\",\"from\":1704067200000," +
                                      "\"toDate\":1762212800000,\"toId\":\"" + OTHER_USER_ID + "\"}";
+        // ADR-029: JSON payload for both notification tools
+        String notifJson           = "{\"mobileNumber\":\"" + CALLER_PHONE + "\",\"name\":\"Test User\"}";
 
         return Stream.of(
             // ---- find_user_by_phone (11 rows) ----
@@ -674,7 +684,26 @@ class McpAccessMatrixTest {
             row("get_payouts_for_user", "ADMIN",    CALLER_PHONE, null,               payoutsOtherJson, ALLOW, false, null),
             row("get_payouts_for_user", "ADMIN",    CALLER_PHONE, null,               payoutsOwnJson,   ALLOW, false, null),
             row("get_payouts_for_user", "OTP",      CALLER_PHONE, null,               payoutsOtherJson, ALLOW, false, null),
-            row("get_payouts_for_user", "OTP",      CALLER_PHONE, null,               payoutsOwnJson,   ALLOW, false, null)
+            row("get_payouts_for_user", "OTP",      CALLER_PHONE, null,               payoutsOwnJson,   ALLOW, false, null),
+
+            // ---- send_landing_options_notification (6 rows) — ADR-029 Tool 1 (gated) ----
+            // null audience: NotificationMcpController gate fires, calls recordViolation, throws CVE → DENY + expectAuditCall=true.
+            // This gate is different from rejectTokenlessMcp(): it calls recordViolation() itself before throwing.
+            row("send_landing_options_notification", null,       null,         null,               notifJson, DENY,  true,  UNAUTHENTICATED_MSG),
+            row("send_landing_options_notification", "DRIVER",   CALLER_PHONE, null,               notifJson, ALLOW, false, null),
+            row("send_landing_options_notification", "CUSTOMER", CALLER_PHONE, null,               notifJson, ALLOW, false, null),
+            row("send_landing_options_notification", "STORE",    CALLER_PHONE, PERMITTED_STORE_ID, notifJson, ALLOW, false, null),
+            row("send_landing_options_notification", "ADMIN",    CALLER_PHONE, null,               notifJson, ALLOW, false, null),
+            row("send_landing_options_notification", "OTP",      CALLER_PHONE, null,               notifJson, ALLOW, false, null),
+
+            // ---- send_shop_options_notification (6 rows) — ADR-029 Tool 2 (@McpPublicTool) ----
+            // All rows ALLOW: tool is explicitly public — no identity gate, no audit call.
+            row("send_shop_options_notification", null,       null,         null,               notifJson, ALLOW, false, null),
+            row("send_shop_options_notification", "DRIVER",   CALLER_PHONE, null,               notifJson, ALLOW, false, null),
+            row("send_shop_options_notification", "CUSTOMER", CALLER_PHONE, null,               notifJson, ALLOW, false, null),
+            row("send_shop_options_notification", "STORE",    CALLER_PHONE, PERMITTED_STORE_ID, notifJson, ALLOW, false, null),
+            row("send_shop_options_notification", "ADMIN",    CALLER_PHONE, null,               notifJson, ALLOW, false, null),
+            row("send_shop_options_notification", "OTP",      CALLER_PHONE, null,               notifJson, ALLOW, false, null)
         );
     }
 
@@ -1000,6 +1029,19 @@ class McpAccessMatrixTest {
                 // findByModifiedDateBetweenAndToId is called post-gate on the ungated ReconServiceImpl.
                 verify(messengerPayoutRepository, atLeastOnce())
                         .findByModifiedDateBetweenAndToId(any(), any(), anyString());
+                break;
+
+            case "send_landing_options_notification":
+                // ADR-029 Tool 1: Gate fires for null audience (DENY row); ALLOW rows reach
+                // whatsappNotificationService.sendLandingOptions() — post-gate proof.
+                verify(whatsappNotificationService, atLeastOnce())
+                        .sendLandingOptions(anyString(), anyString(), any(), any(), any());
+                break;
+
+            case "send_shop_options_notification":
+                // ADR-029 Tool 2: @McpPublicTool — no gate. All rows reach sendShopOptions().
+                verify(whatsappNotificationService, atLeastOnce())
+                        .sendShopOptions(anyString(), anyString());
                 break;
 
             default:

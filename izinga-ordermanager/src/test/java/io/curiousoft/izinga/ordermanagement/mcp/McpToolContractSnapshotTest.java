@@ -18,10 +18,12 @@ import io.curiousoft.izinga.commons.repo.UserProfileRepo;
 import io.curiousoft.izinga.commons.security.AgentIdentityAuditService;
 import io.curiousoft.izinga.messaging.AdminOnlyNotificationService;
 import io.curiousoft.izinga.messaging.firebase.FirebaseNotificationService;
+import io.curiousoft.izinga.messaging.whatsapp.WhatsappNotificationService;
 import io.curiousoft.izinga.ordermanagement.McpConfig;
 import io.curiousoft.izinga.ordermanagement.leads.LeadService;
 import io.curiousoft.izinga.ordermanagement.mcp.DocumentUploadMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.McpCaller;
+import io.curiousoft.izinga.ordermanagement.mcp.NotificationMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.OrderCreationMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.OrderMcpController;
 import io.curiousoft.izinga.ordermanagement.mcp.PayoutMcpController;
@@ -108,9 +110,10 @@ class McpToolContractSnapshotTest {
     private static final String GOLDEN_FILE_RESOURCE = "/mcp/tool-contract-snapshot.json";
     private static final String UPDATE_FLAG = "mcp.contract.update";
 
-    private static final int EXPECTED_TOOL_COUNT = 17;
+    private static final int EXPECTED_TOOL_COUNT = 19;
 
-    // ---- All 17 expected tool names (alphabetical) — create_user removed ADR-026 Phase 2b ----
+    // ---- All 19 expected tool names (alphabetical) — create_user removed ADR-026 Phase 2b;
+    //      notification tools added ADR-029 ----
     private static final List<String> EXPECTED_TOOL_NAMES = Arrays.asList(
             "attach_uploaded_document_to_user_tag",
             "create_document_upload_session",
@@ -128,6 +131,8 @@ class McpToolContractSnapshotTest {
             "get_payouts_for_user",
             "get_required_documents_for_user",
             "recheck_required_documents",
+            "send_landing_options_notification",
+            "send_shop_options_notification",
             "start_order"
     );
 
@@ -139,6 +144,7 @@ class McpToolContractSnapshotTest {
     @Mock private ReferralCodeService        referralCodeService;
     @Mock private AgentIdentityAuditService  agentIdentityAuditService;
     @Mock private DocumentUploadSessionRepo  documentUploadSessionRepo;
+    @Mock private WhatsappNotificationService whatsappNotificationService;
 
     // ---- OrderServiceImpl collaborators ---------------------------------------------------
     @Mock private OrderRepository            orderRepo;
@@ -219,7 +225,8 @@ class McpToolContractSnapshotTest {
                 storeStage1CommissionRepo, storeStage2CommissionRepo,
                 eventPublisher, new AmbassadorProperties(), null);
 
-        // ADR-026 Phase 1-5: wire all real controllers so all 17 tool definitions appear in the snapshot (create_user removed Phase 2b).
+        // ADR-026 Phase 1-5 / ADR-029: wire all real controllers so all 19 tool definitions appear in the snapshot
+        // (create_user removed Phase 2b; notification tools added ADR-029).
         McpCaller mcpCaller = new McpCaller(userProfileRepo);
         OrderCreationMcpController orderCreationController =
                 new OrderCreationMcpController(mcpOrderService, mcpCaller, agentIdentityAuditService);
@@ -233,6 +240,8 @@ class McpToolContractSnapshotTest {
                 new StoreMcpController(storeService, agentIdentityAuditService, "main-pay-account", 0.05);
         PayoutMcpController payoutMcpController =
                 new PayoutMcpController(reconService, mcpCaller, agentIdentityAuditService);
+        NotificationMcpController notificationMcpController =
+                new NotificationMcpController(whatsappNotificationService, mcpCaller, agentIdentityAuditService);
 
         java.util.Map<String, Object> controllerBeans = new java.util.HashMap<>();
         controllerBeans.put("orderCreationMcpController", orderCreationController);
@@ -241,6 +250,7 @@ class McpToolContractSnapshotTest {
         controllerBeans.put("orderMcpController", orderMcpController);
         controllerBeans.put("storeMcpController", storeMcpController);
         controllerBeans.put("payoutMcpController", payoutMcpController);
+        controllerBeans.put("notificationMcpController", notificationMcpController);
         when(applicationContext.getBeansWithAnnotation(McpToolController.class))
                 .thenReturn(controllerBeans);
 
@@ -278,7 +288,7 @@ class McpToolContractSnapshotTest {
     // ---- Structural assertions (independent of golden file) -----------------------------
 
     @Test
-    void providerHasExactly17Tools() {
+    void providerHasExactly19Tools() {
         ToolCallback[] tools = provider.getToolCallbacks();
         assertThat(tools)
                 .as("Expected exactly %d MCP tools", EXPECTED_TOOL_COUNT)
