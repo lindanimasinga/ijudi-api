@@ -306,6 +306,46 @@
   },
   "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"phone\" : {\n      \"type\" : \"string\",\n      \"description\" : \"User phone number, for example +27812815577\"\n    }\n  },\n  \"required\" : [ \"phone\" ],\n  \"additionalProperties\" : false\n}"
 }, {
+  "name" : "send_landing_options_notification",
+  "description" : "Send a landing options WhatsApp notification to a user. Presents available iZinga service categories to the caller. Requires an authenticated scope token.",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "mobileNumber" : {
+        "type" : "string",
+        "description" : "Mobile number of the recipient in international format, e.g. +27821234567"
+      },
+      "name" : {
+        "type" : "string",
+        "description" : "Display name of the recipient"
+      }
+    },
+    "required" : [ "mobileNumber", "name" ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"mobileNumber\" : {\n      \"type\" : \"string\",\n      \"description\" : \"Mobile number of the recipient in international format, e.g. +27821234567\"\n    },\n    \"name\" : {\n      \"type\" : \"string\",\n      \"description\" : \"Display name of the recipient\"\n    }\n  },\n  \"required\" : [ \"mobileNumber\", \"name\" ],\n  \"additionalProperties\" : false\n}"
+}, {
+  "name" : "send_shop_options_notification",
+  "description" : "Send a shop options WhatsApp notification to a user. Presents available iZinga shops to the caller. This tool is publicly accessible and does not require an authenticated scope token.",
+  "inputSchema" : {
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "type" : "object",
+    "properties" : {
+      "mobileNumber" : {
+        "type" : "string",
+        "description" : "Mobile number of the recipient in international format, e.g. +27821234567"
+      },
+      "name" : {
+        "type" : "string",
+        "description" : "Display name of the recipient"
+      }
+    },
+    "required" : [ "mobileNumber", "name" ],
+    "additionalProperties" : false
+  },
+  "inputSchemaRaw" : "{\n  \"$schema\" : \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\" : \"object\",\n  \"properties\" : {\n    \"mobileNumber\" : {\n      \"type\" : \"string\",\n      \"description\" : \"Mobile number of the recipient in international format, e.g. +27821234567\"\n    },\n    \"name\" : {\n      \"type\" : \"string\",\n      \"description\" : \"Display name of the recipient\"\n    }\n  },\n  \"required\" : [ \"mobileNumber\", \"name\" ],\n  \"additionalProperties\" : false\n}"
+}, {
   "name" : "start_order",
   "description" : "Creates a new order for a customer. customerConfirmed MUST be true — only call this after the customer has explicitly confirmed they want to place the order. idempotencyKey MUST be unique per order attempt; duplicate calls within 24 hours return the existing order. orderType must be ONLINE or INSTORE. basketJson is a JSON-serialised Basket with an items array. shippingDataJson is a JSON-serialised ShippingData (required for ONLINE orders, null for INSTORE).",
   "inputSchema" : {
