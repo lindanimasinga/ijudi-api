@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DuplicateKeyException;
 import retrofit2.Call;
 
@@ -407,6 +408,83 @@ class WhatsappNotificationServiceTest {
     void notifyStoreMissingBankDetails_senderThrows_doesNotRethrow() {
         when(whatsAppService.sendMessage(anyString(), any())).thenThrow(new RuntimeException("simulated network error"));
         assertDoesNotThrow(() -> service.notifyStoreMissingBankDetails("0829876543", "Acme Store", "store-id-3"));
+    }
+
+    // ─── sendShopOptions (ADR-029) ───────────────────────────────────────────
+
+    /**
+     * AC-09 (happy path): sendShopOptions sends the izinga_shop_options template using the
+     * CUSTOMER audience line, and returns true on success.
+     */
+    @Test
+    void sendShopOptions_happyPath_sendsIzingaShopOptionsTemplateAndReturnsNormally() throws IOException {
+        when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+
+        boolean result = service.sendShopOptions("+27821234567", "Test User");
+
+        assertTrue(result, "sendShopOptions must return true when the Meta API call succeeds");
+        verify(senderResolver).resolve(Audience.CUSTOMER, null);
+        ArgumentCaptor<WhatsappTemplateRequest> captor = ArgumentCaptor.forClass(WhatsappTemplateRequest.class);
+        verify(whatsAppService).sendMessage(eq("testPhoneId"), captor.capture());
+        assertEquals("izinga_shop_options", captor.getValue().getTemplate().getName());
+        assertEquals("+27821234567", captor.getValue().getTo());
+    }
+
+    /**
+     * AC-09 (IOException path): When the WhatsApp send call throws IOException (e.g. network
+     * error, unapproved Meta template), sendShopOptions absorbs the exception, does NOT rethrow,
+     * and returns false to signal the absorbed failure to the caller.
+     * This is the designed degradation path.
+     */
+    @Test
+    void sendShopOptions_whatsappSendThrowsIOException_absorbsExceptionAndDoesNotRethrow() throws IOException {
+        when(whatsAppService.sendMessage(anyString(), any())).thenReturn(callMock);
+        when(callMock.execute()).thenThrow(new IOException("Meta API: template not approved"));
+
+        boolean result = service.sendShopOptions("+27821234567", "Test User");
+
+        assertFalse(result, "sendShopOptions must return false when IOException is absorbed (AC-09 degraded-outcome signal)");
+    }
+
+    /**
+     * Regression test (AC-09 DataAccessException path): proves that
+     * {@code sendShopOptions} absorbs an unchecked {@code DataAccessException} thrown by
+     * {@code senderResolver.resolve()} (e.g. MongoDB connectivity failure, timeout) and
+     * returns {@code false} without propagating the exception to the agent.
+     *
+     * <p>This test was written as a failing sentinel while the defect was open (ADR-029 Defect 1).
+     * The fix broadened the catch block from {@code IOException} to {@code Exception}, so
+     * {@code DataAccessException} — which extends {@code RuntimeException}, not {@code IOException}
+     * — is now absorbed. <strong>Narrowing the catch back to {@code IOException} will cause this
+     * test to fail</strong>, confirming that the fix is still in place.</p>
+     */
+    @Test
+    void sendShopOptions_senderResolverThrowsDataAccessException_absorbsExceptionAndDoesNotRethrow() {
+        // Simulate MongoDB connectivity failure during sender resolution (e.g. timeout, unavailable)
+        when(senderResolver.resolve(any(Audience.class), any()))
+                .thenThrow(new DataAccessResourceFailureException("MongoDB timeout: senderResolver.resolve"));
+
+        // AC-09 requires graceful degradation — the agent must NOT see this exception.
+        // Currently FAILS: DataAccessException is not caught by catch (IOException e).
+        // Fix: broaden catch to catch (Exception e) or add a separate catch (RuntimeException e) block.
+        boolean result = service.sendShopOptions("+27821234567", "Test User");
+
+        assertFalse(result,
+                "AC-09: sendShopOptions must absorb DataAccessException from senderResolver.resolve() " +
+                "and return false. The agent must never see this exception.");
+    }
+
+    /**
+     * AC-09 (null mobileNumber): When mobileNumber is null, the null guard returns false
+     * immediately (mirrors sibling sendCrimnalCheckConsent). No downstream call is made.
+     */
+    @Test
+    void sendShopOptions_nullMobileNumber_doesNotThrowNullPointerException() {
+        // null/blank guard: returns false immediately, no downstream call
+        boolean result = service.sendShopOptions(null, null);
+
+        assertFalse(result, "sendShopOptions must return false for null mobileNumber (null guard)");
+        verify(senderResolver, never()).resolve(any(), any());
     }
 
     // ─── ADR-028: Throttle / acquireCooldown tests ───────────────────────────

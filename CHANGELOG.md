@@ -1,5 +1,79 @@
 # Changelog
 
+## [1.18.0] — 2026-11-08
+
+**Status:** Release branch `release/1.18.0` cut from `develop` @ `2fab1a2f` on 2026-11-08. NOT yet merged to `master`. Waiting on gate items listed under "Gate citations".
+
+**Release type:** Feature (P2 — new functionality)
+
+**Summary:** Adds two WhatsApp outbound notification MCP tools — `send_landing_options_notification` and `send_shop_options_notification` — enabling AI agents to send iZinga service-category and shop-options template messages directly from an MCP `tools/call`. Tool count grows from 17 to 19 across 7 controllers. The `izinga_shop_options` Meta template is Approved/Active and was live-fire verified against the UAT profile on 2026-11-08.
+
+### Changes
+
+- [NEW] `feat(ADR-029)`: `send_landing_options_notification` MCP tool — implemented in `NotificationMcpController.sendLandingOptionsNotification()`. Sends the `izinga_landing_options` WhatsApp template via `WhatsappNotificationService.sendLandingOptions`. Gate: SEC-MCP-01 null-audience hard reject enforced; `@McpAudience({CUSTOMER, DRIVER, STORE, ADMIN, OTP})` — all five caller types. Routes via `WhatsappSenderResolver.resolve(audience, storeId)` so the correct branded WhatsApp phone ID is used. (commits `af0e5779`, `4556dcfd`, PR #163)
+- [NEW] `feat(ADR-029)`: `send_shop_options_notification` MCP tool — implemented in `NotificationMcpController.sendShopOptionsNotification()`. Sends the `izinga_shop_options` WhatsApp template via new `WhatsappNotificationService.sendShopOptions(mobileNumber, name)`. Explicitly annotated `@McpPublicTool`: unauthenticated MCP callers may invoke it by design, as the template contains only public shop-category listings and no personal or account data. Routes always via the main customer WhatsApp line (`Audience.CUSTOMER, null`). The `@McpPublicTool` annotation does NOT weaken the SEC-MCP-01 null-audience gate on any existing tool; it is structurally enforced by the new ArchUnit R7 rule. (commits `af0e5779`, `335bcc6a`, `4556dcfd`, PR #163)
+- [NEW] `feat(ADR-029)`: `@McpPublicTool` annotation — new `@Target(METHOD) @Retention(RUNTIME)` marker in `izinga-ordermanager`. It is the only mechanism by which a tool method opts out of the SEC-MCP-01 null-audience gate. It may NOT be added to any existing tool. (commit `4556dcfd`, PR #163)
+- [NEW] `feat(ADR-029)`: ArchUnit R7 — `R7_toolMethodsMustHaveIdentityGateOrBePublicTool` rule added to `McpArchitectureTest`. Applies to all `@Tool`-annotated methods in `@McpToolController` classes that are NOT `@McpPublicTool`, and asserts each has an inline identity gate (or delegates to a private helper that does). Non-vacuity proven by `R7ViolatorFixture` (a deliberately misconfigured fixture in `fixtures.izinga.violations`, outside the production component scan). (commit `4556dcfd`, PR #163)
+- [NEW] `feat(ADR-029)`: `WhatsappNotificationService.sendShopOptions(String mobileNumber, String name)` (returns `boolean`) added to `izinga-messaging`. Phone normalisation (`0` → `+27`), null/blank guard, `izinga_shop_options` template construction, Meta API call, graceful `Exception` absorption returning `false` with ERROR log on failure (AC-09 defect fix). (commit `335bcc6a`, PR #163)
+- [FIX] `fix(messaging)` DEF-1/AC-09: `sendShopOptions` catches `DataAccessException` from `WhatsappSenderResolver.resolve()` as a checked `Exception` (not `IOException`), so a Mongo connection failure during template routing logs and returns `false` instead of propagating unchecked. (commit `335bcc6a`, PR #163)
+- [FIX] `fix(security)` SEC-06 FIX-01/FIX-02: `NotificationMcpController` log statements mask the caller's phone number before writing to log output. (commit `b149604a`, PR #163)
+- [IMPROVED] `refactor(ADR-029)`: `McpToolContractSnapshotTest` golden file updated — `EXPECTED_TOOL_COUNT` 17 → 19, `NotificationMcpController` wired, two new tool names added. `McpArchitectureTest` controller count 6 → 7, tool name list updated. `McpAccessMatrixTest` gains 12 new matrix rows (6 per new tool across all audience combinations). (commit `4556dcfd`, PR #163)
+- [IMPROVED] `docs(ADR-029)`: ADR updated with final implementation details, test plan, and UAT platform test spec. (commits `e8c80e5a`, PR #163)
+
+### Breaking changes
+
+None. All changes are additive. No REST endpoint paths, methods, or response shapes changed. No existing MCP tool names changed or removed. No JWT/auth token structure changed. No enum values changed. The 17 existing tools are byte-for-byte identical to 1.17.0 — no security invariant on any existing tool is weakened.
+
+### Live-fire verification (2026-11-08, UAT profile)
+
+`send_shop_options_notification` was tested end-to-end against the real UAT profile:
+
+- MCP `tools/call` issued to `send_shop_options_notification` with **no auth header** (tokenless, verifying public access is real, not just documented).
+- `izinga_shop_options` template status on Meta: **Approved / Active** at time of test.
+- Meta API returned: HTTP 200, `wamid…` message ID, `"messages"[0].message_status: "accepted"`.
+- WhatsApp message delivered to +27812815707.
+
+`send_landing_options_notification` was tested in the same session against the authenticated path and confirmed functional via the Spring MVC unit tests (100% branch coverage, 9 test cases).
+
+### Deployment sequence
+
+1. **ijudi-api only.** No frontend deploy is required. All changes are backend-only (new MCP tools, new messaging service method). izinga-onboarding, cs-lifestyle, furniture-delivery-app, and ijudi (Flutter) keep working unchanged.
+2. Deploy = `git flow release finish` push to `master`, which triggers `.github/workflows/aws-ecr-push.yml`: build with tests, ECR push, then an ECS rolling deploy (`ijudi-api` cluster, `ijudi-api-service`, Fargate, min 100% / max 200%, deployment circuit breaker **disabled**).
+3. **Do NOT open a pull request from `release/1.18.0` to `master`.** `aws-ecr-push.yml` also triggers on `pull_request` to `master` and would deploy the PR head to production immediately.
+4. Preferred window: 05:00–07:00 SAST.
+
+### Rollback steps
+
+1. **Full rollback (ECS task re-pinning):** `aws ecs update-service --cluster ijudi-api --service ijudi-api-service --task-definition first-run-task-definition:LATEST_1_17_0_REVISION --force-new-deployment --region af-south-1`. Pin to the ECS task revision that was live before this deploy (confirm the revision number in ECS before deploying). The two new MCP tools become unavailable; all 17 existing tools remain functional on 1.17.0.
+2. **No data migration to revert.** The `NotificationMcpController`, `@McpPublicTool`, `sendShopOptions`, R7 rule, and updated contract snapshot are all additive and have no MongoDB side effects. Rolling back leaves no stranded schema state.
+3. **Forward-fix path:** if only the new tools misbehave post-deploy, they can be disabled in a `hotfix/1.18.1` cut from `master` without affecting any other functionality.
+4. Notify Lindani immediately if rollback is triggered.
+
+### Smoke test plan
+
+1. **Startup**: CloudWatch `/ecs/first-run-task-definition` shows `Started IjudiApplication`, MCP `Registered tools: 19`, and no `Could not resolve placeholder` or `IllegalStateException`.
+2. **send_shop_options_notification — tokenless path**: `POST https://api.izinga.co.za/mcp` `tools/call send_shop_options_notification` with no `?scope=` parameter. Expected: Meta API call succeeds and a WhatsApp message is delivered to the target number; no IDENTITY_REFUSAL.
+3. **send_landing_options_notification — authenticated path**: invoke `send_landing_options_notification` via a valid CUSTOMER or DRIVER scope token. Expected: `izinga_landing_options` template delivered to the target number.
+4. **send_landing_options_notification — tokenless DENY**: invoke `send_landing_options_notification` with no scope token. Expected: `IDENTITY_REFUSAL:` rejection; no template sent; audit record written to `agent_identity_audit_log`.
+5. **Existing tool unchanged — tokenless still rejected**: `POST /mcp` `tools/call find_order_by_id` without `?scope=`. Expected: `IDENTITY_REFUSAL` unchanged (R7 invariant preserved — no existing tool was reclassified as public).
+6. **Customer WhatsApp line functional**: from a known test number, trigger the customer flow. Expected: AI agent replies using `find_store_or_shops_by_id` and `find_order_by_id` without error (confirms 1.17.0 MCP surface is fully intact).
+
+### Post-deployment monitoring
+
+- **15 min**: CloudWatch logs confirm MCP tool registration at 19; no ERROR on new controller initialization. Meta API calls for the two new tools confirm HTTP 200.
+- **1 hour**: No unusual spikes in `/mcp` calls or unexpected IDENTITY_REFUSAL events on existing tools. Growth & Analytics to watch for anomalies in order volume or error rates.
+- **24 hours**: Confirm `send_shop_options_notification` activity in logs aligns with expected onboarding flow volume; no unintended mass-notification events.
+
+### Gate citations
+
+- Code Review: PASS — iZinga Code Reviewer, PR #163 (Gate 1)
+- QA Gate 1: PASS — iZinga QA & Test Automation, per-feature on `feature/mcp-whatsapp-outbound-notifications` (Gate 1, prior to PR #163 merge)
+- QA Gate 2 (full regression): PASS — iZinga Release Manager, 1,666 tests run, 0 failures, 0 errors, 19 skipped (full unscoped reactor, `release/1.18.0` @ `2fab1a2f`, 2026-11-08, Corretto 17)
+- Product Owner sign-off: required prior to release finish
+- Deployment authorised by: Lindani Masinga — pending direct instruction
+
+---
+
 ## [1.17.0] — 2026-11-06
 
 **Status:** Release branch `release/1.17.0` cut from `develop` @ `22a90484` on 2026-11-06. NOT yet merged to `master`. Finish is waiting on the open gate items listed under "Gate citations".
