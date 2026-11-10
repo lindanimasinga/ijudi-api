@@ -10,6 +10,7 @@ import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistorySe
 import io.curiousoft.izinga.messaging.security.StoreScopeJwtService;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsappConfig;
 import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
+import org.springframework.retry.support.RetryTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -95,10 +96,12 @@ class AiCustomerServiceAgentAdminMintingTest {
     }
 
     private AiCustomerServiceAgent agentWith(WhatsappConfig cfg) {
+        // ADR-031: single-attempt no-op retry for unit tests that don't exercise retry behaviour
+        RetryTemplate noOpRetry = RetryTemplate.builder().maxAttempts(1).fixedBackoff(1).build();
         return new AiCustomerServiceAgent(
                 true, "sk-test", "gpt-4.1-mini", false,
                 restTemplate, conversationHistoryService, agentConfigService,
-                storeScopeJwtService, cfg, userProfileRepo);
+                storeScopeJwtService, cfg, userProfileRepo, noOpRetry);
     }
 
     // ── REQ-A2: admin caller + secret configured → ADMIN audience in JWT ─────

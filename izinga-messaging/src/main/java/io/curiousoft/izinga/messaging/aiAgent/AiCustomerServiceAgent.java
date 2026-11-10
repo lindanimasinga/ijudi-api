@@ -15,8 +15,10 @@ import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsappWebhookPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -49,7 +51,10 @@ public class AiCustomerServiceAgent {
      * See application.yml / application-uat.yml / application-local.yml.
      */
     private final boolean debugLogOpenAi;
+    /** ADR-031 / AC-02: OpenAI-scoped RestTemplate with explicit timeouts (3 s connect, 8 s read). */
     private final RestTemplate restTemplate;
+    /** ADR-031 / REQ-03: RetryTemplate covering 5xx / 429 / connection failures (non-retryable: 4xx). */
+    private final RetryTemplate openAiRetryTemplate;
     private final ConversationHistoryService conversationHistoryService;
     private final AiAgentConfigService agentConfigService;
     /** SA-021-17: attaches per-request scope JWT to MCP server URLs. */
@@ -66,17 +71,21 @@ public class AiCustomerServiceAgent {
             @Value("${openai.api.key:}") String openAiApiKey,
             @Value("${ai.agent.model:gpt-4.1-mini}") String model,
             @Value("${izinga.ai.agent.debug.log-openai-request-response:false}") boolean debugLogOpenAi,
-            RestTemplate restTemplate,
+            // ADR-031 / AC-02: OpenAI-qualified bean (3 s connect, 8 s read timeouts)
+            @Qualifier("openAiRestTemplate") RestTemplate restTemplate,
             ConversationHistoryService conversationHistoryService,
             AiAgentConfigService agentConfigService,
             StoreScopeJwtService storeScopeJwtService,
             WhatsappConfig whatsappConfig,
-            UserProfileRepo userProfileRepo) {
+            UserProfileRepo userProfileRepo,
+            // ADR-031 / REQ-03: programmatic RetryTemplate for OpenAI network calls
+            @Qualifier("openAiRetryTemplate") RetryTemplate openAiRetryTemplate) {
         this.enabled = enabled;
         this.openAiApiKey = openAiApiKey;
         this.model = model;
         this.debugLogOpenAi = debugLogOpenAi;
         this.restTemplate = restTemplate;
+        this.openAiRetryTemplate = openAiRetryTemplate;
         this.conversationHistoryService = conversationHistoryService;
         this.agentConfigService = agentConfigService;
         this.storeScopeJwtService = storeScopeJwtService;
@@ -354,7 +363,16 @@ public class AiCustomerServiceAgent {
             logPreRequest(requestBody, messagesList);
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-            ResponseEntity<Map> response = restTemplate.postForEntity(OPENAI_CHAT_URL, entity, Map.class);
+            // ADR-031 / REQ-03: wrap network call in RetryTemplate — retries on 5xx/429/connection
+            // failures; non-retryable on 4xx (incl. 400 context-window overflow).
+            // On retry exhaustion execute() re-throws; the outer catch returns null.
+            ResponseEntity<Map> response = openAiRetryTemplate.execute(context -> {
+                int attempt = context.getRetryCount() + 1;
+                if (attempt > 1) {
+                    LOG.warn("[AI-RETRY] attempt={} for from={}", attempt, from);
+                }
+                return restTemplate.postForEntity(OPENAI_CHAT_URL, entity, Map.class);
+            });
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 // PO AC-07 / TASK-1: log response output metadata before extracting reply
@@ -473,7 +491,17 @@ public class AiCustomerServiceAgent {
             logPreRequest(requestBody, messagesList);
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-            ResponseEntity<Map> response = restTemplate.postForEntity(OPENAI_CHAT_URL, entity, Map.class);
+            // ADR-031 / REQ-03: wrap network call in RetryTemplate — retries on 5xx/429/connection
+            // failures; non-retryable on 4xx (incl. 400 context-window overflow).
+            // On retry exhaustion execute() re-throws; the outer catch returns null.
+            final String resolvedAgentFinal = resolvedAgent;
+            ResponseEntity<Map> response = openAiRetryTemplate.execute(context -> {
+                int attempt = context.getRetryCount() + 1;
+                if (attempt > 1) {
+                    LOG.warn("[AI-RETRY] attempt={} agent='{}' for from={}", attempt, resolvedAgentFinal, from);
+                }
+                return restTemplate.postForEntity(OPENAI_CHAT_URL, entity, Map.class);
+            });
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 // PO AC-07 / TASK-1: log response output metadata before extracting reply

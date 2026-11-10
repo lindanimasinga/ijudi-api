@@ -7,6 +7,7 @@ import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistory;
 import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistoryService;
 import io.curiousoft.izinga.messaging.security.StoreScopeJwtService;
 import io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsappWebhookPayload;
+import org.springframework.retry.support.RetryTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,10 +51,11 @@ class StoreAiAgentLocationTest {
 
     @BeforeEach
     void setUp() {
+        RetryTemplate noOpRetry = RetryTemplate.builder().maxAttempts(1).fixedBackoff(1).build();
         agent = new StoreAiAgent(
                 true, "sk-test-key", "gpt-4.1-mini", restTemplate,
                 agentConfigService, conversationHistoryService,
-                storeContextResolver, storeRepository, storeScopeJwtService);
+                storeContextResolver, storeRepository, storeScopeJwtService, noOpRetry);
     }
 
     @Test

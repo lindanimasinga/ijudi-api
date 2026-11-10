@@ -7,6 +7,7 @@ import io.curiousoft.izinga.messaging.aiAgent.conversation.ConversationHistorySe
 import io.curiousoft.izinga.messaging.security.StoreScopeJwtService;
 import io.curiousoft.izinga.messaging.whatsapp.WhatsappConfig;
 import io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsappWebhookPayload;
+import org.springframework.retry.support.RetryTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,9 +53,13 @@ class AiCustomerServiceAgentLocationTest {
 
     @BeforeEach
     void setUp() {
+        // ADR-031: RetryTemplate with real 3-attempt / exponential-backoff config omitted for
+        // unit tests that only test location text extraction; a no-op single-attempt retry is
+        // sufficient to wire the constructor without affecting test assertions.
+        RetryTemplate noOpRetry = RetryTemplate.builder().maxAttempts(1).fixedBackoff(1).build();
         agent = new AiCustomerServiceAgent(true, "sk-test-key", "gpt-4.1-mini", false,
                 restTemplate, conversationHistoryService, agentConfigService, storeScopeJwtService,
-                whatsappConfig, userProfileRepo);
+                whatsappConfig, userProfileRepo, noOpRetry);
     }
 
     @Test

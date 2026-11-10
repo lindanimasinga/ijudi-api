@@ -9,8 +9,11 @@ import org.bouncycastle.crypto.params.KeyParameter
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.context.properties.ConfigurationProperties
+import org.apache.hc.client5.http.config.RequestConfig
+import org.apache.hc.core5.util.Timeout
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Primary
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
 import org.springframework.web.client.RestTemplate
 import java.math.BigInteger
@@ -73,6 +76,9 @@ class YocoHeaderConfig {
         it.header("businessuuid", yocoDashBoard.businessuuid)
     };
 
+    // ADR-031: @Primary ensures all currently-unqualified RestTemplate injection points
+    // continue to resolve here with ZERO change to their injection sites.
+    @Primary
     @Bean
     fun restTemplate(): RestTemplate = RestTemplate().apply {
         val connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
@@ -81,6 +87,29 @@ class YocoHeaderConfig {
             .build()
         val httpClient = HttpClients.custom()
             .setConnectionManager(connectionManager)
+            .build()
+        requestFactory = HttpComponentsClientHttpRequestFactory(httpClient)
+    }
+
+    /**
+     * ADR-031 / REQ-01-03: Dedicated RestTemplate for OpenAI calls only.
+     * Explicit timeouts: connect 3 s (fail-fast on DNS/routing), response 8 s
+     * (8 s × 3 attempts + 2 s + 4 s backoff = 30 s worst-case — within the 30 s cap).
+     * Injected via @Qualifier("openAiRestTemplate") in AiCustomerServiceAgent and StoreAiAgent.
+     */
+    @Bean("openAiRestTemplate")
+    fun openAiRestTemplate(): RestTemplate = RestTemplate().apply {
+        val connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
+            .setMaxConnTotal(50)
+            .setMaxConnPerRoute(10)
+            .build()
+        val requestConfig = RequestConfig.custom()
+            .setConnectTimeout(Timeout.ofSeconds(3))
+            .setResponseTimeout(Timeout.ofSeconds(8))
+            .build()
+        val httpClient = HttpClients.custom()
+            .setConnectionManager(connectionManager)
+            .setDefaultRequestConfig(requestConfig)
             .build()
         requestFactory = HttpComponentsClientHttpRequestFactory(httpClient)
     }

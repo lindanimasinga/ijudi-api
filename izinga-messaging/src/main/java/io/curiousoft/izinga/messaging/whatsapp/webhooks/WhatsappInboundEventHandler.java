@@ -35,6 +35,14 @@ public class WhatsappInboundEventHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(WhatsappInboundEventHandler.class);
 
+    /**
+     * ADR-031 / REQ-06-07: customer-facing fallback sent on AI agent null returns.
+     * Tone matches existing handler messages; emoji and support contact per AC-08.
+     */
+    public static final String AI_FALLBACK_MESSAGE =
+            "Sorry, I'm having a bit of trouble right now 🙏 Please try again in a moment, " +
+            "or reach us on WhatsApp at +27812815707 or email hello@curiousoft.dev.";
+
     private final ApplicationEventPublisher eventPublisher;
     private final UserProfileRepo userProfileRepo;
     private final FirestoreService firestoreService;
@@ -211,6 +219,14 @@ public class WhatsappInboundEventHandler {
             }
             if (aiResponseToCustomer != null) {
                 whatsappNotificationService.sendMessage(from, aiResponseToCustomer,
+                        lineContext.audience(), lineContext.storeId());
+            } else {
+                // ADR-031 / REQ-06-07: AI was enabled+active but returned null — genuine failure
+                // or unprocessable input (all 9 null-exit paths in handleWhatsappQueryForAgent +
+                // StoreAiAgent null exits). Never swallow silently — always send fallback.
+                LOG.warn("[AI-FALLBACK] agent returned null for from={} audience={} agentName={} — sending fallback",
+                        from, lineContext.audience(), lineContext.agentName());
+                whatsappNotificationService.sendMessage(from, AI_FALLBACK_MESSAGE,
                         lineContext.audience(), lineContext.storeId());
             }
         }
