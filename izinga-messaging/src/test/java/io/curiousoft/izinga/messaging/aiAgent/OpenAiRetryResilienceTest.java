@@ -261,6 +261,10 @@ class OpenAiRetryResilienceTest {
      * AC-02: When both AI agents return null (agent exhausted retries / network failure),
      * {@link WhatsappInboundEventHandler#handlePreDispatchFlows} sends
      * {@link WhatsappInboundEventHandler#AI_FALLBACK_MESSAGE} to the customer.
+     *
+     * <p>FIX-01: extractUserText must be stubbed to return non-null so the FIX-01 guard
+     * passes (text messages carry processable text — the fallback should fire on genuine
+     * AI failure, not on missing input).
      */
     @Test
     void testAc02_handlerSendsFallback_whenAgentReturnsNull() throws Exception {
@@ -269,6 +273,11 @@ class OpenAiRetryResilienceTest {
 
         // Not a verification message — proceed to AI dispatch
         when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
+
+        // FIX-01: guard uses extractUserText as single source of truth — stub it to allow
+        // AI dispatch to proceed for a text message.
+        when(aiCustomerServiceAgent.extractUserText(any(WhatsappWebhookPayload.Value.Message.class)))
+                .thenReturn("hello");
 
         // AI customer service agent returns null (simulating exhausted retries)
         when(aiCustomerServiceAgent.handleWhatsappQueryForAgent(
@@ -294,6 +303,8 @@ class OpenAiRetryResilienceTest {
      * AC-03: When the AI agent returns a non-null reply,
      * {@link WhatsappInboundEventHandler#handlePreDispatchFlows} sends the REAL reply,
      * NOT the fallback message.
+     *
+     * <p>FIX-01: extractUserText stubbed so the guard passes for a text message.
      */
     @Test
     void testAc03_handlerSendsRealReply_whenAgentSucceeds() throws Exception {
@@ -301,6 +312,10 @@ class OpenAiRetryResilienceTest {
 
         // Not a verification message — proceed to AI dispatch
         when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
+
+        // FIX-01: guard uses extractUserText — stub to allow AI dispatch to proceed.
+        when(aiCustomerServiceAgent.extractUserText(any(WhatsappWebhookPayload.Value.Message.class)))
+                .thenReturn("hello");
 
         when(aiCustomerServiceAgent.isEnabled()).thenReturn(true);
         when(aiCustomerServiceAgent.handleWhatsappQueryForAgent(
@@ -322,6 +337,181 @@ class OpenAiRetryResilienceTest {
                 any(),
                 any()
         );
+    }
+
+    // ── FIX-01: IMAGE message must NOT trigger fallback ───────────────────────
+
+    /**
+     * FIX-01 regression guard: an IMAGE message with AI enabled+active must NEVER trigger
+     * the fallback. The FIX-01 guard calls {@code aiCustomerService.extractUserText(message)}
+     * which returns null for image payloads, so the AI dispatch path (and the fallback) is
+     * skipped entirely. The image handler in {@code dispatchMessageByType} then processes it.
+     *
+     * <p>AC-07 (amended): E-2 (no processable text) must NOT send the fallback.
+     */
+    @Test
+    void testFix01_imageMessage_noFallbackNoAiDispatch() throws Exception {
+        WhatsappInboundEventHandler handler = buildMinimalHandler();
+        when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
+        when(aiCustomerServiceAgent.isEnabled()).thenReturn(true);
+
+        WhatsappWebhookPayload.Value.Message imageMessage = buildImageMessage();
+        // Guard: extractUserText returns null for image messages (no text/button/location)
+        when(aiCustomerServiceAgent.extractUserText(imageMessage)).thenReturn(null);
+
+        invokeHandlePreDispatchFlows(handler, imageMessage, FROM,
+                buildSession(FROM), buildCustomerLineContext());
+
+        // No fallback sent — the apology must never reach a driver uploading a document
+        verify(whatsappNotificationService, never()).sendMessage(
+                anyString(),
+                eq(WhatsappInboundEventHandler.AI_FALLBACK_MESSAGE),
+                any(),
+                any()
+        );
+        // AI agent not invoked for image — no processable text to route through the agent.
+        // Disambiguate the Message overload (the handler always calls the Message overload,
+        // never the String overload directly).
+        verify(aiCustomerServiceAgent, never()).handleWhatsappQueryForAgent(
+                any(WhatsappWebhookPayload.Value.Message.class), anyString(), any(), any());
+    }
+
+    // ── FIX-01: INTERACTIVE message must NOT trigger fallback ─────────────────
+
+    /**
+     * FIX-01 regression guard: an INTERACTIVE (button/list reply) message with AI enabled+active
+     * must NEVER trigger the fallback. extractUserText returns null for interactive payloads
+     * (the interactive field is set but button.getText() is null), so the guard fires first.
+     *
+     * <p>AC-07 (amended): E-2 must NOT send the fallback; quote-acceptance tap must proceed
+     * to handleInteractiveMessage without an apologetic message being sent first.
+     */
+    @Test
+    void testFix01_interactiveMessage_noFallbackNoAiDispatch() throws Exception {
+        WhatsappInboundEventHandler handler = buildMinimalHandler();
+        when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
+        when(aiCustomerServiceAgent.isEnabled()).thenReturn(true);
+
+        WhatsappWebhookPayload.Value.Message interactiveMessage = buildInteractiveMessage();
+        // Guard: extractUserText returns null for interactive messages
+        when(aiCustomerServiceAgent.extractUserText(interactiveMessage)).thenReturn(null);
+
+        invokeHandlePreDispatchFlows(handler, interactiveMessage, FROM,
+                buildSession(FROM), buildCustomerLineContext());
+
+        // No fallback — a quote-acceptance tap must not receive an apology
+        verify(whatsappNotificationService, never()).sendMessage(
+                anyString(),
+                eq(WhatsappInboundEventHandler.AI_FALLBACK_MESSAGE),
+                any(),
+                any()
+        );
+        // Disambiguate the Message overload — the handler never calls the String overload directly
+        verify(aiCustomerServiceAgent, never()).handleWhatsappQueryForAgent(
+                any(WhatsappWebhookPayload.Value.Message.class), anyString(), any(), any());
+    }
+
+    // ── FIX-01: LOCATION message MUST still reach the AI agent ───────────────
+
+    /**
+     * FIX-01 regression guard (location path): a LOCATION message must still reach the AI agent.
+     * {@code Location#describe()} returns a non-null description, so extractUserText is non-null
+     * and the FIX-01 guard passes. The AI agent must be invoked.
+     *
+     * <p>This guard prevents the fix from accidentally silencing the location→AI path documented
+     * in the handleLocationMessage Javadoc: "The AI agent has already seen this location via
+     * handlePreDispatchFlows."
+     */
+    @Test
+    void testFix01_locationMessage_aiIsInvoked() throws Exception {
+        WhatsappInboundEventHandler handler = buildMinimalHandler();
+        when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
+        when(aiCustomerServiceAgent.isEnabled()).thenReturn(true);
+
+        WhatsappWebhookPayload.Value.Message locationMessage = buildLocationMessage();
+        // Guard: extractUserText returns a non-null description for location messages
+        when(aiCustomerServiceAgent.extractUserText(locationMessage))
+                .thenReturn("Customer shared their location (latitude: -26.2, longitude: 28.0)");
+        when(aiCustomerServiceAgent.handleWhatsappQueryForAgent(
+                any(WhatsappWebhookPayload.Value.Message.class), anyString(), isNull(), anyString()))
+                .thenReturn("I see you are near Johannesburg CBD.");
+
+        invokeHandlePreDispatchFlows(handler, locationMessage, FROM,
+                buildSession(FROM), buildCustomerLineContext());
+
+        // AI agent WAS invoked for the location message (regression guard)
+        verify(aiCustomerServiceAgent).handleWhatsappQueryForAgent(
+                any(WhatsappWebhookPayload.Value.Message.class), eq(FROM), isNull(), eq(AGENT_NAME));
+    }
+
+    // ── FIX-01: TEXT message with genuine AI failure MUST send fallback ───────
+
+    /**
+     * FIX-01 correctness: when extractUserText returns non-null (processable text message)
+     * but the AI agent itself returns null due to a genuine failure (e.g. exhausted retries,
+     * network error), the fallback message MUST still be sent. This proves the fix did not
+     * accidentally disarm the genuine-failure path.
+     *
+     * <p>AC-07 (amended): E-4 through E-9 (genuine AI/transport failures) must still send
+     * the fallback; only E-1 through E-3 (no processable input, disabled) must not.
+     */
+    @Test
+    void testFix01_textMessage_genuineAiFailure_fallbackSent() throws Exception {
+        WhatsappInboundEventHandler handler = buildMinimalHandler();
+        when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
+        when(aiCustomerServiceAgent.isEnabled()).thenReturn(true);
+
+        WhatsappWebhookPayload.Value.Message textMessage = buildTextMessage("help me");
+        // Guard passes: processable text exists
+        when(aiCustomerServiceAgent.extractUserText(textMessage)).thenReturn("help me");
+        // Genuine failure: agent returns null (simulates exhausted retries / network error)
+        when(aiCustomerServiceAgent.handleWhatsappQueryForAgent(
+                any(WhatsappWebhookPayload.Value.Message.class), anyString(), isNull(), anyString()))
+                .thenReturn(null);
+
+        invokeHandlePreDispatchFlows(handler, textMessage, FROM,
+                buildSession(FROM), buildCustomerLineContext());
+
+        // Fallback IS sent — genuine failure path must still be customer-visible
+        verify(whatsappNotificationService).sendMessage(
+                eq(FROM),
+                eq(WhatsappInboundEventHandler.AI_FALLBACK_MESSAGE),
+                eq(Audience.CUSTOMER),
+                isNull()
+        );
+    }
+
+    // ── NOTE-01 / Test H2: 429 retried by ACTUAL production bean ─────────────
+
+    /**
+     * H2: Exercises the ACTUAL production {@link OpenAiRetryConfig} bean — not the
+     * fast-backoff mirror — with an {@link HttpClientErrorException.TooManyRequests} (HTTP 429)
+     * exception, to verify that the most-specific subclass classification (traverseClassHierarchy)
+     * correctly treats 429 as RETRYABLE despite {@link HttpClientErrorException} being declared
+     * NON-RETRYABLE. Must see exactly 3 total invocations.
+     *
+     * <p>NOTE-01: Tests A–G use {@code fastProductionRetryTemplate} which mirrors the exception
+     * map — this test independently confirms the same classification on the production bean
+     * including its real backoff policy (2 s + 4 s = ~6 s elapsed; annotate with @Timeout if
+     * test suite SLA requires it). The classification under test is the production one.
+     */
+    @Test
+    void testH2_productionBean_429_retriedThreeTimes() {
+        java.util.concurrent.atomic.AtomicInteger callCount = new java.util.concurrent.atomic.AtomicInteger(0);
+        try {
+            productionRetryTemplate.execute(context -> {
+                callCount.incrementAndGet();
+                throw HttpClientErrorException.TooManyRequests.create(
+                        HttpStatus.TOO_MANY_REQUESTS, "Too Many Requests",
+                        org.springframework.http.HttpHeaders.EMPTY, new byte[0], null);
+            });
+            fail("Expected exception after exhausting retries");
+        } catch (Exception ignored) {
+            // Expected — 429 is retryable, so all 3 attempts are made then exhausted
+        }
+        assertEquals(3, callCount.get(),
+                "Production RetryTemplate must make exactly 3 total attempts on 429 " +
+                "(HttpClientErrorException.TooManyRequests overrides non-retryable parent via traverseClassHierarchy)");
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
@@ -428,5 +618,48 @@ class OpenAiRetryResilienceTest {
 
     private LineContext buildCustomerLineContext() {
         return new LineContext(null, AGENT_NAME, Audience.CUSTOMER, null);
+    }
+
+    /** Builds an IMAGE message payload (no text/button/location → extractUserText returns null). */
+    private WhatsappWebhookPayload.Value.Message buildImageMessage() {
+        WhatsappWebhookPayload.Value.Message.Image image = new WhatsappWebhookPayload.Value.Message.Image();
+        image.setId("img-001");
+        image.setMimeType("image/jpeg");
+        WhatsappWebhookPayload.Value.Message message = new WhatsappWebhookPayload.Value.Message();
+        message.setImage(image);
+        message.setType("image");
+        message.setFrom(FROM);
+        return message;
+    }
+
+    /** Builds an INTERACTIVE message payload (button_reply) — extractUserText returns null. */
+    private WhatsappWebhookPayload.Value.Message buildInteractiveMessage() {
+        WhatsappWebhookPayload.Value.Message.Interactive.ButtonReply buttonReply =
+                new WhatsappWebhookPayload.Value.Message.Interactive.ButtonReply();
+        buttonReply.setId("accept_quote");
+        buttonReply.setTitle("Accept");
+        WhatsappWebhookPayload.Value.Message.Interactive interactive =
+                new WhatsappWebhookPayload.Value.Message.Interactive();
+        interactive.setType("button_reply");
+        interactive.setButtonReply(buttonReply);
+        WhatsappWebhookPayload.Value.Message message = new WhatsappWebhookPayload.Value.Message();
+        message.setInteractive(interactive);
+        message.setType("interactive");
+        message.setFrom(FROM);
+        return message;
+    }
+
+    /** Builds a LOCATION message payload — Location#describe() returns non-null text. */
+    private WhatsappWebhookPayload.Value.Message buildLocationMessage() {
+        WhatsappWebhookPayload.Value.Message.Location location =
+                new WhatsappWebhookPayload.Value.Message.Location();
+        location.setLatitude(-26.2);
+        location.setLongitude(28.0);
+        location.setAddress("Johannesburg CBD");
+        WhatsappWebhookPayload.Value.Message message = new WhatsappWebhookPayload.Value.Message();
+        message.setLocation(location);
+        message.setType("location");
+        message.setFrom(FROM);
+        return message;
     }
 }

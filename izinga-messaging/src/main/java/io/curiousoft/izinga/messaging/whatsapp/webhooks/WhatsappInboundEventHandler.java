@@ -199,6 +199,21 @@ public class WhatsappInboundEventHandler {
             return null;
         }
 
+        // FIX-01 / AC-07 (amended): guard AI dispatch and fallback on processable input text.
+        // Uses aiCustomerService.extractUserText as the SINGLE SOURCE OF TRUTH — the same logic
+        // the agents themselves use internally. If it returns null/blank, this message type
+        // carries no text the AI can process (e.g. IMAGE, INTERACTIVE): skip AI dispatch entirely
+        // and return null WITHOUT sending the fallback, letting dispatchMessageByType handle it.
+        // LOCATION messages DO produce a non-null description (Location#describe()) and still
+        // reach the AI agent — no regression for the location path.
+        // E-1 (message==null, defensive) and E-2 (no processable text) must NOT send fallback.
+        String preDispatchUserText = aiCustomerService.extractUserText(message);
+        if (preDispatchUserText == null || preDispatchUserText.isBlank()) {
+            LOG.debug("[AI-SKIP] no processable text for type={} from={} — skipping AI dispatch and fallback",
+                    message.getType(), from);
+            return null;
+        }
+
         // ADR-030: new-session pre-dispatch shortcut removed. The AI agent now handles
         // ALL messages, including the first message of a new session. The landing-options
         // template is sent by the AI via the send_landing_options_notification MCP tool,

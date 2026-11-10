@@ -170,6 +170,8 @@ class StoreLineWebhookIntegrationTest {
                 .thenReturn(Optional.of(storeLine()));
         when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
         when(aiCustomerService.isEnabled()).thenReturn(true);
+        // FIX-01: extractUserText guard must pass so STORE routing reaches storeAiAgent
+        when(aiCustomerService.extractUserText(any())).thenReturn("What do you have on the menu?");
 
         WhatsappSession session = existingSession(FROM_STORE, PHONE_ID_STORE, true);
         when(whatsappSessionRepo.findByFromAndPhoneNumberId(FROM_STORE, PHONE_ID_STORE))
@@ -203,6 +205,8 @@ class StoreLineWebhookIntegrationTest {
                 .thenReturn(Optional.of(customerLine()));
         when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
         when(aiCustomerService.isEnabled()).thenReturn(true);
+        // FIX-01: extractUserText guard must pass so CUSTOMER routing reaches aiCustomerService
+        when(aiCustomerService.extractUserText(any())).thenReturn("Where is my order?");
 
         WhatsappSession session = existingSession(FROM_CUSTOMER, PHONE_ID_CUSTOMER, true);
         when(whatsappSessionRepo.findByFromAndPhoneNumberId(FROM_CUSTOMER, PHONE_ID_CUSTOMER))
@@ -410,6 +414,8 @@ class StoreLineWebhookIntegrationTest {
         when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
         // ADR-030: AI is enabled — DRIVER new session must reach the AI agent
         when(aiCustomerService.isEnabled()).thenReturn(true);
+        // FIX-01: extractUserText guard must pass so DRIVER routing reaches AI agent
+        when(aiCustomerService.extractUserText(any())).thenReturn("Hello driver");
         when(aiCustomerService.handleWhatsappQueryForAgent(
                 any(WhatsappWebhookPayload.Value.Message.class), eq(FROM_STORE), isNull(), eq("driver_support")))
                 .thenReturn("Welcome, driver! How can I help you?");
@@ -443,6 +449,8 @@ class StoreLineWebhookIntegrationTest {
         when(whatsappLineService.findByPhoneNumberId(unknownPhone)).thenReturn(Optional.empty());
         when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
         when(aiCustomerService.isEnabled()).thenReturn(true);
+        // FIX-01: extractUserText guard must pass so the fallback-to-CUSTOMER path invokes the agent
+        when(aiCustomerService.extractUserText(any())).thenReturn("Hello");
 
         WhatsappSession session = existingSession(FROM_CUSTOMER, null, true);
         when(whatsappSessionRepo.findByFrom(FROM_CUSTOMER)).thenReturn(Optional.of(session));

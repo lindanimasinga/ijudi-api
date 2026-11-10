@@ -154,12 +154,12 @@ public class StoreAiAgent {
             // ADR-031 / REQ-03: wrap network call in RetryTemplate — retries on 5xx/429/connection
             // failures; non-retryable on 4xx (incl. 400 context-window overflow).
             // On retry exhaustion execute() re-throws; the outer catch returns null.
+            // NOTE-05: log every attempt unconditionally so QA can grep for attempt=1 on a
+            // non-retryable 4xx (proves exactly one attempt, no retry).
             final String resolvedAgentFinal = resolvedAgent;
             ResponseEntity<Map> response = openAiRetryTemplate.execute(context -> {
                 int attempt = context.getRetryCount() + 1;
-                if (attempt > 1) {
-                    LOG.warn("[AI-RETRY] StoreAiAgent attempt={} agent='{}' for from={}", attempt, resolvedAgentFinal, from);
-                }
+                LOG.warn("[AI-ATTEMPT] StoreAiAgent attempt={} agent='{}' for from={}", attempt, resolvedAgentFinal, from);
                 return restTemplate.postForEntity(OPENAI_CHAT_URL, entity, Map.class);
             });
 

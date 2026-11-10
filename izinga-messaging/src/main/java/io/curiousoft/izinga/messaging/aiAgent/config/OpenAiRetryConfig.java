@@ -3,9 +3,6 @@ package io.curiousoft.izinga.messaging.aiAgent.config;
 import org.springframework.classify.BinaryExceptionClassifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.retry.RetryListener;
-import org.springframework.retry.RetryContext;
-import org.springframework.retry.RetryCallback;
 import org.springframework.retry.backoff.ExponentialBackOffPolicy;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
@@ -55,24 +52,13 @@ public class OpenAiRetryConfig {
         backOff.setMultiplier(2.0);
         backOff.setMaxInterval(10000);
 
-        RetryTemplate template = RetryTemplate.builder()
+        // NOTE-03: no RetryListener registered — the no-op listener was removed.
+        // Attempt logging is handled at every call-site via [AI-ATTEMPT] on every attempt
+        // unconditionally, which gives QA a greppable positive line for both retryable and
+        // non-retryable failures (attempt=1 for non-retryable 4xx proves exactly one attempt).
+        return RetryTemplate.builder()
                 .customPolicy(policy)
                 .customBackoff(backOff)
                 .build();
-
-        // ADR-031 / AC-04: retry attempt logging via RetryListener (not RetryListenerSupport —
-        // that class is deprecated/removed in spring-retry 2.x; use the interface with default methods).
-        template.registerListener(new RetryListener() {
-            @Override
-            public <T, E extends Throwable> void onError(RetryContext context,
-                                                          RetryCallback<T, E> callback,
-                                                          Throwable throwable) {
-                if (context.getRetryCount() > 0) {
-                    // Log is performed in the call-site using context.getRetryCount() + 1
-                }
-            }
-        });
-
-        return template;
     }
 }
