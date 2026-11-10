@@ -58,8 +58,8 @@ class AiCustomerServiceAgentTest {
 
     @BeforeEach
     void setUp() {
-        enabledAgent = new AiCustomerServiceAgent(true, FAKE_API_KEY, FAKE_MODEL, restTemplate, conversationHistoryService, agentConfigService, storeScopeJwtService, whatsappConfig, userProfileRepo);
-        disabledAgent = new AiCustomerServiceAgent(false, FAKE_API_KEY, FAKE_MODEL, restTemplate, conversationHistoryService, agentConfigService, storeScopeJwtService, whatsappConfig, userProfileRepo);
+        enabledAgent = new AiCustomerServiceAgent(true, FAKE_API_KEY, FAKE_MODEL, false, restTemplate, conversationHistoryService, agentConfigService, storeScopeJwtService, whatsappConfig, userProfileRepo);
+        disabledAgent = new AiCustomerServiceAgent(false, FAKE_API_KEY, FAKE_MODEL, false, restTemplate, conversationHistoryService, agentConfigService, storeScopeJwtService, whatsappConfig, userProfileRepo);
     }
 
     // ─── isEnabled ────────────────────────────────────────────────────────────

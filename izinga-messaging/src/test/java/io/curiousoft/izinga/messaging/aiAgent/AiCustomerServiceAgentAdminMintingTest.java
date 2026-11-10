@@ -96,7 +96,7 @@ class AiCustomerServiceAgentAdminMintingTest {
 
     private AiCustomerServiceAgent agentWith(WhatsappConfig cfg) {
         return new AiCustomerServiceAgent(
-                true, "sk-test", "gpt-4.1-mini",
+                true, "sk-test", "gpt-4.1-mini", false,
                 restTemplate, conversationHistoryService, agentConfigService,
                 storeScopeJwtService, cfg, userProfileRepo);
     }

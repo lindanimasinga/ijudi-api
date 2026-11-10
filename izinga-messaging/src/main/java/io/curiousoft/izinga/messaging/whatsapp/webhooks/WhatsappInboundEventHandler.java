@@ -191,21 +191,12 @@ public class WhatsappInboundEventHandler {
             return null;
         }
 
-        if (session.isNewSession()) {
-            LOG.info("New WhatsApp session started for {}", from);
-            // SA-5: DRIVER line must not receive the customer landing menu
-            if (lineContext.audience() != Audience.DRIVER) {
-                var user = userProfileRepo.findByMobileNumber(from);
-                String landingTemplateName = lineContext.line() != null
-                        ? lineContext.line().getLandingTemplateName() : null;
-                whatsappNotificationService.sendLandingOptions(from, extractContactName(contacts), user,
-                        lineContext.audience(), lineContext.storeId(), landingTemplateName);
-            } else {
-                LOG.info("SA-5: DRIVER line — skipping customer landing options for {}", from);
-            }
-            return null;
-        }
-
+        // ADR-030: new-session pre-dispatch shortcut removed. The AI agent now handles
+        // ALL messages, including the first message of a new session. The landing-options
+        // template is sent by the AI via the send_landing_options_notification MCP tool,
+        // giving it full control over which template to use per audience.
+        LOG.debug("Pre-dispatch: isNewSession={} isAIEnabled={} isAIAgentActive={}",
+                session.isNewSession(), isAiCustomerServiceEnabled, session.isAIAgentActive());
         if (isAiCustomerServiceEnabled && session.isAIAgentActive()) {
             LOG.info("AI customer service enabled, processing message from {} via agent={} audience={}",
                     from, lineContext.agentName(), lineContext.audience());

@@ -52,7 +52,7 @@ class AiCustomerServiceAgentLocationTest {
 
     @BeforeEach
     void setUp() {
-        agent = new AiCustomerServiceAgent(true, "sk-test-key", "gpt-4.1-mini",
+        agent = new AiCustomerServiceAgent(true, "sk-test-key", "gpt-4.1-mini", false,
                 restTemplate, conversationHistoryService, agentConfigService, storeScopeJwtService,
                 whatsappConfig, userProfileRepo);
     }
