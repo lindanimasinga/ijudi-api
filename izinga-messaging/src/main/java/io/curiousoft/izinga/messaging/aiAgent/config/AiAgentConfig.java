@@ -65,8 +65,11 @@ public class AiAgentConfig {
     private Integer version = 1;
 
     /**
-     * Whether the agent is allowed to use mcp tools (e.g., external APIs)
+     * Whether the agent is allowed to use mcp tools (e.g., external APIs).
+     * @Builder.Default is required: without it Lombok ignores the field initializer
+     * and the builder always produces useTools=false, breaking tool dispatch.
      */
+    @Builder.Default
     private boolean useTools = true;
 
     /**

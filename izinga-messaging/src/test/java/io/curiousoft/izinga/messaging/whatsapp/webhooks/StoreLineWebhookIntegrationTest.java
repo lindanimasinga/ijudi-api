@@ -245,10 +245,11 @@ class StoreLineWebhookIntegrationTest {
         when(whatsappSessionRepo.save(sessionCaptor.capture()))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        // New sessions trigger landing options unless DRIVER — mock user lookup to avoid NPE
-        when(userProfileRepo.findByMobileNumber(FROM_STORE)).thenReturn(null);
+        // ADR-030: new-session no longer calls sendLandingOptions directly.
+        // AI agent handles all messages including first messages.
         when(userProfileRepo.findByRole(any())).thenReturn(List.of());
         when(deviceRepo.findByUserIdIn(any())).thenReturn(List.of());
+        when(aiCustomerService.isEnabled()).thenReturn(false); // AI disabled — focus on session properties
 
         WhatsappWebhookPayload payload = buildTextPayload(
                 FROM_STORE, "Hello", PHONE_ID_STORE, "New Store Customer");
@@ -268,17 +269,17 @@ class StoreLineWebhookIntegrationTest {
         assertEquals(AGENT_NAME_STORE, saved.getAgentName(),
                 "session must carry agentName of the STORE line");
 
-        // REQ-24: no landingTemplateName configured on this line → falls back to the
-        // generic template (null sixth arg; WhatsappNotificationService defaults it).
-        verify(whatsappNotificationService).sendLandingOptions(
-                eq(FROM_STORE), eq("New Store Customer"), any(),
-                eq(Audience.STORE), eq(STORE_ID), isNull());
+        // ADR-030: handler must NOT call sendLandingOptions directly on new session
+        verify(whatsappNotificationService, never()).sendLandingOptions(
+                anyString(), anyString(), any(), any(), any(), any());
     }
 
-    // ---- REQ-24: STORE line with its own landingTemplateName uses that template, not the generic one ----
+    // ---- ADR-030: STORE line with custom landingTemplateName — handler stores it on session but
+    //              does NOT call sendLandingOptions directly. The AI agent receives landingTemplateName
+    //              via session context and decides when/whether to send the template. ----
 
     @Test
-    void storeLine_withLandingTemplateName_threadsTemplateNameIntoSendLandingOptions() {
+    void storeLine_withLandingTemplateName_newSession_handlerDoesNotCallSendLandingOptionsDirectly() {
         when(whatsappLineService.findByPhoneNumberId(PHONE_ID_STORE))
                 .thenReturn(Optional.of(storeLine("rxnova24_landing_options")));
         when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
@@ -286,20 +287,22 @@ class StoreLineWebhookIntegrationTest {
         when(whatsappSessionRepo.findByFromAndPhoneNumberId(FROM_STORE, PHONE_ID_STORE))
                 .thenReturn(Optional.empty());
         when(whatsappSessionRepo.findByFrom(FROM_STORE)).thenReturn(Optional.empty());
-        when(whatsappSessionRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        when(userProfileRepo.findByMobileNumber(FROM_STORE)).thenReturn(null);
+        ArgumentCaptor<WhatsappSession> sessionCaptor = ArgumentCaptor.forClass(WhatsappSession.class);
+        when(whatsappSessionRepo.save(sessionCaptor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
         when(userProfileRepo.findByRole(any())).thenReturn(List.of());
         when(deviceRepo.findByUserIdIn(any())).thenReturn(List.of());
+        when(aiCustomerService.isEnabled()).thenReturn(false); // AI disabled — focus on session properties
 
         WhatsappWebhookPayload payload = buildTextPayload(
                 FROM_STORE, "Hello", PHONE_ID_STORE, "New Store Customer");
 
         handler.handleInbound(new WhatsappInboundEvent(this, payload));
 
-        verify(whatsappNotificationService).sendLandingOptions(
-                eq(FROM_STORE), eq("New Store Customer"), any(),
-                eq(Audience.STORE), eq(STORE_ID), eq("rxnova24_landing_options"));
+        // ADR-030: handler must NOT call sendLandingOptions directly
+        verify(whatsappNotificationService, never()).sendLandingOptions(
+                anyString(), anyString(), any(), any(), any(), any());
     }
 
     // ---- T-17 test 4: Session created for CUSTOMER line carries null storeId ----
@@ -318,9 +321,10 @@ class StoreLineWebhookIntegrationTest {
         when(whatsappSessionRepo.save(sessionCaptor.capture()))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        when(userProfileRepo.findByMobileNumber(FROM_CUSTOMER)).thenReturn(null);
+        // ADR-030: handler no longer calls findByMobileNumber on new session
         when(userProfileRepo.findByRole(any())).thenReturn(List.of());
         when(deviceRepo.findByUserIdIn(any())).thenReturn(List.of());
+        when(aiCustomerService.isEnabled()).thenReturn(false); // AI disabled — focus on session properties
 
         WhatsappWebhookPayload payload = buildTextPayload(
                 FROM_CUSTOMER, "Hello", PHONE_ID_CUSTOMER, "New Customer");
@@ -390,9 +394,10 @@ class StoreLineWebhookIntegrationTest {
     }
 
     // ---- T-17 test 6: DRIVER line does NOT receive customer landing options (SA-5) ----
+    //                  ADR-030: DRIVER new session now routes to AI agent directly
 
     @Test
-    void driverLine_newSession_doesNotReceiveLandingOptions() {
+    void driverLine_newSession_doesNotReceiveLandingOptionsAndRoutesToAiAgent() {
         String phoneIdDriver = "wa-phone-driver-001";
         WhatsappLine driverLine = new WhatsappLine();
         driverLine.setPhoneNumberId(phoneIdDriver);
@@ -403,6 +408,11 @@ class StoreLineWebhookIntegrationTest {
         when(whatsappLineService.findByPhoneNumberId(phoneIdDriver))
                 .thenReturn(Optional.of(driverLine));
         when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
+        // ADR-030: AI is enabled — DRIVER new session must reach the AI agent
+        when(aiCustomerService.isEnabled()).thenReturn(true);
+        when(aiCustomerService.handleWhatsappQueryForAgent(
+                any(WhatsappWebhookPayload.Value.Message.class), eq(FROM_STORE), isNull(), eq("driver_support")))
+                .thenReturn("Welcome, driver! How can I help you?");
 
         // New session
         when(whatsappSessionRepo.findByFromAndPhoneNumberId(eq(FROM_STORE), eq(phoneIdDriver)))
@@ -417,11 +427,12 @@ class StoreLineWebhookIntegrationTest {
 
         handler.handleInbound(new WhatsappInboundEvent(this, payload));
 
-        // SA-5: sendLandingOptions must NOT be called for DRIVER lines.
-        // Verify against the 6-arg overload — the handler always calls that one now,
-        // so verifying the old 3-arg overload here would be vacuously true.
+        // SA-5 preserved: sendLandingOptions must NEVER be called for DRIVER lines.
         verify(whatsappNotificationService, never())
                 .sendLandingOptions(any(), any(), any(), any(), any(), any());
+        // ADR-030: DRIVER new session now routes directly to AiCustomerServiceAgent
+        verify(aiCustomerService).handleWhatsappQueryForAgent(
+                any(WhatsappWebhookPayload.Value.Message.class), eq(FROM_STORE), isNull(), eq("driver_support"));
     }
 
     // ---- T-17 test 7: Unknown phoneNumberId falls back to CUSTOMER context, StoreAiAgent not called ----

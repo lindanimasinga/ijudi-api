@@ -18,10 +18,13 @@ import static org.mockito.Mockito.*;
 /**
  * Tests for {@link AiAgentConfigInitializer}.
  *
- * Key invariant under test: every fresh-seeded agent config must have useTools=true.
- * AiAgentConfig.builder() defaults the primitive boolean to false (no @Builder.Default),
- * so the initializer must explicitly call saved.setUseTools(true) before the second
- * repository.save() in each fresh-creation path.
+ * Key invariants under test:
+ * 1. Fresh-seeded agent configs have useTools=true.
+ *    @Builder.Default now makes the builder produce useTools=true; the initializer's
+ *    explicit setUseTools(true) call is a belt-and-suspenders guard for paths that
+ *    bypass the builder.
+ * 2. Existing documents with useTools=false (persisted before the @Builder.Default fix)
+ *    are backfilled to useTools=true on startup (Cause B fix).
  */
 @ExtendWith(MockitoExtension.class)
 class AiAgentConfigInitializerTest {
@@ -48,8 +51,8 @@ class AiAgentConfigInitializerTest {
 
         AiAgentConfig fromService = AiAgentConfig.builder()
                 .id("d1").agentName("driver_support").active(true).build();
-        // useTools is false here because @Builder.Default is absent — this is the pre-fix state
-        assertFalse(fromService.isUseTools(), "pre-condition: builder leaves useTools=false");
+        // @Builder.Default now makes the builder produce useTools=true; verify the builder is working
+        assertTrue(fromService.isUseTools(), "pre-condition: @Builder.Default makes builder produce useTools=true");
 
         when(configService.saveAgentConfig(eq("driver_support"), anyString(), anyString()))
                 .thenReturn(fromService);
@@ -80,8 +83,8 @@ class AiAgentConfigInitializerTest {
 
         AiAgentConfig fromService = AiAgentConfig.builder()
                 .id("c1").agentName("customer_support").active(true).build();
-        // useTools is false here because @Builder.Default is absent — this is the pre-fix state
-        assertFalse(fromService.isUseTools(), "pre-condition: builder leaves useTools=false");
+        // @Builder.Default now makes the builder produce useTools=true; verify the builder is working
+        assertTrue(fromService.isUseTools(), "pre-condition: @Builder.Default makes builder produce useTools=true");
 
         when(configService.saveAgentConfig(eq("customer_support"), anyString(), anyString()))
                 .thenReturn(fromService);
@@ -141,6 +144,54 @@ class AiAgentConfigInitializerTest {
         verify(repository, never()).save(any());
     }
 
+    // ---- Cause B backfill: existing docs with useTools=false must be fixed on startup ----
+
+    @Test
+    void run_driverSupport_existingDocWithUseToolsFalse_backfillsUseToolsTrue() throws Exception {
+        // Simulate a document persisted before the @Builder.Default fix: useTools=false
+        AiAgentConfig existing = AiAgentConfig.builder()
+                .id("old-driver").agentName("driver_support").active(true)
+                .audience(Audience.DRIVER)
+                .mcpServers(List.of(AiAgentConfigService.DEFAULT_MCP_SERVER))
+                .build();
+        existing.setUseTools(false); // force the pre-fix state
+
+        when(repository.findByAgentName("driver_support")).thenReturn(Optional.of(existing));
+        when(repository.findByAgentName("customer_support")).thenReturn(Optional.of(existingDoc("customer_support")));
+        when(repository.findByAgentName("store_support_default")).thenReturn(Optional.of(existingDoc("store_support_default")));
+
+        initializer.run();
+
+        // The backfill block must call repository.save with useTools=true
+        ArgumentCaptor<AiAgentConfig> captor = ArgumentCaptor.forClass(AiAgentConfig.class);
+        verify(repository).save(captor.capture());
+        assertTrue(captor.getValue().isUseTools(),
+                "driver_support backfill must set useTools=true on existing doc");
+    }
+
+    @Test
+    void run_customerSupport_existingDocWithUseToolsFalse_backfillsUseToolsTrue() throws Exception {
+        // Simulate a document persisted before the @Builder.Default fix: useTools=false
+        AiAgentConfig existing = AiAgentConfig.builder()
+                .id("old-customer").agentName("customer_support").active(true)
+                .audience(Audience.CUSTOMER)
+                .mcpServers(List.of(AiAgentConfigService.DEFAULT_MCP_SERVER))
+                .build();
+        existing.setUseTools(false); // force the pre-fix state
+
+        when(repository.findByAgentName("customer_support")).thenReturn(Optional.of(existing));
+        when(repository.findByAgentName("driver_support")).thenReturn(Optional.of(existingDoc("driver_support")));
+        when(repository.findByAgentName("store_support_default")).thenReturn(Optional.of(existingDoc("store_support_default")));
+
+        initializer.run();
+
+        // The backfill block must call repository.save with useTools=true
+        ArgumentCaptor<AiAgentConfig> captor = ArgumentCaptor.forClass(AiAgentConfig.class);
+        verify(repository).save(captor.capture());
+        assertTrue(captor.getValue().isUseTools(),
+                "customer_support backfill must set useTools=true on existing doc");
+    }
+
     // ---- store_support_default fresh seed preserves useTools=true via builder ----
 
     @Test
@@ -165,14 +216,18 @@ class AiAgentConfigInitializerTest {
 
     // ---- helper ----
 
-    /** Builds a minimal pre-existing document that passes the audience+mcpServers backfill checks. */
+    /**
+     * Builds a minimal pre-existing document that passes ALL backfill checks without dirtying:
+     * audience is non-null, mcpServers is non-empty, and useTools=true (@Builder.Default).
+     */
     private AiAgentConfig existingDoc(String agentName) {
         return AiAgentConfig.builder()
                 .id("existing-" + agentName)
                 .agentName(agentName)
                 .active(true)
-                .audience(Audience.DRIVER) // any non-null audience suppresses the dirty flag
+                .audience(Audience.DRIVER) // any non-null audience suppresses the audience dirty flag
                 .mcpServers(List.of(AiAgentConfigService.DEFAULT_MCP_SERVER))
+                // useTools defaults to true via @Builder.Default — no setUseTools needed here
                 .build();
     }
 }

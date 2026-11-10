@@ -358,12 +358,12 @@ class WhatsappInboundEventHandlerTest {
     }
 
     /**
-     * AC-09: first message in a new session → landing-options flow runs, neither AI agent
-     * is called, and the location doc IS still persisted (consistent with every other
-     * message type) but no AI-reply doc is written.
+     * ADR-030: first message in a new session → AI agent is now invoked directly.
+     * The handler no longer short-circuits to sendLandingOptions on new sessions.
+     * The AI agent decides which template to send via the MCP tool.
      */
     @Test
-    void handleInbound_locationMessage_newSession_runsLandingOptionsNotAiAgent() throws Exception {
+    void handleInbound_locationMessage_newSession_routesToAiAgent() throws Exception {
         WhatsappWebhookPayload.Value.Message.Location location =
                 new WhatsappWebhookPayload.Value.Message.Location();
         location.setName("Sandton City");
@@ -375,27 +375,33 @@ class WhatsappInboundEventHandlerTest {
 
         // No lastMessageDate — treated as new session by upsertSession
         WhatsappSession session = new WhatsappSession(FROM);
+        // isAIAgentActive defaults to true on a new WhatsappSession
 
         when(whatsappSessionRepo.findByFrom(FROM)).thenReturn(Optional.of(session));
         when(whatsappSessionRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
+        when(aiCustomerService.isEnabled()).thenReturn(true);
+        when(aiCustomerService.handleWhatsappQueryForAgent(
+                any(WhatsappWebhookPayload.Value.Message.class), eq(FROM), isNull(), anyString()))
+                .thenReturn("Welcome! How can I help you today?");
         when(firestoreService.writeMessageForCustomer(eq(FROM), anyString(), any()))
                 .thenReturn("msg-new-loc-1");
 
         handler.handleInbound(new WhatsappInboundEvent(this, payload));
 
-        // Landing options must be sent (new session path)
-        verify(whatsappNotificationService).sendLandingOptions(
-                eq(FROM), anyString(), any(), any(), any(), any());
-        // Neither AI agent must be called
-        verify(aiCustomerService, never()).handleWhatsappQueryForAgent(
-                any(WhatsappWebhookPayload.Value.Message.class), anyString(), any(), anyString());
+        // ADR-030: handler must NOT call sendLandingOptions directly on new session
+        verify(whatsappNotificationService, never()).sendLandingOptions(
+                anyString(), anyString(), any(), any(), any(), any());
+        // AI agent MUST be called — it now handles the new-session response
+        verify(aiCustomerService).handleWhatsappQueryForAgent(
+                any(WhatsappWebhookPayload.Value.Message.class), eq(FROM), isNull(), anyString());
         verify(storeAiAgent, never()).handleWhatsappQuery(
                 any(WhatsappWebhookPayload.Value.Message.class), anyString(), anyString(), any());
-        // Location doc IS written (1 write, no AI-reply doc)
-        verify(firestoreService, times(1)).writeMessageForCustomer(eq(FROM), anyString(), any());
-        // No AI reply sent via WhatsApp either
-        verify(whatsappNotificationService, never()).sendMessage(anyString(), anyString(), any(), any());
+        // Location doc IS written + AI reply doc (2 writes total)
+        verify(firestoreService, times(2)).writeMessageForCustomer(eq(FROM), anyString(), any());
+        // AI reply IS sent via WhatsApp
+        verify(whatsappNotificationService).sendMessage(
+                eq(FROM), eq("Welcome! How can I help you today?"), eq(Audience.CUSTOMER), isNull());
     }
 
     // ── multi-line routing tests ───────────────────────────────────────────────
