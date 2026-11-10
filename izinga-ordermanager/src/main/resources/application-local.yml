@@ -1,0 +1,10 @@
+spring:
+    config:
+        activate:
+            on-profile: local
+izinga:
+    ai:
+        agent:
+            debug:
+                # PO AC-04: enabled for local development; MUST NOT be true in prod.
+                log-openai-request-response: true

@@ -113,6 +113,11 @@ izinga:
         commission-amount-car: 60.00
         commission-amount-bakkie: 70.00
         commission-amount-truck: 70.00
+    ai:
+        agent:
+            debug:
+                # PO AC-04: set true in uat/local profiles only. MUST remain false in prod.
+                log-openai-request-response: false
 
 cancellation:
     fee:

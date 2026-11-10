@@ -92,3 +92,10 @@ whatsapp:
         orderConfirmationCustomerTemplate: order_confirmed
         orderConfirmationShopTemplate: order_management_1
         orderConfirmationMessengerTemplate: order_management_messenger
+izinga:
+    ai:
+        agent:
+            debug:
+                # C-1 (Legal): phone masking applied to all logged tool-call arguments (see AiCustomerServiceAgent).
+                # Permitted in UAT because phone numbers are masked. MUST NOT be true in prod.
+                log-openai-request-response: true
