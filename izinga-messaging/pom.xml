@@ -123,5 +123,11 @@
             <artifactId>lombok</artifactId>
             <scope>provided</scope>
         </dependency>
+        <!-- ADR-031: programmatic RetryTemplate for OpenAI network-call resilience.
+             Version omitted — managed by Spring Boot 3.3.6 BOM at 2.0.10. -->
+        <dependency>
+            <groupId>org.springframework.retry</groupId>
+            <artifactId>spring-retry</artifactId>
+        </dependency>
     </dependencies>
 </project>

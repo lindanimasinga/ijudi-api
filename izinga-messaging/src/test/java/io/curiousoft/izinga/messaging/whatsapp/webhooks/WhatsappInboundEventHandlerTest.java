@@ -207,6 +207,9 @@ class WhatsappInboundEventHandlerTest {
         when(whatsappSessionRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
         when(aiCustomerService.isEnabled()).thenReturn(true);
+        // FIX-01: extractUserText guard must pass for location messages — stub non-null text
+        when(aiCustomerService.extractUserText(any())).thenReturn(
+                "Customer shared their location: Sandton City, 83 Rivonia Rd, Sandton (latitude: -26.1076, longitude: 28.0526)");
         when(aiCustomerService.handleWhatsappQueryForAgent(any(WhatsappWebhookPayload.Value.Message.class), eq(FROM), isNull(), anyString()))
                 .thenReturn("Thanks, we've noted your location.");
         when(firestoreService.writeMessageForCustomer(eq(FROM), anyString(), any())).thenReturn("msg-loc-1");
@@ -308,6 +311,9 @@ class WhatsappInboundEventHandlerTest {
         when(whatsappSessionRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
         when(aiCustomerService.isEnabled()).thenReturn(true);
+        // FIX-01: extractUserText guard must pass for location messages on STORE line
+        when(aiCustomerService.extractUserText(any())).thenReturn(
+                "Customer shared their location: (latitude: -26.1076, longitude: 28.0526)");
         when(storeAiAgent.handleWhatsappQuery(
                 any(WhatsappWebhookPayload.Value.Message.class), eq(FROM), eq(storeId), anyString()))
                 .thenReturn("We noted your location, thanks!");
@@ -381,6 +387,9 @@ class WhatsappInboundEventHandlerTest {
         when(whatsappSessionRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(verificationConsentService.isVerificationMessage(any())).thenReturn(false);
         when(aiCustomerService.isEnabled()).thenReturn(true);
+        // FIX-01: extractUserText guard must pass for new-session location messages
+        when(aiCustomerService.extractUserText(any())).thenReturn(
+                "Customer shared their location: Sandton City, (latitude: -26.1076, longitude: 28.0526)");
         when(aiCustomerService.handleWhatsappQueryForAgent(
                 any(WhatsappWebhookPayload.Value.Message.class), eq(FROM), isNull(), anyString()))
                 .thenReturn("Welcome! How can I help you today?");
