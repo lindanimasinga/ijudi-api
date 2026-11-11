@@ -113,6 +113,21 @@ izinga:
         commission-amount-car: 60.00
         commission-amount-bakkie: 70.00
         commission-amount-truck: 70.00
+    ai:
+        agent:
+            debug:
+                # PO AC-04: set true in uat/local profiles only. MUST remain false in prod.
+                log-openai-request-response: false
+        openai:
+            # ADR-031 / REQ-01 (Option C): OpenAI HTTP client timeouts — tunable without a release.
+            # connect-timeout-seconds: TCP connect timeout. 3 s is ample; a longer value only
+            #   delays fail-fast on DNS/routing failures. Change only with a concrete reason.
+            # response-timeout-seconds: time to first byte from OpenAI. Raised from 8 s to 15 s
+            #   after QA measured real MCP tool-use round-trips of 6.73 s (only 1.27 s margin
+            #   under the old 8 s limit). Worst-case: 15 × 3 attempts + 2 + 4 s backoff = 51 s.
+            #   Acceptable — this flow is async and does NOT block Meta's webhook ack.
+            connect-timeout-seconds: 3
+            response-timeout-seconds: 15
 
 cancellation:
     fee:

@@ -15,6 +15,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.*;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
@@ -82,10 +83,11 @@ class StoreAiAgentPromptTest {
 
     @BeforeEach
     void setUp() {
+        RetryTemplate noOpRetry = RetryTemplate.builder().maxAttempts(1).fixedBackoff(1).build();
         agent = new StoreAiAgent(
                 true, "sk-test-key", "gpt-4.1-mini", restTemplate,
                 agentConfigService, conversationHistoryService,
-                storeContextResolver, storeRepository, storeScopeJwtService);
+                storeContextResolver, storeRepository, storeScopeJwtService, noOpRetry);
     }
 
     /**
@@ -265,10 +267,11 @@ class StoreAiAgentPromptTest {
         StoreScopeJwtService realJwtService =
                 new StoreScopeJwtService("test-secret-at-least-32-chars-1234");
 
+        RetryTemplate noOpRetryForJwt = RetryTemplate.builder().maxAttempts(1).fixedBackoff(1).build();
         StoreAiAgent agentWithRealJwt = new StoreAiAgent(
                 true, "sk-test-key", "gpt-4.1-mini", restTemplate,
                 agentConfigService, conversationHistoryService,
-                storeContextResolver, storeRepository, realJwtService);
+                storeContextResolver, storeRepository, realJwtService, noOpRetryForJwt);
 
         AiAgentConfig config = AiAgentConfig.builder()
                 .agentName("store_support_" + STORE_ID)

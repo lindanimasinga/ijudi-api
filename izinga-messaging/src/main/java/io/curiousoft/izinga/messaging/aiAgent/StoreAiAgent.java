@@ -11,8 +11,10 @@ import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsappWebhookPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -45,7 +47,10 @@ public class StoreAiAgent {
     private final boolean enabled;
     private final String openAiApiKey;
     private final String model;
+    /** ADR-031 / AC-02: OpenAI-scoped RestTemplate with explicit timeouts (3 s connect, 15 s read). */
     private final RestTemplate restTemplate;
+    /** ADR-031 / REQ-03: RetryTemplate covering 5xx / 429 / connection failures (non-retryable: 4xx). */
+    private final RetryTemplate openAiRetryTemplate;
     private final AiAgentConfigService agentConfigService;
     private final ConversationHistoryService conversationHistoryService;
     private final StoreContextResolver storeContextResolver;
@@ -56,16 +61,20 @@ public class StoreAiAgent {
             @Value("${ai.agent.enabled:false}") boolean enabled,
             @Value("${openai.api.key:}") String openAiApiKey,
             @Value("${ai.agent.model:gpt-4.1-mini}") String model,
-            RestTemplate restTemplate,
+            // ADR-031 / AC-02: OpenAI-qualified bean (3 s connect, 15 s read timeouts — configurable)
+            @Qualifier("openAiRestTemplate") RestTemplate restTemplate,
             AiAgentConfigService agentConfigService,
             ConversationHistoryService conversationHistoryService,
             StoreContextResolver storeContextResolver,
             StoreRepository storeRepository,
-            StoreScopeJwtService storeScopeJwtService) {
+            StoreScopeJwtService storeScopeJwtService,
+            // ADR-031 / REQ-03: programmatic RetryTemplate for OpenAI network calls
+            @Qualifier("openAiRetryTemplate") RetryTemplate openAiRetryTemplate) {
         this.enabled = enabled;
         this.openAiApiKey = openAiApiKey;
         this.model = model;
         this.restTemplate = restTemplate;
+        this.openAiRetryTemplate = openAiRetryTemplate;
         this.agentConfigService = agentConfigService;
         this.conversationHistoryService = conversationHistoryService;
         this.storeContextResolver = storeContextResolver;
@@ -142,7 +151,23 @@ public class StoreAiAgent {
             }
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-            ResponseEntity<Map> response = restTemplate.postForEntity(OPENAI_CHAT_URL, entity, Map.class);
+            // ADR-031 / REQ-03: wrap network call in RetryTemplate — retries on 5xx/429/connection
+            // failures; non-retryable on 4xx (incl. 400 context-window overflow).
+            // On retry exhaustion execute() re-throws; the outer catch returns null.
+            // NOTE-05: log every attempt unconditionally so QA can grep for attempt=1 on a
+            // non-retryable 4xx (proves exactly one attempt, no retry).
+            // ADR-031 (Option B+C): attempt=1 at INFO (a successful call must not emit WARN);
+            // attempt >= 2 at WARN (a genuine retry warrants alerting).
+            final String resolvedAgentFinal = resolvedAgent;
+            ResponseEntity<Map> response = openAiRetryTemplate.execute(context -> {
+                int attempt = context.getRetryCount() + 1;
+                if (attempt == 1) {
+                    LOG.info("[AI-ATTEMPT] StoreAiAgent attempt={} agent='{}' for from={}", attempt, resolvedAgentFinal, from);
+                } else {
+                    LOG.warn("[AI-ATTEMPT] StoreAiAgent attempt={} agent='{}' for from={}", attempt, resolvedAgentFinal, from);
+                }
+                return restTemplate.postForEntity(OPENAI_CHAT_URL, entity, Map.class);
+            });
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 String reply = extractReply(response.getBody());

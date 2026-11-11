@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.*;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
@@ -58,8 +59,10 @@ class AiCustomerServiceAgentTest {
 
     @BeforeEach
     void setUp() {
-        enabledAgent = new AiCustomerServiceAgent(true, FAKE_API_KEY, FAKE_MODEL, restTemplate, conversationHistoryService, agentConfigService, storeScopeJwtService, whatsappConfig, userProfileRepo);
-        disabledAgent = new AiCustomerServiceAgent(false, FAKE_API_KEY, FAKE_MODEL, restTemplate, conversationHistoryService, agentConfigService, storeScopeJwtService, whatsappConfig, userProfileRepo);
+        // ADR-031: RetryTemplate wired for compilation; @Disabled class is never executed.
+        RetryTemplate noOpRetry = RetryTemplate.builder().maxAttempts(1).fixedBackoff(1).build();
+        enabledAgent = new AiCustomerServiceAgent(true, FAKE_API_KEY, FAKE_MODEL, false, restTemplate, conversationHistoryService, agentConfigService, storeScopeJwtService, whatsappConfig, userProfileRepo, noOpRetry);
+        disabledAgent = new AiCustomerServiceAgent(false, FAKE_API_KEY, FAKE_MODEL, false, restTemplate, conversationHistoryService, agentConfigService, storeScopeJwtService, whatsappConfig, userProfileRepo, noOpRetry);
     }
 
     // ─── isEnabled ────────────────────────────────────────────────────────────

@@ -43,7 +43,7 @@ public class AiAgentConfigInitializer implements CommandLineRunner {
 
         var existing = repository.findByAgentName(agentName);
         if (existing.isPresent()) {
-            // SA-021-4: backfill audience and mcpServers if absent
+            // SA-021-4: backfill audience, mcpServers, and useTools if absent/false
             var config = existing.get();
             boolean dirty = false;
             if (config.getAudience() == null) {
@@ -54,10 +54,16 @@ public class AiAgentConfigInitializer implements CommandLineRunner {
                 config.setMcpServers(List.of(AiAgentConfigService.DEFAULT_MCP_SERVER));
                 dirty = true;
             }
+            if (!config.isUseTools()) {
+                // Cause B fix: existing docs persisted with useTools=false due to missing
+                // @Builder.Default on AiAgentConfig.useTools. Backfill to true.
+                config.setUseTools(true);
+                dirty = true;
+            }
             if (dirty) {
                 repository.save(config);
                 configService.invalidateCache(agentName);
-                LOG.info("SA-021-4: backfilled audience and mcpServers for agent={}", agentName);
+                LOG.info("SA-021-4: backfilled audience, mcpServers, and/or useTools for agent={}", agentName);
             }
             return;
         }
@@ -178,9 +184,8 @@ public class AiAgentConfigInitializer implements CommandLineRunner {
         String description = "AI agent for driver support and onboarding via WhatsApp";
         var saved = configService.saveAgentConfig(agentName, systemPrompt, description);
         // Set audience, mcpServers, and useTools on the newly created config.
-        // useTools must be set explicitly: AiAgentConfig.builder() defaults the primitive
-        // boolean to false (no @Builder.Default), so saveAgentConfig() returns useTools=false
-        // unless we override it here.
+        // @Builder.Default on AiAgentConfig.useTools ensures useTools=true from the builder,
+        // but we also set it explicitly here to guard against any path that bypasses the builder.
         saved.setAudience(Audience.DRIVER);
         saved.setMcpServers(List.of(AiAgentConfigService.DEFAULT_MCP_SERVER));
         saved.setUseTools(true);
@@ -194,7 +199,7 @@ public class AiAgentConfigInitializer implements CommandLineRunner {
 
         var existing = repository.findByAgentName(agentName);
         if (existing.isPresent()) {
-            // SA-021-4: backfill audience and mcpServers if absent
+            // SA-021-4: backfill audience, mcpServers, and useTools if absent/false
             var config = existing.get();
             boolean dirty = false;
             if (config.getAudience() == null) {
@@ -205,10 +210,16 @@ public class AiAgentConfigInitializer implements CommandLineRunner {
                 config.setMcpServers(List.of(AiAgentConfigService.DEFAULT_MCP_SERVER));
                 dirty = true;
             }
+            if (!config.isUseTools()) {
+                // Cause B fix: existing docs persisted with useTools=false due to missing
+                // @Builder.Default on AiAgentConfig.useTools. Backfill to true.
+                config.setUseTools(true);
+                dirty = true;
+            }
             if (dirty) {
                 repository.save(config);
                 configService.invalidateCache(agentName);
-                LOG.info("SA-021-4: backfilled audience and mcpServers for agent={}", agentName);
+                LOG.info("SA-021-4: backfilled audience, mcpServers, and/or useTools for agent={}", agentName);
             }
             return;
         }
@@ -417,9 +428,8 @@ public class AiAgentConfigInitializer implements CommandLineRunner {
                 - If asked for something you cannot confirm: "I don't have that information, but I can help you with..." or direct to support.
                 """;
         var saved = configService.saveAgentConfig(agentName, systemPrompt, "AI agent for customer support via WhatsApp");
-        // useTools must be set explicitly: AiAgentConfig.builder() defaults the primitive
-        // boolean to false (no @Builder.Default), so saveAgentConfig() returns useTools=false
-        // unless we override it here.
+        // @Builder.Default on AiAgentConfig.useTools ensures useTools=true from the builder,
+        // but we also set it explicitly here to guard against any path that bypasses the builder.
         saved.setAudience(Audience.CUSTOMER);
         saved.setMcpServers(List.of(AiAgentConfigService.DEFAULT_MCP_SERVER));
         saved.setUseTools(true);

@@ -162,7 +162,7 @@ handleInbound:
 - For each message:
   - Upserts whatsapp session and marks new session if last message older than 90 minutes.
   - Runs verification-consent flow.
-  - For new session, sends landing options.
+  - Routes ALL messages (including new sessions) to AI agent if enabled and session AI active (ADR-030: handler no longer calls sendLandingOptions directly on new sessions; the AI agent calls the send_landing_options_notification MCP tool instead).
   - If AI service enabled and session AI active, gets AI response and sends back.
   - Routes by message type:
     - text -> persist to Firestore and notify admins via push.

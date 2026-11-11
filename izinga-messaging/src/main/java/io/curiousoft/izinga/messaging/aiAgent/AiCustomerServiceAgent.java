@@ -1,5 +1,6 @@
 package io.curiousoft.izinga.messaging.aiAgent;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.curiousoft.izinga.commons.model.ProfileRoles;
 import io.curiousoft.izinga.commons.model.UserProfile;
 import io.curiousoft.izinga.commons.repo.UserProfileRepo;
@@ -14,12 +15,17 @@ import io.curiousoft.izinga.messaging.whatsapp.lines.Audience;
 import io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsappWebhookPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Component
 public class AiCustomerServiceAgent {
@@ -30,10 +36,25 @@ public class AiCustomerServiceAgent {
     /** REQ-11: removed hardcoded AGENT_NAME constant — resolved from LineContext at call time. */
     private static final String DEFAULT_AGENT_NAME = "driver_support";
 
+    /**
+     * C-1 (Legal): matches phone-number-like sequences — optional + then 7–15 digits.
+     * Applied to tool-call arguments and any phone-containing log output to mask all but the last 4 digits.
+     */
+    private static final Pattern PHONE_PATTERN = Pattern.compile("\\+?[0-9]{7,15}");
+
     private final boolean enabled;
     private final String openAiApiKey;
     private final String model;
+    /**
+     * PO AC-04: flag to enable detailed OpenAI request/response DEBUG logging.
+     * Default false. Set true in uat and local profiles. MUST NOT be true in prod.
+     * See application.yml / application-uat.yml / application-local.yml.
+     */
+    private final boolean debugLogOpenAi;
+    /** ADR-031 / AC-02: OpenAI-scoped RestTemplate with explicit timeouts (3 s connect, 15 s read). */
     private final RestTemplate restTemplate;
+    /** ADR-031 / REQ-03: RetryTemplate covering 5xx / 429 / connection failures (non-retryable: 4xx). */
+    private final RetryTemplate openAiRetryTemplate;
     private final ConversationHistoryService conversationHistoryService;
     private final AiAgentConfigService agentConfigService;
     /** SA-021-17: attaches per-request scope JWT to MCP server URLs. */
@@ -42,27 +63,151 @@ public class AiCustomerServiceAgent {
     private final WhatsappConfig whatsappConfig;
     /** AMD-01 (REQ-A2): used to resolve callerPhone to UserProfile for role check. */
     private final UserProfileRepo userProfileRepo;
+    /** Used for debug-only serialisation of tools array. Never injected into request body. */
+    private final ObjectMapper debugObjectMapper = new ObjectMapper();
 
     public AiCustomerServiceAgent(
             @Value("${ai.agent.enabled:false}") boolean enabled,
             @Value("${openai.api.key:}") String openAiApiKey,
             @Value("${ai.agent.model:gpt-4.1-mini}") String model,
-            RestTemplate restTemplate,
+            @Value("${izinga.ai.agent.debug.log-openai-request-response:false}") boolean debugLogOpenAi,
+            // ADR-031 / AC-02: OpenAI-qualified bean (3 s connect, 15 s read timeouts — configurable)
+            @Qualifier("openAiRestTemplate") RestTemplate restTemplate,
             ConversationHistoryService conversationHistoryService,
             AiAgentConfigService agentConfigService,
             StoreScopeJwtService storeScopeJwtService,
             WhatsappConfig whatsappConfig,
-            UserProfileRepo userProfileRepo) {
+            UserProfileRepo userProfileRepo,
+            // ADR-031 / REQ-03: programmatic RetryTemplate for OpenAI network calls
+            @Qualifier("openAiRetryTemplate") RetryTemplate openAiRetryTemplate) {
         this.enabled = enabled;
         this.openAiApiKey = openAiApiKey;
         this.model = model;
+        this.debugLogOpenAi = debugLogOpenAi;
         this.restTemplate = restTemplate;
+        this.openAiRetryTemplate = openAiRetryTemplate;
         this.conversationHistoryService = conversationHistoryService;
         this.agentConfigService = agentConfigService;
         this.storeScopeJwtService = storeScopeJwtService;
         this.whatsappConfig = whatsappConfig;
         this.userProfileRepo = userProfileRepo;
     }
+
+    // ─── POPIA / legal helpers ──────────────────────────────────────────────────
+
+    /**
+     * C-1 (Legal / POPIA): masks all but the last 4 digits of any phone-like substring in {@code text}.
+     * Example: "+27812815707" → "***5707".
+     * Applied to logged tool-call arguments to prevent direct identifiers reaching log storage.
+     */
+    static String maskPhoneInText(String text) {
+        if (text == null) return null;
+        Matcher m = PHONE_PATTERN.matcher(text);
+        StringBuilder sb = new StringBuilder();
+        while (m.find()) {
+            String matched = m.group();
+            String masked = "***" + matched.substring(matched.length() - 4);
+            m.appendReplacement(sb, Matcher.quoteReplacement(masked));
+        }
+        m.appendTail(sb);
+        return sb.toString();
+    }
+
+    /**
+     * SEC-WA02-01-A: redacts the JWT token value in any {@code ?scope=<token>} or
+     * {@code &scope=<token>} query parameter so that the JWT never reaches log storage.
+     * URL structure (host, path) is preserved for diagnostics.
+     */
+    static String redactJwtInUrl(String text) {
+        if (text == null) return null;
+        return text.replaceAll("([?&]scope=)[^&\"'\\s]+", "$1[REDACTED]");
+    }
+
+    // ─── diagnostic logging helpers ─────────────────────────────────────────────
+
+    /**
+     * PO AC-03/AC-04: logs the OpenAI request metadata when {@link #debugLogOpenAi} is on.
+     * Logs at DEBUG only. Never logs: Authorization header, API key, message text, or JWT values.
+     *
+     * @param requestBody   the full request map to be sent to OpenAI
+     * @param inputMessages the input messages list (roles logged, text NOT logged)
+     */
+    private void logPreRequest(Map<String, Object> requestBody, List<Map<String, Object>> inputMessages) {
+        if (!debugLogOpenAi) return;
+        try {
+            boolean toolsPresent = requestBody.containsKey("tools");
+            Object modelObj = requestBody.get("model");
+
+            // Count + role sequence only — message text is never logged
+            String inputDesc;
+            if (inputMessages == null) {
+                inputDesc = "null";
+            } else {
+                List<String> roles = inputMessages.stream()
+                        .map(msg -> msg.get("role") != null ? msg.get("role").toString() : "?")
+                        .collect(Collectors.toList());
+                inputDesc = inputMessages.size() + " messages " + roles;
+            }
+
+            // Serialise tools with JWT redaction — never log the token value
+            String toolsJson = "none";
+            if (toolsPresent) {
+                try {
+                    String raw = debugObjectMapper.writeValueAsString(requestBody.get("tools"));
+                    toolsJson = redactJwtInUrl(raw);
+                } catch (Exception e) {
+                    toolsJson = "[serialization-error]";
+                }
+            }
+
+            LOG.debug("[AI-DEBUG] model={} toolsPresent={} input: {} tools: {}",
+                    modelObj, toolsPresent, inputDesc, toolsJson);
+        } catch (Exception e) {
+            LOG.debug("[AI-DEBUG] logPreRequest error: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * PO AC-03/AC-04: logs the OpenAI response output metadata when {@link #debugLogOpenAi} is on.
+     * Logs at DEBUG only. For non-message output items (mcp_call, function_call, tool_call,
+     * mcp_list_tools), logs the full item with phone numbers masked. Never logs message text.
+     *
+     * @param responseBody the response map returned by OpenAI
+     */
+    @SuppressWarnings("unchecked")
+    private void logPostResponse(Map<?, ?> responseBody) {
+        if (!debugLogOpenAi) return;
+        try {
+            var output = (List<Map<String, Object>>) responseBody.get("output");
+            if (output == null) {
+                LOG.debug("[AI-DEBUG] response output: null");
+                return;
+            }
+            List<String> types = output.stream()
+                    .map(item -> item.get("type") != null ? item.get("type").toString() : "null")
+                    .collect(Collectors.toList());
+            LOG.debug("[AI-DEBUG] response output: {} items {}", output.size(), types);
+
+            for (Map<String, Object> item : output) {
+                String type = item.get("type") != null ? item.get("type").toString() : "null";
+                // Log full item for tool-call types; never log message/text content
+                if (!"message".equals(type)) {
+                    try {
+                        String itemJson = debugObjectMapper.writeValueAsString(item);
+                        // C-1: mask phone numbers that may appear in tool arguments
+                        itemJson = maskPhoneInText(itemJson);
+                        LOG.debug("[AI-DEBUG] non-message output item type={}: {}", type, itemJson);
+                    } catch (Exception e) {
+                        LOG.debug("[AI-DEBUG] non-message output item type={} [serialization-error]", type);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOG.debug("[AI-DEBUG] logPostResponse error: {}", e.getMessage());
+        }
+    }
+
+    // ─── MCP scoping ────────────────────────────────────────────────────────────
 
     /**
      * SA-021-17 / ADR-024: Build the MCP tools list with scope JWTs appended to each server URL.
@@ -214,10 +359,24 @@ public class AiCustomerServiceAgent {
                 requestBody.put("tools", mcpServerToolsForAgent);
             }
 
+            // PO AC-07 / TASK-1: log request metadata before dispatch (never logs API key or message text)
+            logPreRequest(requestBody, messagesList);
+
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-            ResponseEntity<Map> response = restTemplate.postForEntity(OPENAI_CHAT_URL, entity, Map.class);
+            // ADR-031 / REQ-03: wrap network call in RetryTemplate — retries on 5xx/429/connection
+            // failures; non-retryable on 4xx (incl. 400 context-window overflow).
+            // On retry exhaustion execute() re-throws; the outer catch returns null.
+            ResponseEntity<Map> response = openAiRetryTemplate.execute(context -> {
+                int attempt = context.getRetryCount() + 1;
+                if (attempt > 1) {
+                    LOG.warn("[AI-RETRY] attempt={} for from={}", attempt, from);
+                }
+                return restTemplate.postForEntity(OPENAI_CHAT_URL, entity, Map.class);
+            });
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                // PO AC-07 / TASK-1: log response output metadata before extracting reply
+                logPostResponse(response.getBody());
                 String reply = extractReply(response.getBody());
                 if (reply != null) {
                     // Add AI response to conversation history
@@ -267,8 +426,17 @@ public class AiCustomerServiceAgent {
      * Extracts the text to send to the AI agent: body text, button reply title, or — for a
      * shared location — a natural-language description including latitude/longitude and the
      * address/name when available (see {@link WhatsappWebhookPayload.Value.Message.Location#describe()}).
+     *
+     * <p>FIX-01 / AC-07: exposed as {@code public} so {@link
+     * io.curiousoft.izinga.messaging.whatsapp.webhooks.WhatsappInboundEventHandler} can use this
+     * as the SINGLE SOURCE OF TRUTH guard before arming the AI dispatch and fallback path.
+     * IMAGE and INTERACTIVE messages carry no extractable text and return {@code null} here;
+     * the handler therefore skips the AI agent (and the fallback) for those types.
+     * LOCATION messages DO produce a non-null description via {@code Location#describe()} and
+     * still reach the AI agent correctly.
+     * Any change to extraction logic is reflected automatically in the handler's guard.
      */
-    private String extractUserText(WhatsappWebhookPayload.Value.Message message) {
+    public String extractUserText(WhatsappWebhookPayload.Value.Message message) {
         if (message.getText() != null && message.getText().getBody() != null) {
             return message.getText().getBody().trim();
         }
@@ -328,10 +496,31 @@ public class AiCustomerServiceAgent {
                 requestBody.put("tools", mcpServerToolsForAgent);
             }
 
+            // PO AC-07 / TASK-1: log request metadata before dispatch (never logs API key or message text)
+            logPreRequest(requestBody, messagesList);
+
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-            ResponseEntity<Map> response = restTemplate.postForEntity(OPENAI_CHAT_URL, entity, Map.class);
+            // ADR-031 / REQ-03: wrap network call in RetryTemplate — retries on 5xx/429/connection
+            // failures; non-retryable on 4xx (incl. 400 context-window overflow).
+            // On retry exhaustion execute() re-throws; the outer catch returns null.
+            // NOTE-05: log every attempt unconditionally so QA can grep for attempt=1 on a
+            // non-retryable 4xx (proves exactly one attempt, no retry). Retry attempts show N > 1.
+            // ADR-031 (Option B+C): attempt=1 at INFO (a successful call must not emit WARN);
+            // attempt >= 2 at WARN (a genuine retry warrants alerting).
+            final String resolvedAgentFinal = resolvedAgent;
+            ResponseEntity<Map> response = openAiRetryTemplate.execute(context -> {
+                int attempt = context.getRetryCount() + 1;
+                if (attempt == 1) {
+                    LOG.info("[AI-ATTEMPT] attempt={} agent='{}' for from={}", attempt, resolvedAgentFinal, from);
+                } else {
+                    LOG.warn("[AI-ATTEMPT] attempt={} agent='{}' for from={}", attempt, resolvedAgentFinal, from);
+                }
+                return restTemplate.postForEntity(OPENAI_CHAT_URL, entity, Map.class);
+            });
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                // PO AC-07 / TASK-1: log response output metadata before extracting reply
+                logPostResponse(response.getBody());
                 String reply = extractReply(response.getBody());
                 if (reply != null) {
                     conversationHistoryService.addAssistantMessage(conversation, reply);
@@ -348,20 +537,42 @@ public class AiCustomerServiceAgent {
         return null;
     }
 
+    /**
+     * Extracts the text reply from the OpenAI Responses API output array.
+     *
+     * <p>Observability improvement: emits a WARN (unconditionally) when the output contains
+     * no {@code message} item — this catches tool-call-only or error responses that would
+     * previously be silently dropped. When {@link #debugLogOpenAi} is on, also logs a DEBUG
+     * line for each non-message item that is discarded.</p>
+     */
     @SuppressWarnings("unchecked")
     private String extractReply(Map<?, ?> responseBody) {
         try {
             var output = (List<Map<String, Object>>) responseBody.get("output");
             if (output == null || output.isEmpty()) return null;
-            // Find the message object in the output array
+
             Map<String, Object> messageObj = null;
+            List<String> allTypes = new ArrayList<>();
+
             for (Map<String, Object> item : output) {
-                if ("message".equals(item.get("type"))) {
-                    messageObj = item;
-                    break;
+                String type = item.get("type") != null ? item.get("type").toString() : "null";
+                allTypes.add(type);
+                if ("message".equals(type)) {
+                    if (messageObj == null) messageObj = item;  // keep first match
+                } else {
+                    // PO AC-04: only log discarded items when debug flag is on
+                    if (debugLogOpenAi) {
+                        LOG.debug("[AI-DEBUG] extractReply: non-message output item type={}", type);
+                    }
                 }
             }
-            if (messageObj == null) return null;
+
+            if (messageObj == null) {
+                // Unconditional WARN — a response with no message item is always an observability gap
+                LOG.warn("AI response contained no message item — output types: {}", allTypes);
+                return null;
+            }
+
             var content = (List<Map<String, Object>>) messageObj.get("content");
             if (content == null || content.isEmpty()) return null;
             // Extract text from the first content item

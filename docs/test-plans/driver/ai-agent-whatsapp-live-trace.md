@@ -10,7 +10,7 @@ Last verified: 2026-11-01 — Live manual / UAT profile — PASS (CUSTOMER-audie
 **Covered:**
 - `POST /whatsapp/webhook` receives a Meta Cloud API payload and passes HMAC validation (SEC-01 bypass active when appSecret is blank — confirmed legitimate per ADR logged 2026-09-28)
 - `WhatsappInboundEventHandler` resolves `LineContext` (phoneNumberId → `WhatsappLine` → audience + agentName + storeId), creates/resumes `WhatsappSession`, and dispatches to the correct handler
-- New-session flow: first inbound message triggers `sendLandingOptions` (template `izinga_landing_options`) — AI agent is NOT invoked on the first message of a new session
+- New-session flow (ADR-030): first inbound message is now routed to the AI agent — `sendLandingOptions` is no longer called directly by the handler; the AI agent invokes the `send_landing_options_notification` MCP tool to decide which template to use
 - Resumed-session flow (within 90-minute window): `isAIAgentActive=true` + `ai.agent.enabled=true` → `AiCustomerServiceAgent.handleWhatsappQueryForAgent()` invoked for DRIVER/CUSTOMER audience
 - `AiCustomerServiceAgent` loads `AiAgentConfig` (system prompt + MCP tool definitions) for `agentName=driver_support`, retrieves conversation history from MongoDB, calls OpenAI Responses API (`https://api.openai.com/v1/responses`), stores assistant reply, and returns reply text
 - Outbound WhatsApp text message sent via Meta Graph API (`https://graph.facebook.com/v23.0/{phoneNumberId}/messages`) — HTTP 200 + wamid confirmed
@@ -149,11 +149,11 @@ If you need help with any step, just ask!
 
 | ID | Description | Type | Input | Expected output | Notes |
 |---|---|---|---|---|---|
-| AI-01 | New session — landing options sent, AI not invoked | Live E2E | POST 1 payload above; `from` not in active session | HTTP 200; template `izinga_landing_options` sent; no AiCustomerServiceAgent log | Confirmed 2026-11-01 |
+| AI-01 | New session — AI agent invoked, sends landing options via MCP tool (ADR-030) | Live E2E | POST 1 payload above; `from` not in active session | HTTP 200; AiCustomerServiceAgent invoked; AI calls `send_landing_options_notification` MCP tool; landing template sent | ADR-030 fix — was: handler called sendLandingOptions directly, AI not invoked |
 | AI-02 | Resumed session — AI agent invoked for driver sign-up query | Live E2E | POST 2 payload above; active session within 90 min | HTTP 200; OpenAI called; reply delivered to `from`; Firestore writes logged | Confirmed 2026-11-01 |
 | AI-03 | HMAC bypass when appSecret blank | Unit | `X-Hub-Signature-256` absent; `appSecret=null` | SEC-01 BYPASS ACTIVE logged; request accepted | See SEC-01 in `WhatsAppWebhookController` |
 | AI-04 | HMAC validation when appSecret configured | Unit | Valid HMAC in header | Request accepted | Inverse: invalid HMAC → 403 |
-| AI-05 | Session expiry — AI not invoked after 90 min gap | Unit/Live | `lastSeen` > 90 min ago | `isNewSession=true`; landing options re-sent | Not exercised in this pass |
+| AI-05 | Session expiry — AI invoked on new session after 90 min gap (ADR-030) | Unit/Live | `lastSeen` > 90 min ago | `isNewSession=true`; AI agent invoked; AI calls `send_landing_options_notification` MCP tool | Not exercised in this pass; was: landing options re-sent directly by handler |
 | AI-06 | `isAIAgentActive=false` — AI skipped | Unit | Session with `isAIAgentActive=false` | AI not invoked; landing options or no-op | Not exercised in this pass |
 | AI-07 | `ai.agent.enabled=false` (kill switch) | Unit | `ai.agent.enabled=false` in config | `aiCustomerService.isEnabled()=false`; AI not invoked | Toggle in Secrets Manager |
 | AI-08 | STORE audience → StoreAiAgent | Unit | `phoneNumberId` mapped to STORE audience line | `storeAiAgent.handleWhatsappQuery()` invoked, not `aiCustomerService` | Not exercised in this pass |

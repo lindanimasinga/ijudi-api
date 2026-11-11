@@ -35,6 +35,14 @@ public class WhatsappInboundEventHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(WhatsappInboundEventHandler.class);
 
+    /**
+     * ADR-031 / REQ-06-07: customer-facing fallback sent on AI agent null returns.
+     * Tone matches existing handler messages; emoji and support contact per AC-08.
+     */
+    public static final String AI_FALLBACK_MESSAGE =
+            "Sorry, I'm having a bit of trouble right now 🙏 Please try again in a moment, " +
+            "or reach us on WhatsApp at +27812815707 or email hello@curiousoft.dev.";
+
     private final ApplicationEventPublisher eventPublisher;
     private final UserProfileRepo userProfileRepo;
     private final FirestoreService firestoreService;
@@ -191,21 +199,27 @@ public class WhatsappInboundEventHandler {
             return null;
         }
 
-        if (session.isNewSession()) {
-            LOG.info("New WhatsApp session started for {}", from);
-            // SA-5: DRIVER line must not receive the customer landing menu
-            if (lineContext.audience() != Audience.DRIVER) {
-                var user = userProfileRepo.findByMobileNumber(from);
-                String landingTemplateName = lineContext.line() != null
-                        ? lineContext.line().getLandingTemplateName() : null;
-                whatsappNotificationService.sendLandingOptions(from, extractContactName(contacts), user,
-                        lineContext.audience(), lineContext.storeId(), landingTemplateName);
-            } else {
-                LOG.info("SA-5: DRIVER line — skipping customer landing options for {}", from);
-            }
+        // FIX-01 / AC-07 (amended): guard AI dispatch and fallback on processable input text.
+        // Uses aiCustomerService.extractUserText as the SINGLE SOURCE OF TRUTH — the same logic
+        // the agents themselves use internally. If it returns null/blank, this message type
+        // carries no text the AI can process (e.g. IMAGE, INTERACTIVE): skip AI dispatch entirely
+        // and return null WITHOUT sending the fallback, letting dispatchMessageByType handle it.
+        // LOCATION messages DO produce a non-null description (Location#describe()) and still
+        // reach the AI agent — no regression for the location path.
+        // E-1 (message==null, defensive) and E-2 (no processable text) must NOT send fallback.
+        String preDispatchUserText = aiCustomerService.extractUserText(message);
+        if (preDispatchUserText == null || preDispatchUserText.isBlank()) {
+            LOG.debug("[AI-SKIP] no processable text for type={} from={} — skipping AI dispatch and fallback",
+                    message.getType(), from);
             return null;
         }
 
+        // ADR-030: new-session pre-dispatch shortcut removed. The AI agent now handles
+        // ALL messages, including the first message of a new session. The landing-options
+        // template is sent by the AI via the send_landing_options_notification MCP tool,
+        // giving it full control over which template to use per audience.
+        LOG.debug("Pre-dispatch: isNewSession={} isAIEnabled={} isAIAgentActive={}",
+                session.isNewSession(), isAiCustomerServiceEnabled, session.isAIAgentActive());
         if (isAiCustomerServiceEnabled && session.isAIAgentActive()) {
             LOG.info("AI customer service enabled, processing message from {} via agent={} audience={}",
                     from, lineContext.agentName(), lineContext.audience());
@@ -220,6 +234,14 @@ public class WhatsappInboundEventHandler {
             }
             if (aiResponseToCustomer != null) {
                 whatsappNotificationService.sendMessage(from, aiResponseToCustomer,
+                        lineContext.audience(), lineContext.storeId());
+            } else {
+                // ADR-031 / REQ-06-07: AI was enabled+active but returned null — genuine failure
+                // or unprocessable input (all 9 null-exit paths in handleWhatsappQueryForAgent +
+                // StoreAiAgent null exits). Never swallow silently — always send fallback.
+                LOG.warn("[AI-FALLBACK] agent returned null for from={} audience={} agentName={} — sending fallback",
+                        from, lineContext.audience(), lineContext.agentName());
+                whatsappNotificationService.sendMessage(from, AI_FALLBACK_MESSAGE,
                         lineContext.audience(), lineContext.storeId());
             }
         }
