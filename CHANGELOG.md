@@ -51,7 +51,7 @@ None. All changes are confined to `izinga-messaging` and `izinga-yoco-pay` inter
 
 - Code Review: PASS — iZinga Code Reviewer, `bugfix/mcp-tool-dispatch-fix` (commits `38791810`, `dd3f5289`, `685bdc47`; merge `4177d3fe`) — 2026-11-10
 - Code Review: PASS — iZinga Code Reviewer, `bugfix/openai-api-retry-resilience` (commits `9425208c`, `8dde1721`, `79217762`, `7af800ca`, `5c3faa96`; merge `259f8f31`) — 2026-11-11
-- QA full regression (Gate 2): PASS on `develop` @ `259f8f31` — 918 tests, 0 failures, 0 errors, 4 skipped, BUILD SUCCESS, Corretto 17 (2026-11-11). Note: test count did not increment by the expected +1 after the final test addition; this discrepancy is tracked under the pre-existing `task_723cde3e` build-instability investigation and is not a new concern.
+- QA full regression (Gate 2): PASS on `release/1.18.1` @ `8bc6e404` — 1694 tests, 0 failures, 0 errors, 19 skipped, BUILD SUCCESS, Corretto 17 (2026-11-11). Note: the development verification in ADR-031 reported 918 tests; the Release Manager Gate 2 run on the release branch reports 1694. Module breakdown: izinga-ordermanager 911, izinga-messaging 257, izinga-usermanagement 248, izinga-recon 162, izinga-payfast 62, izinga-commons 35, izinga-documentmanagement 13, izinga-yoco-pay 6. The 776-test gap versus the development count likely reflects modules not included in the developer's environment run; this is flagged into `task_723cde3e` (pre-existing build-instability investigation) but is NOT a blocker — the release branch runs clean with 0 failures and 0 errors across all 1694 tests.
 - Live-fire on `uat` profile (`+27812815707` only): both fixes verified end-to-end (2026-11-10–11). ADR-031 live-fire record: `docs/test-plans/platform/openai-retry-resilience.md`. Tool-dispatch test plan: `docs/test-plans/customer/whatsapp-ai-agent-tool-dispatch.md`.
 - Product Owner sign-off: Lindani Masinga — direct dispatch 2026-11-11
 
@@ -59,7 +59,7 @@ None. All changes are confined to `izinga-messaging` and `izinga-yoco-pay` inter
 
 ## [1.18.0] — 2026-11-08
 
-**Status:** Release branch `release/1.18.0` cut from `develop` @ `2fab1a2f` on 2026-11-08. NOT yet merged to `master`. Waiting on gate items listed under "Gate citations".
+**Status:** Merged to `master` and deployed to production on 2026-11-09. Tag `1.18.0` on `master` @ `1d629e68`.
 
 **Release type:** Feature (P2 — new functionality)
 
