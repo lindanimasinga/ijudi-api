@@ -23,7 +23,10 @@ import java.util.Map;
  * This is empirically verified in {@code OpenAiRetryResilienceTest#httpStatus429_retried}.
  *
  * <p>Backoff: initial 2 s, multiplier 2.0, max 10 s.
- * Worst-case: 8 s response × 3 + 2 s backoff + 4 s backoff = 30 s (exactly within 30 s cap).
+ * Worst-case: 15 s response × 3 + 2 s backoff + 4 s backoff = 51 s.
+ * Acceptable — this flow is async and does NOT block Meta's webhook ack.
+ * Response timeout is configurable via {@code izinga.ai.openai.response-timeout-seconds}
+ * in {@code application.yml} (see {@code YocoHeaderConfig.openAiResponseTimeoutSeconds}).
  *
  * <p>NO spring-aspects, NO AOP weaving, NO @EnableRetry — purely programmatic.
  * {@code RetryTemplate.execute()} wraps only the network call inside the existing try-catch.

@@ -68,6 +68,26 @@ private fun convertToHex(messageDigest: ByteArray): String {
 @Configuration
 class YocoHeaderConfig {
 
+    /**
+     * ADR-031 / REQ-01 (Option C): connect timeout for OpenAI API calls, in seconds.
+     * Tunable via {@code izinga.ai.openai.connect-timeout-seconds} without a release.
+     * Default 3 s — ample for TCP connect; a longer value only delays fail-fast on
+     * DNS/routing failures.
+     */
+    @Value("\${izinga.ai.openai.connect-timeout-seconds:3}")
+    var openAiConnectTimeoutSeconds: Long = 3
+
+    /**
+     * ADR-031 / REQ-01 (Option C): response timeout for OpenAI API calls, in seconds.
+     * Tunable via {@code izinga.ai.openai.response-timeout-seconds} without a release.
+     * Default 15 s — raised from 8 s after QA measured real MCP tool-use round-trips of
+     * 6.73 s (only 1.27 s margin under the old 8 s limit).
+     * Worst-case with 3 attempts + 2 s + 4 s backoff: 15 × 3 + 2 + 4 = 51 s.
+     * This flow is async (Meta webhook ack is already returned) so 51 s is acceptable.
+     */
+    @Value("\${izinga.ai.openai.response-timeout-seconds:15}")
+    var openAiResponseTimeoutSeconds: Long = 15
+
     @Bean
     fun basicAuthRequestInterceptor(@Value("\${yoco.api.key}") apiKey: String, yocoDashBoard: YocoDashBoardConfiguration): RequestInterceptor = RequestInterceptor {
         it.header("Authorization", "Bearer $apiKey")
@@ -93,24 +113,35 @@ class YocoHeaderConfig {
 
     /**
      * ADR-031 / REQ-01-03: Dedicated RestTemplate for OpenAI calls only.
-     * Explicit timeouts: connect 3 s (fail-fast on DNS/routing), response 8 s
-     * (8 s × 3 attempts + 2 s + 4 s backoff = 30 s worst-case — within the 30 s cap).
+     * Explicit timeouts: connect {@link #openAiConnectTimeoutSeconds} s (default 3 s,
+     * fail-fast on DNS/routing), response {@link #openAiResponseTimeoutSeconds} s (default 15 s).
+     * Both are tunable via {@code izinga.ai.openai.*} properties in {@code application.yml}
+     * without a release.
+     * Worst-case: 15 s × 3 attempts + 2 s + 4 s backoff = 51 s.
+     * Acceptable — this flow is async and does NOT block Meta's webhook ack.
      * Injected via @Qualifier("openAiRestTemplate") in AiCustomerServiceAgent and StoreAiAgent.
      */
     @Bean("openAiRestTemplate")
-    fun openAiRestTemplate(): RestTemplate = RestTemplate().apply {
-        val connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
-            .setMaxConnTotal(50)
-            .setMaxConnPerRoute(10)
-            .build()
-        val requestConfig = RequestConfig.custom()
-            .setConnectTimeout(Timeout.ofSeconds(3))
-            .setResponseTimeout(Timeout.ofSeconds(8))
-            .build()
-        val httpClient = HttpClients.custom()
-            .setConnectionManager(connectionManager)
-            .setDefaultRequestConfig(requestConfig)
-            .build()
-        requestFactory = HttpComponentsClientHttpRequestFactory(httpClient)
+    fun openAiRestTemplate(): RestTemplate {
+        // ADR-031 (Option C): log the resolved timeout values at startup so QA and ops can confirm
+        // the properties are bound correctly. If the @Value is unbound, Kotlin defaults apply (3/15).
+        logger.info("ADR-031: openAiRestTemplate timeouts — connect={}s response={}s " +
+                "(izinga.ai.openai.connect-timeout-seconds / response-timeout-seconds)",
+            openAiConnectTimeoutSeconds, openAiResponseTimeoutSeconds)
+        return RestTemplate().apply {
+            val connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
+                .setMaxConnTotal(50)
+                .setMaxConnPerRoute(10)
+                .build()
+            val requestConfig = RequestConfig.custom()
+                .setConnectTimeout(Timeout.ofSeconds(openAiConnectTimeoutSeconds))
+                .setResponseTimeout(Timeout.ofSeconds(openAiResponseTimeoutSeconds))
+                .build()
+            val httpClient = HttpClients.custom()
+                .setConnectionManager(connectionManager)
+                .setDefaultRequestConfig(requestConfig)
+                .build()
+            requestFactory = HttpComponentsClientHttpRequestFactory(httpClient)
+        }
     }
 }

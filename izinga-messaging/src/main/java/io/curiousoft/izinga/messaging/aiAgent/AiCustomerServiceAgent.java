@@ -51,7 +51,7 @@ public class AiCustomerServiceAgent {
      * See application.yml / application-uat.yml / application-local.yml.
      */
     private final boolean debugLogOpenAi;
-    /** ADR-031 / AC-02: OpenAI-scoped RestTemplate with explicit timeouts (3 s connect, 8 s read). */
+    /** ADR-031 / AC-02: OpenAI-scoped RestTemplate with explicit timeouts (3 s connect, 15 s read). */
     private final RestTemplate restTemplate;
     /** ADR-031 / REQ-03: RetryTemplate covering 5xx / 429 / connection failures (non-retryable: 4xx). */
     private final RetryTemplate openAiRetryTemplate;
@@ -71,7 +71,7 @@ public class AiCustomerServiceAgent {
             @Value("${openai.api.key:}") String openAiApiKey,
             @Value("${ai.agent.model:gpt-4.1-mini}") String model,
             @Value("${izinga.ai.agent.debug.log-openai-request-response:false}") boolean debugLogOpenAi,
-            // ADR-031 / AC-02: OpenAI-qualified bean (3 s connect, 8 s read timeouts)
+            // ADR-031 / AC-02: OpenAI-qualified bean (3 s connect, 15 s read timeouts — configurable)
             @Qualifier("openAiRestTemplate") RestTemplate restTemplate,
             ConversationHistoryService conversationHistoryService,
             AiAgentConfigService agentConfigService,
@@ -505,10 +505,16 @@ public class AiCustomerServiceAgent {
             // On retry exhaustion execute() re-throws; the outer catch returns null.
             // NOTE-05: log every attempt unconditionally so QA can grep for attempt=1 on a
             // non-retryable 4xx (proves exactly one attempt, no retry). Retry attempts show N > 1.
+            // ADR-031 (Option B+C): attempt=1 at INFO (a successful call must not emit WARN);
+            // attempt >= 2 at WARN (a genuine retry warrants alerting).
             final String resolvedAgentFinal = resolvedAgent;
             ResponseEntity<Map> response = openAiRetryTemplate.execute(context -> {
                 int attempt = context.getRetryCount() + 1;
-                LOG.warn("[AI-ATTEMPT] attempt={} agent='{}' for from={}", attempt, resolvedAgentFinal, from);
+                if (attempt == 1) {
+                    LOG.info("[AI-ATTEMPT] attempt={} agent='{}' for from={}", attempt, resolvedAgentFinal, from);
+                } else {
+                    LOG.warn("[AI-ATTEMPT] attempt={} agent='{}' for from={}", attempt, resolvedAgentFinal, from);
+                }
                 return restTemplate.postForEntity(OPENAI_CHAT_URL, entity, Map.class);
             });
 
