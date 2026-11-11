@@ -1,5 +1,62 @@
 # Changelog
 
+## [1.18.1] — 2026-11-11
+
+**Status:** Release branch `release/1.18.1` cut from `develop` @ `259f8f31` on 2026-11-11. NOT yet merged to `master`. Waiting on gate items listed under "Gate citations".
+
+**Release type:** Patch (P1 — bug fixes, no new features)
+
+**Summary:** Fixes two production defects in the WhatsApp AI agent pipeline that together prevented MCP tools from ever being invoked: (1) a new-session pre-dispatch shortcut that bypassed the AI agent entirely on first messages (`ADR-030`), and a Lombok `@Builder.Default` omission that silently left `AiAgentConfig.useTools=false` on all MongoDB-persisted configs, so even existing-session messages never reached OpenAI with tools enabled; (2) adds configurable retry (3 attempts, exponential back-off), dedicated connect/response timeouts (3 s / 15 s), and a customer-facing fallback message for all genuine OpenAI API failures, replacing the previous behaviour of total WhatsApp silence on any transient error (`ADR-031`).
+
+### Changes
+
+- [FIX] `fix(messaging)` CAUSE-A — ADR-030: Removed the `if (session.isNewSession())` pre-dispatch block from `WhatsappInboundEventHandler.handlePreDispatchFlows()`. The block sent a `sendLandingOptions` template and returned `null`, meaning the AI agent was never invoked on the first message of any session. The AI agent now handles all inbound messages including new sessions, and invokes the `send_landing_options_notification` MCP tool when appropriate. `WhatsappNotificationService.sendLandingOptions` is preserved — it is still used by `NotificationMcpController` and `SchedulerService`. (commit `dd3f5289`, ADR-030)
+- [FIX] `fix(messaging)` CAUSE-B — Lombok `@Builder.Default` on `AiAgentConfig.useTools`: without this annotation Lombok ignores the field's `= true` initializer; the builder always produced `useTools=false`. All MongoDB-persisted `AiAgentConfig` documents (both `customer_support` and `driver_support`) therefore had `useTools=false`, so tools were never sent to OpenAI. Added `@Builder.Default`, plus backfill in `AiAgentConfigInitializer` on both existing-document paths so stale documents are corrected on next application startup. (commit `dd3f5289`)
+- [FIX] `fix(messaging)` ADR-031 — OpenAI API retry and timeout: added `OpenAiRetryConfig` bean (`spring-retry` 2.0.10, BOM-managed) with `SimpleRetryPolicy(3, retryable-exception-map)`. Retryable: `ResourceAccessException`, `HttpServerErrorException`, `HttpClientErrorException.TooManyRequests`; non-retryable: all other 4xx (including HTTP 400 context-window overflow). `ExponentialBackOffPolicy`: 2 000 ms initial, ×2.0, 10 000 ms cap. No `@EnableRetry` or AOP weaving — programmatic `RetryTemplate` only. (commit `9425208c`, ADR-031)
+- [FIX] `fix(messaging)` ADR-031 — Dedicated OpenAI `RestTemplate` with configurable timeouts: new `@Bean("openAiRestTemplate")` in `YocoHeaderConfig` (`izinga-yoco-pay`), injected via `@Qualifier` at `AiCustomerServiceAgent` and `StoreAiAgent`. Timeouts: connect 3 s, response 15 s (raised from initial 8 s after QA live-fire measured real round-trips of 6.73 s and 4.98 s on `uat`). Both values are configurable via `izinga.ai.openai.connect-timeout-seconds` and `izinga.ai.openai.response-timeout-seconds` in `application.yml` without a release. `@Primary` added to the existing shared `restTemplate()` bean to prevent `NoUniqueBeanDefinitionException` with two `RestTemplate` candidates. The shared bean body is unchanged. (commits `79217762`, `9425208c`, ADR-031)
+- [FIX] `fix(messaging)` ADR-031 FIX-01 — Guard AI dispatch on `extractUserText`: IMAGE and INTERACTIVE messages now log `[AI-SKIP]` and return without sending the fallback, preventing double-message on driver document uploads and delivery-quote-acceptance taps. LOCATION messages still reach the AI via `Location#describe()`. (commit `8dde1721`, ADR-031 Decision 6)
+- [FIX] `fix(messaging)` ADR-031 — Customer-facing fallback message: all genuine-failure exits from `handleWhatsappQueryForAgent` (exhausted retries, non-retryable 4xx, catch-all, misconfigured system prompt) now dispatch: "Sorry, I'm having a bit of trouble right now 🙏 Please try again in a moment, or reach us on WhatsApp at +27812815707 or email hello@curiousoft.dev." Fallback is dispatched from `WhatsappInboundEventHandler` (single choke point), not from inside the agents, so the correct WhatsApp line (determined by audience and storeId from `LineContext`) is always used. (commit `9425208c`, ADR-031 Decision 5)
+- [IMPROVED] `docs(messaging)`: diagnostic logging for OpenAI request/response added in TASK 1 (`38791810`). Debug-log before AI dispatch check added in CAUSE-A fix (`dd3f5289`). Attempt counter at INFO (attempt=1 on first try) and WARN (attempt≥2 on retries) added per ADR-031 logging convention, providing positive evidence the call was made and greppable retry events (`[AI-ATTEMPT] attempt=N`).
+
+### Breaking changes
+
+None. All changes are confined to `izinga-messaging` and `izinga-yoco-pay` internals. No REST API endpoint shapes, response models, MCP tool names, enum values, JWT/auth token structure, or public contracts altered. The `useTools` backfill runs on startup — no manual migration required.
+
+### Deployment sequence
+
+1. `ijudi-api` only — no frontend changes required. The WhatsApp AI agent fix and OpenAI resilience changes are entirely server-side.
+
+### Rollback steps
+
+1. Redeploy the v1.18.0 artifact (tag `1.18.0` on `master`) via ECS. The WhatsApp AI agent will revert to never invoking MCP tools; existing-session `useTools=false` documents will remain uncorrected.
+2. The `@Builder.Default` / `useTools` backfill is an in-place document update on startup; rolling back to 1.18.0 does not un-backfill already-corrected documents, but it does stop future corrections. No data loss.
+3. The `OpenAiRetryConfig` bean and dedicated `RestTemplate` are new additions only — no schema or config changes that persist on rollback. Rolling back removes the timeouts and retry; OpenAI calls resume with no timeout and no retry (pre-patch behaviour).
+4. Notify Lindani immediately if rollback is triggered and state which symptom prompted it.
+
+### Smoke test plan
+
+1. Send a WhatsApp message as a customer on a new session (first message on a fresh session) — verify the AI agent responds with an appropriate template or reply, not silence. Confirms CAUSE-A fix (new-session bypass removed).
+2. Send a WhatsApp message as a customer on an existing session and expect a tool-use response (e.g., ask about an open order) — verify the AI agent calls the relevant MCP tool (e.g., `find_order_by_id`) and returns a data-driven reply. Confirms CAUSE-B fix (`useTools=true` now effective).
+3. Check application startup logs — verify `connect=3s response=15s` is logged for the OpenAI `RestTemplate` configuration, and that the application starts with no `NoUniqueBeanDefinitionException`. Confirms ADR-031 timeout config loaded.
+4. Send an image (driver document upload) via WhatsApp — verify `[AI-SKIP]` appears in logs and no apology fallback is sent to the driver. Confirms ADR-031 FIX-01 (IMAGE guard).
+5. Simulate an OpenAI 503 (or disconnect the VPN mid-flight) and send a WhatsApp message — verify `[AI-ATTEMPT] attempt=1`, `[AI-ATTEMPT] attempt=2`, `[AI-ATTEMPT] attempt=3` appear in logs at WARN level, and the customer receives the fallback message. Confirms retry and fallback dispatch.
+
+### Post-deployment monitoring
+
+- 15 min: Check logs for `[AI-SKIP]` only on IMAGE/INTERACTIVE, absence of null-return events from `StoreAiAgent` or `AiCustomerServiceAgent`, and absence of `NoUniqueBeanDefinitionException`. Confirm `connect=3s response=15s` in startup log.
+- 1 hour: Confirm WhatsApp AI MCP tool-call volume is non-zero — at least one `[AI-ATTEMPT]` log line from a real customer message. Growth & Analytics to watch for first confirmed MCP tool invocations (should be the first time these have ever fired in production).
+- 24 hours: Review AI agent response quality — confirm customers are receiving data-driven replies via MCP tools rather than template-only responses. Flag any unexpected double-messages or spurious fallback apologies to Engineering.
+
+### Gate citations
+
+- Code Review: PASS — iZinga Code Reviewer, `bugfix/mcp-tool-dispatch-fix` (commits `38791810`, `dd3f5289`, `685bdc47`; merge `4177d3fe`) — 2026-11-10
+- Code Review: PASS — iZinga Code Reviewer, `bugfix/openai-api-retry-resilience` (commits `9425208c`, `8dde1721`, `79217762`, `7af800ca`, `5c3faa96`; merge `259f8f31`) — 2026-11-11
+- QA full regression (Gate 2): PASS on `develop` @ `259f8f31` — 918 tests, 0 failures, 0 errors, 4 skipped, BUILD SUCCESS, Corretto 17 (2026-11-11). Note: test count did not increment by the expected +1 after the final test addition; this discrepancy is tracked under the pre-existing `task_723cde3e` build-instability investigation and is not a new concern.
+- Live-fire on `uat` profile (`+27812815707` only): both fixes verified end-to-end (2026-11-10–11). ADR-031 live-fire record: `docs/test-plans/platform/openai-retry-resilience.md`. Tool-dispatch test plan: `docs/test-plans/customer/whatsapp-ai-agent-tool-dispatch.md`.
+- Product Owner sign-off: Lindani Masinga — direct dispatch 2026-11-11
+
+---
+
 ## [1.18.0] — 2026-11-08
 
 **Status:** Release branch `release/1.18.0` cut from `develop` @ `2fab1a2f` on 2026-11-08. NOT yet merged to `master`. Waiting on gate items listed under "Gate citations".
